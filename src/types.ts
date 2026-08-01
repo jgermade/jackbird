@@ -14,6 +14,7 @@ export type Mp3Track = {
   relativePath: string;
   size: number;
   vfsFileId: string;
+  checksum: string;
   metadata: TrackMetadata;
 };
 

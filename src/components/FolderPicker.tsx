@@ -2,20 +2,22 @@ type FolderPickerProps = {
   onPickFolder: () => Promise<void>;
   disabled: boolean;
   loading: boolean;
+  hasRoots: boolean;
 };
 
 export function FolderPicker(props: FolderPickerProps): JSX.Element {
-  const { onPickFolder, disabled, loading } = props;
+  const { onPickFolder, disabled, loading, hasRoots } = props;
 
   return (
-    <section className="panel panel-hero">
-      <h1>MP3 Manager</h1>
-      <p>
-        Escanea tu colección local, edita metadatos ID3 y actualiza carátulas sin subir nada a ningún servidor.
-      </p>
-      <button className="btn btn-primary" onClick={() => void onPickFolder()} disabled={disabled}>
-        {loading ? "Escaneando colección..." : "Seleccionar carpeta musical"}
-      </button>
-    </section>
+    <button className="toolbar-add-btn" onClick={() => void onPickFolder()} disabled={disabled}>
+      <span className="toolbar-add-icon">+</span>
+      <span>
+        {loading
+          ? "Escaneando..."
+          : hasRoots
+            ? "Añadir root"
+            : "Abrir libreria"}
+      </span>
+    </button>
   );
 }

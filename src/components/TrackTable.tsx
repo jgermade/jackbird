@@ -4,10 +4,11 @@ type TrackTableProps = {
   tracks: Mp3Track[];
   selectedTrackId: string | null;
   onSelectTrack: (id: string) => void;
+  loadingMetadata: boolean;
 };
 
 export function TrackTable(props: TrackTableProps): JSX.Element {
-  const { tracks, selectedTrackId, onSelectTrack } = props;
+  const { tracks, selectedTrackId, onSelectTrack, loadingMetadata } = props;
 
   return (
     <section className="panel panel-list">
@@ -36,9 +37,15 @@ export function TrackTable(props: TrackTableProps): JSX.Element {
                   onClick={() => onSelectTrack(track.id)}
                 >
                   <td className="mono">{track.relativePath}</td>
-                  <td>{track.metadata.title || "-"}</td>
-                  <td>{track.metadata.artist || "-"}</td>
-                  <td>{track.metadata.album || "-"}</td>
+                  <td>
+                    {track.metadata.title || (loadingMetadata ? <span className="placeholder-line" /> : "-")}
+                  </td>
+                  <td>
+                    {track.metadata.artist || (loadingMetadata ? <span className="placeholder-line" /> : "-")}
+                  </td>
+                  <td>
+                    {track.metadata.album || (loadingMetadata ? <span className="placeholder-line" /> : "-")}
+                  </td>
                 </tr>
               );
             })}

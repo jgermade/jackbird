@@ -1,133 +1,120 @@
 # Technology Stack & Architecture
 
-This document describes the technical stack, codebase architecture, build tools, dataset pipeline, and functional/UI requirements implemented in the `rom-manager` project.
+This document describes the technical stack and codebase architecture implemented in the
+`mp3-manager` project.
 
 ---
 
 ## 1. Core Architecture & Design Principles
 
-- **100% Client-Side / Zero Backend**: Operates strictly inside the user's browser using the Chromium **File System Access API** (`showDirectoryPicker`, `FileSystemHandle`). Files are never uploaded to any remote server.
-- **Hash-Based Identification**: Deterministic ROM identification via CRC32/MD5/SHA1 checksums checked against DAT catalogs (No-Intro / Redump). Local file names are never trusted as absolute authority.
-- **Non-Destructive Plan-First Operations**: File moving and renaming operations are calculated as a **Plan** first, requiring user preview and explicit approval before any disk modification takes place.
-- **Curated Collections Protection**: Dedicated user-created collection subfolders are strictly unmanaged and preserved untouched.
+- **100% Client-Side / Zero Backend**: Operates strictly inside the user's browser using the
+  Chromium **File System Access API** (`showDirectoryPicker`, `FileSystemDirectoryHandle`).
+  Files are never uploaded to any remote server.
+- **VFS Abstraction**: All file access goes through the `VfsAdapter` interface
+  (`src/vfs/types.ts`), implemented today by `BrowserVfs` (`src/vfs/browserVfs.ts`) on top of
+  the File System Access API. The UI never depends on `FileSystemFileHandle` directly, so a
+  different backend (e.g. remote sync) can be plugged in later.
+- **Metadata engine over bytes**: `src/lib/id3.ts` reads/writes ID3 tags on `Uint8Array`
+  buffers, not on file handles, so it stays decoupled from the VFS implementation.
+- **Multi-root workspaces**: Several folders ("roots") can be open at once as tabs; each root
+  keeps its own track list, metadata draft, and grouping mode.
+- **Small, reusable components / stateful views**: `src/components/` holds presentational
+  components with no store coupling; `src/views/Mp3ManagerView.tsx` owns state and composes
+  them.
 
 ---
 
 ## 2. Technology Stack
 
 ### Frontend & UI
-- **Language**: TypeScript (`^5.6.2`), targeting ESNext / modern web platforms.
-- **UI Library**: Preact (`^10.24.2`) for lightweight component rendering.
-- **Routing**: `preact-router` (`^4.1.2`).
-- **State Management**: `@preact/signals` (`^1.3.0`) for reactive local and global state.
-- **Styling**: Vanilla CSS with modern CSS variables, CSS grid/flexbox layouts, responsive design, dark theme styling, glassmorphism, and hardware-accelerated animations.
+- **Language**: TypeScript (`^5.6.2`).
+- **UI Library**: React 18 (`^18.3.1`) with `react-dom`.
+- **Styling**: a single vanilla CSS file (`src/styles.css`) using CSS custom properties
+  (`:root` variables) for colors, spacing and fonts.
 
-### Web APIs & Hashing
-- **File System Access API**: Native Chromium directory handle management, file streaming, and in-place file system operations.
-- **WASM Hashing**: `hash-wasm` (`^4.12.0`) for WebAssembly-powered, high-performance client-side checksum calculation (CRC32, MD5, SHA1).
-- **VFS Sync**: `@cloudauthn/vfs-sync` (`^0.1.24`) for directory handle persistence across reloads via IndexedDB.
+### Web APIs & Metadata
+- **File System Access API**: directory picking, permission checks, file streaming and
+  in-place writes (`src/vfs/browserVfs.ts`).
+- **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
+  `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
+  root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.
+- **Session persistence**: `src/lib/rootSessionStore.ts` persists open root handles and
+  their grouping mode in IndexedDB (`mp3-manager` database) so workspaces survive a reload.
 
 ### Build Tools & Tooling
-- **Application Bundler & Dev Server**: Vite (`^5.4.8`) via `@preact/preset-vite` (`^2.8.2`).
-- **Embeddable Library Bundler**: `tsup` (`^8.3.5`) compiling `src/index.ts` to `dist/index.js` and `dist/index.d.ts`.
-- **Scripts Runtime**: Node.js (`>=24.0.0`) using ES modules (`"type": "module"`).
-- **Linter**: `oxlint` (`^1.0.0`) for ultra-fast TypeScript/JavaScript linting.
-- **Test Runner**: Vitest (`^2.1.8`) with `@vitest/coverage-v8` for unit testing across core modules and services.
+- **Bundler & Dev Server**: Vite (`^5.4.8`).
+- **Type checking**: `tsc --noEmit` (the `build` script runs it before `vite build`; the
+  project has `"noEmit": true` in `tsconfig.json`, so `tsc` never writes `.js` files —
+  Vite/esbuild handles all transpilation).
+- **Scripts Runtime**: Node.js, `"type": "module"`.
 
 ---
 
 ## 3. Project Structure & Layering
 
 ```
-rom-manager/
+mp3-manager/
 ├── src/
-│   ├── app.tsx                 # Main application entry component
-│   ├── main.tsx                # DOM mounting & root entrypoint
-│   ├── index.html              # HTML shell & font definitions
-│   ├── components/             # Reusable UI components
-│   │   ├── FileTree/           # File tree component & sub-elements
-│   │   ├── BrandLogo.tsx       # Brand header logo rendering
-│   │   ├── SystemLogos.tsx     # Console system logo rendering
-│   │   ├── Tabs.tsx            # Navigation tab bar
-│   │   ├── WelcomeCardIllustrations.tsx # Custom Landing SVG illustrations
-│   │   └── icons.tsx           # SVG icon registry
-│   ├── views/                  # Primary screen layouts
-│   │   └── ROMExplorer/        # Main ROM explorer workspace view & panels
-│   ├── core/                   # Pure, side-effect-free domain logic
-│   │   ├── rom-grouping.ts     # Title grouping & name parsing logic
-│   │   ├── rom-matching.ts     # DAT checksum matching engine
-│   │   ├── rom-regions.ts      # Region parsing & fallback preferences
-│   │   ├── rom-organize.ts     # File rename/move plan generation
-│   │   ├── rom-covers.ts       # Cover matching & thumbnail resolution
-│   │   ├── rom-media.ts        # Cartridge vs Disc medium behavior
-│   │   ├── system-info.ts      # 24 MiSTer console definitions & DAT keys
-│   │   ├── wizard-tree.ts      # Wizard tree state transform
-│   │   └── zip-directory.ts    # Romset member hash verification
-│   └── services/               # Stateful services & async operations
-│       ├── RomLibraryService.ts # Local filesystem scanner & organizer
-│       ├── ROMDatasetService.ts # DAT JSON dataset loader & indexer
-│       ├── RomIntakeService.ts  # File drop intake processing
-│       ├── HandleStoreService.ts# IndexedDB persistent handle storage
-│       ├── CoverService.ts     # Cover downloading & caching
-│       └── ArchiveService.ts   # Zip/Archive reading and member hashing
-├── scripts/                    # Dataset compilation & maintenance scripts
-│   ├── download-dats.mjs       # Downloads reference No-Intro/Redump DATs
-│   ├── fetch-covers.mjs        # Lists libretro-thumbnails repositories
-│   ├── build-datasets.mjs      # Converts XML DATs to static JSON datasets
-│   ├── json-to-sqlite.mjs      # Exports catalog datasets to SQLite
-│   └── verify-romsets.mjs      # Verification CLI for physical romsets
-├── static/datasets/            # Pre-compiled JSON datasets for retro systems
-└── SESSIONS/                   # Chronological session specifications & audit trail
+│   ├── App.tsx                  # Root component, renders Mp3ManagerView
+│   ├── main.tsx                 # DOM mounting & root entrypoint
+│   ├── types.ts                 # Track / TrackMetadata / EditableMetadata types
+│   ├── styles.css               # Single stylesheet, CSS variables in :root
+│   ├── components/              # Presentational, store-free UI components
+│   │   ├── FolderPicker.tsx     # "Open folder" button + loading state
+│   │   ├── RootTabs.tsx         # Tab bar for open root workspaces
+│   │   ├── TrackTable.tsx       # Flat-mode track listing
+│   │   ├── TrackWizardList.tsx  # Wizard-mode tree (album/disc/track rows)
+│   │   ├── MetadataEditor.tsx   # ID3 field editor for the selected track
+│   │   └── CoverDropzone.tsx    # Drag & drop / pick cover art
+│   ├── views/
+│   │   └── Mp3ManagerView.tsx   # Owns all state: roots, tabs, session restore,
+│   │                            # metadata drafts, wizard tree building, saving
+│   ├── lib/
+│   │   ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
+│   │   └── rootSessionStore.ts  # IndexedDB persistence of open roots
+│   ├── services/
+│   │   └── ThemeService.ts      # Light/dark theme, persisted + system preference
+│   └── vfs/
+│       ├── types.ts             # VfsAdapter contract (mount/listFiles/readFile/writeFile)
+│       └── browserVfs.ts        # File System Access API implementation
+└── SESSIONS/                    # Chronological session specifications & audit trail
 ```
 
 ---
 
 ## 4. Applied Functional Requirements
 
-### Hardware Systems & Medium Rules
-- **24 Mainstream MiSTer Systems**: Mapped by exact MiSTer folder names under `/games` (e.g., `Nintendo - SNES`, `Sony - PlayStation`, `SNK - Neo Geo`).
-- **Medium Organization**:
-  - **Cartridge Systems**: Organized in flat file structures (`<System>/<Game>.<variant>.<ext>`).
-  - **Disc Systems**: Organized in dedicated folders per game and subfolders per variant (`<System>/<Game>/<variant>/...`).
-  - **Neo Geo / Romsets**: Zip/Folder chip dump checksum validation based on member file checksums rather than single archive checksum.
+### Root workspaces & tabs
+- Multiple folders can be opened as roots simultaneously; each has its own tab
+  (`RootTabs`), track list, and independent grouping mode (`flat` or `wizard`).
+- Open roots (their directory handles) and grouping mode are persisted in IndexedDB via
+  `rootSessionStore.ts` and restored on reload if read/write permission is still granted.
 
-### Metadata & Persistence (`.meta/`)
-- Metadata lives entirely outside ROM folders in `.meta/`:
-  - `.meta/<system>/<Game>.json`: Editable per-game metadata.
-  - `.meta/<system>/<Game>.<region>.case.png`: Cached cover art images per region.
-  - `.meta/<system>/scan.json`: Local hash calculation cache to avoid re-hashing unchanged files.
-  - `.meta/wizard.json`: Per-folder explorer settings and configuration.
+### Track identification & metadata
+- Tracks are scanned via the VFS (`BrowserVfs.listFiles`), read as bytes
+  (`BrowserVfs.readFile`), and parsed into `TrackMetadata` (title, artist, album, year,
+  genre, track number, cover) via `jsmediatags`.
+- A `checksum` is computed per track for change detection and cached in a per-root
+  `.meta/mp3-manager.json` snapshot (`MetaSnapshot` / `MetaRecord`).
+- Edits are written back as ID3 tags with `browser-id3-writer`, serialized to bytes, and
+  persisted through `BrowserVfs.writeFile`; each write is recorded via
+  `getWriteOperations()`.
 
-### Title Grouping & Normalization
-- **Base Title Parsing**: Parses DAT titles to extract base game titles, stripping flags, revisions, languages, and regional tags.
-- **Roman Numeral Normalization**: Normalizes Roman numerals (e.g., *Final Fantasy III* vs *Final Fantasy 3*) for accurate game group key resolution.
-- **Variant Identification**: Grouping under unified Game entries with variants identified by region, language, and revision tags.
-
-### Explorer Modes
-- **Flat Mode**: Raw file system tree listing showing disk structure as-is.
-- **Wizard Mode**: Consolidated game view displaying one row per game, folding recognized ROM variants into an expandable drawer with inline action controls.
+### Explorer modes
+- **Flat mode** (`TrackTable`): raw list of tracks in the root.
+- **Wizard mode** (`TrackWizardList`): tracks folded into an album/disc tree
+  (`WizardTreeRow`), with expand/collapse state per album and disc.
 
 ---
 
 ## 5. Applied UI / UX Requirements & Features
 
-- **Initial Landing View**:
-  - Welcome landing view with an infinite looping 3-row horizontal scrolling marquee carousel (`.welcome-systems`).
-  - 2x2 grid welcome cards featuring custom SVG illustrations.
-  - Footer containing Legal info and GitHub link with SVG branding icon.
-- **Directory Handle Persistence & Refresh**:
-  - Remembers and restores last opened directory handles via `HandleStoreService`.
-  - Header tab refresh button allows switching back to the landing view or reloading the persisted directory handle.
-- **FileTree Split Item Layout**:
-  - Restructured `.tree-item` into a left toggle container (caret, icon, label as a single click target for expanding/selecting) and a right container for inline action buttons.
-- **Cover Display & Active Variant Indicator**:
-  - Fixed aspect-ratio container for cover art to eliminate layout shifts during image loading.
-  - Region selector buttons (`EU`, `US`, `JP`) in fixed display order with fallback priority based on region preference.
-  - Visual active cover indicator attached to the variant matching the displayed cover.
-  - Automatic filtering preventing missing game variants (`.variant.status-missing`) from becoming active cover candidates.
-- **Granular File Consolidation**:
-  - Support for game-level consolidation plan generation.
-  - Inline `.tree-organize` action button to consolidate an individual variant file independently.
-  - Preservation of active game selection after variant consolidation operations.
-- **Keyboard Navigation**:
-  - Native arrow key navigation (Up/Down) when focus is outside text inputs to iterate through games and files seamlessly.
+- Tabs for multiple open roots, each showing a loaded/total track count while metadata is
+  still being read.
+- Flat/Wizard mode switch scoped per active root.
+- Metadata editor bound to the selected track, with cover art drag & drop
+  (`CoverDropzone`).
+- Session restore on load: previously opened roots (with granted permission) reopen
+  automatically, keeping the last active tab.
+- Light/dark theme toggle (`ThemeToggle`), defaulting to the OS `prefers-color-scheme`
+  and persisted across reloads.

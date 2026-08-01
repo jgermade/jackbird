@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { EditableMetadata, Mp3Track } from "../types";
 import { CoverDropzone } from "./CoverDropzone";
 
@@ -29,21 +30,89 @@ function Field(props: {
 
 export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
   const { track, value, saving, onChange, onSave } = props;
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    setEditing(false);
+  }, [track?.id]);
 
   if (!track) {
     return (
       <section className="panel panel-editor empty">
-        <h2>Editor</h2>
-        <p>Selecciona una pista para editar sus metadatos y su caratula.</p>
+        <h2>Detalles</h2>
+        <p>Selecciona una pista para ver su ficha y editar metadatos.</p>
+      </section>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <section className="panel panel-editor">
+        <div className="metadata-hero">
+          <div>
+            <h2>{value.title || track.name}</h2>
+            <p className="metadata-subtitle mono">{track.relativePath}</p>
+          </div>
+          <div className="metadata-tags">
+            {value.album && <span className="tag">{value.album}</span>}
+            {value.artist && <span className="tag">{value.artist}</span>}
+            {value.year && <span className="tag">{value.year}</span>}
+          </div>
+        </div>
+
+        <div className="details-grid">
+          <div className="fact">
+            <span className="fact-label">Archivo</span>
+            <span className="fact-value mono">{track.name}</span>
+          </div>
+          <div className="fact">
+            <span className="fact-label">Artista</span>
+            <span className="fact-value">{value.artist || "-"}</span>
+          </div>
+          <div className="fact">
+            <span className="fact-label">Album</span>
+            <span className="fact-value">{value.album || "-"}</span>
+          </div>
+          <div className="fact">
+            <span className="fact-label">Genero</span>
+            <span className="fact-value">{value.genre || "-"}</span>
+          </div>
+          <div className="fact">
+            <span className="fact-label">Pista</span>
+            <span className="fact-value">{value.trackNumber || "-"}</span>
+          </div>
+          <div className="fact">
+            <span className="fact-label">Tamano</span>
+            <span className="fact-value">{(track.size / (1024 * 1024)).toFixed(2)} MB</span>
+          </div>
+        </div>
+
+        <div className="details-cover-preview">
+          {value.coverDataUrl ? (
+            <img className="cover-image" src={value.coverDataUrl} alt="Caratula" />
+          ) : (
+            <div className="cover-empty">Sin caratula</div>
+          )}
+        </div>
+
+        <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
+          Editar metadatos
+        </button>
       </section>
     );
   }
 
   return (
     <section className="panel panel-editor">
-      <div className="panel-title-row">
-        <h2>Editor</h2>
-        <span className="mono">{track.name}</span>
+      <div className="metadata-hero">
+        <div>
+          <h2>{value.title || track.name}</h2>
+          <p className="metadata-subtitle mono">{track.relativePath}</p>
+        </div>
+        <div className="metadata-tags">
+          {value.album && <span className="tag">{value.album}</span>}
+          {value.artist && <span className="tag">{value.artist}</span>}
+        </div>
       </div>
 
       <div className="form-grid">
@@ -80,9 +149,14 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
         onSetCover={(coverDataUrl) => onChange({ ...value, coverDataUrl })}
       />
 
-      <button className="btn btn-primary" type="button" disabled={saving} onClick={() => void onSave()}>
-        {saving ? "Guardando..." : "Guardar metadatos en MP3"}
-      </button>
+      <div className="editor-actions">
+        <button className="btn btn-ghost" type="button" disabled={saving} onClick={() => setEditing(false)}>
+          Cancelar
+        </button>
+        <button className="btn btn-primary" type="button" disabled={saving} onClick={() => void onSave()}>
+          {saving ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </div>
     </section>
   );
 }

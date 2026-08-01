@@ -13,6 +13,7 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 export class BrowserVfs implements VfsAdapter {
   private root: FileSystemDirectoryHandle | null = null;
+  private rootName = "";
   private entries = new Map<string, FileEntry>();
   private writes: VfsWriteOperation[] = [];
 
@@ -21,8 +22,21 @@ export class BrowserVfs implements VfsAdapter {
       throw new Error("Tu navegador no soporta File System Access API.");
     }
 
-    this.root = await window.showDirectoryPicker({ mode: "readwrite" });
+    await this.mountFromHandle(await window.showDirectoryPicker({ mode: "readwrite" }));
+  }
+
+  async mountFromHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+    this.root = handle;
+    this.rootName = this.root.name;
     this.entries.clear();
+  }
+
+  getRootName(): string {
+    return this.rootName;
+  }
+
+  getRootHandle(): FileSystemDirectoryHandle | null {
+    return this.root;
   }
 
   async listFiles(options?: VfsListOptions): Promise<VfsFile[]> {
@@ -80,6 +94,81 @@ export class BrowserVfs implements VfsAdapter {
 
   getWriteOperations(): VfsWriteOperation[] {
     return [...this.writes];
+  }
+
+  async readTextFile(relativePath: string): Promise<string | null> {
+    const handle = await this.getFileHandleByRelativePath(relativePath, false);
+    if (!handle) {
+      return null;
+    }
+
+    const file = await handle.getFile();
+    return file.text();
+  }
+
+  async writeTextFile(relativePath: string, text: string): Promise<void> {
+    const handle = await this.getFileHandleByRelativePath(relativePath, true);
+    if (!handle) {
+      throw new Error("No se pudo crear el archivo de metadatos.");
+    }
+
+    const writable = await handle.createWritable();
+    await writable.write(text);
+    await writable.close();
+  }
+
+  async hasReadWritePermission(): Promise<boolean> {
+    if (!this.root) {
+      return false;
+    }
+
+    const handle = this.root as FileSystemDirectoryHandle & {
+      queryPermission?: (descriptor: { mode: "readwrite" }) => Promise<PermissionState>;
+      requestPermission?: (descriptor: { mode: "readwrite" }) => Promise<PermissionState>;
+    };
+
+    const read = handle.queryPermission
+      ? await handle.queryPermission({ mode: "readwrite" })
+      : "granted";
+    if (read === "granted") {
+      return true;
+    }
+
+    const asked = handle.requestPermission
+      ? await handle.requestPermission({ mode: "readwrite" })
+      : "denied";
+    return asked === "granted";
+  }
+
+  private async getFileHandleByRelativePath(
+    relativePath: string,
+    create: boolean
+  ): Promise<FileSystemFileHandle | null> {
+    if (!this.root) {
+      throw new Error("No hay ningun volumen montado en VFS.");
+    }
+
+    const parts = relativePath.split("/").filter(Boolean);
+    if (parts.length === 0) {
+      return null;
+    }
+
+    const fileName = parts.pop()!;
+    let directory = this.root;
+
+    for (const segment of parts) {
+      try {
+        directory = await directory.getDirectoryHandle(segment, { create });
+      } catch {
+        return null;
+      }
+    }
+
+    try {
+      return await directory.getFileHandle(fileName, { create });
+    } catch {
+      return null;
+    }
   }
 
   private async *walk(
