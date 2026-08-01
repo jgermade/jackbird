@@ -1,0 +1,267 @@
+:root {
+  --bg: #f3eee4;
+  --bg-soft: #f8f4ec;
+  --panel: #fffaf1;
+  --ink: #1d2320;
+  --muted: #5f6963;
+  --line: #d8d0c2;
+  --accent: #157a6e;
+  --accent-strong: #0f5d53;
+  --danger: #b3261e;
+  --radius: 16px;
+  --shadow: 0 14px 30px rgba(16, 20, 17, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 8% 10%, #fde6cb 0, transparent 28%),
+    radial-gradient(circle at 85% 20%, #c9efe6 0, transparent 32%),
+    linear-gradient(140deg, #f7f1e5, #ece5d8 55%, #e4ddd1);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.layout {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+  animation: fade-up 500ms ease-out;
+}
+
+.panel {
+  background: color-mix(in srgb, var(--panel) 88%, white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.panel-hero {
+  padding: 22px;
+}
+
+.panel-hero p {
+  margin-top: 10px;
+  color: var(--muted);
+  max-width: 75ch;
+}
+
+.panel-message {
+  padding: 12px 16px;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 16px;
+}
+
+.panel-list,
+.panel-editor {
+  padding: 14px;
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.table-wrap {
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  font-size: 0.92rem;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-soft);
+}
+
+tbody tr {
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+tbody tr:hover {
+  background: #f3ece1;
+}
+
+tbody tr.is-selected {
+  background: #e8f4f2;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #fffdf9;
+  color: var(--ink);
+}
+
+.cover-dropzone {
+  margin-top: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  min-height: 220px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(21, 122, 110, 0.04),
+    rgba(21, 122, 110, 0.04) 8px,
+    rgba(255, 255, 255, 0.2) 8px,
+    rgba(255, 255, 255, 0.2) 16px
+  );
+}
+
+.cover-image {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.cover-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.btn-primary {
+  color: white;
+  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+}
+
+.btn-secondary {
+  color: var(--ink);
+  background: #f0ede5;
+  border: 1px solid var(--line);
+}
+
+.btn-ghost {
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.message {
+  margin: 4px 0;
+}
+
+.message.error {
+  color: var(--danger);
+}
+
+.message.info {
+  color: var(--accent-strong);
+}
+
+.mono {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.8rem;
+}
+
+.empty {
+  display: grid;
+  place-content: center;
+  min-height: 340px;
+}
+
+@keyframes fade-up {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-wrap {
+    max-height: 46vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .layout {
+    padding: 12px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
