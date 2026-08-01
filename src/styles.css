@@ -487,6 +487,14 @@ input {
   display: block;
 }
 
+.library-loading-status {
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
 .panel-title-row {
   min-height: 36px;
   padding: 0 12px;

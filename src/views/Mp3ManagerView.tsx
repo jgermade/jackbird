@@ -108,7 +108,7 @@ export function Mp3ManagerView(): JSX.Element {
     if (row?.kind === "album") {
       return {
         label: row.label,
-        tracks: activeRoot.tracks.filter((track) => (track.metadata.album.trim() || "Sin album") === row.album)
+        tracks: activeRoot.tracks.filter((track) => track.relativePath.startsWith(`${row.album}/`))
       };
     }
 
@@ -757,31 +757,23 @@ export function Mp3ManagerView(): JSX.Element {
             </section>
           )}
 
-          {activeRoot?.loadingMetadata ? (
-            <section className="panel panel-list">
-              <div className="panel-title-row">
-                <h2>Library</h2>
-                <span>
-                  {activeRoot.loadedCount}/{activeRoot.tracks.length}
-                </span>
-              </div>
-              <p className="loading-hint">
-                Cargando metadatos antes de agrupar por album ({activeRoot.loadedCount}/{activeRoot.tracks.length})...
-              </p>
-            </section>
-          ) : (
-            <TrackWizardList
-              rows={treeRows}
-              selectedTrackIds={activeRoot?.selectedTrackIds ?? []}
-              activeRowKey={activeRoot?.activeRowKey ?? null}
-              onSelectTrack={handleSelectTrack}
-              onSelectRow={handleSelectTreeRow}
-              onToggleAlbum={handleToggleAlbum}
-              onToggleDisc={handleToggleDisc}
-              onConsolidateTrack={handleConsolidateTrack}
-              loadingMetadata={Boolean(activeRoot?.loadingMetadata)}
-            />
+          {activeRoot?.loadingMetadata && (
+            <p className="library-loading-status">
+              Cargando metadatos {activeRoot.loadedCount}/{activeRoot.tracks.length}...
+            </p>
           )}
+
+          <TrackWizardList
+            rows={treeRows}
+            selectedTrackIds={activeRoot?.selectedTrackIds ?? []}
+            activeRowKey={activeRoot?.activeRowKey ?? null}
+            onSelectTrack={handleSelectTrack}
+            onSelectRow={handleSelectTreeRow}
+            onToggleAlbum={handleToggleAlbum}
+            onToggleDisc={handleToggleDisc}
+            onConsolidateTrack={handleConsolidateTrack}
+            loadingMetadata={Boolean(activeRoot?.loadingMetadata)}
+          />
         </aside>
 
         <section className="detail-pane">
@@ -831,11 +823,6 @@ function isEmptyMetadata(value: EditableMetadata): boolean {
   );
 }
 
-function parseTrackNumber(value: string): number {
-  const match = value.match(/\d+/);
-  return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
-}
-
 async function sha1Hex(bytes: Uint8Array): Promise<string> {
   const stable = new Uint8Array(bytes.byteLength);
   stable.set(bytes);
@@ -871,91 +858,68 @@ async function writeMetaSnapshot(vfs: BrowserVfs, snapshot: MetaSnapshot): Promi
 }
 
 function buildWizardRows(tracks: Mp3Track[], root: RootWorkspace | null): WizardTreeRow[] {
-  const albumMap = new Map<string, Map<string, Mp3Track[]>>();
+  type FolderNode = {
+    folders: Map<string, FolderNode>;
+    tracks: Mp3Track[];
+  };
+
+  const rootNode: FolderNode = { folders: new Map(), tracks: [] };
 
   for (const track of tracks) {
-    const album = track.metadata.album.trim() || "Sin album";
-    const disc = inferDiscLabel(track);
+    const folders = track.relativePath.split("/").slice(0, -1);
+    let node = rootNode;
 
-    if (!albumMap.has(album)) {
-      albumMap.set(album, new Map<string, Mp3Track[]>());
+    for (const folder of folders) {
+      if (!node.folders.has(folder)) {
+        node.folders.set(folder, { folders: new Map(), tracks: [] });
+      }
+      node = node.folders.get(folder)!;
     }
 
-    const discMap = albumMap.get(album)!;
-    if (!discMap.has(disc)) {
-      discMap.set(disc, []);
-    }
-
-    discMap.get(disc)!.push(track);
+    node.tracks.push(track);
   }
 
   const expandedAlbums = new Set(root?.expandedAlbums ?? []);
-  const expandedDiscs = new Set(root?.expandedDiscs ?? []);
   const rows: WizardTreeRow[] = [];
 
-  for (const [album, discsMap] of [...albumMap.entries()].sort(([left], [right]) => left.localeCompare(right, "es"))) {
-    const albumKey = `album:${album}`;
-    const albumExpanded = expandedAlbums.has(album);
-    rows.push({
-      key: albumKey,
-      kind: "album",
-      album,
-      label: album,
-      expanded: albumExpanded,
-      parentKey: null,
-      depth: 0
-    });
-
-    if (!albumExpanded) {
-      continue;
-    }
-
-    for (const [disc, discTracks] of [...discsMap.entries()].sort(([left], [right]) => left.localeCompare(right, "es"))) {
-      const discToken = `${album}::${disc}`;
-      const discKey = `disc:${discToken}`;
-      const discExpanded = expandedDiscs.has(discToken);
+  function appendNode(node: FolderNode, parentPath: string, parentKey: string | null, depth: number): void {
+    for (const [folder, child] of [...node.folders.entries()].sort(([left], [right]) => left.localeCompare(right, "es"))) {
+      const folderPath = parentPath ? `${parentPath}/${folder}` : folder;
+      const folderKey = `folder:${folderPath}`;
+      const expanded = expandedAlbums.has(folderPath);
 
       rows.push({
-        key: discKey,
-        kind: "disc",
-        album,
-        disc,
-        label: disc,
-        expanded: discExpanded,
-        parentKey: albumKey,
-        depth: 1
+        key: folderKey,
+        kind: "album",
+        album: folderPath,
+        label: folder,
+        expanded,
+        parentKey,
+        depth
       });
 
-      if (!discExpanded) {
-        continue;
-      }
-
-      for (const track of [...discTracks].sort((left, right) => {
-        const leftTrackNumber = parseTrackNumber(left.metadata.trackNumber);
-        const rightTrackNumber = parseTrackNumber(right.metadata.trackNumber);
-
-        if (leftTrackNumber !== rightTrackNumber) {
-          return leftTrackNumber - rightTrackNumber;
-        }
-
-        return left.name.localeCompare(right.name, "es");
-      })) {
-        rows.push({
-          key: `track:${track.id}`,
-          kind: "track",
-          album,
-          disc,
-          label: track.metadata.title || track.name,
-          trackId: track.id,
-          trackNumber: track.metadata.trackNumber,
-          artist: track.metadata.artist,
-          relativePath: track.relativePath,
-          parentKey: discKey,
-          depth: 2
-        });
+      if (expanded) {
+        appendNode(child, folderPath, folderKey, depth + 1);
       }
     }
+
+    for (const track of [...node.tracks].sort((left, right) => left.relativePath.localeCompare(right.relativePath, "es"))) {
+      rows.push({
+        key: `track:${track.id}`,
+        kind: "track",
+        album: parentPath,
+        label: track.metadata.title || track.name,
+        trackId: track.id,
+        trackNumber: track.metadata.trackNumber,
+        artist: track.metadata.artist,
+        relativePath: track.relativePath,
+        parentKey,
+        depth
+      });
+    }
   }
+
+  appendNode(rootNode, "", null, 0);
 
   return rows;
 }

@@ -54,6 +54,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                   <button
                     type="button"
                     className={active ? "tree-row tree-row-album is-active" : "tree-row tree-row-album"}
+                    style={{ paddingInlineStart: `calc(0.75rem + ${row.depth * 0.7}rem)` }}
                     onClick={() => onSelectRow(row.key)}
                     onDoubleClick={() => onToggleAlbum(row.album)}
                   >
@@ -95,6 +96,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                       ? "wizard-track-row tree-row-track is-selected"
                       : "wizard-track-row tree-row-track"
                   }
+                  style={{ paddingInlineStart: `calc(0.75rem + ${row.depth * 0.7}rem)` }}
                   onClick={(event) => {
                     if (row.trackId) {
                       onSelectTrack(row.trackId, event.shiftKey);
