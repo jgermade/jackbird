@@ -19,14 +19,51 @@ function Field(props: {
   placeholder?: string;
 }): JSX.Element {
   return (
-    <label className="field">
-      <span>{props.label}</span>
+    <label className="fact field">
+      <span className="fact-label">{props.label}</span>
       <input
         value={props.value}
         placeholder={props.placeholder}
         onChange={(event) => props.onChange(event.target.value)}
       />
     </label>
+  );
+}
+
+function MetadataValue(props: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="metadata-value">
+      <span>{props.label}</span>
+      <strong>{props.value || "-"}</strong>
+    </div>
+  );
+}
+
+function TechnicalDetails(props: { track: Mp3Track }): JSX.Element {
+  const { track } = props;
+
+  return (
+    <details className="technical-details">
+      <summary>Datos del archivo</summary>
+      <div className="technical-list">
+        <div>
+          <span>Archivo</span>
+          <code>{track.name}</code>
+        </div>
+        <div>
+          <span>Ruta</span>
+          <code>{track.relativePath}</code>
+        </div>
+        <div>
+          <span>Tamano</span>
+          <strong>{(track.size / (1024 * 1024)).toFixed(2)} MB</strong>
+        </div>
+        <div>
+          <span>Checksum</span>
+          <code>{track.checksum || "Pendiente"}</code>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -49,92 +86,76 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
 
   if (!editing) {
     return (
-      <section className="panel panel-editor">
-        <div className="metadata-hero">
-          <div className="cover-hero">
+      <section className="panel panel-editor metadata-sheet">
+        <header className="metadata-hero">
+          <figure className="cover-hero">
             {value.coverDataUrl ? (
               <img className="cover-image" src={value.coverDataUrl} alt="Caratula" />
             ) : (
               <div className="cover-empty">Sin caratula</div>
             )}
-          </div>
+          </figure>
 
           <div className="metadata-hero-info">
             <h2>{value.title || track.name}</h2>
-            <p className="metadata-subtitle mono">{track.relativePath}</p>
+            <p className="metadata-subtitle">{value.artist || "Artista desconocido"}</p>
             <div className="metadata-tags">
               {value.album && <span className="tag">{value.album}</span>}
-              {value.artist && <span className="tag">{value.artist}</span>}
               {value.year && <span className="tag">{value.year}</span>}
+              {value.genre && <span className="tag">{value.genre}</span>}
             </div>
             <TrackAudioPlayer track={track} onLoadAudioBytes={onLoadAudioBytes} />
           </div>
-        </div>
+        </header>
 
-        <div className="details-grid">
-          <div className="fact">
-            <span className="fact-label">Archivo</span>
-            <span className="fact-value mono">{track.name}</span>
+        <section className="metadata-section">
+          <h3>Metadatos</h3>
+          <div className="metadata-values">
+            <MetadataValue label="Titulo" value={value.title} />
+            <MetadataValue label="Artista" value={value.artist} />
+            <MetadataValue label="Album" value={value.album} />
+            <MetadataValue label="Ano" value={value.year} />
+            <MetadataValue label="Genero" value={value.genre} />
+            <MetadataValue label="Pista" value={value.trackNumber} />
           </div>
-          <div className="fact">
-            <span className="fact-label">Ruta</span>
-            <span className="fact-value mono">{track.relativePath}</span>
-          </div>
-          <div className="fact">
-            <span className="fact-label">Artista</span>
-            <span className="fact-value">{value.artist || "-"}</span>
-          </div>
-          <div className="fact">
-            <span className="fact-label">Album</span>
-            <span className="fact-value">{value.album || "-"}</span>
-          </div>
-          <div className="fact">
-            <span className="fact-label">Genero</span>
-            <span className="fact-value">{value.genre || "-"}</span>
-          </div>
-          <div className="fact">
-            <span className="fact-label">Pista</span>
-            <span className="fact-value">{value.trackNumber || "-"}</span>
-          </div>
-          <div className="fact">
-            <span className="fact-label">Tamano</span>
-            <span className="fact-value">{(track.size / (1024 * 1024)).toFixed(2)} MB</span>
-          </div>
-          <div className="fact">
-            <span className="fact-label">Checksum</span>
-            <span className="fact-value mono">{track.checksum || "Pendiente"}</span>
-          </div>
-        </div>
+        </section>
 
-        <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
-          Editar metadatos
-        </button>
+        <TechnicalDetails track={track} />
+
+        <footer className="metadata-actions">
+          <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
+            Editar metadatos
+          </button>
+        </footer>
       </section>
     );
   }
 
   return (
-    <section className="panel panel-editor">
-      <div className="metadata-hero">
-        <div className="cover-hero">
+    <section className="panel panel-editor metadata-sheet">
+      <header className="metadata-hero">
+        <figure className="cover-hero">
           <CoverDropzone
             coverDataUrl={value.coverDataUrl}
             onSetCover={(coverDataUrl) => onChange({ ...value, coverDataUrl })}
+            compact
           />
-        </div>
+        </figure>
 
         <div className="metadata-hero-info">
           <h2>{value.title || track.name}</h2>
-          <p className="metadata-subtitle mono">{track.relativePath}</p>
+          <p className="metadata-subtitle">{value.artist || "Artista desconocido"}</p>
           <div className="metadata-tags">
             {value.album && <span className="tag">{value.album}</span>}
-            {value.artist && <span className="tag">{value.artist}</span>}
+            {value.year && <span className="tag">{value.year}</span>}
           </div>
           <TrackAudioPlayer track={track} onLoadAudioBytes={onLoadAudioBytes} />
         </div>
-      </div>
+      </header>
 
-      <div className="form-grid">
+      <section className="metadata-section">
+        <h3>Metadatos</h3>
+        <div className="metadata-values">
         <Field
           label="Titulo"
           value={value.title}
@@ -161,7 +182,10 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
           onChange={(trackNumber) => onChange({ ...value, trackNumber })}
           placeholder="1/12"
         />
-      </div>
+        </div>
+      </section>
+
+      <TechnicalDetails track={track} />
 
       <div className="editor-actions">
         <button className="btn btn-ghost" type="button" disabled={saving} onClick={() => setEditing(false)}>

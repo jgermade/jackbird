@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { AlbumOverview } from "../components/AlbumOverview";
 import { FolderPicker } from "../components/FolderPicker";
+import { LibraryLanding } from "../components/LibraryLanding";
 import { MetadataEditor } from "../components/MetadataEditor";
 import { RootTabs } from "../components/RootTabs";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { TrackTable } from "../components/TrackTable";
 import { TrackWizardList, type WizardTreeRow } from "../components/TrackWizardList";
 import { readTrackMetadataFromBytes, writeTrackMetadataToBytes } from "../lib/id3";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
@@ -213,7 +214,6 @@ export function Mp3ManagerView(): JSX.Element {
     const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const rootLabel = options.rootLabel ?? (vfs.getRootName() || `Root ${roots.length + 1}`);
     const groupingMode = options.groupingMode ?? "wizard";
-    const firstTrack = nextTracks[0] ?? null;
     const snapshot = await readMetaSnapshot(vfs);
 
     setRoots((currentRoots) => {
@@ -223,15 +223,15 @@ export function Mp3ManagerView(): JSX.Element {
         label: rootLabel,
         vfs,
         tracks: nextTracks,
-        selectedTrackId: firstTrack?.id ?? null,
-        draft: firstTrack?.metadata ?? emptyMetadata(),
+        selectedTrackId: null,
+        draft: emptyMetadata(),
         loadingMetadata: true,
         loadedCount: 0,
         groupingMode,
         metaSnapshot: snapshot,
         expandedAlbums: [],
         expandedDiscs: [],
-        activeRowKey: firstTrack ? `track:${firstTrack.id}` : null
+        activeRowKey: null
       };
 
       if (existingIndex === -1) {
@@ -475,23 +475,6 @@ export function Mp3ManagerView(): JSX.Element {
     );
   }
 
-  function handleSetGroupingMode(mode: GroupingMode): void {
-    if (!activeRootId) {
-      return;
-    }
-
-    setRoots((currentRoots) =>
-      currentRoots.map((root) =>
-        root.id === activeRootId
-          ? {
-              ...root,
-              groupingMode: mode
-            }
-          : root
-      )
-    );
-  }
-
   function handleToggleAlbum(album: string): void {
     if (!activeRootId) {
       return;
@@ -697,8 +680,6 @@ export function Mp3ManagerView(): JSX.Element {
     }
   }
 
-  const mode = activeRoot?.groupingMode ?? "wizard";
-
   return (
     <main className="app-shell">
       <header className="app-topbar">
@@ -722,25 +703,6 @@ export function Mp3ManagerView(): JSX.Element {
           />
 
           <div className="header-right-actions">
-            <div className="mode-switch-actions" role="group" aria-label="Modo de agrupacion por carpeta">
-              <button
-                type="button"
-                className={mode === "flat" ? "btn btn-secondary is-active" : "btn btn-ghost"}
-                onClick={() => handleSetGroupingMode("flat")}
-                disabled={!activeRoot}
-              >
-                Flat
-              </button>
-              <button
-                type="button"
-                className={mode === "wizard" ? "btn btn-secondary is-active" : "btn btn-ghost"}
-                onClick={() => handleSetGroupingMode("wizard")}
-                disabled={!activeRoot}
-              >
-                Wizard
-              </button>
-            </div>
-
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
           </div>
         </div>
@@ -761,14 +723,7 @@ export function Mp3ManagerView(): JSX.Element {
             </section>
           )}
 
-          {mode === "flat" ? (
-            <TrackTable
-              tracks={activeRoot?.tracks ?? []}
-              selectedTrackId={activeRoot?.selectedTrackId ?? null}
-              onSelectTrack={handleSelectTrack}
-              loadingMetadata={Boolean(activeRoot?.loadingMetadata)}
-            />
-          ) : activeRoot?.loadingMetadata ? (
+          {activeRoot?.loadingMetadata ? (
             <section className="panel panel-list">
               <div className="panel-title-row">
                 <h2>Library</h2>
@@ -796,14 +751,24 @@ export function Mp3ManagerView(): JSX.Element {
         </aside>
 
         <section className="detail-pane">
-          <MetadataEditor
-            track={selectedTrack}
-            value={activeRoot?.draft ?? emptyMetadata()}
-            saving={saving}
-            onChange={handleChangeDraft}
-            onSave={handleSave}
-            onLoadAudioBytes={handleLoadAudioBytes}
-          />
+          {!activeRoot ? (
+            <LibraryLanding onOpenFolder={() => void handlePickFolder()} />
+          ) : selectedTrack ? (
+            <MetadataEditor
+              track={selectedTrack}
+              value={activeRoot.draft}
+              saving={saving}
+              onChange={handleChangeDraft}
+              onSave={handleSave}
+              onLoadAudioBytes={handleLoadAudioBytes}
+            />
+          ) : (
+            <AlbumOverview
+              rootLabel={activeRoot.label}
+              tracks={activeRoot.tracks}
+              onSelectTrack={handleSelectTrack}
+            />
+          )}
         </section>
       </section>
     </main>
@@ -939,6 +904,7 @@ function buildWizardRows(tracks: Mp3Track[], root: RootWorkspace | null): Wizard
           label: track.metadata.title || track.name,
           trackId: track.id,
           trackNumber: track.metadata.trackNumber,
+          artist: track.metadata.artist,
           relativePath: track.relativePath,
           parentKey: discKey,
           depth: 2

@@ -9,6 +9,7 @@ export type WizardTreeRow = {
   expanded?: boolean;
   trackId?: string;
   trackNumber?: string;
+  artist?: string;
   relativePath?: string;
 };
 
@@ -43,11 +44,6 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
 
   return (
     <section className="panel panel-list">
-      <div className="panel-title-row">
-        <h2>Library</h2>
-        <span>{rows.length}</span>
-      </div>
-
       <div className="wizard-wrap">
         <ul className="tree-list">
           {rows.map((row) => {
@@ -106,11 +102,10 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                     }
                   }}
                 >
-                  <span className="tree-arrow tree-arrow-empty" />
                   <span className="tree-icon">💿</span>
                   <span className="wizard-track-number mono">{row.trackNumber || (loadingMetadata ? "..." : "-")}</span>
                   <span className="wizard-track-title">{row.label || (loadingMetadata ? "Cargando metadatos..." : "-")}</span>
-                  <span className="wizard-track-path mono">{row.relativePath}</span>
+                  {row.artist && <span className="wizard-track-artist">{row.artist}</span>}
                 </button>
                 <button
                   type="button"
