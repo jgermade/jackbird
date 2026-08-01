@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import type { EditableMetadata, Mp3Track } from "../types";
 import { CoverDropzone } from "./CoverDropzone";
-import { TrackAudioPlayer } from "./TrackAudioPlayer";
 
 type MetadataEditorProps = {
   track: Mp3Track | null;
@@ -9,7 +8,6 @@ type MetadataEditorProps = {
   saving: boolean;
   onChange: (next: EditableMetadata) => void;
   onSave: () => Promise<void>;
-  onLoadAudioBytes: (track: Mp3Track) => Promise<Uint8Array>;
 };
 
 function Field(props: {
@@ -68,7 +66,7 @@ function TechnicalDetails(props: { track: Mp3Track }): JSX.Element {
 }
 
 export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
-  const { track, value, saving, onChange, onSave, onLoadAudioBytes } = props;
+  const { track, value, saving, onChange, onSave } = props;
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
@@ -104,7 +102,6 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
               {value.year && <span className="tag">{value.year}</span>}
               {value.genre && <span className="tag">{value.genre}</span>}
             </div>
-            <TrackAudioPlayer track={track} onLoadAudioBytes={onLoadAudioBytes} />
           </div>
         </header>
 
@@ -149,7 +146,6 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
             {value.album && <span className="tag">{value.album}</span>}
             {value.year && <span className="tag">{value.year}</span>}
           </div>
-          <TrackAudioPlayer track={track} onLoadAudioBytes={onLoadAudioBytes} />
         </div>
       </header>
 

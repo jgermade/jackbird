@@ -1,11 +1,11 @@
 import type { Mp3Track } from "../types";
-import { AlbumAudioPlayer } from "./AlbumAudioPlayer";
 
 type AlbumOverviewProps = {
   rootLabel: string;
   tracks: Mp3Track[];
   onSelectTrack: (trackId: string) => void;
-  onLoadAudioBytes: (track: Mp3Track) => Promise<Uint8Array>;
+  onPlayTrack: (trackId: string) => void;
+  playingTrackId: string | null;
 };
 
 type AlbumGroup = {
@@ -64,7 +64,7 @@ function groupAlbums(tracks: Mp3Track[]): AlbumGroup[] {
 }
 
 export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
-  const { rootLabel, tracks, onSelectTrack, onLoadAudioBytes } = props;
+  const { rootLabel, tracks, onSelectTrack, onPlayTrack, playingTrackId } = props;
   const albums = groupAlbums(tracks);
 
   return (
@@ -88,10 +88,6 @@ export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
                 {album.year && <span className="tag">{album.year}</span>}
                 {album.genre && <span className="tag">{album.genre}</span>}
               </div>
-              <AlbumAudioPlayer
-                tracks={[...album.discs.values()].flat()}
-                onLoadAudioBytes={onLoadAudioBytes}
-              />
               <div className="album-discs">
                 {[...album.discs.entries()].map(([disc, discTracks]) => (
                   <section key={disc} className="album-disc">
@@ -104,10 +100,21 @@ export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
                         .sort((left, right) => trackOrder(left) - trackOrder(right))
                         .map((track) => (
                           <li key={track.id}>
-                            <button type="button" onClick={() => onSelectTrack(track.id)}>
-                              <span>{track.metadata.trackNumber || "-"}</span>
-                              <span>{track.metadata.title || track.name}</span>
-                            </button>
+                            <div className={playingTrackId === track.id ? "album-track-row is-playing" : "album-track-row"}>
+                              <button type="button" className="album-track-main" onClick={() => onSelectTrack(track.id)}>
+                                <span>{track.metadata.trackNumber || "-"}</span>
+                                <span>{track.metadata.title || track.name}</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="album-track-play"
+                                onClick={() => onPlayTrack(track.id)}
+                                aria-label={`Reproducir ${track.metadata.title || track.name}`}
+                                title="Reproducir desde esta pista"
+                              >
+                                {playingTrackId === track.id ? "\u25B6" : "\u25B7"}
+                              </button>
+                            </div>
                           </li>
                         ))}
                     </ol>

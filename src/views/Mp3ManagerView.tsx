@@ -3,8 +3,9 @@ import { AlbumOverview } from "../components/AlbumOverview";
 import { FolderPicker } from "../components/FolderPicker";
 import { LibraryLanding } from "../components/LibraryLanding";
 import { MetadataEditor } from "../components/MetadataEditor";
+import { PlaybackBar } from "../components/PlaybackBar";
+import { PreferencesModal } from "../components/PreferencesModal";
 import { RootTabs } from "../components/RootTabs";
-import { ThemeToggle } from "../components/ThemeToggle";
 import { TrackWizardList, type WizardTreeRow } from "../components/TrackWizardList";
 import { readTrackMetadataFromBytes, writeTrackMetadataToBytes } from "../lib/id3";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
@@ -23,6 +24,12 @@ type MetaRecord = {
 type MetaSnapshot = {
   version: 1;
   tracks: Record<string, MetaRecord>;
+};
+
+type PlaybackQueue = {
+  rootId: string;
+  trackIds: string[];
+  sourceLabel: string;
 };
 
 type RootWorkspace = {
@@ -73,6 +80,10 @@ export function Mp3ManagerView(): JSX.Element {
   const [restoring, setRestoring] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [playbackQueue, setPlaybackQueue] = useState<PlaybackQueue | null>(null);
+  const [playbackIndex, setPlaybackIndex] = useState(0);
+  const [showPlaybackList, setShowPlaybackList] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
 
   const activeRoot = useMemo(
     () => roots.find((root) => root.id === activeRootId) ?? null,
@@ -127,6 +138,23 @@ export function Mp3ManagerView(): JSX.Element {
 
   const detailTracks = detailScope.tracks;
   const detailLabel = detailScope.label;
+
+  const playbackRoot = useMemo(
+    () => roots.find((root) => root.id === playbackQueue?.rootId) ?? null,
+    [roots, playbackQueue]
+  );
+  const playbackTracks = useMemo(() => {
+    if (!playbackQueue || !playbackRoot) {
+      return [] as Mp3Track[];
+    }
+
+    const tracksById = new Map(playbackRoot.tracks.map((track) => [track.id, track]));
+    return playbackQueue.trackIds.flatMap((trackId) => {
+      const track = tracksById.get(trackId);
+      return track ? [track] : [];
+    });
+  }, [playbackQueue, playbackRoot]);
+  const playbackTrack = playbackTracks[playbackIndex] ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -437,6 +465,54 @@ export function Mp3ManagerView(): JSX.Element {
 
     setInfoMessage(null);
     setErrorMessage(null);
+    setShowPlaybackList(false);
+  }
+
+  function handlePlayVisibleTrack(trackId: string): void {
+    if (!activeRoot || detailTracks.length === 0) {
+      return;
+    }
+
+    const trackIds = detailTracks.map((track) => track.id);
+    const index = trackIds.indexOf(trackId);
+    if (index === -1) {
+      return;
+    }
+
+    setPlaybackQueue({ rootId: activeRoot.id, trackIds, sourceLabel: detailLabel });
+    setPlaybackIndex(index);
+    setShowPlaybackList(false);
+  }
+
+  function handlePreviousPlaybackTrack(): void {
+    setPlaybackIndex((index) => Math.max(0, index - 1));
+  }
+
+  function handleNextPlaybackTrack(): void {
+    setPlaybackIndex((index) => Math.min(playbackTracks.length - 1, index + 1));
+  }
+
+  function handleReturnToPlaybackList(): void {
+    if (!playbackQueue) {
+      return;
+    }
+
+    setActiveRootId(playbackQueue.rootId);
+    setRoots((currentRoots) =>
+      currentRoots.map((root) =>
+        root.id === playbackQueue.rootId
+          ? {
+              ...root,
+              selectedTrackId: null,
+              selectedTrackIds: playbackQueue.trackIds,
+              selectionAnchorTrackId: null,
+              activeRowKey: null,
+              draft: emptyMetadata()
+            }
+          : root
+      )
+    );
+    setShowPlaybackList(true);
   }
 
   function handleSelectRoot(rootId: string): void {
@@ -471,6 +547,11 @@ export function Mp3ManagerView(): JSX.Element {
   }
 
   function handleCloseRoot(rootId: string): void {
+    if (playbackQueue?.rootId === rootId) {
+      setPlaybackQueue(null);
+      setPlaybackIndex(0);
+    }
+
     setRoots((currentRoots) => {
       const index = currentRoots.findIndex((root) => root.id === rootId);
       if (index === -1) {
@@ -585,12 +666,12 @@ export function Mp3ManagerView(): JSX.Element {
     );
   }
 
-  async function handleLoadAudioBytes(track: Mp3Track): Promise<Uint8Array> {
-    if (!activeRoot) {
-      throw new Error("No hay ninguna carpeta activa.");
+  async function handleLoadPlaybackAudioBytes(track: Mp3Track): Promise<Uint8Array> {
+    if (!playbackRoot) {
+      throw new Error("La carpeta de la lista de reproduccion ya no esta disponible.");
     }
 
-    return activeRoot.vfs.readFile(track.vfsFileId);
+    return playbackRoot.vfs.readFile(track.vfsFileId);
   }
 
   function handleLibraryKeyDown(event: KeyboardEvent<HTMLElement>): void {
@@ -737,7 +818,28 @@ export function Mp3ManagerView(): JSX.Element {
           />
 
           <div className="header-right-actions">
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <PlaybackBar
+              track={playbackTrack}
+              trackKey={playbackTrack && playbackQueue ? `${playbackQueue.rootId}:${playbackTrack.id}` : null}
+              sourceLabel={playbackQueue?.sourceLabel ?? "Lista"}
+              position={playbackIndex}
+              total={playbackTracks.length}
+              canGoPrevious={playbackIndex > 0}
+              canGoNext={playbackIndex < playbackTracks.length - 1}
+              onLoadAudioBytes={handleLoadPlaybackAudioBytes}
+              onPrevious={handlePreviousPlaybackTrack}
+              onNext={handleNextPlaybackTrack}
+              onReturnToList={handleReturnToPlaybackList}
+            />
+            <button
+              type="button"
+              className="preferences-trigger"
+              onClick={() => setPreferencesOpen(true)}
+              aria-label="Abrir preferencias"
+              title="Preferencias"
+            >
+              &#9881;
+            </button>
           </div>
         </div>
       </header>
@@ -779,21 +881,21 @@ export function Mp3ManagerView(): JSX.Element {
         <section className="detail-pane">
           {!activeRoot ? (
             <LibraryLanding onOpenFolder={() => void handlePickFolder()} />
-          ) : selectedTrack ? (
+            ) : selectedTrack && !showPlaybackList ? (
             <MetadataEditor
               track={selectedTrack}
               value={activeRoot.draft}
               saving={saving}
               onChange={handleChangeDraft}
               onSave={handleSave}
-              onLoadAudioBytes={handleLoadAudioBytes}
             />
           ) : detailTracks.length > 0 ? (
             <AlbumOverview
               rootLabel={detailLabel}
               tracks={detailTracks}
               onSelectTrack={handleSelectTrack}
-              onLoadAudioBytes={handleLoadAudioBytes}
+              onPlayTrack={handlePlayVisibleTrack}
+              playingTrackId={playbackTrack?.id ?? null}
             />
           ) : (
             <section className="selection-prompt">
@@ -807,6 +909,12 @@ export function Mp3ManagerView(): JSX.Element {
           )}
         </section>
       </section>
+      <PreferencesModal
+        open={preferencesOpen}
+        theme={theme}
+        onClose={() => setPreferencesOpen(false)}
+        onToggleTheme={toggleTheme}
+      />
     </main>
   );
 }
