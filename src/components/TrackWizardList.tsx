@@ -20,6 +20,7 @@ type TrackWizardListProps = {
   onSelectRow: (key: string) => void;
   onToggleAlbum: (album: string) => void;
   onToggleDisc: (album: string, disc: string) => void;
+  onConsolidateTrack: (trackId: string) => void;
   loadingMetadata: boolean;
 };
 
@@ -36,6 +37,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
     onSelectRow,
     onToggleAlbum,
     onToggleDisc,
+    onConsolidateTrack,
     loadingMetadata
   } = props;
 
@@ -89,7 +91,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
             const active = row.key === activeRowKey;
 
             return (
-              <li key={row.key}>
+              <li key={row.key} className="tree-item">
                 <button
                   type="button"
                   className={
@@ -109,6 +111,20 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                   <span className="wizard-track-number mono">{row.trackNumber || (loadingMetadata ? "..." : "-")}</span>
                   <span className="wizard-track-title">{row.label || (loadingMetadata ? "Cargando metadatos..." : "-")}</span>
                   <span className="wizard-track-path mono">{row.relativePath}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tree-organize"
+                  title="Consolidar (patron de nombre pendiente de definir)"
+                  aria-label="Consolidar pista"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (row.trackId) {
+                      onConsolidateTrack(row.trackId);
+                    }
+                  }}
+                >
+                  🧩
                 </button>
               </li>
             );

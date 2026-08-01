@@ -258,32 +258,7 @@ export function Mp3ManagerView(): JSX.Element {
     let loadedCount = 0;
     let snapshotDirty = false;
 
-    for (const track of nextTracks) {
-      const sourceBytes = await vfs.readFile(track.vfsFileId);
-      const checksum = await sha1Hex(sourceBytes);
-      const stored = snapshot.tracks[track.relativePath];
-      const metadata =
-        stored && stored.checksum === checksum
-          ? stored.metadata
-          : await readTrackMetadataFromBytes(sourceBytes, track.name);
-
-      if (!stored || stored.checksum !== checksum) {
-        snapshot.tracks[track.relativePath] = {
-          checksum,
-          metadata,
-          updatedAt: new Date().toISOString()
-        };
-        snapshotDirty = true;
-      }
-
-      pendingUpdates.push({ trackId: track.id, metadata, checksum });
-      loadedCount += 1;
-
-      const shouldFlush = loadedCount % 10 === 0 || loadedCount === nextTracks.length;
-      if (!shouldFlush) {
-        continue;
-      }
-
+    function flush(): void {
       const updates = [...pendingUpdates];
       pendingUpdates.length = 0;
 
@@ -326,6 +301,52 @@ export function Mp3ManagerView(): JSX.Element {
 
       setInfoMessage(`Root ${rootLabel}. Cargando metadatos ${loadedCount}/${nextTracks.length}...`);
     }
+
+    // Files are read and their metadata parsed concurrently (bounded pool)
+    // instead of one track at a time: while one file's bytes are still being
+    // read from disk, other workers can already be hashing/parsing the files
+    // that arrived first, overlapping I/O with CPU work.
+    const READ_CONCURRENCY = 6;
+    let cursor = 0;
+
+    async function worker(): Promise<void> {
+      while (true) {
+        const trackIndex = cursor;
+        cursor += 1;
+        if (trackIndex >= nextTracks.length) {
+          return;
+        }
+
+        const track = nextTracks[trackIndex];
+        const sourceBytes = await vfs.readFile(track.vfsFileId);
+        const checksum = await sha1Hex(sourceBytes);
+        const stored = snapshot.tracks[track.relativePath];
+        const metadata =
+          stored && stored.checksum === checksum
+            ? stored.metadata
+            : await readTrackMetadataFromBytes(sourceBytes, track.name);
+
+        if (!stored || stored.checksum !== checksum) {
+          snapshot.tracks[track.relativePath] = {
+            checksum,
+            metadata,
+            updatedAt: new Date().toISOString()
+          };
+          snapshotDirty = true;
+        }
+
+        pendingUpdates.push({ trackId: track.id, metadata, checksum });
+        loadedCount += 1;
+
+        if (loadedCount % 10 === 0 || loadedCount === nextTracks.length) {
+          flush();
+        }
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(READ_CONCURRENCY, nextTracks.length) }, () => worker())
+    );
 
     if (snapshotDirty) {
       await writeMetaSnapshot(vfs, snapshot);
@@ -541,6 +562,20 @@ export function Mp3ManagerView(): JSX.Element {
     }
   }
 
+  function handleConsolidateTrack(_trackId: string): void {
+    setInfoMessage(
+      "Consolidar: pendiente de definir el patron de nombre (estilo mp3tag). Boton de marcador por ahora."
+    );
+  }
+
+  async function handleLoadAudioBytes(track: Mp3Track): Promise<Uint8Array> {
+    if (!activeRoot) {
+      throw new Error("No hay ninguna carpeta activa.");
+    }
+
+    return activeRoot.vfs.readFile(track.vfsFileId);
+  }
+
   function handleLibraryKeyDown(event: KeyboardEvent<HTMLElement>): void {
     if (!activeRoot || activeRoot.groupingMode !== "wizard" || treeRows.length === 0) {
       return;
@@ -733,6 +768,18 @@ export function Mp3ManagerView(): JSX.Element {
               onSelectTrack={handleSelectTrack}
               loadingMetadata={Boolean(activeRoot?.loadingMetadata)}
             />
+          ) : activeRoot?.loadingMetadata ? (
+            <section className="panel panel-list">
+              <div className="panel-title-row">
+                <h2>Library</h2>
+                <span>
+                  {activeRoot.loadedCount}/{activeRoot.tracks.length}
+                </span>
+              </div>
+              <p className="loading-hint">
+                Cargando metadatos antes de agrupar por album ({activeRoot.loadedCount}/{activeRoot.tracks.length})...
+              </p>
+            </section>
           ) : (
             <TrackWizardList
               rows={treeRows}
@@ -742,6 +789,7 @@ export function Mp3ManagerView(): JSX.Element {
               onSelectRow={handleSelectTreeRow}
               onToggleAlbum={handleToggleAlbum}
               onToggleDisc={handleToggleDisc}
+              onConsolidateTrack={handleConsolidateTrack}
               loadingMetadata={Boolean(activeRoot?.loadingMetadata)}
             />
           )}
@@ -754,6 +802,7 @@ export function Mp3ManagerView(): JSX.Element {
             saving={saving}
             onChange={handleChangeDraft}
             onSave={handleSave}
+            onLoadAudioBytes={handleLoadAudioBytes}
           />
         </section>
       </section>

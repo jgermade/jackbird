@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { EditableMetadata, Mp3Track } from "../types";
 import { CoverDropzone } from "./CoverDropzone";
+import { TrackAudioPlayer } from "./TrackAudioPlayer";
 
 type MetadataEditorProps = {
   track: Mp3Track | null;
@@ -8,6 +9,7 @@ type MetadataEditorProps = {
   saving: boolean;
   onChange: (next: EditableMetadata) => void;
   onSave: () => Promise<void>;
+  onLoadAudioBytes: (track: Mp3Track) => Promise<Uint8Array>;
 };
 
 function Field(props: {
@@ -29,7 +31,7 @@ function Field(props: {
 }
 
 export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
-  const { track, value, saving, onChange, onSave } = props;
+  const { track, value, saving, onChange, onSave, onLoadAudioBytes } = props;
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
@@ -49,14 +51,23 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
     return (
       <section className="panel panel-editor">
         <div className="metadata-hero">
-          <div>
+          <div className="cover-hero">
+            {value.coverDataUrl ? (
+              <img className="cover-image" src={value.coverDataUrl} alt="Caratula" />
+            ) : (
+              <div className="cover-empty">Sin caratula</div>
+            )}
+          </div>
+
+          <div className="metadata-hero-info">
             <h2>{value.title || track.name}</h2>
             <p className="metadata-subtitle mono">{track.relativePath}</p>
-          </div>
-          <div className="metadata-tags">
-            {value.album && <span className="tag">{value.album}</span>}
-            {value.artist && <span className="tag">{value.artist}</span>}
-            {value.year && <span className="tag">{value.year}</span>}
+            <div className="metadata-tags">
+              {value.album && <span className="tag">{value.album}</span>}
+              {value.artist && <span className="tag">{value.artist}</span>}
+              {value.year && <span className="tag">{value.year}</span>}
+            </div>
+            <TrackAudioPlayer track={track} onLoadAudioBytes={onLoadAudioBytes} />
           </div>
         </div>
 
@@ -64,6 +75,10 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
           <div className="fact">
             <span className="fact-label">Archivo</span>
             <span className="fact-value mono">{track.name}</span>
+          </div>
+          <div className="fact">
+            <span className="fact-label">Ruta</span>
+            <span className="fact-value mono">{track.relativePath}</span>
           </div>
           <div className="fact">
             <span className="fact-label">Artista</span>
@@ -85,14 +100,10 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
             <span className="fact-label">Tamano</span>
             <span className="fact-value">{(track.size / (1024 * 1024)).toFixed(2)} MB</span>
           </div>
-        </div>
-
-        <div className="details-cover-preview">
-          {value.coverDataUrl ? (
-            <img className="cover-image" src={value.coverDataUrl} alt="Caratula" />
-          ) : (
-            <div className="cover-empty">Sin caratula</div>
-          )}
+          <div className="fact">
+            <span className="fact-label">Checksum</span>
+            <span className="fact-value mono">{track.checksum || "Pendiente"}</span>
+          </div>
         </div>
 
         <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
@@ -105,13 +116,21 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
   return (
     <section className="panel panel-editor">
       <div className="metadata-hero">
-        <div>
+        <div className="cover-hero">
+          <CoverDropzone
+            coverDataUrl={value.coverDataUrl}
+            onSetCover={(coverDataUrl) => onChange({ ...value, coverDataUrl })}
+          />
+        </div>
+
+        <div className="metadata-hero-info">
           <h2>{value.title || track.name}</h2>
           <p className="metadata-subtitle mono">{track.relativePath}</p>
-        </div>
-        <div className="metadata-tags">
-          {value.album && <span className="tag">{value.album}</span>}
-          {value.artist && <span className="tag">{value.artist}</span>}
+          <div className="metadata-tags">
+            {value.album && <span className="tag">{value.album}</span>}
+            {value.artist && <span className="tag">{value.artist}</span>}
+          </div>
+          <TrackAudioPlayer track={track} onLoadAudioBytes={onLoadAudioBytes} />
         </div>
       </div>
 
@@ -143,11 +162,6 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
           placeholder="1/12"
         />
       </div>
-
-      <CoverDropzone
-        coverDataUrl={value.coverDataUrl}
-        onSetCover={(coverDataUrl) => onChange({ ...value, coverDataUrl })}
-      />
 
       <div className="editor-actions">
         <button className="btn btn-ghost" type="button" disabled={saving} onClick={() => setEditing(false)}>
