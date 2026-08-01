@@ -93,8 +93,14 @@ export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
       <button type="button" className="playback-icon" disabled={!canGoNext} onClick={onNext} aria-label="Pista siguiente" title="Pista siguiente">
         &#9654;&#9654;
       </button>
-      <button type="button" className="playback-return" onClick={onReturnToList} title={`Volver a ${sourceLabel}`}>
-        Lista: {sourceLabel} {position + 1}/{total}
+      <button
+        type="button"
+        className="playback-return"
+        onClick={onReturnToList}
+        aria-label={`Volver a ${sourceLabel}, pista ${position + 1} de ${total}`}
+        title={`Volver a ${sourceLabel}, pista ${position + 1} de ${total}`}
+      >
+        &#9776;
       </button>
       {loading ? <span className="playback-status">Cargando...</span> : audioUrl && <audio src={audioUrl} controls autoPlay onEnded={onNext} />}
       {error && <span className="fact-error">{error}</span>}

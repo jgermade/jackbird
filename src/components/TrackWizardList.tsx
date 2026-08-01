@@ -25,10 +25,6 @@ type TrackWizardListProps = {
   loadingMetadata: boolean;
 };
 
-function TreeArrow(props: { expanded?: boolean }): JSX.Element {
-  return <span className="tree-arrow">{props.expanded ? "▾" : "▸"}</span>;
-}
-
 export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
   const {
     rows,
@@ -50,15 +46,22 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
             if (row.kind === "album") {
               const active = row.key === activeRowKey;
               return (
-                <li key={row.key}>
+                <li key={row.key} className="tree-folder-item">
+                  <button
+                    type="button"
+                    className="tree-caret"
+                    aria-label={`${row.expanded ? "Colapsar" : "Expandir"} ${row.label}`}
+                    aria-expanded={row.expanded}
+                    style={{ marginInlineStart: `calc(${row.depth * 0.7}rem)` }}
+                    onClick={() => onToggleAlbum(row.album)}
+                  >
+                    {row.expanded ? "▾" : "▸"}
+                  </button>
                   <button
                     type="button"
                     className={active ? "tree-row tree-row-album is-active" : "tree-row tree-row-album"}
-                    style={{ paddingInlineStart: `calc(0.75rem + ${row.depth * 0.7}rem)` }}
                     onClick={() => onSelectRow(row.key)}
-                    onDoubleClick={() => onToggleAlbum(row.album)}
                   >
-                    <TreeArrow expanded={row.expanded} />
                     <span className="tree-icon">📁</span>
                     <span className="tree-label">{row.label}</span>
                   </button>
@@ -69,14 +72,22 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
             if (row.kind === "disc") {
               const active = row.key === activeRowKey;
               return (
-                <li key={row.key}>
+                <li key={row.key} className="tree-folder-item">
+                  <button
+                    type="button"
+                    className="tree-caret"
+                    aria-label={`${row.expanded ? "Colapsar" : "Expandir"} ${row.label}`}
+                    aria-expanded={row.expanded}
+                    style={{ marginInlineStart: `calc(${row.depth * 0.7}rem)` }}
+                    onClick={() => onToggleDisc(row.album, row.disc ?? "Disco 1")}
+                  >
+                    {row.expanded ? "▾" : "▸"}
+                  </button>
                   <button
                     type="button"
                     className={active ? "tree-row tree-row-disc is-active" : "tree-row tree-row-disc"}
                     onClick={() => onSelectRow(row.key)}
-                    onDoubleClick={() => onToggleDisc(row.album, row.disc ?? "Disco 1")}
                   >
-                    <TreeArrow expanded={row.expanded} />
                     <span className="tree-icon">📁</span>
                     <span className="tree-label">{row.label}</span>
                   </button>

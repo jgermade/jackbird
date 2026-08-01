@@ -436,6 +436,8 @@ export function Mp3ManagerView(): JSX.Element {
       return;
     }
 
+    const visibleTrackIds = treeRows.flatMap((row) => (row.kind === "track" && row.trackId ? [row.trackId] : []));
+
     setRoots((currentRoots) =>
       currentRoots.map((root) => {
         if (root.id !== activeRootId) {
@@ -443,7 +445,6 @@ export function Mp3ManagerView(): JSX.Element {
         }
 
         const track = root.tracks.find((item) => item.id === trackId);
-        const visibleTrackIds = treeRows.flatMap((row) => (row.kind === "track" && row.trackId ? [row.trackId] : []));
         const anchorIndex = root.selectionAnchorTrackId ? visibleTrackIds.indexOf(root.selectionAnchorTrackId) : -1;
         const targetIndex = visibleTrackIds.indexOf(trackId);
         const selectedTrackIds =
@@ -473,7 +474,7 @@ export function Mp3ManagerView(): JSX.Element {
       return;
     }
 
-    const trackIds = detailTracks.map((track) => track.id);
+    const trackIds = orderDetailPlaylist(detailTracks).map((track) => track.id);
     const index = trackIds.indexOf(trackId);
     if (index === -1) {
       return;
@@ -945,6 +946,35 @@ function inferDiscLabel(track: Mp3Track): string {
   }
 
   return "Disco 1";
+}
+
+function trackNumberOrder(track: Mp3Track): number {
+  const match = track.metadata.trackNumber.match(/\d+/);
+  return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
+}
+
+function orderDetailPlaylist(tracks: Mp3Track[]): Mp3Track[] {
+  return [...tracks].sort((left, right) => {
+    const albumOrder = (left.metadata.album || left.relativePath.split("/")[0]).localeCompare(
+      right.metadata.album || right.relativePath.split("/")[0],
+      "es"
+    );
+    if (albumOrder !== 0) {
+      return albumOrder;
+    }
+
+    const discOrder = inferDiscLabel(left).localeCompare(inferDiscLabel(right), "es", { numeric: true });
+    if (discOrder !== 0) {
+      return discOrder;
+    }
+
+    const trackOrder = trackNumberOrder(left) - trackNumberOrder(right);
+    if (trackOrder !== 0) {
+      return trackOrder;
+    }
+
+    return left.name.localeCompare(right.name, "es");
+  });
 }
 
 async function readMetaSnapshot(vfs: BrowserVfs): Promise<MetaSnapshot> {
