@@ -1,9 +1,11 @@
 import type { Mp3Track } from "../types";
+import { AlbumAudioPlayer } from "./AlbumAudioPlayer";
 
 type AlbumOverviewProps = {
   rootLabel: string;
   tracks: Mp3Track[];
   onSelectTrack: (trackId: string) => void;
+  onLoadAudioBytes: (track: Mp3Track) => Promise<Uint8Array>;
 };
 
 type AlbumGroup = {
@@ -62,7 +64,7 @@ function groupAlbums(tracks: Mp3Track[]): AlbumGroup[] {
 }
 
 export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
-  const { rootLabel, tracks, onSelectTrack } = props;
+  const { rootLabel, tracks, onSelectTrack, onLoadAudioBytes } = props;
   const albums = groupAlbums(tracks);
 
   return (
@@ -86,6 +88,10 @@ export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
                 {album.year && <span className="tag">{album.year}</span>}
                 {album.genre && <span className="tag">{album.genre}</span>}
               </div>
+              <AlbumAudioPlayer
+                tracks={[...album.discs.values()].flat()}
+                onLoadAudioBytes={onLoadAudioBytes}
+              />
               <div className="album-discs">
                 {[...album.discs.entries()].map(([disc, discTracks]) => (
                   <section key={disc} className="album-disc">

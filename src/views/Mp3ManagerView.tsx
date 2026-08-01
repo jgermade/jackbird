@@ -31,6 +31,8 @@ type RootWorkspace = {
   vfs: BrowserVfs;
   tracks: Mp3Track[];
   selectedTrackId: string | null;
+  selectedTrackIds: string[];
+  selectionAnchorTrackId: string | null;
   draft: EditableMetadata;
   loadingMetadata: boolean;
   loadedCount: number;
@@ -89,27 +91,42 @@ export function Mp3ManagerView(): JSX.Element {
     [treeRows]
   );
 
-  useEffect(() => {
-    if (!activeRoot || activeRoot.groupingMode !== "wizard" || treeRows.length === 0) {
-      return;
+  const detailScope = useMemo(() => {
+    if (!activeRoot) {
+      return { label: "", tracks: [] as Mp3Track[] };
     }
 
-    if (activeRoot.activeRowKey && rowByKey.has(activeRoot.activeRowKey)) {
-      return;
+    if (activeRoot.selectedTrackIds.length > 0) {
+      const selectedIds = new Set(activeRoot.selectedTrackIds);
+      return {
+        label: activeRoot.selectedTrackIds.length === 1 ? activeRoot.label : "Pistas seleccionadas",
+        tracks: activeRoot.tracks.filter((track) => selectedIds.has(track.id))
+      };
     }
 
-    const firstRow = treeRows[0];
-    setRoots((currentRoots) =>
-      currentRoots.map((root) =>
-        root.id === activeRoot.id
-          ? {
-              ...root,
-              activeRowKey: firstRow.key
-            }
-          : root
-      )
-    );
-  }, [activeRoot, treeRows, rowByKey]);
+    const row = activeRoot.activeRowKey ? rowByKey.get(activeRoot.activeRowKey) : undefined;
+    if (row?.kind === "album") {
+      return {
+        label: row.label,
+        tracks: activeRoot.tracks.filter((track) => (track.metadata.album.trim() || "Sin album") === row.album)
+      };
+    }
+
+    if (row?.kind === "disc" && row.disc) {
+      return {
+        label: `${row.album} - ${row.disc}`,
+        tracks: activeRoot.tracks.filter(
+          (track) =>
+            (track.metadata.album.trim() || "Sin album") === row.album && inferDiscLabel(track) === row.disc
+        )
+      };
+    }
+
+    return { label: activeRoot.label, tracks: [] as Mp3Track[] };
+  }, [activeRoot, rowByKey]);
+
+  const detailTracks = detailScope.tracks;
+  const detailLabel = detailScope.label;
 
   useEffect(() => {
     let cancelled = false;
@@ -224,6 +241,8 @@ export function Mp3ManagerView(): JSX.Element {
         vfs,
         tracks: nextTracks,
         selectedTrackId: null,
+        selectedTrackIds: [],
+        selectionAnchorTrackId: null,
         draft: emptyMetadata(),
         loadingMetadata: true,
         loadedCount: 0,
@@ -384,7 +403,7 @@ export function Mp3ManagerView(): JSX.Element {
     }
   }
 
-  function handleSelectTrack(trackId: string): void {
+  function handleSelectTrack(trackId: string, extendRange = false): void {
     if (!activeRootId) {
       return;
     }
@@ -396,11 +415,22 @@ export function Mp3ManagerView(): JSX.Element {
         }
 
         const track = root.tracks.find((item) => item.id === trackId);
+        const visibleTrackIds = treeRows.flatMap((row) => (row.kind === "track" && row.trackId ? [row.trackId] : []));
+        const anchorIndex = root.selectionAnchorTrackId ? visibleTrackIds.indexOf(root.selectionAnchorTrackId) : -1;
+        const targetIndex = visibleTrackIds.indexOf(trackId);
+        const selectedTrackIds =
+          extendRange && anchorIndex !== -1 && targetIndex !== -1
+            ? visibleTrackIds.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
+            : [trackId];
+        const singleSelection = selectedTrackIds.length === 1;
+
         return {
           ...root,
-          selectedTrackId: trackId,
+          selectedTrackId: singleSelection ? trackId : null,
+          selectedTrackIds,
+          selectionAnchorTrackId: extendRange && root.selectionAnchorTrackId ? root.selectionAnchorTrackId : trackId,
           activeRowKey: `track:${trackId}`,
-          draft: track?.metadata ?? emptyMetadata()
+          draft: singleSelection ? track?.metadata ?? emptyMetadata() : emptyMetadata()
         };
       })
     );
@@ -534,7 +564,11 @@ export function Mp3ManagerView(): JSX.Element {
 
         return {
           ...root,
-          activeRowKey: rowKey
+          activeRowKey: rowKey,
+          selectedTrackId: null,
+          selectedTrackIds: [],
+          selectionAnchorTrackId: null,
+          draft: emptyMetadata()
         };
       })
     );
@@ -738,7 +772,7 @@ export function Mp3ManagerView(): JSX.Element {
           ) : (
             <TrackWizardList
               rows={treeRows}
-              selectedTrackId={activeRoot?.selectedTrackId ?? null}
+              selectedTrackIds={activeRoot?.selectedTrackIds ?? []}
               activeRowKey={activeRoot?.activeRowKey ?? null}
               onSelectTrack={handleSelectTrack}
               onSelectRow={handleSelectTreeRow}
@@ -762,12 +796,22 @@ export function Mp3ManagerView(): JSX.Element {
               onSave={handleSave}
               onLoadAudioBytes={handleLoadAudioBytes}
             />
-          ) : (
+          ) : detailTracks.length > 0 ? (
             <AlbumOverview
-              rootLabel={activeRoot.label}
-              tracks={activeRoot.tracks}
+              rootLabel={detailLabel}
+              tracks={detailTracks}
               onSelectTrack={handleSelectTrack}
+              onLoadAudioBytes={handleLoadAudioBytes}
             />
+          ) : (
+            <section className="selection-prompt">
+              <span className="detail-eyebrow">{activeRoot.label}</span>
+              <h2>Selecciona un album o una pista</h2>
+              <p>
+                Elige una carpeta del arbol para ver sus albumes, o usa Shift al pulsar
+                pistas para revisar una seleccion multiple.
+              </p>
+            </section>
           )}
         </section>
       </section>

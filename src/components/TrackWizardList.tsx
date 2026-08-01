@@ -15,9 +15,9 @@ export type WizardTreeRow = {
 
 type TrackWizardListProps = {
   rows: WizardTreeRow[];
-  selectedTrackId: string | null;
+  selectedTrackIds: string[];
   activeRowKey: string | null;
-  onSelectTrack: (id: string) => void;
+  onSelectTrack: (id: string, extendRange: boolean) => void;
   onSelectRow: (key: string) => void;
   onToggleAlbum: (album: string) => void;
   onToggleDisc: (album: string, disc: string) => void;
@@ -32,7 +32,7 @@ function TreeArrow(props: { expanded?: boolean }): JSX.Element {
 export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
   const {
     rows,
-    selectedTrackId,
+    selectedTrackIds,
     activeRowKey,
     onSelectTrack,
     onSelectRow,
@@ -83,7 +83,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
               );
             }
 
-            const selected = row.trackId === selectedTrackId;
+            const selected = Boolean(row.trackId && selectedTrackIds.includes(row.trackId));
             const active = row.key === activeRowKey;
 
             return (
@@ -95,10 +95,9 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                       ? "wizard-track-row tree-row-track is-selected"
                       : "wizard-track-row tree-row-track"
                   }
-                  onClick={() => {
-                    onSelectRow(row.key);
+                  onClick={(event) => {
                     if (row.trackId) {
-                      onSelectTrack(row.trackId);
+                      onSelectTrack(row.trackId, event.shiftKey);
                     }
                   }}
                 >

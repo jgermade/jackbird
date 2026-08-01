@@ -351,6 +351,24 @@ input {
   gap: 0.8rem;
 }
 
+.selection-prompt {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: clamp(3rem, 14vh, 9rem) 2rem;
+  text-align: center;
+}
+
+.selection-prompt h2 {
+  margin-top: 0.25rem;
+  font-size: 1.35rem;
+}
+
+.selection-prompt p {
+  margin: 0.75rem auto 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .album-summary {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
@@ -391,6 +409,20 @@ input {
 .album-summary-content > p {
   margin: 0.2rem 0 0.5rem;
   color: var(--muted);
+}
+
+.album-audio-player {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.album-audio-player .track-audio-player {
+  max-width: 320px;
 }
 
 .album-discs {
