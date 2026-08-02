@@ -5,6 +5,6 @@ export default defineConfig({
     extensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"]
   },
   server: {
-    port: 5173
+    port: 8666
   }
 });
