@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import type { Mp3Track } from "../types";
 
 type PlaybackBarProps = {
@@ -13,6 +13,8 @@ type PlaybackBarProps = {
   onPrevious: () => void;
   onNext: () => void;
   onReturnToList: () => void;
+  onPlaybackStateChange?: (playing: boolean) => void;
+  audioRef?: RefObject<HTMLAudioElement>;
 };
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -33,7 +35,9 @@ export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
     onLoadAudioBytes,
     onPrevious,
     onNext,
-    onReturnToList
+    onReturnToList,
+    onPlaybackStateChange,
+    audioRef
   } = props;
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,11 +47,12 @@ export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
     if (!track) {
       setAudioUrl(null);
       setError(null);
+      onPlaybackStateChange?.(false);
       return;
     }
 
     let cancelled = false;
-      setAudioUrl(null);
+    setAudioUrl(null);
     setLoading(true);
     setError(null);
 
@@ -60,6 +65,7 @@ export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
       .catch((cause) => {
         if (!cancelled) {
           setError(cause instanceof Error ? cause.message : "No se pudo cargar el audio.");
+          onPlaybackStateChange?.(false);
         }
       })
       .finally(() => {
@@ -102,7 +108,24 @@ export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
       >
         &#9776;
       </button>
-      {loading ? <span className="playback-status">Cargando...</span> : audioUrl && <audio src={audioUrl} controls autoPlay onEnded={onNext} />}
+      {loading ? (
+        <span className="playback-status">Cargando...</span>
+      ) : (
+        audioUrl && (
+          <audio
+            ref={audioRef}
+            src={audioUrl}
+            controls
+            autoPlay
+            onPlay={() => onPlaybackStateChange?.(true)}
+            onPause={() => onPlaybackStateChange?.(false)}
+            onEnded={() => {
+              onPlaybackStateChange?.(false);
+              onNext();
+            }}
+          />
+        )
+      )}
       {error && <span className="fact-error">{error}</span>}
     </div>
   );

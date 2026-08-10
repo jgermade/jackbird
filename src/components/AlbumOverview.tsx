@@ -3,9 +3,11 @@ import type { Mp3Track } from "../types";
 type AlbumOverviewProps = {
   rootLabel: string;
   tracks: Mp3Track[];
-  onSelectTrack: (trackId: string) => void;
+  selectedTrackIds?: string[];
+  onSelectTrack: (trackId: string, options?: { toggle?: boolean; extendRange?: boolean }) => void;
   onPlayTrack: (trackId: string) => void;
   playingTrackId: string | null;
+  isAudioPlaying?: boolean;
 };
 
 type AlbumGroup = {
@@ -64,8 +66,17 @@ function groupAlbums(tracks: Mp3Track[]): AlbumGroup[] {
 }
 
 export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
-  const { rootLabel, tracks, onSelectTrack, onPlayTrack, playingTrackId } = props;
+  const {
+    rootLabel,
+    tracks,
+    selectedTrackIds = [],
+    onSelectTrack,
+    onPlayTrack,
+    playingTrackId,
+    isAudioPlaying = false
+  } = props;
   const albums = groupAlbums(tracks);
+  const selectedSet = new Set(selectedTrackIds);
 
   return (
     <section className="album-overview">
@@ -98,25 +109,64 @@ export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
                     <ol>
                       {[...discTracks]
                         .sort((left, right) => trackOrder(left) - trackOrder(right))
-                        .map((track) => (
-                          <li key={track.id}>
-                            <div className={playingTrackId === track.id ? "album-track-row is-playing" : "album-track-row"}>
-                              <button type="button" className="album-track-main" onClick={() => onSelectTrack(track.id)}>
-                                <span>{track.metadata.trackNumber || "-"}</span>
-                                <span>{track.metadata.title || track.name}</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="album-track-play"
-                                onClick={() => onPlayTrack(track.id)}
-                                aria-label={`Reproducir ${track.metadata.title || track.name}`}
-                                title="Reproducir desde esta pista"
+                        .map((track) => {
+                          const isSelected = selectedSet.has(track.id);
+                          const isCurrentPlayback = playingTrackId === track.id;
+                          const showPauseIcon = isCurrentPlayback && isAudioPlaying;
+                          const rowClass = [
+                            "album-track-row",
+                            isSelected && "is-selected",
+                            isCurrentPlayback && "is-playing"
+                          ]
+                            .filter(Boolean)
+                            .join(" ");
+
+                          return (
+                            <li key={track.id}>
+                              <div
+                                className={rowClass}
+                                onClick={(event) => {
+                                  onSelectTrack(track.id, {
+                                    toggle: !event.shiftKey,
+                                    extendRange: event.shiftKey
+                                  });
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    onSelectTrack(track.id, {
+                                      toggle: !event.shiftKey,
+                                      extendRange: event.shiftKey
+                                    });
+                                  }
+                                }}
                               >
-                                {playingTrackId === track.id ? "\u25B6" : "\u25B7"}
-                              </button>
-                            </div>
-                          </li>
-                        ))}
+                                <div className="album-track-main">
+                                  <span>{track.metadata.trackNumber || "-"}</span>
+                                  <span>{track.metadata.title || track.name}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="album-track-play"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onPlayTrack(track.id);
+                                  }}
+                                  aria-label={
+                                    showPauseIcon
+                                      ? `Pausar ${track.metadata.title || track.name}`
+                                      : `Reproducir ${track.metadata.title || track.name}`
+                                  }
+                                  title={showPauseIcon ? "Pausar" : "Reproducir desde esta pista"}
+                                >
+                                  {showPauseIcon ? "⏸" : "▶"}
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
                     </ol>
                   </section>
                 ))}

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { AlbumOverview } from "../components/AlbumOverview";
+import { DetailActionBar } from "../components/DetailActionBar";
 import { FolderPicker } from "../components/FolderPicker";
 import { LibraryLanding } from "../components/LibraryLanding";
-import { MetadataEditor } from "../components/MetadataEditor";
+import { MetadataEditModal } from "../components/MetadataEditModal";
 import { PlaybackBar } from "../components/PlaybackBar";
 import { PreferencesModal } from "../components/PreferencesModal";
 import { RootTabs } from "../components/RootTabs";
+import { TrackInfoModal } from "../components/TrackInfoModal";
 import { TrackWizardList, type WizardTreeRow } from "../components/TrackWizardList";
 import { readTrackMetadataFromBytes, writeTrackMetadataToBytes } from "../lib/id3";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
@@ -82,8 +84,11 @@ export function Mp3ManagerView(): JSX.Element {
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [playbackQueue, setPlaybackQueue] = useState<PlaybackQueue | null>(null);
   const [playbackIndex, setPlaybackIndex] = useState(0);
-  const [showPlaybackList, setShowPlaybackList] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const activeRoot = useMemo(
     () => roots.find((root) => root.id === activeRootId) ?? null,
@@ -95,6 +100,14 @@ export function Mp3ManagerView(): JSX.Element {
     [activeRoot]
   );
 
+  const selectedTracks = useMemo(() => {
+    if (!activeRoot || activeRoot.selectedTrackIds.length === 0) {
+      return [];
+    }
+    const set = new Set(activeRoot.selectedTrackIds);
+    return activeRoot.tracks.filter((track) => set.has(track.id));
+  }, [activeRoot]);
+
   const treeRows = useMemo(() => buildWizardRows(activeRoot?.tracks ?? [], activeRoot), [activeRoot]);
 
   const rowByKey = useMemo(
@@ -105,14 +118,6 @@ export function Mp3ManagerView(): JSX.Element {
   const detailScope = useMemo(() => {
     if (!activeRoot) {
       return { label: "", tracks: [] as Mp3Track[] };
-    }
-
-    if (activeRoot.selectedTrackIds.length > 0) {
-      const selectedIds = new Set(activeRoot.selectedTrackIds);
-      return {
-        label: activeRoot.selectedTrackIds.length === 1 ? activeRoot.label : "Pistas seleccionadas",
-        tracks: activeRoot.tracks.filter((track) => selectedIds.has(track.id))
-      };
     }
 
     const row = activeRoot.activeRowKey ? rowByKey.get(activeRoot.activeRowKey) : undefined;
@@ -133,7 +138,14 @@ export function Mp3ManagerView(): JSX.Element {
       };
     }
 
-    return { label: activeRoot.label, tracks: [] as Mp3Track[] };
+    if (row?.kind === "track" && row.album) {
+      return {
+        label: row.album,
+        tracks: activeRoot.tracks.filter((track) => track.relativePath.startsWith(`${row.album}/`))
+      };
+    }
+
+    return { label: activeRoot.label, tracks: activeRoot.tracks };
   }, [activeRoot, rowByKey]);
 
   const detailTracks = detailScope.tracks;
@@ -431,12 +443,19 @@ export function Mp3ManagerView(): JSX.Element {
     }
   }
 
-  function handleSelectTrack(trackId: string, extendRange = false): void {
+  function handleSelectTrack(
+    trackId: string,
+    options?: boolean | { toggle?: boolean; extendRange?: boolean }
+  ): void {
     if (!activeRootId) {
       return;
     }
 
+    const extendRange = typeof options === "object" ? Boolean(options.extendRange) : Boolean(options);
+    const toggle = typeof options === "object" ? (options.toggle !== undefined ? options.toggle : !extendRange) : !extendRange;
+
     const visibleTrackIds = treeRows.flatMap((row) => (row.kind === "track" && row.trackId ? [row.trackId] : []));
+    const orderedTrackIds = visibleTrackIds.length > 0 ? visibleTrackIds : (activeRoot?.tracks.map((t) => t.id) ?? []);
 
     setRoots((currentRoots) =>
       currentRoots.map((root) => {
@@ -444,33 +463,119 @@ export function Mp3ManagerView(): JSX.Element {
           return root;
         }
 
-        const track = root.tracks.find((item) => item.id === trackId);
-        const anchorIndex = root.selectionAnchorTrackId ? visibleTrackIds.indexOf(root.selectionAnchorTrackId) : -1;
-        const targetIndex = visibleTrackIds.indexOf(trackId);
-        const selectedTrackIds =
-          extendRange && anchorIndex !== -1 && targetIndex !== -1
-            ? visibleTrackIds.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
-            : [trackId];
+        let selectedTrackIds: string[];
+
+        if (toggle) {
+          const exists = root.selectedTrackIds.includes(trackId);
+          if (exists) {
+            selectedTrackIds = root.selectedTrackIds.filter((id) => id !== trackId);
+          } else {
+            selectedTrackIds = [...root.selectedTrackIds, trackId];
+          }
+        } else if (extendRange) {
+          const anchorId = root.selectionAnchorTrackId ?? root.selectedTrackIds[0] ?? trackId;
+          const anchorIndex = orderedTrackIds.indexOf(anchorId);
+          const targetIndex = orderedTrackIds.indexOf(trackId);
+          if (anchorIndex !== -1 && targetIndex !== -1) {
+            const start = Math.min(anchorIndex, targetIndex);
+            const end = Math.max(anchorIndex, targetIndex);
+            const range = orderedTrackIds.slice(start, end + 1);
+            selectedTrackIds = Array.from(new Set([...root.selectedTrackIds, ...range]));
+          } else {
+            selectedTrackIds = [trackId];
+          }
+        } else {
+          selectedTrackIds = [trackId];
+        }
+
         const singleSelection = selectedTrackIds.length === 1;
+        const activeTrackId = singleSelection ? selectedTrackIds[0] : trackId;
+        const trackObj = root.tracks.find((item) => item.id === activeTrackId);
 
         return {
           ...root,
-          selectedTrackId: singleSelection ? trackId : null,
+          selectedTrackId: singleSelection ? activeTrackId : null,
           selectedTrackIds,
-          selectionAnchorTrackId: extendRange && root.selectionAnchorTrackId ? root.selectionAnchorTrackId : trackId,
-          activeRowKey: `track:${trackId}`,
-          draft: singleSelection ? track?.metadata ?? emptyMetadata() : emptyMetadata()
+          selectionAnchorTrackId: toggle
+            ? root.selectionAnchorTrackId ?? trackId
+            : extendRange
+            ? root.selectionAnchorTrackId ?? trackId
+            : trackId,
+          activeRowKey: `track:${activeTrackId}`,
+          draft: singleSelection ? trackObj?.metadata ?? emptyMetadata() : emptyMetadata()
         };
       })
     );
 
     setInfoMessage(null);
     setErrorMessage(null);
-    setShowPlaybackList(false);
+  }
+
+  function handleClearSelection(): void {
+    if (!activeRootId) {
+      return;
+    }
+    setRoots((currentRoots) =>
+      currentRoots.map((root) =>
+        root.id === activeRootId
+          ? {
+              ...root,
+              selectedTrackId: null,
+              selectedTrackIds: [],
+              selectionAnchorTrackId: null,
+              draft: emptyMetadata()
+            }
+          : root
+      )
+    );
+  }
+
+  function handleDeleteSelectedTracks(): void {
+    if (!activeRoot || activeRoot.selectedTrackIds.length === 0) {
+      return;
+    }
+
+    const count = activeRoot.selectedTrackIds.length;
+    const message =
+      count === 1
+        ? "¿Estás seguro de que deseas quitar esta pista de la biblioteca?"
+        : `¿Estás seguro de que deseas quitar las ${count} pistas seleccionadas de la biblioteca?`;
+
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    const toRemove = new Set(activeRoot.selectedTrackIds);
+    setRoots((currentRoots) =>
+      currentRoots.map((root) => {
+        if (root.id !== activeRoot.id) {
+          return root;
+        }
+        return {
+          ...root,
+          tracks: root.tracks.filter((track) => !toRemove.has(track.id)),
+          selectedTrackId: null,
+          selectedTrackIds: [],
+          selectionAnchorTrackId: null,
+          draft: emptyMetadata()
+        };
+      })
+    );
+
+    setInfoMessage(count === 1 ? "Pista eliminada de la biblioteca." : `${count} pistas eliminadas de la biblioteca.`);
   }
 
   function handlePlayVisibleTrack(trackId: string): void {
     if (!activeRoot || detailTracks.length === 0) {
+      return;
+    }
+
+    if (playbackTrack?.id === trackId && audioRef.current) {
+      if (audioRef.current.paused) {
+        void audioRef.current.play();
+      } else {
+        audioRef.current.pause();
+      }
       return;
     }
 
@@ -482,7 +587,6 @@ export function Mp3ManagerView(): JSX.Element {
 
     setPlaybackQueue({ rootId: activeRoot.id, trackIds, sourceLabel: detailLabel });
     setPlaybackIndex(index);
-    setShowPlaybackList(false);
   }
 
   function handlePreviousPlaybackTrack(): void {
@@ -513,7 +617,6 @@ export function Mp3ManagerView(): JSX.Element {
           : root
       )
     );
-    setShowPlaybackList(true);
   }
 
   function handleSelectRoot(rootId: string): void {
@@ -789,6 +892,7 @@ export function Mp3ManagerView(): JSX.Element {
       );
 
       setInfoMessage(`Metadatos guardados en ${selectedTrack.name}. Operaciones VFS en tab: ${writeCount}.`);
+      setEditModalOpen(false);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
     } finally {
@@ -831,6 +935,8 @@ export function Mp3ManagerView(): JSX.Element {
               onPrevious={handlePreviousPlaybackTrack}
               onNext={handleNextPlaybackTrack}
               onReturnToList={handleReturnToPlaybackList}
+              onPlaybackStateChange={setIsAudioPlaying}
+              audioRef={audioRef}
             />
             <button
               type="button"
@@ -882,31 +988,39 @@ export function Mp3ManagerView(): JSX.Element {
         <section className="detail-pane">
           {!activeRoot ? (
             <LibraryLanding onOpenFolder={() => void handlePickFolder()} />
-            ) : selectedTrack && !showPlaybackList ? (
-            <MetadataEditor
-              track={selectedTrack}
-              value={activeRoot.draft}
-              saving={saving}
-              onChange={handleChangeDraft}
-              onSave={handleSave}
-            />
-          ) : detailTracks.length > 0 ? (
-            <AlbumOverview
-              rootLabel={detailLabel}
-              tracks={detailTracks}
-              onSelectTrack={handleSelectTrack}
-              onPlayTrack={handlePlayVisibleTrack}
-              playingTrackId={playbackTrack?.id ?? null}
-            />
           ) : (
-            <section className="selection-prompt">
-              <span className="detail-eyebrow">{activeRoot.label}</span>
-              <h2>Selecciona un album o una pista</h2>
-              <p>
-                Elige una carpeta del arbol para ver sus albumes, o usa Shift al pulsar
-                pistas para revisar una seleccion multiple.
-              </p>
-            </section>
+            <>
+              {activeRoot.selectedTrackIds.length > 0 && (
+                <DetailActionBar
+                  selectedCount={activeRoot.selectedTrackIds.length}
+                  onShowInfo={() => setInfoModalOpen(true)}
+                  onEdit={() => setEditModalOpen(true)}
+                  onDelete={handleDeleteSelectedTracks}
+                  onClearSelection={handleClearSelection}
+                />
+              )}
+
+              {detailTracks.length > 0 ? (
+                <AlbumOverview
+                  rootLabel={detailLabel}
+                  tracks={detailTracks}
+                  selectedTrackIds={activeRoot.selectedTrackIds}
+                  onSelectTrack={handleSelectTrack}
+                  onPlayTrack={handlePlayVisibleTrack}
+                  playingTrackId={playbackTrack?.id ?? null}
+                  isAudioPlaying={isAudioPlaying}
+                />
+              ) : (
+                <section className="selection-prompt">
+                  <span className="detail-eyebrow">{activeRoot.label}</span>
+                  <h2>Selecciona un album o una pista</h2>
+                  <p>
+                    Elige una carpeta del arbol para ver sus albumes, o usa Shift al pulsar
+                    pistas para revisar una seleccion multiple.
+                  </p>
+                </section>
+              )}
+            </>
           )}
         </section>
       </section>
@@ -915,6 +1029,20 @@ export function Mp3ManagerView(): JSX.Element {
         theme={theme}
         onClose={() => setPreferencesOpen(false)}
         onToggleTheme={toggleTheme}
+      />
+      <MetadataEditModal
+        open={editModalOpen}
+        track={selectedTrack}
+        value={activeRoot?.draft ?? emptyMetadata()}
+        saving={saving}
+        onChange={handleChangeDraft}
+        onSave={handleSave}
+        onClose={() => setEditModalOpen(false)}
+      />
+      <TrackInfoModal
+        open={infoModalOpen}
+        tracks={selectedTracks}
+        onClose={() => setInfoModalOpen(false)}
       />
     </main>
   );
