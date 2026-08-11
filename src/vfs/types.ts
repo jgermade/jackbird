@@ -3,6 +3,7 @@ export type VfsFile = {
   name: string;
   relativePath: string;
   size: number;
+  lastModified?: number;
 };
 
 export type VfsWriteOperation = {

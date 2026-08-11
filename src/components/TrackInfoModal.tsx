@@ -96,8 +96,14 @@ export function TrackInfoModal(props: TrackInfoModalProps): JSX.Element {
               <dt>Tamaño</dt>
               <dd>{formatBytes(singleTrack.size)}</dd>
 
-              <dt>Checksum SHA-1</dt>
-              <dd className="mono-text">{singleTrack.checksum || "-"}</dd>
+              <dt>Checksum Completo</dt>
+              <dd className="mono-text">{singleTrack.fullChecksum || singleTrack.checksum || "-"}</dd>
+
+              <dt>Checksum Audio (sin ID3)</dt>
+              <dd className="mono-text">{singleTrack.audioChecksum || "-"}</dd>
+
+              <dt>Última verificación</dt>
+              <dd>{singleTrack.lastVerifiedAt ? new Date(singleTrack.lastVerifiedAt).toLocaleString() : "-"}</dd>
             </dl>
           </div>
         ) : (

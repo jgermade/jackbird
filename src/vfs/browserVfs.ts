@@ -192,7 +192,8 @@ export class BrowserVfs implements VfsAdapter {
           id,
           name: file.name,
           relativePath,
-          size: file.size
+          size: file.size,
+          lastModified: file.lastModified
         },
         handle: fileHandle
       };

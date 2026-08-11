@@ -9,16 +9,26 @@ import { PreferencesModal } from "../components/PreferencesModal";
 import { RootTabs } from "../components/RootTabs";
 import { TrackInfoModal } from "../components/TrackInfoModal";
 import { TrackWizardList, type WizardTreeRow } from "../components/TrackWizardList";
-import { readTrackMetadataFromBytes, writeTrackMetadataToBytes } from "../lib/id3";
+import {
+  calculateDualChecksums,
+  readTrackMetadataFromBytes,
+  writeTrackMetadataToBytes
+} from "../lib/id3";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
 import { useTheme } from "../services/ThemeService";
 import type { EditableMetadata, Mp3Track, TrackMetadata } from "../types";
 import { BrowserVfs } from "../vfs/browserVfs";
+import type { VfsFile } from "../vfs/types";
 
 type GroupingMode = "flat" | "wizard";
 
 type MetaRecord = {
   checksum: string;
+  fullChecksum?: string;
+  audioChecksum?: string;
+  size?: number;
+  lastModified?: number;
+  lastVerifiedAt?: string;
   metadata: TrackMetadata;
   updatedAt: string;
 };
@@ -95,10 +105,7 @@ export function Mp3ManagerView(): JSX.Element {
     [roots, activeRootId]
   );
 
-  const selectedTrack = useMemo(
-    () => activeRoot?.tracks.find((track) => track.id === activeRoot.selectedTrackId) ?? null,
-    [activeRoot]
-  );
+
 
   const selectedTracks = useMemo(() => {
     if (!activeRoot || activeRoot.selectedTrackIds.length === 0) {
@@ -248,6 +255,112 @@ export function Mp3ManagerView(): JSX.Element {
     });
   }, [roots, activeRootId, restoring]);
 
+  useEffect(() => {
+    if (!activeRoot || activeRoot.loadingMetadata || activeRoot.tracks.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function runBackgroundVerifier(): Promise<void> {
+      if (!activeRoot) {
+        return;
+      }
+
+      const tracksToVerify = [...activeRoot.tracks].sort((a, b) => {
+        if (!a.audioChecksum && b.audioChecksum) return -1;
+        if (a.audioChecksum && !b.audioChecksum) return 1;
+        const timeA = a.lastVerifiedAt ? new Date(a.lastVerifiedAt).getTime() : 0;
+        const timeB = b.lastVerifiedAt ? new Date(b.lastVerifiedAt).getTime() : 0;
+        return timeA - timeB;
+      });
+
+      const now = Date.now();
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+      const candidates = tracksToVerify.filter((t) => {
+        if (!t.audioChecksum || !t.lastVerifiedAt) return true;
+        return now - new Date(t.lastVerifiedAt).getTime() > ONE_DAY_MS;
+      });
+
+      if (candidates.length === 0) {
+        return;
+      }
+
+      let modifiedCount = 0;
+      const currentSnapshot = activeRoot.metaSnapshot;
+
+      for (const track of candidates) {
+        if (cancelled) {
+          break;
+        }
+
+        await new Promise((r) => setTimeout(r, 300));
+        if (cancelled) {
+          break;
+        }
+
+        try {
+          const sourceBytes = await activeRoot.vfs.readFile(track.vfsFileId);
+          const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
+          const nowIso = new Date().toISOString();
+
+          currentSnapshot.tracks[track.relativePath] = {
+            checksum: fullChecksum,
+            fullChecksum,
+            audioChecksum,
+            size: track.size,
+            lastModified: track.lastModified,
+            lastVerifiedAt: nowIso,
+            metadata: track.metadata,
+            updatedAt: currentSnapshot.tracks[track.relativePath]?.updatedAt ?? nowIso
+          };
+
+          modifiedCount += 1;
+
+          setRoots((currentRoots) =>
+            currentRoots.map((r) => {
+              if (r.id !== activeRoot.id) return r;
+              return {
+                ...r,
+                tracks: r.tracks.map((t) =>
+                  t.id === track.id
+                    ? {
+                        ...t,
+                        checksum: fullChecksum,
+                        fullChecksum,
+                        audioChecksum,
+                        lastVerifiedAt: nowIso
+                      }
+                    : t
+                ),
+                metaSnapshot: currentSnapshot
+              };
+            })
+          );
+
+          if (modifiedCount % 10 === 0) {
+            await writeMetaSnapshot(activeRoot.vfs, currentSnapshot);
+          }
+        } catch {
+          // Ignore individual background read errors
+        }
+      }
+
+      if (modifiedCount > 0 && !cancelled) {
+        await writeMetaSnapshot(activeRoot.vfs, currentSnapshot);
+      }
+    }
+
+    const timer = setTimeout(() => {
+      void runBackgroundVerifier();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeRoot?.id, activeRoot?.loadingMetadata]);
+
   async function hydrateRoot(
     vfs: BrowserVfs,
     options: {
@@ -258,20 +371,54 @@ export function Mp3ManagerView(): JSX.Element {
     } = {}
   ): Promise<void> {
     const mp3Files = await vfs.listFiles({ extensions: [".mp3"] });
-    const nextTracks: Mp3Track[] = mp3Files.map((entry) => ({
-      id: entry.relativePath,
-      name: entry.name,
-      relativePath: entry.relativePath,
-      size: entry.size,
-      vfsFileId: entry.id,
-      checksum: "",
-      metadata: emptyMetadata()
-    }));
-
     const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const rootLabel = options.rootLabel ?? (vfs.getRootName() || `Root ${roots.length + 1}`);
     const groupingMode = options.groupingMode ?? "wizard";
     const snapshot = await readMetaSnapshot(vfs);
+
+    const initialTracks: Mp3Track[] = [];
+    const staleOrNewFiles: Array<{ file: VfsFile; trackIndex: number }> = [];
+
+    mp3Files.forEach((entry, index) => {
+      const stored = snapshot.tracks[entry.relativePath];
+      const isCacheValid =
+        Boolean(stored) &&
+        stored.size === entry.size &&
+        stored.lastModified === entry.lastModified;
+
+      if (isCacheValid && stored) {
+        initialTracks.push({
+          id: entry.relativePath,
+          name: entry.name,
+          relativePath: entry.relativePath,
+          size: entry.size,
+          lastModified: entry.lastModified,
+          vfsFileId: entry.id,
+          checksum: stored.fullChecksum || stored.checksum,
+          fullChecksum: stored.fullChecksum || stored.checksum,
+          audioChecksum: stored.audioChecksum,
+          lastVerifiedAt: stored.lastVerifiedAt,
+          metadata: stored.metadata
+        });
+      } else {
+        initialTracks.push({
+          id: entry.relativePath,
+          name: entry.name,
+          relativePath: entry.relativePath,
+          size: entry.size,
+          lastModified: entry.lastModified,
+          vfsFileId: entry.id,
+          checksum: stored?.fullChecksum || stored?.checksum || "",
+          fullChecksum: stored?.fullChecksum || stored?.checksum,
+          audioChecksum: stored?.audioChecksum,
+          lastVerifiedAt: stored?.lastVerifiedAt,
+          metadata: stored?.metadata ?? emptyMetadata()
+        });
+        staleOrNewFiles.push({ file: entry, trackIndex: index });
+      }
+    });
+
+    const isFullyCached = staleOrNewFiles.length === 0;
 
     setRoots((currentRoots) => {
       const existingIndex = currentRoots.findIndex((root) => root.id === rootId);
@@ -279,13 +426,13 @@ export function Mp3ManagerView(): JSX.Element {
         id: rootId,
         label: rootLabel,
         vfs,
-        tracks: nextTracks,
+        tracks: initialTracks,
         selectedTrackId: null,
         selectedTrackIds: [],
         selectionAnchorTrackId: null,
         draft: emptyMetadata(),
-        loadingMetadata: true,
-        loadedCount: 0,
+        loadingMetadata: !isFullyCached,
+        loadedCount: initialTracks.length - staleOrNewFiles.length,
         groupingMode,
         metaSnapshot: snapshot,
         expandedAlbums: [],
@@ -311,10 +458,27 @@ export function Mp3ManagerView(): JSX.Element {
       setActiveRootId(rootId);
     }
 
-    setInfoMessage(`Root ${rootLabel} abierta. Cargando metadatos 0/${nextTracks.length}...`);
+    if (isFullyCached) {
+      setInfoMessage(`Root ${rootLabel} lista. ${initialTracks.length} archivos MP3 preparados (desde caché).`);
+      return;
+    }
 
-    const pendingUpdates: Array<{ trackId: string; metadata: TrackMetadata; checksum: string }> = [];
-    let loadedCount = 0;
+    setInfoMessage(
+      `Root ${rootLabel} abierta. Cargando metadatos ${initialTracks.length - staleOrNewFiles.length}/${initialTracks.length}...`
+    );
+
+    type TrackUpdate = {
+      trackId: string;
+      metadata: TrackMetadata;
+      fullChecksum: string;
+      audioChecksum: string;
+      size: number;
+      lastModified?: number;
+      lastVerifiedAt: string;
+    };
+
+    const pendingUpdates: TrackUpdate[] = [];
+    let loadedCount = initialTracks.length - staleOrNewFiles.length;
     let snapshotDirty = false;
 
     function flush(): void {
@@ -338,7 +502,12 @@ export function Mp3ManagerView(): JSX.Element {
 
             nextTracksById.set(update.trackId, {
               ...currentTrack,
-              checksum: update.checksum,
+              checksum: update.fullChecksum,
+              fullChecksum: update.fullChecksum,
+              audioChecksum: update.audioChecksum,
+              size: update.size,
+              lastModified: update.lastModified,
+              lastVerifiedAt: update.lastVerifiedAt,
               metadata: update.metadata
             });
 
@@ -352,59 +521,67 @@ export function Mp3ManagerView(): JSX.Element {
             tracks: root.tracks.map((item) => nextTracksById.get(item.id) ?? item),
             draft: nextDraft,
             loadedCount,
-            loadingMetadata: loadedCount < nextTracks.length,
+            loadingMetadata: loadedCount < initialTracks.length,
             metaSnapshot: snapshot
           };
         })
       );
 
-      setInfoMessage(`Root ${rootLabel}. Cargando metadatos ${loadedCount}/${nextTracks.length}...`);
+      setInfoMessage(`Root ${rootLabel}. Cargando metadatos ${loadedCount}/${initialTracks.length}...`);
     }
 
-    // Files are read and their metadata parsed concurrently (bounded pool)
-    // instead of one track at a time: while one file's bytes are still being
-    // read from disk, other workers can already be hashing/parsing the files
-    // that arrived first, overlapping I/O with CPU work.
     const READ_CONCURRENCY = 6;
     let cursor = 0;
 
     async function worker(): Promise<void> {
       while (true) {
-        const trackIndex = cursor;
+        const itemIndex = cursor;
         cursor += 1;
-        if (trackIndex >= nextTracks.length) {
+        if (itemIndex >= staleOrNewFiles.length) {
           return;
         }
 
-        const track = nextTracks[trackIndex];
-        const sourceBytes = await vfs.readFile(track.vfsFileId);
-        const checksum = await sha1Hex(sourceBytes);
-        const stored = snapshot.tracks[track.relativePath];
+        const { file } = staleOrNewFiles[itemIndex];
+        const sourceBytes = await vfs.readFile(file.id);
+        const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
+        const stored = snapshot.tracks[file.relativePath];
         const metadata =
-          stored && stored.checksum === checksum
+          stored && (stored.fullChecksum || stored.checksum) === fullChecksum
             ? stored.metadata
-            : await readTrackMetadataFromBytes(sourceBytes, track.name);
+            : await readTrackMetadataFromBytes(sourceBytes, file.name);
 
-        if (!stored || stored.checksum !== checksum) {
-          snapshot.tracks[track.relativePath] = {
-            checksum,
-            metadata,
-            updatedAt: new Date().toISOString()
-          };
-          snapshotDirty = true;
-        }
+        const nowIso = new Date().toISOString();
+        snapshot.tracks[file.relativePath] = {
+          checksum: fullChecksum,
+          fullChecksum,
+          audioChecksum,
+          size: file.size,
+          lastModified: file.lastModified,
+          lastVerifiedAt: nowIso,
+          metadata,
+          updatedAt: nowIso
+        };
+        snapshotDirty = true;
 
-        pendingUpdates.push({ trackId: track.id, metadata, checksum });
+        pendingUpdates.push({
+          trackId: file.relativePath,
+          metadata,
+          fullChecksum,
+          audioChecksum,
+          size: file.size,
+          lastModified: file.lastModified,
+          lastVerifiedAt: nowIso
+        });
         loadedCount += 1;
 
-        if (loadedCount % 10 === 0 || loadedCount === nextTracks.length) {
+        if (loadedCount % 10 === 0 || loadedCount === initialTracks.length) {
           flush();
         }
       }
     }
 
     await Promise.all(
-      Array.from({ length: Math.min(READ_CONCURRENCY, nextTracks.length) }, () => worker())
+      Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
     );
 
     if (snapshotDirty) {
@@ -417,14 +594,14 @@ export function Mp3ManagerView(): JSX.Element {
           ? {
               ...root,
               loadingMetadata: false,
-              loadedCount: nextTracks.length,
+              loadedCount: initialTracks.length,
               metaSnapshot: snapshot
             }
           : root
       )
     );
 
-    setInfoMessage(`Root ${rootLabel} lista. ${nextTracks.length} archivos MP3 preparados.`);
+    setInfoMessage(`Root ${rootLabel} lista. ${initialTracks.length} archivos MP3 preparados.`);
   }
 
   async function handlePickFolder(): Promise<void> {
@@ -838,8 +1015,27 @@ export function Mp3ManagerView(): JSX.Element {
     }
   }
 
+  function handleOpenEditModal(): void {
+    if (selectedTracks.length === 0 || !activeRootId) {
+      return;
+    }
+
+    const commonDraft = computeCommonMetadata(selectedTracks);
+    setRoots((currentRoots) =>
+      currentRoots.map((root) =>
+        root.id === activeRootId
+          ? {
+              ...root,
+              draft: commonDraft
+            }
+          : root
+      )
+    );
+    setEditModalOpen(true);
+  }
+
   async function handleSave(): Promise<void> {
-    if (!selectedTrack || !activeRoot) {
+    if (!activeRoot || selectedTracks.length === 0) {
       return;
     }
 
@@ -848,21 +1044,55 @@ export function Mp3ManagerView(): JSX.Element {
     setInfoMessage(null);
 
     try {
-      const sourceBytes = await activeRoot.vfs.readFile(selectedTrack.vfsFileId);
-      const nextBytes = await writeTrackMetadataToBytes(sourceBytes, activeRoot.draft);
-      await activeRoot.vfs.writeFile(selectedTrack.vfsFileId, nextBytes);
-      const checksum = await sha1Hex(nextBytes);
+      const draft = activeRoot.draft;
+      const varied = getVariedFields(selectedTracks);
+      const nextSnapshotTracks = { ...activeRoot.metaSnapshot.tracks };
+      const updatedTrackMap = new Map(activeRoot.tracks.map((t) => [t.id, t]));
+
+      for (const track of selectedTracks) {
+        const nextMeta: TrackMetadata = {
+          title: varied.title && !draft.title ? track.metadata.title : draft.title,
+          artist: varied.artist && !draft.artist ? track.metadata.artist : draft.artist,
+          album: varied.album && !draft.album ? track.metadata.album : draft.album,
+          year: varied.year && !draft.year ? track.metadata.year : draft.year,
+          genre: varied.genre && !draft.genre ? track.metadata.genre : draft.genre,
+          trackNumber: varied.trackNumber && !draft.trackNumber ? track.metadata.trackNumber : draft.trackNumber,
+          coverDataUrl: varied.coverDataUrl && draft.coverDataUrl === null ? track.metadata.coverDataUrl : draft.coverDataUrl
+        };
+
+        const sourceBytes = await activeRoot.vfs.readFile(track.vfsFileId);
+        const nextBytes = await writeTrackMetadataToBytes(sourceBytes, nextMeta);
+        await activeRoot.vfs.writeFile(track.vfsFileId, nextBytes);
+        const { fullChecksum, audioChecksum } = await calculateDualChecksums(nextBytes);
+        const nowIso = new Date().toISOString();
+        const lastMod = Date.now();
+
+        nextSnapshotTracks[track.relativePath] = {
+          checksum: fullChecksum,
+          fullChecksum,
+          audioChecksum,
+          size: nextBytes.byteLength,
+          lastModified: lastMod,
+          lastVerifiedAt: nowIso,
+          metadata: nextMeta,
+          updatedAt: nowIso
+        };
+
+        updatedTrackMap.set(track.id, {
+          ...track,
+          checksum: fullChecksum,
+          fullChecksum,
+          audioChecksum,
+          size: nextBytes.byteLength,
+          lastModified: lastMod,
+          lastVerifiedAt: nowIso,
+          metadata: nextMeta
+        });
+      }
 
       const nextSnapshot: MetaSnapshot = {
         ...activeRoot.metaSnapshot,
-        tracks: {
-          ...activeRoot.metaSnapshot.tracks,
-          [selectedTrack.relativePath]: {
-            checksum,
-            metadata: { ...activeRoot.draft },
-            updatedAt: new Date().toISOString()
-          }
-        }
+        tracks: nextSnapshotTracks
       };
 
       await writeMetaSnapshot(activeRoot.vfs, nextSnapshot);
@@ -878,20 +1108,13 @@ export function Mp3ManagerView(): JSX.Element {
           return {
             ...root,
             metaSnapshot: nextSnapshot,
-            tracks: root.tracks.map((item) =>
-              item.id === selectedTrack.id
-                ? {
-                    ...item,
-                    checksum,
-                    metadata: { ...root.draft }
-                  }
-                : item
-            )
+            tracks: root.tracks.map((item) => updatedTrackMap.get(item.id) ?? item)
           };
         })
       );
 
-      setInfoMessage(`Metadatos guardados en ${selectedTrack.name}. Operaciones VFS en tab: ${writeCount}.`);
+      const trackLabel = selectedTracks.length === 1 ? selectedTracks[0].name : `${selectedTracks.length} pistas`;
+      setInfoMessage(`Metadatos guardados en ${trackLabel}. Operaciones VFS en tab: ${writeCount}.`);
       setEditModalOpen(false);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
@@ -994,7 +1217,7 @@ export function Mp3ManagerView(): JSX.Element {
                 <DetailActionBar
                   selectedCount={activeRoot.selectedTrackIds.length}
                   onShowInfo={() => setInfoModalOpen(true)}
-                  onEdit={() => setEditModalOpen(true)}
+                  onEdit={handleOpenEditModal}
                   onDelete={handleDeleteSelectedTracks}
                   onClearSelection={handleClearSelection}
                 />
@@ -1032,7 +1255,7 @@ export function Mp3ManagerView(): JSX.Element {
       />
       <MetadataEditModal
         open={editModalOpen}
-        track={selectedTrack}
+        tracks={selectedTracks}
         value={activeRoot?.draft ?? emptyMetadata()}
         saving={saving}
         onChange={handleChangeDraft}
@@ -1060,12 +1283,62 @@ function isEmptyMetadata(value: EditableMetadata): boolean {
   );
 }
 
-async function sha1Hex(bytes: Uint8Array): Promise<string> {
-  const stable = new Uint8Array(bytes.byteLength);
-  stable.set(bytes);
-  const digest = await crypto.subtle.digest("SHA-1", stable.buffer);
-  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+function computeCommonMetadata(tracks: Mp3Track[]): EditableMetadata {
+  if (tracks.length === 0) {
+    return emptyMetadata();
+  }
+
+  const first = tracks[0].metadata;
+  const result: EditableMetadata = { ...first };
+
+  for (let i = 1; i < tracks.length; i++) {
+    const meta = tracks[i].metadata;
+    if (meta.title !== result.title) result.title = "";
+    if (meta.artist !== result.artist) result.artist = "";
+    if (meta.album !== result.album) result.album = "";
+    if (meta.year !== result.year) result.year = "";
+    if (meta.genre !== result.genre) result.genre = "";
+    if (meta.trackNumber !== result.trackNumber) result.trackNumber = "";
+    if (meta.coverDataUrl !== result.coverDataUrl) result.coverDataUrl = null;
+  }
+
+  return result;
 }
+
+function getVariedFields(tracks: Mp3Track[]): {
+  title: boolean;
+  artist: boolean;
+  album: boolean;
+  year: boolean;
+  genre: boolean;
+  trackNumber: boolean;
+  coverDataUrl: boolean;
+} {
+  if (tracks.length <= 1) {
+    return {
+      title: false,
+      artist: false,
+      album: false,
+      year: false,
+      genre: false,
+      trackNumber: false,
+      coverDataUrl: false
+    };
+  }
+
+  const first = tracks[0].metadata;
+  return {
+    title: tracks.some((t) => t.metadata.title !== first.title),
+    artist: tracks.some((t) => t.metadata.artist !== first.artist),
+    album: tracks.some((t) => t.metadata.album !== first.album),
+    year: tracks.some((t) => t.metadata.year !== first.year),
+    genre: tracks.some((t) => t.metadata.genre !== first.genre),
+    trackNumber: tracks.some((t) => t.metadata.trackNumber !== first.trackNumber),
+    coverDataUrl: tracks.some((t) => t.metadata.coverDataUrl !== first.coverDataUrl)
+  };
+}
+
+
 
 function inferDiscLabel(track: Mp3Track): string {
   const byPath = track.relativePath.match(/(?:^|\/)(?:cd|disc)[ _-]?(\d+)(?:\/|$)/i);

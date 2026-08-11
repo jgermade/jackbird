@@ -15,6 +15,10 @@ export type Mp3Track = {
   size: number;
   vfsFileId: string;
   checksum: string;
+  fullChecksum?: string;
+  audioChecksum?: string;
+  lastModified?: number;
+  lastVerifiedAt?: string;
   metadata: TrackMetadata;
 };
 

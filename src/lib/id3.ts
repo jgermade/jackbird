@@ -109,3 +109,68 @@ export async function writeTrackMetadataToBytes(
   const blob = writer.getBlob();
   return new Uint8Array(await blob.arrayBuffer());
 }
+
+export function getAudioFrameSlice(bytes: Uint8Array): Uint8Array {
+  let start = 0;
+  let end = bytes.length;
+
+  // Check ID3v2 header at offset 0
+  if (bytes.length >= 10 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) {
+    const flags = bytes[5];
+    const hasFooter = Boolean(flags & 0x10);
+    const tagSize =
+      ((bytes[6] & 0x7f) << 21) |
+      ((bytes[7] & 0x7f) << 14) |
+      ((bytes[8] & 0x7f) << 7) |
+      (bytes[9] & 0x7f);
+    start = 10 + tagSize + (hasFooter ? 10 : 0);
+  }
+
+  // Check ID3v1 tag at end of file (128 bytes)
+  if (
+    end - start > 128 &&
+    bytes[end - 128] === 0x54 &&
+    bytes[end - 127] === 0x41 &&
+    bytes[end - 126] === 0x47
+  ) {
+    end -= 128;
+  }
+
+  // Check APEv2 footer at end of file (32 bytes)
+  if (
+    end - start > 32 &&
+    bytes[end - 32] === 0x41 &&
+    bytes[end - 31] === 0x50 &&
+    bytes[end - 30] === 0x45 &&
+    bytes[end - 29] === 0x54 &&
+    bytes[end - 28] === 0x41 &&
+    bytes[end - 27] === 0x47 &&
+    bytes[end - 26] === 0x45 &&
+    bytes[end - 25] === 0x58
+  ) {
+    end -= 32;
+  }
+
+  if (start >= end || start >= bytes.length) {
+    return bytes;
+  }
+
+  return bytes.subarray(start, end);
+}
+
+export async function sha1Hex(bytes: Uint8Array): Promise<string> {
+  const stable = new Uint8Array(bytes.byteLength);
+  stable.set(bytes);
+  const digest = await crypto.subtle.digest("SHA-1", stable.buffer);
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+export async function calculateDualChecksums(
+  bytes: Uint8Array
+): Promise<{ fullChecksum: string; audioChecksum: string }> {
+  const fullChecksum = await sha1Hex(bytes);
+  const audioSlice = getAudioFrameSlice(bytes);
+  const audioChecksum = await sha1Hex(audioSlice);
+  return { fullChecksum, audioChecksum };
+}
+

@@ -4,7 +4,7 @@ import { MetadataEditor } from "./MetadataEditor";
 
 type MetadataEditModalProps = {
   open: boolean;
-  track: Mp3Track | null;
+  tracks: Mp3Track[];
   value: EditableMetadata;
   saving: boolean;
   onChange: (next: EditableMetadata) => void;
@@ -13,7 +13,7 @@ type MetadataEditModalProps = {
 };
 
 export function MetadataEditModal(props: MetadataEditModalProps): JSX.Element {
-  const { open, track, value, saving, onChange, onSave, onClose } = props;
+  const { open, tracks, value, saving, onChange, onSave, onClose } = props;
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -30,6 +30,13 @@ export function MetadataEditModal(props: MetadataEditModalProps): JSX.Element {
     }
   }, [open]);
 
+  const titleText =
+    tracks.length === 1
+      ? tracks[0].metadata.title || tracks[0].name
+      : tracks.length > 1
+        ? `Editar ${tracks.length} pistas seleccionadas`
+        : "Editar pista";
+
   return (
     <dialog
       ref={dialogRef}
@@ -45,23 +52,24 @@ export function MetadataEditModal(props: MetadataEditModalProps): JSX.Element {
       <header className="modal-header">
         <div>
           <span className="detail-eyebrow">Edición de metadatos</span>
-          <h2 id="edit-modal-title">{track ? track.metadata.title || track.name : "Editar pista"}</h2>
+          <h2 id="edit-modal-title">{titleText}</h2>
         </div>
         <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar modal de edición" title="Cerrar">
           ✕
         </button>
       </header>
       <div className="modal-body">
-        {track ? (
+        {tracks.length > 0 ? (
           <MetadataEditor
-            track={track}
+            tracks={tracks}
             value={value}
             saving={saving}
             onChange={onChange}
             onSave={onSave}
+            isModal
           />
         ) : (
-          <p>No hay pista seleccionada para editar.</p>
+          <p>No hay pistas seleccionadas para editar.</p>
         )}
       </div>
     </dialog>
