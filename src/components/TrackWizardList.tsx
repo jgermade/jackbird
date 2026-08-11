@@ -33,7 +33,14 @@ function CaretGlyph({ expanded }: { expanded?: boolean }): JSX.Element {
       aria-hidden="true"
       focusable="false"
     >
-      <path d="M6 3.5L11 8l-5 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M6 3.5L11 8l-5 4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -65,18 +72,26 @@ function FolderGlyph({ open }: { open?: boolean }): JSX.Element {
 function TrackGlyph(): JSX.Element {
   return (
     <svg className="tree-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <circle cx="6" cy="11.5" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M8.2 11.5V3.6l5.3-1.1v7.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="13.5" cy="10" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        fill="currentColor"
+        d="M10.75 1.8v7.15a2.2 2.2 0 1 0 1.2 1.95V3.85L5.4 5.15v5.55A2.2 2.2 0 1 0 6.6 12.65V4.45L10.75 1.8z"
+      />
     </svg>
   );
 }
 
-function OrganizeGlyph(): JSX.Element {
+function RenameGlyph(): JSX.Element {
   return (
     <svg className="tree-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
       <path
-        d="M3 4.5h10M3 8h10M3 11.5h10M5.5 3v3M10.5 6.5v3M7.5 10v3"
+        d="M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.35 4.15 11.85 7.65"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.3"
@@ -84,6 +99,16 @@ function OrganizeGlyph(): JSX.Element {
       />
     </svg>
   );
+}
+
+function formatTrackNumber(value: string | undefined): string {
+  if (!value) {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  const slash = trimmed.indexOf("/");
+  return slash === -1 ? trimmed : trimmed.slice(0, slash).trim();
 }
 
 export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
@@ -158,9 +183,8 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
 
             const selected = Boolean(row.trackId && selectedTrackIds.includes(row.trackId));
             const active = row.key === activeRowKey;
-            const trackClass = [
-              "wizard-track-row",
-              "tree-row-track",
+            const itemClass = [
+              "tree-item",
               selected ? "is-selected" : "",
               active && !selected ? "is-active" : ""
             ]
@@ -168,11 +192,11 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
               .join(" ");
 
             return (
-              <li key={row.key} className="tree-item" style={depthStyle}>
+              <li key={row.key} className={itemClass} style={depthStyle}>
                 <span className="tree-caret-spacer" aria-hidden="true" />
                 <button
                   type="button"
-                  className={trackClass}
+                  className="wizard-track-row tree-row-track"
                   onClick={(event) => {
                     if (row.trackId) {
                       onSelectTrack(row.trackId, event.shiftKey);
@@ -183,7 +207,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                     <TrackGlyph />
                   </span>
                   <span className="wizard-track-number mono">
-                    {row.trackNumber || (loadingMetadata ? "…" : "—")}
+                    {formatTrackNumber(row.trackNumber) || (loadingMetadata ? "…" : "—")}
                   </span>
                   <span className="wizard-track-meta">
                     <span className="wizard-track-title">
@@ -194,9 +218,9 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                 </button>
                 <button
                   type="button"
-                  className="tree-organize"
-                  title="Consolidar (patrón de nombre pendiente de definir)"
-                  aria-label="Consolidar pista"
+                  className="tree-rename"
+                  title="Renombrar (patrón pendiente de definir)"
+                  aria-label="Renombrar pista"
                   onClick={(event) => {
                     event.stopPropagation();
                     if (row.trackId) {
@@ -204,7 +228,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                     }
                   }}
                 >
-                  <OrganizeGlyph />
+                  <RenameGlyph />
                 </button>
               </li>
             );

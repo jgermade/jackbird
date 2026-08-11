@@ -843,6 +843,7 @@ tbody tr.is-selected {
   height: 0.95rem;
   display: block;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .tree-caret-glyph {
@@ -860,24 +861,14 @@ tbody tr.is-selected {
   align-items: stretch;
   min-height: 1.85rem;
   position: relative;
-}
-
-.tree-folder-item::before,
-.tree-item::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--tree-depth) * 0.85rem + 0.55rem);
-  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  pointer-events: none;
-  opacity: min(0.55, var(--tree-depth));
+  padding-inline-start: 0.35rem;
 }
 
 .tree-caret,
 .tree-caret-spacer {
-  width: 1.55rem;
-  flex: 0 0 1.55rem;
-  margin-inline-start: calc(var(--tree-depth) * 0.85rem);
+  width: 1.35rem;
+  flex: 0 0 1.35rem;
+  margin-inline-start: calc(var(--tree-depth) * 0.9rem + 0.35rem);
   display: inline-grid;
   place-items: center;
 }
@@ -908,9 +899,9 @@ tbody tr.is-selected {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
   min-height: 1.85rem;
-  padding: 0.15rem 0.55rem 0.15rem 0.1rem;
+  padding: 0.15rem 0.65rem 0.15rem 0.2rem;
   color: var(--ink);
   box-shadow: inset 0 0 0 0 transparent;
 }
@@ -922,29 +913,30 @@ tbody tr.is-selected {
   border-radius: 0;
   background: transparent;
   text-align: left;
-  display: grid;
-  gap: 0.35rem;
-  grid-template-columns: 1rem 2.4rem minmax(0, 1fr);
+  display: flex;
+  gap: 0.45rem;
   align-items: center;
   min-height: 1.85rem;
-  padding: 0.15rem 0.35rem 0.15rem 0.1rem;
+  padding: 0.15rem 0.35rem 0.15rem 0.2rem;
   cursor: pointer;
   color: var(--ink);
-  box-shadow: inset 0 0 0 0 transparent;
 }
 
-.tree-row:hover,
-.wizard-track-row:hover {
+.tree-row:hover {
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
 }
 
-.tree-row.is-active,
-.wizard-track-row.is-active {
+.tree-item:hover {
+  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+}
+
+.tree-row.is-active {
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.wizard-track-row.is-selected {
+.tree-item.is-active,
+.tree-item.is-selected {
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -980,8 +972,8 @@ tbody tr.is-selected {
 }
 
 .tree-row.is-active .tree-icon,
-.wizard-track-row.is-selected .tree-icon,
-.wizard-track-row.is-active .tree-icon {
+.tree-item.is-selected .tree-icon,
+.tree-item.is-active .tree-icon {
   color: var(--accent);
 }
 
@@ -999,13 +991,16 @@ tbody tr.is-selected {
   line-height: 1.2;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  min-width: 1.1rem;
+  flex: 0 0 auto;
 }
 
 .wizard-track-meta {
   min-width: 0;
+  flex: 1 1 auto;
   display: flex;
-  flex-direction: column;
-  gap: 0.02rem;
+  align-items: baseline;
+  gap: 0.55rem;
 }
 
 .wizard-track-title {
@@ -1016,16 +1011,19 @@ tbody tr.is-selected {
   font-size: 0.84rem;
   color: var(--ink);
   line-height: 1.2;
+  flex: 0 1 auto;
 }
 
 .wizard-track-artist {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.15;
+  flex: 1 1 auto;
+  text-align: right;
 }
 
 .tree-item .tree-row-track {
@@ -1033,7 +1031,7 @@ tbody tr.is-selected {
   min-width: 0;
 }
 
-.tree-organize {
+.tree-rename {
   flex: 0 0 auto;
   align-self: center;
   width: 1.55rem;
@@ -1044,24 +1042,26 @@ tbody tr.is-selected {
   background: transparent;
   cursor: pointer;
   padding: 0;
-  margin-right: 0.3rem;
+  margin-right: 0.35rem;
   border-radius: 6px;
   color: var(--muted);
   opacity: 0;
   pointer-events: none;
 }
 
-.tree-item:hover .tree-organize,
-.tree-item:focus-within .tree-organize {
+.tree-item:hover .tree-rename,
+.tree-item:focus-within .tree-rename,
+.tree-item.is-selected .tree-rename,
+.tree-item.is-active .tree-rename {
   opacity: 0.75;
   pointer-events: auto;
 }
 
-.tree-organize:hover,
-.tree-organize:focus-visible {
+.tree-rename:hover,
+.tree-rename:focus-visible {
   opacity: 1;
   color: var(--accent);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--panel) 55%, var(--accent-soft));
 }
 
 .tree-folder-item .tree-row {
