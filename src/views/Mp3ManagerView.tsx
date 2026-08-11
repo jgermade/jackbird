@@ -18,7 +18,7 @@ import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
 import { useTheme } from "../services/ThemeService";
 import type { EditableMetadata, Mp3Track, TrackMetadata } from "../types";
 import { BrowserVfs } from "../vfs/browserVfs";
-import type { VfsFile } from "../vfs/types";
+
 
 type GroupingMode = "flat" | "wizard";
 
@@ -370,55 +370,27 @@ export function Mp3ManagerView(): JSX.Element {
       setActive?: boolean;
     } = {}
   ): Promise<void> {
-    const mp3Files = await vfs.listFiles({ extensions: [".mp3"] });
     const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const rootLabel = options.rootLabel ?? (vfs.getRootName() || `Root ${roots.length + 1}`);
     const groupingMode = options.groupingMode ?? "wizard";
+
+    // ─── Phase 1: Snapshot → instant render ──────────────────────────────────
     const snapshot = await readMetaSnapshot(vfs);
 
-    const initialTracks: Mp3Track[] = [];
-    const staleOrNewFiles: Array<{ file: VfsFile; trackIndex: number }> = [];
-
-    mp3Files.forEach((entry, index) => {
-      const stored = snapshot.tracks[entry.relativePath];
-      const isCacheValid =
-        Boolean(stored) &&
-        stored.size === entry.size &&
-        stored.lastModified === entry.lastModified;
-
-      if (isCacheValid && stored) {
-        initialTracks.push({
-          id: entry.relativePath,
-          name: entry.name,
-          relativePath: entry.relativePath,
-          size: entry.size,
-          lastModified: entry.lastModified,
-          vfsFileId: entry.id,
-          checksum: stored.fullChecksum || stored.checksum,
-          fullChecksum: stored.fullChecksum || stored.checksum,
-          audioChecksum: stored.audioChecksum,
-          lastVerifiedAt: stored.lastVerifiedAt,
-          metadata: stored.metadata
-        });
-      } else {
-        initialTracks.push({
-          id: entry.relativePath,
-          name: entry.name,
-          relativePath: entry.relativePath,
-          size: entry.size,
-          lastModified: entry.lastModified,
-          vfsFileId: entry.id,
-          checksum: stored?.fullChecksum || stored?.checksum || "",
-          fullChecksum: stored?.fullChecksum || stored?.checksum,
-          audioChecksum: stored?.audioChecksum,
-          lastVerifiedAt: stored?.lastVerifiedAt,
-          metadata: stored?.metadata ?? emptyMetadata()
-        });
-        staleOrNewFiles.push({ file: entry, trackIndex: index });
-      }
-    });
-
-    const isFullyCached = staleOrNewFiles.length === 0;
+    const snapshotEntries = Object.entries(snapshot.tracks);
+    const initialTracks: Mp3Track[] = snapshotEntries.map(([relativePath, stored]) => ({
+      id: relativePath,
+      name: relativePath.split("/").at(-1) ?? relativePath,
+      relativePath,
+      size: stored.size ?? 0,
+      lastModified: stored.lastModified,
+      vfsFileId: relativePath, // placeholder until walk resolves real VfsFile id
+      checksum: stored.fullChecksum || stored.checksum,
+      fullChecksum: stored.fullChecksum || stored.checksum,
+      audioChecksum: stored.audioChecksum,
+      lastVerifiedAt: stored.lastVerifiedAt,
+      metadata: stored.metadata
+    }));
 
     setRoots((currentRoots) => {
       const existingIndex = currentRoots.findIndex((root) => root.id === rootId);
@@ -431,8 +403,8 @@ export function Mp3ManagerView(): JSX.Element {
         selectedTrackIds: [],
         selectionAnchorTrackId: null,
         draft: emptyMetadata(),
-        loadingMetadata: !isFullyCached,
-        loadedCount: initialTracks.length - staleOrNewFiles.length,
+        loadingMetadata: true, // walk is pending
+        loadedCount: initialTracks.length,
         groupingMode,
         metaSnapshot: snapshot,
         expandedAlbums: [],
@@ -458,151 +430,226 @@ export function Mp3ManagerView(): JSX.Element {
       setActiveRootId(rootId);
     }
 
-    if (isFullyCached) {
-      setInfoMessage(`Root ${rootLabel} lista. ${initialTracks.length} archivos MP3 preparados (desde caché).`);
-      return;
-    }
+    // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
+    void (async () => {
+      try {
+        const mp3Files = await vfs.listFiles({ extensions: [".mp3"] });
 
-    setInfoMessage(
-      `Root ${rootLabel} abierta. Cargando metadatos ${initialTracks.length - staleOrNewFiles.length}/${initialTracks.length}...`
-    );
+        // Update vfsFileId for all existing tracks now that we have real VfsFile entries
+        const fileByPath = new Map(mp3Files.map((f) => [f.relativePath, f]));
+        const snapshotPaths = new Set(Object.keys(snapshot.tracks));
+        const fsPaths = new Set(mp3Files.map((f) => f.relativePath));
 
-    type TrackUpdate = {
-      trackId: string;
-      metadata: TrackMetadata;
-      fullChecksum: string;
-      audioChecksum: string;
-      size: number;
-      lastModified?: number;
-      lastVerifiedAt: string;
-    };
+        // Tracks removed from disk
+        const removedPaths = [...snapshotPaths].filter((p) => !fsPaths.has(p));
 
-    const pendingUpdates: TrackUpdate[] = [];
-    let loadedCount = initialTracks.length - staleOrNewFiles.length;
-    let snapshotDirty = false;
+        // New files not in snapshot
+        const newFiles = mp3Files.filter((f) => !snapshotPaths.has(f.relativePath));
 
-    function flush(): void {
-      const updates = [...pendingUpdates];
-      pendingUpdates.length = 0;
+        // Files that exist in both but have changed size/lastModified
+        const modifiedFiles = mp3Files.filter((f) => {
+          const stored = snapshot.tracks[f.relativePath];
+          return stored && (stored.size !== f.size || stored.lastModified !== f.lastModified);
+        });
 
-      setRoots((currentRoots) =>
-        currentRoots.map((root) => {
-          if (root.id !== rootId) {
-            return root;
-          }
+        const staleOrNewFiles = [...newFiles, ...modifiedFiles];
+        const isFullyCached = staleOrNewFiles.length === 0 && removedPaths.length === 0;
 
-          let nextDraft = root.draft;
-          const nextTracksById = new Map(root.tracks.map((item) => [item.id, item]));
-
-          for (const update of updates) {
-            const currentTrack = nextTracksById.get(update.trackId);
-            if (!currentTrack) {
-              continue;
+        // Apply vfsFileId updates and remove deleted tracks
+        setRoots((currentRoots) =>
+          currentRoots.map((root) => {
+            if (root.id !== rootId) {
+              return root;
             }
 
-            nextTracksById.set(update.trackId, {
-              ...currentTrack,
-              checksum: update.fullChecksum,
-              fullChecksum: update.fullChecksum,
-              audioChecksum: update.audioChecksum,
-              size: update.size,
-              lastModified: update.lastModified,
-              lastVerifiedAt: update.lastVerifiedAt,
-              metadata: update.metadata
-            });
+            let tracks = root.tracks
+              .filter((t) => !removedPaths.includes(t.relativePath))
+              .map((t) => {
+                const file = fileByPath.get(t.relativePath);
+                return file ? { ...t, vfsFileId: file.id } : t;
+              });
 
-            if (root.selectedTrackId === update.trackId && isEmptyMetadata(nextDraft)) {
-              nextDraft = update.metadata;
+            // Add genuinely new files (not in snapshot at all) as empty placeholder tracks
+            for (const file of newFiles) {
+              tracks.push({
+                id: file.relativePath,
+                name: file.name,
+                relativePath: file.relativePath,
+                size: file.size,
+                lastModified: file.lastModified,
+                vfsFileId: file.id,
+                checksum: "",
+                fullChecksum: undefined,
+                audioChecksum: undefined,
+                lastVerifiedAt: undefined,
+                metadata: emptyMetadata()
+              });
             }
+
+            return {
+              ...root,
+              tracks,
+              loadingMetadata: !isFullyCached,
+              loadedCount: tracks.length - staleOrNewFiles.length
+            };
+          })
+        );
+
+        if (removedPaths.length > 0) {
+          for (const p of removedPaths) {
+            delete snapshot.tracks[p];
           }
+        }
 
-          return {
-            ...root,
-            tracks: root.tracks.map((item) => nextTracksById.get(item.id) ?? item),
-            draft: nextDraft,
-            loadedCount,
-            loadingMetadata: loadedCount < initialTracks.length,
-            metaSnapshot: snapshot
-          };
-        })
-      );
-
-      setInfoMessage(`Root ${rootLabel}. Cargando metadatos ${loadedCount}/${initialTracks.length}...`);
-    }
-
-    const READ_CONCURRENCY = 6;
-    let cursor = 0;
-
-    async function worker(): Promise<void> {
-      while (true) {
-        const itemIndex = cursor;
-        cursor += 1;
-        if (itemIndex >= staleOrNewFiles.length) {
+        if (isFullyCached) {
+          setRoots((currentRoots) =>
+            currentRoots.map((root) =>
+              root.id === rootId ? { ...root, loadingMetadata: false } : root
+            )
+          );
           return;
         }
 
-        const { file } = staleOrNewFiles[itemIndex];
-        const sourceBytes = await vfs.readFile(file.id);
-        const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
-        const stored = snapshot.tracks[file.relativePath];
-        const metadata =
-          stored && (stored.fullChecksum || stored.checksum) === fullChecksum
-            ? stored.metadata
-            : await readTrackMetadataFromBytes(sourceBytes, file.name);
-
-        const nowIso = new Date().toISOString();
-        snapshot.tracks[file.relativePath] = {
-          checksum: fullChecksum,
-          fullChecksum,
-          audioChecksum,
-          size: file.size,
-          lastModified: file.lastModified,
-          lastVerifiedAt: nowIso,
-          metadata,
-          updatedAt: nowIso
+        // Process stale/new files concurrently
+        type TrackUpdate = {
+          trackId: string;
+          metadata: TrackMetadata;
+          fullChecksum: string;
+          audioChecksum: string;
+          size: number;
+          lastModified?: number;
+          lastVerifiedAt: string;
         };
-        snapshotDirty = true;
 
-        pendingUpdates.push({
-          trackId: file.relativePath,
-          metadata,
-          fullChecksum,
-          audioChecksum,
-          size: file.size,
-          lastModified: file.lastModified,
-          lastVerifiedAt: nowIso
-        });
-        loadedCount += 1;
+        const pendingUpdates: TrackUpdate[] = [];
+        let loadedCount = initialTracks.length - staleOrNewFiles.length + (removedPaths.length > 0 ? 0 : 0);
+        let snapshotDirty = removedPaths.length > 0;
+        const totalAfterWalk = mp3Files.length;
 
-        if (loadedCount % 10 === 0 || loadedCount === initialTracks.length) {
-          flush();
+        function flush(): void {
+          const updates = [...pendingUpdates];
+          pendingUpdates.length = 0;
+
+          setRoots((currentRoots) =>
+            currentRoots.map((root) => {
+              if (root.id !== rootId) {
+                return root;
+              }
+
+              const nextTracksById = new Map(root.tracks.map((item) => [item.id, item]));
+
+              for (const update of updates) {
+                const currentTrack = nextTracksById.get(update.trackId);
+                if (!currentTrack) {
+                  continue;
+                }
+
+                nextTracksById.set(update.trackId, {
+                  ...currentTrack,
+                  checksum: update.fullChecksum,
+                  fullChecksum: update.fullChecksum,
+                  audioChecksum: update.audioChecksum,
+                  size: update.size,
+                  lastModified: update.lastModified,
+                  lastVerifiedAt: update.lastVerifiedAt,
+                  metadata: update.metadata
+                });
+              }
+
+              return {
+                ...root,
+                tracks: root.tracks.map((item) => nextTracksById.get(item.id) ?? item),
+                loadedCount,
+                loadingMetadata: loadedCount < totalAfterWalk,
+                metaSnapshot: snapshot
+              };
+            })
+          );
         }
-      }
-    }
 
-    await Promise.all(
-      Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
-    );
+        const READ_CONCURRENCY = 6;
+        let cursor = 0;
 
-    if (snapshotDirty) {
-      await writeMetaSnapshot(vfs, snapshot);
-    }
-
-    setRoots((currentRoots) =>
-      currentRoots.map((root) =>
-        root.id === rootId
-          ? {
-              ...root,
-              loadingMetadata: false,
-              loadedCount: initialTracks.length,
-              metaSnapshot: snapshot
+        async function worker(): Promise<void> {
+          while (true) {
+            const itemIndex = cursor;
+            cursor += 1;
+            if (itemIndex >= staleOrNewFiles.length) {
+              return;
             }
-          : root
-      )
-    );
 
-    setInfoMessage(`Root ${rootLabel} lista. ${initialTracks.length} archivos MP3 preparados.`);
+            const file = staleOrNewFiles[itemIndex];
+            const sourceBytes = await vfs.readFile(file.id);
+            const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
+            const stored = snapshot.tracks[file.relativePath];
+            const metadata =
+              stored && (stored.fullChecksum || stored.checksum) === fullChecksum
+                ? stored.metadata
+                : await readTrackMetadataFromBytes(sourceBytes, file.name);
+
+            const nowIso = new Date().toISOString();
+            snapshot.tracks[file.relativePath] = {
+              checksum: fullChecksum,
+              fullChecksum,
+              audioChecksum,
+              size: file.size,
+              lastModified: file.lastModified,
+              lastVerifiedAt: nowIso,
+              metadata,
+              updatedAt: nowIso
+            };
+            snapshotDirty = true;
+
+            pendingUpdates.push({
+              trackId: file.relativePath,
+              metadata,
+              fullChecksum,
+              audioChecksum,
+              size: file.size,
+              lastModified: file.lastModified,
+              lastVerifiedAt: nowIso
+            });
+            loadedCount += 1;
+
+            if (loadedCount % 10 === 0 || loadedCount === totalAfterWalk) {
+              flush();
+            }
+          }
+        }
+
+        await Promise.all(
+          Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
+        );
+
+        if (snapshotDirty) {
+          await writeMetaSnapshot(vfs, snapshot);
+        }
+
+        setRoots((currentRoots) =>
+          currentRoots.map((root) =>
+            root.id === rootId
+              ? {
+                  ...root,
+                  loadingMetadata: false,
+                  loadedCount: totalAfterWalk,
+                  metaSnapshot: snapshot
+                }
+              : root
+          )
+        );
+      } catch {
+        // Walk failed silently — snapshot data is still usable
+        setRoots((currentRoots) =>
+          currentRoots.map((root) =>
+            root.id === rootId ? { ...root, loadingMetadata: false } : root
+          )
+        );
+      }
+    })();
   }
+
+
+
 
   async function handlePickFolder(): Promise<void> {
     setLoading(true);
@@ -1271,17 +1318,7 @@ export function Mp3ManagerView(): JSX.Element {
   );
 }
 
-function isEmptyMetadata(value: EditableMetadata): boolean {
-  return (
-    !value.title &&
-    !value.artist &&
-    !value.album &&
-    !value.year &&
-    !value.genre &&
-    !value.trackNumber &&
-    !value.coverDataUrl
-  );
-}
+
 
 function computeCommonMetadata(tracks: Mp3Track[]): EditableMetadata {
   if (tracks.length === 0) {
