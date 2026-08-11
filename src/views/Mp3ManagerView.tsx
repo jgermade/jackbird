@@ -960,6 +960,43 @@ export function Mp3ManagerView(): JSX.Element {
     );
   }
 
+  function handleExpandAllFolders(): void {
+    if (!activeRootId || !activeRoot) {
+      return;
+    }
+
+    const albums = collectFolderPaths(activeRoot.tracks);
+
+    setRoots((currentRoots) =>
+      currentRoots.map((root) =>
+        root.id === activeRootId
+          ? {
+              ...root,
+              expandedAlbums: albums
+            }
+          : root
+      )
+    );
+  }
+
+  function handleCollapseAllFolders(): void {
+    if (!activeRootId) {
+      return;
+    }
+
+    setRoots((currentRoots) =>
+      currentRoots.map((root) =>
+        root.id === activeRootId
+          ? {
+              ...root,
+              expandedAlbums: [],
+              expandedDiscs: []
+            }
+          : root
+      )
+    );
+  }
+
   function handleSelectTreeRow(rowKey: string): void {
     if (!activeRootId) {
       return;
@@ -1224,8 +1261,48 @@ export function Mp3ManagerView(): JSX.Element {
       <section className="app-body">
         <aside className="library-pane" onKeyDown={handleLibraryKeyDown} tabIndex={0}>
           <div className="library-head">
-            <h2>Library</h2>
-            <span>{activeRoot?.tracks.length ?? 0}</span>
+            <div className="library-head-title">
+              <h2>Biblioteca</h2>
+              <span className="library-head-count">{activeRoot?.tracks.length ?? 0}</span>
+            </div>
+            <div className="library-head-actions">
+              <button
+                type="button"
+                className="library-head-btn"
+                onClick={handleExpandAllFolders}
+                disabled={!activeRoot || activeRoot.tracks.length === 0}
+                title="Expandir todo"
+                aria-label="Expandir todo"
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path
+                    d="M3 5.5h10M3 10.5h10M8 3v5M8 8v5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="library-head-btn"
+                onClick={handleCollapseAllFolders}
+                disabled={!activeRoot || activeRoot.expandedAlbums.length === 0}
+                title="Colapsar todo"
+                aria-label="Colapsar todo"
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path
+                    d="M3 5.5h10M3 10.5h10"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {(errorMessage || infoMessage || restoring) && (
@@ -1431,6 +1508,22 @@ async function readMetaSnapshot(vfs: BrowserVfs): Promise<MetaSnapshot> {
 
 async function writeMetaSnapshot(vfs: BrowserVfs, snapshot: MetaSnapshot): Promise<void> {
   await vfs.writeTextFile(META_FILE_PATH, JSON.stringify(snapshot, null, 2));
+}
+
+function collectFolderPaths(tracks: Mp3Track[]): string[] {
+  const paths = new Set<string>();
+
+  for (const track of tracks) {
+    const folders = track.relativePath.split("/").slice(0, -1);
+    let current = "";
+
+    for (const folder of folders) {
+      current = current ? `${current}/${folder}` : folder;
+      paths.add(current);
+    }
+  }
+
+  return [...paths];
 }
 
 function buildWizardRows(tracks: Mp3Track[], root: RootWorkspace | null): WizardTreeRow[] {
