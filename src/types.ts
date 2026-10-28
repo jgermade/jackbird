@@ -13,7 +13,6 @@ export type Mp3Track = {
   name: string;
   relativePath: string;
   size: number;
-  vfsFileId: string;
   checksum: string;
   fullChecksum?: string;
   audioChecksum?: string;

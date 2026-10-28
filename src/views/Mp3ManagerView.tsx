@@ -17,7 +17,7 @@ import {
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
 import { useTheme } from "../services/ThemeService";
 import type { EditableMetadata, Mp3Track, TrackMetadata } from "../types";
-import { BrowserVfs } from "../vfs/browserVfs";
+import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 
 
 type GroupingMode = "flat" | "wizard";
@@ -47,7 +47,10 @@ type PlaybackQueue = {
 type RootWorkspace = {
   id: string;
   label: string;
-  vfs: BrowserVfs;
+  /** The storage seam. Nothing above this line knows which backend is behind it. */
+  vfs: VFSAdapter;
+  /** Kept here rather than on the adapter: it is what the session store persists. */
+  rootHandle: FileSystemDirectoryHandle;
   tracks: Mp3Track[];
   selectedTrackId: string | null;
   selectedTrackIds: string[];
@@ -188,15 +191,15 @@ export function Mp3ManagerView(): JSX.Element {
             break;
           }
 
-          const vfs = new BrowserVfs();
-          await vfs.mountFromHandle(persistedRoot.handle);
-          const hasPermission = await vfs.hasReadWritePermission();
+          const vfs = FSAAdapter.fromHandle(persistedRoot.handle);
+          const hasPermission = await vfs.ensurePermission();
 
           if (!hasPermission) {
             continue;
           }
 
           await hydrateRoot(vfs, {
+            rootHandle: persistedRoot.handle,
             rootId: persistedRoot.id,
             rootLabel: persistedRoot.label,
             groupingMode: persistedRoot.groupingMode,
@@ -234,20 +237,12 @@ export function Mp3ManagerView(): JSX.Element {
     }
 
     const rootsForSession = roots
-      .map((root) => {
-        const handle = root.vfs.getRootHandle();
-        if (!handle) {
-          return null;
-        }
-
-        return {
-          id: root.id,
-          label: root.label,
-          handle,
-          groupingMode: root.groupingMode
-        };
-      })
-      .filter((value): value is NonNullable<typeof value> => value !== null);
+      .map((root) => ({
+        id: root.id,
+        label: root.label,
+        handle: root.rootHandle,
+        groupingMode: root.groupingMode
+      }));
 
     void saveRootSession({
       roots: rootsForSession,
@@ -300,7 +295,7 @@ export function Mp3ManagerView(): JSX.Element {
         }
 
         try {
-          const sourceBytes = await activeRoot.vfs.readFile(track.vfsFileId);
+          const sourceBytes = await activeRoot.vfs.read(track.relativePath);
           const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
           const nowIso = new Date().toISOString();
 
@@ -362,16 +357,17 @@ export function Mp3ManagerView(): JSX.Element {
   }, [activeRoot?.id, activeRoot?.loadingMetadata]);
 
   async function hydrateRoot(
-    vfs: BrowserVfs,
+    vfs: VFSAdapter,
     options: {
+      rootHandle: FileSystemDirectoryHandle;
       rootId?: string;
       rootLabel?: string;
       groupingMode?: GroupingMode;
       setActive?: boolean;
-    } = {}
+    }
   ): Promise<void> {
     const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const rootLabel = options.rootLabel ?? (vfs.getRootName() || `Root ${roots.length + 1}`);
+    const rootLabel = options.rootLabel ?? (vfs.name || `Root ${roots.length + 1}`);
     const groupingMode = options.groupingMode ?? "wizard";
 
     // ─── Phase 1: Snapshot → instant render ──────────────────────────────────
@@ -384,7 +380,6 @@ export function Mp3ManagerView(): JSX.Element {
       relativePath,
       size: stored.size ?? 0,
       lastModified: stored.lastModified,
-      vfsFileId: relativePath, // placeholder until walk resolves real VfsFile id
       checksum: stored.fullChecksum || stored.checksum,
       fullChecksum: stored.fullChecksum || stored.checksum,
       audioChecksum: stored.audioChecksum,
@@ -398,6 +393,7 @@ export function Mp3ManagerView(): JSX.Element {
         id: rootId,
         label: rootLabel,
         vfs,
+        rootHandle: options.rootHandle,
         tracks: initialTracks,
         selectedTrackId: null,
         selectedTrackIds: [],
@@ -433,10 +429,15 @@ export function Mp3ManagerView(): JSX.Element {
     // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
     void (async () => {
       try {
-        const mp3Files = await vfs.listFiles({ extensions: [".mp3"] });
+        const mp3Files = (await walk(vfs))
+          .filter((entry) => entry.path.toLowerCase().endsWith(".mp3"))
+          .map((entry) => ({
+            name: entry.path.split("/").at(-1) ?? entry.path,
+            relativePath: entry.path,
+            size: entry.stat.size,
+            lastModified: entry.stat.mtime
+          }));
 
-        // Update vfsFileId for all existing tracks now that we have real VfsFile entries
-        const fileByPath = new Map(mp3Files.map((f) => [f.relativePath, f]));
         const snapshotPaths = new Set(Object.keys(snapshot.tracks));
         const fsPaths = new Set(mp3Files.map((f) => f.relativePath));
 
@@ -455,19 +456,14 @@ export function Mp3ManagerView(): JSX.Element {
         const staleOrNewFiles = [...newFiles, ...modifiedFiles];
         const isFullyCached = staleOrNewFiles.length === 0 && removedPaths.length === 0;
 
-        // Apply vfsFileId updates and remove deleted tracks
+        // Drop tracks that are gone from disk
         setRoots((currentRoots) =>
           currentRoots.map((root) => {
             if (root.id !== rootId) {
               return root;
             }
 
-            let tracks = root.tracks
-              .filter((t) => !removedPaths.includes(t.relativePath))
-              .map((t) => {
-                const file = fileByPath.get(t.relativePath);
-                return file ? { ...t, vfsFileId: file.id } : t;
-              });
+            const tracks = root.tracks.filter((t) => !removedPaths.includes(t.relativePath));
 
             // Add genuinely new files (not in snapshot at all) as empty placeholder tracks
             for (const file of newFiles) {
@@ -477,7 +473,6 @@ export function Mp3ManagerView(): JSX.Element {
                 relativePath: file.relativePath,
                 size: file.size,
                 lastModified: file.lastModified,
-                vfsFileId: file.id,
                 checksum: "",
                 fullChecksum: undefined,
                 audioChecksum: undefined,
@@ -579,7 +574,7 @@ export function Mp3ManagerView(): JSX.Element {
             }
 
             const file = staleOrNewFiles[itemIndex];
-            const sourceBytes = await vfs.readFile(file.id);
+            const sourceBytes = await vfs.read(file.relativePath);
             const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
             const stored = snapshot.tracks[file.relativePath];
             const metadata =
@@ -657,9 +652,12 @@ export function Mp3ManagerView(): JSX.Element {
     setInfoMessage(null);
 
     try {
-      const vfs = new BrowserVfs();
-      await vfs.mount();
-      await hydrateRoot(vfs);
+      if (!isFSAAvailable()) {
+        throw new Error("Tu navegador no soporta File System Access API.");
+      }
+
+      const vfs = await FSAAdapter.pick();
+      await hydrateRoot(vfs, { rootHandle: vfs.root });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No se pudo escanear la carpeta seleccionada.");
     } finally {
@@ -857,8 +855,10 @@ export function Mp3ManagerView(): JSX.Element {
       return;
     }
 
-    const currentFiles = await root.vfs.listFiles({ extensions: [".mp3"] });
-    const currentPaths = new Set(currentFiles.map((file) => file.relativePath));
+    const currentFiles = (await walk(root.vfs)).filter((entry) =>
+      entry.path.toLowerCase().endsWith(".mp3")
+    );
+    const currentPaths = new Set(currentFiles.map((file) => file.path));
     const knownPaths = new Set(root.tracks.map((track) => track.relativePath));
 
     if (currentFiles.length === root.tracks.length && [...currentPaths].every((path) => knownPaths.has(path))) {
@@ -867,6 +867,7 @@ export function Mp3ManagerView(): JSX.Element {
 
     setInfoMessage(`Resincronizando root ${root.label}...`);
     await hydrateRoot(root.vfs, {
+      rootHandle: root.rootHandle,
       rootId: root.id,
       rootLabel: root.label,
       groupingMode: root.groupingMode,
@@ -1036,7 +1037,7 @@ export function Mp3ManagerView(): JSX.Element {
       throw new Error("La carpeta de la lista de reproduccion ya no esta disponible.");
     }
 
-    return playbackRoot.vfs.readFile(track.vfsFileId);
+    return playbackRoot.vfs.read(track.relativePath);
   }
 
   function handleLibraryKeyDown(event: KeyboardEvent<HTMLElement>): void {
@@ -1144,9 +1145,9 @@ export function Mp3ManagerView(): JSX.Element {
           coverDataUrl: varied.coverDataUrl && draft.coverDataUrl === null ? track.metadata.coverDataUrl : draft.coverDataUrl
         };
 
-        const sourceBytes = await activeRoot.vfs.readFile(track.vfsFileId);
+        const sourceBytes = await activeRoot.vfs.read(track.relativePath);
         const nextBytes = await writeTrackMetadataToBytes(sourceBytes, nextMeta);
-        await activeRoot.vfs.writeFile(track.vfsFileId, nextBytes);
+        await activeRoot.vfs.write(track.relativePath, nextBytes);
         const { fullChecksum, audioChecksum } = await calculateDualChecksums(nextBytes);
         const nowIso = new Date().toISOString();
         const lastMod = Date.now();
@@ -1181,8 +1182,6 @@ export function Mp3ManagerView(): JSX.Element {
 
       await writeMetaSnapshot(activeRoot.vfs, nextSnapshot);
 
-      const writeCount = activeRoot.vfs.getWriteOperations().length;
-
       setRoots((currentRoots) =>
         currentRoots.map((root) => {
           if (root.id !== activeRoot.id) {
@@ -1198,7 +1197,7 @@ export function Mp3ManagerView(): JSX.Element {
       );
 
       const trackLabel = selectedTracks.length === 1 ? selectedTracks[0].name : `${selectedTracks.length} pistas`;
-      setInfoMessage(`Metadatos guardados en ${trackLabel}. Operaciones VFS en tab: ${writeCount}.`);
+      setInfoMessage(`Metadatos guardados en ${trackLabel}.`);
       setEditModalOpen(false);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
@@ -1492,8 +1491,13 @@ function orderDetailPlaylist(tracks: Mp3Track[]): Mp3Track[] {
   });
 }
 
-async function readMetaSnapshot(vfs: BrowserVfs): Promise<MetaSnapshot> {
-  const raw = await vfs.readTextFile(META_FILE_PATH);
+async function readMetaSnapshot(vfs: VFSAdapter): Promise<MetaSnapshot> {
+  const exists = await vfs.stat(META_FILE_PATH);
+  if (!exists) {
+    return emptySnapshot();
+  }
+
+  const raw = new TextDecoder().decode(await vfs.read(META_FILE_PATH)).trim();
   if (!raw) {
     return emptySnapshot();
   }
@@ -1506,8 +1510,9 @@ async function readMetaSnapshot(vfs: BrowserVfs): Promise<MetaSnapshot> {
   }
 }
 
-async function writeMetaSnapshot(vfs: BrowserVfs, snapshot: MetaSnapshot): Promise<void> {
-  await vfs.writeTextFile(META_FILE_PATH, JSON.stringify(snapshot, null, 2));
+async function writeMetaSnapshot(vfs: VFSAdapter, snapshot: MetaSnapshot): Promise<void> {
+  const encoded = new TextEncoder().encode(JSON.stringify(snapshot, null, 2));
+  await vfs.write(META_FILE_PATH, encoded);
 }
 
 function collectFolderPaths(tracks: Mp3Track[]): string[] {
