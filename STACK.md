@@ -77,7 +77,8 @@ mp3-manager/
 │   └── vfs/
 │       ├── types.ts             # VfsAdapter contract (mount/listFiles/readFile/writeFile)
 │       └── browserVfs.ts        # File System Access API implementation
-└── SESSIONS/                    # Chronological session specifications & audit trail
+├── RECORD/                      # Specs, plans, walkthroughs & audit trail (see AGENTS.md)
+└── ROADMAP/                     # Dated roadmaps with Mermaid Gantt charts (see AGENTS.md)
 ```
 
 ---
