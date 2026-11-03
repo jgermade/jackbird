@@ -56,17 +56,7 @@
   <div class="deck">
     <div class="brand">
       <img class="logo" :src="logoUrl" alt="" />
-      <div class="names">
-        <span class="wordmark">{{ t("app.name") }}</span>
-        <span class="mm-legend">{{ t("faceplate.tagline") }}</span>
-      </div>
-    </div>
-
-    <div class="open-folder">
-      <Key :variant="hasRoots ? 'secondary' : 'primary'" :disabled="library.loading" @click="openFolder()">
-        <Reel :if="library.loading" :size="14" speed="fast" />
-        {{ folderLabel }}
-      </Key>
+      <span class="wordmark">{{ t("app.name") }}</span>
     </div>
 
     <div class="transport">
@@ -109,8 +99,18 @@
     </div>
   </div>
 
-  <span :if="!hasRoots" class="no-roots mm-legend">{{ t("roots.empty") }}</span>
-  <Tabs :else :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable @change="selectRoot($event.detail)" @close="closeRoot($event.detail)" />
+  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
+    <template :slot.end>
+      <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
+      <span class="open-folder">
+        <Key size="sm" :variant="hasRoots ? 'secondary' : 'primary'" :disabled="library.loading" :title="folderLabel" @click="openFolder()">
+          <Reel :if="library.loading" :size="12" speed="fast" />
+          <svg :else class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          {{ folderLabel }}
+        </Key>
+      </span>
+    </template>
+  </Tabs>
 </header>
 
 <style scoped>
@@ -125,21 +125,18 @@
 
   .deck {
     display: grid;
-    grid-template-columns: auto auto auto minmax(0, 1fr) auto;
-    grid-template-areas: "brand open transport screen actions";
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "brand transport screen actions";
     align-items: center;
     gap: var(--mm-space-3) var(--mm-space-4);
     padding: var(--mm-space-3) var(--mm-space-4);
   }
   .brand { grid-area: brand; display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
-  .open-folder { grid-area: open; }
   .transport { grid-area: transport; }
   .screen { grid-area: screen; min-width: 0; }
   .actions { grid-area: actions; display: flex; align-items: center; gap: var(--mm-space-3); }
 
   .logo { display: block; flex: none; height: 2.75rem; width: auto; }
-  .names { display: grid; gap: 2px; min-width: 0; }
-  .names > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .wordmark {
     font-family: var(--mm-font-label);
     font-stretch: var(--mm-stretch-label);
@@ -148,21 +145,16 @@
     letter-spacing: .08em;
     line-height: var(--mm-leading-tight);
     text-transform: uppercase;
+    white-space: nowrap;
   }
   .icon { width: .875rem; height: .875rem; }
 
-  .no-roots {
-    display: block;
-    padding: var(--mm-space-2) var(--mm-space-4);
-    border-top: var(--mm-border-width) solid var(--mm-border);
-  }
-
   @media (max-width: 1100px) {
     .deck {
-      grid-template-columns: auto auto minmax(0, 1fr) auto;
+      grid-template-columns: auto minmax(0, 1fr) auto;
       grid-template-areas:
-        "brand open . actions"
-        "transport screen screen screen";
+        "brand . actions"
+        "transport screen screen";
     }
   }
   /* The brand spans two columns, so the first one is as wide as the
@@ -171,12 +163,11 @@
     .deck {
       grid-template-columns: auto minmax(0, 1fr) auto;
       grid-template-areas:
-        "brand brand open"
+        "brand brand brand"
         "transport screen screen"
         "actions actions actions";
       padding: var(--mm-space-3);
     }
-    .open-folder { justify-self: end; }
     .actions { justify-content: space-between; }
   }
 </style>

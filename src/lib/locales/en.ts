@@ -62,7 +62,6 @@ export const en = {
   "album.playFromHere": "Play from this track",
   "album.pauseShort": "Pause",
 
-  "faceplate.tagline": "Library deck",
   "faceplate.transport": "Transport",
   "faceplate.play": "Play",
   "faceplate.pause": "Pause",

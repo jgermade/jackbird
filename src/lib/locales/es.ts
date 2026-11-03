@@ -63,7 +63,6 @@ export const es: Record<MessageKey, string> = {
   "album.playFromHere": "Reproducir desde esta pista",
   "album.pauseShort": "Pausar",
 
-  "faceplate.tagline": "Pletina de biblioteca",
   "faceplate.transport": "Transporte",
   "faceplate.play": "Reproducir",
   "faceplate.pause": "Pausar",

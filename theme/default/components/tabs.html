@@ -8,7 +8,8 @@
   // An item is `{ id, label, meta, closeLabel }`; `meta` is small mono text
   // after the label (a count), `closeLabel` the close key's accessible name.
   // The choice goes up through `:model` and as `change`; a close key emits
-  // `close` with the item's id, and the owner decides what goes.
+  // `close` with the item's id, and the owner decides what goes. The `end`
+  // slot sits right after the last tab: a key that adds one, say.
   //
   // **Part of the default theme**: imports `Led`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -66,6 +67,7 @@
       <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
     </button>
   </div>
+  <div :if="$slots.end" class="end"><slot.end /></div>
 </div>
 
 <style scoped>
@@ -77,6 +79,13 @@
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
     scrollbar-width: thin;
+  }
+  .end {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--mm-space-2);
+    padding: 0 var(--mm-space-2) var(--mm-space-1);
   }
   .tab {
     position: relative;
