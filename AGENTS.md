@@ -10,6 +10,10 @@ Check [THESAURUS.md](THESAURUS.md)
 documentation, records, roadmaps and commit messages. This applies whatever language the
 conversation with the user is held in.
 
+The one exception is UI translations. The interface is available in English and Spanish, with
+English as the source and the fallback: every string is written in English first, and its
+Spanish translation lives only in the Spanish translation file.
+
 ## Project Management
 
 ### Records
