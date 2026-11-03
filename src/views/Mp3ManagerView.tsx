@@ -1,35 +1,31 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import { useEffect, useMemo, type KeyboardEvent } from "react";
 import { AlbumOverview } from "../components/AlbumOverview";
 import { DetailActionBar } from "../components/DetailActionBar";
-import { FolderPicker } from "../components/FolderPicker";
 import { LibraryLanding } from "../components/LibraryLanding";
 import { MetadataEditModal } from "../components/MetadataEditModal";
-import { PlaybackBar } from "../components/PlaybackBar";
 import { PreferencesModal } from "../components/PreferencesModal";
-import { RootTabs } from "../components/RootTabs";
 import { TrackInfoModal } from "../components/TrackInfoModal";
 import { TrackWizardList } from "../components/TrackWizardList";
+import Faceplate from "./faceplate.html";
+import { Jq79Island } from "./Jq79Island";
 import { computeCommonMetadata, emptyMetadata, getVariedFields } from "../helpers/metadata";
-import { emptySnapshot, parseMetaSnapshot, serializeMetaSnapshot } from "../helpers/snapshot";
 import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows } from "../helpers/tree";
-import {
-  calculateDualChecksums,
-  readTrackMetadataFromBytes,
-  writeTrackMetadataToBytes
-} from "../lib/id3";
+import { calculateDualChecksums, writeTrackMetadataToBytes } from "../lib/id3";
 import { languageName, useT } from "../lib/i18n";
 import { library } from "../lib/library";
+import { writeMetaSnapshot } from "../lib/meta";
 import { playback } from "../lib/playback";
+import { playQueue, togglePlay } from "../lib/player";
 import { LANGUAGES, preferences, setLanguage, toggleTheme } from "../lib/preferences";
 import { useStoreValue } from "../lib/react-store";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
+import { hydrateRoot, openFolder } from "../lib/roots";
 import { ui } from "../lib/ui";
-import type { EditableMetadata, GroupingMode, MetaSnapshot, Mp3Track, RootWorkspace, TrackMetadata } from "../types";
-import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
+import type { EditableMetadata, MetaSnapshot, Mp3Track, TrackMetadata } from "../types";
+import { FSAAdapter } from "@cloudauthn/vfs-sync";
 
 
-const META_FILE_PATH = ".meta/mp3-manager.json";
 
 export function Mp3ManagerView(): JSX.Element {
   // State lives in the lib/ stores; React reads it through useStoreValue
@@ -39,18 +35,16 @@ export function Mp3ManagerView(): JSX.Element {
   const [language] = useStoreValue(preferences, "language");
   const [roots, setRoots] = useStoreValue(library, "roots");
   const [activeRootId, setActiveRootId] = useStoreValue(library, "activeRootId");
-  const [loading, setLoading] = useStoreValue(library, "loading");
   const [saving, setSaving] = useStoreValue(library, "saving");
   const [restoring, setRestoring] = useStoreValue(library, "restoring");
   const [errorMessage, setErrorMessage] = useStoreValue(library, "errorMessage");
   const [infoMessage, setInfoMessage] = useStoreValue(library, "infoMessage");
-  const [playbackQueue, setPlaybackQueue] = useStoreValue(playback, "queue");
-  const [playbackIndex, setPlaybackIndex] = useStoreValue(playback, "index");
-  const [isAudioPlaying, setIsAudioPlaying] = useStoreValue(playback, "playing");
+  const [playbackQueue] = useStoreValue(playback, "queue");
+  const [playbackIndex] = useStoreValue(playback, "index");
+  const [isAudioPlaying] = useStoreValue(playback, "playing");
   const [preferencesOpen, setPreferencesOpen] = useStoreValue(ui, "preferencesOpen");
   const [editModalOpen, setEditModalOpen] = useStoreValue(ui, "editModalOpen");
   const [infoModalOpen, setInfoModalOpen] = useStoreValue(ui, "infoModalOpen");
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     document.title = t("app.name");
@@ -298,312 +292,6 @@ export function Mp3ManagerView(): JSX.Element {
     };
   }, [activeRoot?.id, activeRoot?.loadingMetadata]);
 
-  async function hydrateRoot(
-    vfs: VFSAdapter,
-    options: {
-      rootHandle: FileSystemDirectoryHandle;
-      rootId?: string;
-      rootLabel?: string;
-      groupingMode?: GroupingMode;
-      setActive?: boolean;
-    }
-  ): Promise<void> {
-    const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const rootLabel = options.rootLabel ?? (vfs.name || t("roots.fallbackName", { number: roots.length + 1 }));
-    const groupingMode = options.groupingMode ?? "wizard";
-
-    // ─── Phase 1: Snapshot → instant render ──────────────────────────────────
-    const snapshot = await readMetaSnapshot(vfs);
-
-    const snapshotEntries = Object.entries(snapshot.tracks);
-    const initialTracks: Mp3Track[] = snapshotEntries.map(([relativePath, stored]) => ({
-      id: relativePath,
-      name: relativePath.split("/").at(-1) ?? relativePath,
-      relativePath,
-      size: stored.size ?? 0,
-      lastModified: stored.lastModified,
-      checksum: stored.fullChecksum || stored.checksum,
-      fullChecksum: stored.fullChecksum || stored.checksum,
-      audioChecksum: stored.audioChecksum,
-      lastVerifiedAt: stored.lastVerifiedAt,
-      metadata: stored.metadata
-    }));
-
-    setRoots((currentRoots) => {
-      const existingIndex = currentRoots.findIndex((root) => root.id === rootId);
-      const nextRoot: RootWorkspace = {
-        id: rootId,
-        label: rootLabel,
-        vfs,
-        rootHandle: options.rootHandle,
-        tracks: initialTracks,
-        selectedTrackId: null,
-        selectedTrackIds: [],
-        selectionAnchorTrackId: null,
-        draft: emptyMetadata(),
-        loadingMetadata: true, // walk is pending
-        loadedCount: initialTracks.length,
-        groupingMode,
-        metaSnapshot: snapshot,
-        expandedAlbums: [],
-        expandedDiscs: [],
-        activeRowKey: null
-      };
-
-      if (existingIndex === -1) {
-        return [...currentRoots, nextRoot];
-      }
-
-      const copy = [...currentRoots];
-      copy[existingIndex] = {
-        ...nextRoot,
-        expandedAlbums: currentRoots[existingIndex].expandedAlbums,
-        expandedDiscs: currentRoots[existingIndex].expandedDiscs,
-        activeRowKey: currentRoots[existingIndex].activeRowKey
-      };
-      return copy;
-    });
-
-    if (options.setActive !== false) {
-      setActiveRootId(rootId);
-    }
-
-    // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
-    void (async () => {
-      try {
-        const mp3Files = (await walk(vfs))
-          .filter((entry) => entry.path.toLowerCase().endsWith(".mp3"))
-          .map((entry) => ({
-            name: entry.path.split("/").at(-1) ?? entry.path,
-            relativePath: entry.path,
-            size: entry.stat.size,
-            lastModified: entry.stat.mtime
-          }));
-
-        const snapshotPaths = new Set(Object.keys(snapshot.tracks));
-        const fsPaths = new Set(mp3Files.map((f) => f.relativePath));
-
-        // Tracks removed from disk
-        const removedPaths = [...snapshotPaths].filter((p) => !fsPaths.has(p));
-
-        // New files not in snapshot
-        const newFiles = mp3Files.filter((f) => !snapshotPaths.has(f.relativePath));
-
-        // Files that exist in both but have changed size/lastModified
-        const modifiedFiles = mp3Files.filter((f) => {
-          const stored = snapshot.tracks[f.relativePath];
-          return stored && (stored.size !== f.size || stored.lastModified !== f.lastModified);
-        });
-
-        const staleOrNewFiles = [...newFiles, ...modifiedFiles];
-        const isFullyCached = staleOrNewFiles.length === 0 && removedPaths.length === 0;
-
-        // Drop tracks that are gone from disk
-        setRoots((currentRoots) =>
-          currentRoots.map((root) => {
-            if (root.id !== rootId) {
-              return root;
-            }
-
-            const tracks = root.tracks.filter((t) => !removedPaths.includes(t.relativePath));
-
-            // Add genuinely new files (not in snapshot at all) as empty placeholder tracks
-            for (const file of newFiles) {
-              tracks.push({
-                id: file.relativePath,
-                name: file.name,
-                relativePath: file.relativePath,
-                size: file.size,
-                lastModified: file.lastModified,
-                checksum: "",
-                fullChecksum: undefined,
-                audioChecksum: undefined,
-                lastVerifiedAt: undefined,
-                metadata: emptyMetadata()
-              });
-            }
-
-            return {
-              ...root,
-              tracks,
-              loadingMetadata: !isFullyCached,
-              loadedCount: tracks.length - staleOrNewFiles.length
-            };
-          })
-        );
-
-        if (removedPaths.length > 0) {
-          for (const p of removedPaths) {
-            delete snapshot.tracks[p];
-          }
-        }
-
-        if (isFullyCached) {
-          setRoots((currentRoots) =>
-            currentRoots.map((root) =>
-              root.id === rootId ? { ...root, loadingMetadata: false } : root
-            )
-          );
-          return;
-        }
-
-        // Process stale/new files concurrently
-        type TrackUpdate = {
-          trackId: string;
-          metadata: TrackMetadata;
-          fullChecksum: string;
-          audioChecksum: string;
-          size: number;
-          lastModified?: number;
-          lastVerifiedAt: string;
-        };
-
-        const pendingUpdates: TrackUpdate[] = [];
-        let loadedCount = initialTracks.length - staleOrNewFiles.length + (removedPaths.length > 0 ? 0 : 0);
-        let snapshotDirty = removedPaths.length > 0;
-        const totalAfterWalk = mp3Files.length;
-
-        function flush(): void {
-          const updates = [...pendingUpdates];
-          pendingUpdates.length = 0;
-
-          setRoots((currentRoots) =>
-            currentRoots.map((root) => {
-              if (root.id !== rootId) {
-                return root;
-              }
-
-              const nextTracksById = new Map(root.tracks.map((item) => [item.id, item]));
-
-              for (const update of updates) {
-                const currentTrack = nextTracksById.get(update.trackId);
-                if (!currentTrack) {
-                  continue;
-                }
-
-                nextTracksById.set(update.trackId, {
-                  ...currentTrack,
-                  checksum: update.fullChecksum,
-                  fullChecksum: update.fullChecksum,
-                  audioChecksum: update.audioChecksum,
-                  size: update.size,
-                  lastModified: update.lastModified,
-                  lastVerifiedAt: update.lastVerifiedAt,
-                  metadata: update.metadata
-                });
-              }
-
-              return {
-                ...root,
-                tracks: root.tracks.map((item) => nextTracksById.get(item.id) ?? item),
-                loadedCount,
-                loadingMetadata: loadedCount < totalAfterWalk,
-                metaSnapshot: snapshot
-              };
-            })
-          );
-        }
-
-        const READ_CONCURRENCY = 6;
-        let cursor = 0;
-
-        async function worker(): Promise<void> {
-          while (true) {
-            const itemIndex = cursor;
-            cursor += 1;
-            if (itemIndex >= staleOrNewFiles.length) {
-              return;
-            }
-
-            const file = staleOrNewFiles[itemIndex];
-            const sourceBytes = await vfs.read(file.relativePath);
-            const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
-            const stored = snapshot.tracks[file.relativePath];
-            const metadata =
-              stored && (stored.fullChecksum || stored.checksum) === fullChecksum
-                ? stored.metadata
-                : await readTrackMetadataFromBytes(sourceBytes, file.name);
-
-            const nowIso = new Date().toISOString();
-            snapshot.tracks[file.relativePath] = {
-              checksum: fullChecksum,
-              fullChecksum,
-              audioChecksum,
-              size: file.size,
-              lastModified: file.lastModified,
-              lastVerifiedAt: nowIso,
-              metadata,
-              updatedAt: nowIso
-            };
-            snapshotDirty = true;
-
-            pendingUpdates.push({
-              trackId: file.relativePath,
-              metadata,
-              fullChecksum,
-              audioChecksum,
-              size: file.size,
-              lastModified: file.lastModified,
-              lastVerifiedAt: nowIso
-            });
-            loadedCount += 1;
-
-            if (loadedCount % 10 === 0 || loadedCount === totalAfterWalk) {
-              flush();
-            }
-          }
-        }
-
-        await Promise.all(
-          Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
-        );
-
-        if (snapshotDirty) {
-          await writeMetaSnapshot(vfs, snapshot);
-        }
-
-        setRoots((currentRoots) =>
-          currentRoots.map((root) =>
-            root.id === rootId
-              ? {
-                  ...root,
-                  loadingMetadata: false,
-                  loadedCount: totalAfterWalk,
-                  metaSnapshot: snapshot
-                }
-              : root
-          )
-        );
-      } catch {
-        // Walk failed silently — snapshot data is still usable
-        setRoots((currentRoots) =>
-          currentRoots.map((root) =>
-            root.id === rootId ? { ...root, loadingMetadata: false } : root
-          )
-        );
-      }
-    })();
-  }
-
-  async function handlePickFolder(): Promise<void> {
-    setLoading(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
-
-    try {
-      if (!isFSAAvailable()) {
-        throw new Error(t("message.noFsa"));
-      }
-
-      const vfs = await FSAAdapter.pick();
-      await hydrateRoot(vfs, { rootHandle: vfs.root });
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("message.scanFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function handleSelectTrack(
     trackId: string,
     options?: boolean | { toggle?: boolean; extendRange?: boolean }
@@ -728,12 +416,8 @@ export function Mp3ManagerView(): JSX.Element {
       return;
     }
 
-    if (playbackTrack?.id === trackId && audioRef.current) {
-      if (audioRef.current.paused) {
-        void audioRef.current.play();
-      } else {
-        audioRef.current.pause();
-      }
+    if (playbackTrack?.id === trackId) {
+      togglePlay();
       return;
     }
 
@@ -743,95 +427,7 @@ export function Mp3ManagerView(): JSX.Element {
       return;
     }
 
-    setPlaybackQueue({ rootId: activeRoot.id, trackIds, sourceLabel: detailLabel });
-    setPlaybackIndex(index);
-  }
-
-  function handlePreviousPlaybackTrack(): void {
-    setPlaybackIndex((index) => Math.max(0, index - 1));
-  }
-
-  function handleNextPlaybackTrack(): void {
-    setPlaybackIndex((index) => Math.min(playbackTracks.length - 1, index + 1));
-  }
-
-  function handleReturnToPlaybackList(): void {
-    if (!playbackQueue) {
-      return;
-    }
-
-    setActiveRootId(playbackQueue.rootId);
-    setRoots((currentRoots) =>
-      currentRoots.map((root) =>
-        root.id === playbackQueue.rootId
-          ? {
-              ...root,
-              selectedTrackId: null,
-              selectedTrackIds: playbackQueue.trackIds,
-              selectionAnchorTrackId: null,
-              activeRowKey: null,
-              draft: emptyMetadata()
-            }
-          : root
-      )
-    );
-  }
-
-  function handleSelectRoot(rootId: string): void {
-    setActiveRootId(rootId);
-    setInfoMessage(null);
-    setErrorMessage(null);
-
-    void resyncRootIfNeeded(rootId);
-  }
-
-  async function resyncRootIfNeeded(rootId: string): Promise<void> {
-    const root = roots.find((item) => item.id === rootId);
-    if (!root || root.loadingMetadata) {
-      return;
-    }
-
-    const currentFiles = (await walk(root.vfs)).filter((entry) =>
-      entry.path.toLowerCase().endsWith(".mp3")
-    );
-    const currentPaths = new Set(currentFiles.map((file) => file.path));
-    const knownPaths = new Set(root.tracks.map((track) => track.relativePath));
-
-    if (currentFiles.length === root.tracks.length && [...currentPaths].every((path) => knownPaths.has(path))) {
-      return;
-    }
-
-    setInfoMessage(t("message.resyncing", { name: root.label }));
-    await hydrateRoot(root.vfs, {
-      rootHandle: root.rootHandle,
-      rootId: root.id,
-      rootLabel: root.label,
-      groupingMode: root.groupingMode,
-      setActive: false
-    });
-  }
-
-  function handleCloseRoot(rootId: string): void {
-    if (playbackQueue?.rootId === rootId) {
-      setPlaybackQueue(null);
-      setPlaybackIndex(0);
-    }
-
-    setRoots((currentRoots) => {
-      const index = currentRoots.findIndex((root) => root.id === rootId);
-      if (index === -1) {
-        return currentRoots;
-      }
-
-      const nextRoots = currentRoots.filter((root) => root.id !== rootId);
-
-      if (activeRootId === rootId) {
-        const fallback = nextRoots[index] ?? nextRoots[index - 1] ?? null;
-        setActiveRootId(fallback?.id ?? null);
-      }
-
-      return nextRoots;
-    });
+    playQueue({ rootId: activeRoot.id, trackIds, sourceLabel: detailLabel }, index);
   }
 
   function handleChangeDraft(next: EditableMetadata): void {
@@ -966,14 +562,6 @@ export function Mp3ManagerView(): JSX.Element {
     setInfoMessage(
       t("message.consolidatePending")
     );
-  }
-
-  async function handleLoadPlaybackAudioBytes(track: Mp3Track): Promise<Uint8Array> {
-    if (!playbackRoot) {
-      throw new Error(t("playback.folderGone"));
-    }
-
-    return playbackRoot.vfs.read(track.relativePath);
   }
 
   function handleLibraryKeyDown(event: KeyboardEvent<HTMLElement>): void {
@@ -1144,56 +732,7 @@ export function Mp3ManagerView(): JSX.Element {
 
   return (
     <main className="app-shell">
-      <header className="app-topbar">
-        <div className="header-left">
-          <h1 className="brand">{t("app.name")}</h1>
-          <FolderPicker t={t} onPickFolder={handlePickFolder} disabled={loading} loading={loading} hasRoots={roots.length > 0} />
-        </div>
-
-        <div className="header-right">
-          <RootTabs
-            t={t}
-            tabs={roots.map((root) => ({
-              id: root.id,
-              label: root.label,
-              count: root.tracks.length,
-              loadingMetadata: root.loadingMetadata,
-              loadedCount: root.loadedCount
-            }))}
-            activeTabId={activeRootId}
-            onSelectTab={handleSelectRoot}
-            onCloseTab={handleCloseRoot}
-          />
-
-          <div className="header-right-actions">
-            <PlaybackBar
-              t={t}
-              track={playbackTrack}
-              trackKey={playbackTrack && playbackQueue ? `${playbackQueue.rootId}:${playbackTrack.id}` : null}
-              sourceLabel={playbackQueue?.sourceLabel ?? t("playback.defaultSource")}
-              position={playbackIndex}
-              total={playbackTracks.length}
-              canGoPrevious={playbackIndex > 0}
-              canGoNext={playbackIndex < playbackTracks.length - 1}
-              onLoadAudioBytes={handleLoadPlaybackAudioBytes}
-              onPrevious={handlePreviousPlaybackTrack}
-              onNext={handleNextPlaybackTrack}
-              onReturnToList={handleReturnToPlaybackList}
-              onPlaybackStateChange={setIsAudioPlaying}
-              audioRef={audioRef}
-            />
-            <button
-              type="button"
-              className="preferences-trigger"
-              onClick={() => setPreferencesOpen(true)}
-              aria-label={t("preferences.open")}
-              title={t("preferences.title")}
-            >
-              &#9881;
-            </button>
-          </div>
-        </div>
-      </header>
+      <Jq79Island component={Faceplate} className="faceplate-island" />
 
       <section className="app-body">
         <aside className="library-pane" onKeyDown={handleLibraryKeyDown} tabIndex={0}>
@@ -1272,7 +811,7 @@ export function Mp3ManagerView(): JSX.Element {
 
         <section className="detail-pane">
           {!activeRoot ? (
-            <LibraryLanding t={t} onOpenFolder={() => void handlePickFolder()} />
+            <LibraryLanding t={t} onOpenFolder={() => void openFolder()} />
           ) : (
             <>
               {activeRoot.selectedTrackIds.length > 0 && (
@@ -1336,18 +875,4 @@ export function Mp3ManagerView(): JSX.Element {
       />
     </main>
   );
-}
-
-async function readMetaSnapshot(vfs: VFSAdapter): Promise<MetaSnapshot> {
-  const exists = await vfs.stat(META_FILE_PATH);
-  if (!exists) {
-    return emptySnapshot();
-  }
-
-  return parseMetaSnapshot(new TextDecoder().decode(await vfs.read(META_FILE_PATH)));
-}
-
-async function writeMetaSnapshot(vfs: VFSAdapter, snapshot: MetaSnapshot): Promise<void> {
-  const encoded = new TextEncoder().encode(serializeMetaSnapshot(snapshot));
-  await vfs.write(META_FILE_PATH, encoded);
 }

@@ -6,7 +6,7 @@
    Two tones with the same roles. Silver (light) is satin aluminium, white
    polycarbonate and a reflective LCD; Graphite (dark) is anodised black and
    a VFD. `:root` is Silver and `[data-theme="dark"]` re-points the colours:
-   the attribute ThemeService sets on <html>. Any element can be an island of
+   the attribute lib/preferences.ts sets on <html>. Any element can be an island of
    the other tone with `data-tone="dark"` or `data-tone="light"`. Shape, type
    and motion are the same in both.
 

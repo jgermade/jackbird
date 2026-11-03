@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatBytes, formatTrackNumber } from "./format.ts";
+import { formatBytes, formatTime, formatTrackNumber } from "./format.ts";
 
 describe("formatBytes", () => {
   it("writes zero as 0 Bytes", () => {
@@ -33,5 +33,24 @@ describe("formatTrackNumber", () => {
 
   it("keeps a plain number as written", () => {
     assert.equal(formatTrackNumber(" 07 "), "07");
+  });
+});
+
+describe("formatTime", () => {
+  it("writes minutes and seconds, two digits each, dropping fractions", () => {
+    assert.equal(formatTime(192.7), "03:12");
+    assert.equal(formatTime(5), "00:05");
+    assert.equal(formatTime(5999), "99:59");
+  });
+
+  it("goes past 99 minutes without wrapping", () => {
+    assert.equal(formatTime(6000), "100:00");
+  });
+
+  it("is 00:00 for nothing, a negative or an unknown duration", () => {
+    assert.equal(formatTime(0), "00:00");
+    assert.equal(formatTime(-3), "00:00");
+    assert.equal(formatTime(Number.NaN), "00:00");
+    assert.equal(formatTime(Number.POSITIVE_INFINITY), "00:00");
   });
 });

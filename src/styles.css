@@ -77,6 +77,14 @@ input {
   box-shadow: none;
 }
 
+/* The jq79 faceplate (src/views/faceplate.html) sits in this React-owned
+   element, which keeps it at the top as the old header did. */
+.faceplate-island {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
 .app-topbar {
   position: sticky;
   top: 0;

@@ -75,7 +75,9 @@ for (const file of files) {
   if (!layer) continue;
 
   for (const { specifier, line } of importsOf(readFileSync(file, "utf8"))) {
-    if (/\.(css|woff2?|svg|png|jpe?g)$/.test(specifier)) continue;
+    // Assets (styles, fonts, images) are not code and belong to no layer,
+    // with or without a Vite query (`logo.svg?url`).
+    if (/\.(css|woff2?|svg|png|jpe?g)$/.test(specifier.split("?")[0])) continue;
 
     if (!specifier.startsWith(".")) {
       const name = specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0];

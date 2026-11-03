@@ -35,9 +35,14 @@ export function languageName(language: Language): string {
   return CATALOGUES[language]["language.self"];
 }
 
-/** A translator in the current language. */
+/** A text in the current language. Read in a jq79 binding, it re-renders when the language changes. */
 export function t(key: MessageKey, params?: Params): string {
   return createTranslate(preferences.language)(key, params);
+}
+
+/** A counted text in the current language (`key.one` / `key.other`). */
+export function tn(key: PluralKey, count: number, params?: Params): string {
+  return createTranslate(preferences.language).n(key, count, params);
 }
 
 /** A translator for React that changes when the language does. */

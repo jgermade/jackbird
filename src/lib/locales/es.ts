@@ -5,7 +5,7 @@
 import type { MessageKey } from "./en";
 
 export const es: Record<MessageKey, string> = {
-  "app.name": "MP3 Manager",
+  "app.name": "jackbird",
   "language.self": "Español",
 
   "common.close": "Cerrar",
@@ -62,6 +62,24 @@ export const es: Record<MessageKey, string> = {
   "album.pause": "Pausar {title}",
   "album.playFromHere": "Reproducir desde esta pista",
   "album.pauseShort": "Pausar",
+
+  "faceplate.tagline": "Pletina de biblioteca",
+  "faceplate.transport": "Transporte",
+  "faceplate.play": "Reproducir",
+  "faceplate.pause": "Pausar",
+  "faceplate.state.stopped": "Parado",
+  "faceplate.state.playing": "Sonando",
+  "faceplate.state.paused": "Pausa",
+  "faceplate.state.loading": "Cargando",
+  "faceplate.state.error": "Error",
+  "faceplate.track": "Pista",
+  "faceplate.idle": "Nada sonando",
+  "faceplate.position": "Posición",
+  "faceplate.positionText": "{position} de {duration}",
+  "faceplate.tone": "Tono oscuro",
+  "faceplate.light": "Plata",
+  "faceplate.dark": "Grafito",
+  "faceplate.roots": "Roots abiertas",
 
   "playback.label": "Reproductor de lista",
   "playback.defaultSource": "Lista",

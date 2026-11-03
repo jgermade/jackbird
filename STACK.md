@@ -19,8 +19,9 @@ This document describes the technical stack and codebase architecture implemente
 - **Multi-root workspaces**: Several folders ("roots") can be open at once as tabs; each root
   keeps its own track list, metadata draft, and grouping mode.
 - **Small, reusable components / stateful views**: `src/components/` holds presentational
-  components with no store coupling; `src/views/Mp3ManagerView.tsx` owns state and composes
-  them.
+  components with no store coupling; views compose them over the `src/lib/` stores. The top bar
+  is a jq79 view (`src/views/faceplate.html`); the rest is still the React
+  `src/views/Mp3ManagerView.tsx`, which mounts the faceplate through `Jq79Island`.
 
 ---
 
@@ -86,19 +87,21 @@ mp3-manager/
 │   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
 │   │                            # metadata, tracks, tree, snapshot, format
 │   ├── styles.css               # Single stylesheet, CSS variables in :root
-│   ├── components/              # Presentational, store-free UI components
-│   │   ├── FolderPicker.tsx     # "Open folder" button + loading state
-│   │   ├── RootTabs.tsx         # Tab bar for open root workspaces
-│   │   ├── TrackTable.tsx       # Flat-mode track listing
+│   ├── assets/brand/            # jackbird-metal.svg: the logo (faceplate, favicon)
+│   ├── components/              # Presentational, store-free UI components (React, until moved)
 │   │   ├── TrackWizardList.tsx  # Wizard-mode tree (album/disc/track rows)
 │   │   ├── MetadataEditor.tsx   # ID3 field editor for the selected track
 │   │   └── CoverDropzone.tsx    # Drag & drop / pick cover art
 │   ├── views/
-│   │   └── Mp3ManagerView.tsx   # Reads the lib/ stores; handlers for roots, tabs,
-│   │                            # session restore, metadata drafts and saving
+│   │   ├── faceplate.html       # jq79: brand, folder key, transport, display, root tabs
+│   │   ├── Jq79Island.tsx       # Mounts a jq79 view inside React (until React goes)
+│   │   └── Mp3ManagerView.tsx   # React: library, album sheet, dialogs; session restore
 │   ├── lib/
 │   │   ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
 │   │   ├── rootSessionStore.ts  # IndexedDB persistence of open roots
+│   │   ├── meta.ts              # Reads and writes .meta/mp3-manager.json in a root
+│   │   ├── roots.ts             # hydrateRoot, openFolder, selectRoot, closeRoot, …
+│   │   ├── player.ts            # The one Audio element; nowPlaying, playQueue, next, …
 │   │   ├── library.ts, playback.ts, ui.ts  # jq79 stores for the app's state
 │   │   ├── preferences.ts       # Theme and language: saved, else from the system
 │   │   ├── storage.ts           # Every localStorage key, in one place
@@ -124,7 +127,7 @@ mp3-manager/
 
 ### Root workspaces & tabs
 - Multiple folders can be opened as roots simultaneously; each has its own tab
-  (`RootTabs`), track list, and independent grouping mode (`flat` or `wizard`).
+  (the faceplate's `Tabs`), track list, and independent grouping mode (`flat` or `wizard`).
 - Open roots (their directory handles) and grouping mode are persisted in IndexedDB via
   `rootSessionStore.ts` and restored on reload if read/write permission is still granted.
 

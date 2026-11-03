@@ -17,8 +17,8 @@ gantt
     Layers, helpers and tests          :done, layers, after theme, 1d
     Stores and i18n (en, es)           :done, stores, after layers, 1d
   section Screens in jq79
-    Faceplate                          :active, face, after stores, 2d
-    Library                            :lib, after face, 3d
+    Faceplate                          :done, face, after stores, 1d
+    Library                            :active, lib, after face, 3d
     Modals and forms                   :forms, after lib, 2d
   section Clean-up
     Remove React and old styles        :clean, after forms, 1d

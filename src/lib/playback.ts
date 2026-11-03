@@ -1,4 +1,5 @@
-// What is playing: the queue, the position in it, and whether audio runs.
+// What is playing: the queue, the position in it, whether audio runs, and
+// where in the track it is. lib/player.ts drives the audio and writes here.
 
 import { $reactive } from "jq79";
 import type { PlaybackQueue } from "../types";
@@ -6,5 +7,10 @@ import type { PlaybackQueue } from "../types";
 export const playback = $reactive({
   queue: null as PlaybackQueue | null,
   index: 0,
-  playing: false
+  playing: false,
+  /** Seconds into the current track, and its length (0 until known). */
+  position: 0,
+  duration: 0,
+  loading: false,
+  error: null as string | null
 });

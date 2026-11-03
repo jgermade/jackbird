@@ -8,7 +8,8 @@ Check [THESAURUS.md](THESAURUS.md)
 
 The UI is moving from React to [jq79](https://github.com/jgermade/jq79) components, one screen
 at a time. Code lives in four layers, and an import that crosses them the wrong way fails
-`npm test` (`scripts/check-layers.mjs`; `import type` is exempt, since it is erased):
+`npm test` (`scripts/check-layers.mjs`; `import type` is exempt, since it is erased, and so are
+assets such as styles, fonts and images):
 
 | Folder | What | May import |
 | --- | --- | --- |

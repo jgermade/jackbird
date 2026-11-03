@@ -18,3 +18,9 @@ export function formatTrackNumber(value: string | undefined): string {
   const slash = trimmed.indexOf("/");
   return slash === -1 ? trimmed : trimmed.slice(0, slash).trim();
 }
+
+/** `03:12`: minutes and seconds of a duration, whole seconds; unknown or negative is `00:00`. */
+export function formatTime(seconds: number): string {
+  const whole = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  return `${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`;
+}

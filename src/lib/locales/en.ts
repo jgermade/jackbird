@@ -4,7 +4,7 @@
 // `{name}` marks a value filled in at runtime.
 
 export const en = {
-  "app.name": "MP3 Manager",
+  "app.name": "jackbird",
   "language.self": "English",
 
   "common.close": "Close",
@@ -61,6 +61,24 @@ export const en = {
   "album.pause": "Pause {title}",
   "album.playFromHere": "Play from this track",
   "album.pauseShort": "Pause",
+
+  "faceplate.tagline": "Library deck",
+  "faceplate.transport": "Transport",
+  "faceplate.play": "Play",
+  "faceplate.pause": "Pause",
+  "faceplate.state.stopped": "Stop",
+  "faceplate.state.playing": "Play",
+  "faceplate.state.paused": "Pause",
+  "faceplate.state.loading": "Loading",
+  "faceplate.state.error": "Error",
+  "faceplate.track": "Track",
+  "faceplate.idle": "Nothing playing",
+  "faceplate.position": "Position",
+  "faceplate.positionText": "{position} of {duration}",
+  "faceplate.tone": "Dark tone",
+  "faceplate.light": "Silver",
+  "faceplate.dark": "Graphite",
+  "faceplate.roots": "Open roots",
 
   "playback.label": "Playlist player",
   "playback.defaultSource": "List",
