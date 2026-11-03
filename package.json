@@ -11,7 +11,7 @@
     "test": "npm run test:layers && npm run test:types && npm run test:unit && npm run test:coverage",
     "test:layers": "node scripts/check-layers.mjs",
     "test:types": "tsc -p tsconfig.test.json",
-    "test:unit": "mkdir -p .tmp/coverage && node --test --experimental-strip-types --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/helpers/**' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-exclude='src/**/*.test-support.ts' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=.tmp/coverage/lcov.info 'src/helpers/**/*.test.ts'",
+    "test:unit": "mkdir -p .tmp/coverage && node --test --experimental-strip-types --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/helpers/**' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-exclude='src/**/*.test-support.ts' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=.tmp/coverage/lcov.info 'src/**/*.test.ts'",
     "test:coverage": "node scripts/check-coverage.mjs .tmp/coverage/lcov.info 90"
   },
   "dependencies": {

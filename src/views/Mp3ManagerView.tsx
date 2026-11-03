@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
 import { AlbumOverview } from "../components/AlbumOverview";
 import { DetailActionBar } from "../components/DetailActionBar";
 import { FolderPicker } from "../components/FolderPicker";
@@ -11,65 +11,50 @@ import { TrackInfoModal } from "../components/TrackInfoModal";
 import { TrackWizardList } from "../components/TrackWizardList";
 import { computeCommonMetadata, emptyMetadata, getVariedFields } from "../helpers/metadata";
 import { emptySnapshot, parseMetaSnapshot, serializeMetaSnapshot } from "../helpers/snapshot";
-import { collectFolderPaths, inferDiscLabel, orderDetailPlaylist } from "../helpers/tracks";
+import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows } from "../helpers/tree";
 import {
   calculateDualChecksums,
   readTrackMetadataFromBytes,
   writeTrackMetadataToBytes
 } from "../lib/id3";
+import { languageName, useT } from "../lib/i18n";
+import { library } from "../lib/library";
+import { playback } from "../lib/playback";
+import { LANGUAGES, preferences, setLanguage, toggleTheme } from "../lib/preferences";
+import { useStoreValue } from "../lib/react-store";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
-import { useTheme } from "../lib/ThemeService";
-import type { EditableMetadata, MetaSnapshot, Mp3Track, TrackMetadata } from "../types";
+import { ui } from "../lib/ui";
+import type { EditableMetadata, GroupingMode, MetaSnapshot, Mp3Track, RootWorkspace, TrackMetadata } from "../types";
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 
-type GroupingMode = "flat" | "wizard";
-
-type PlaybackQueue = {
-  rootId: string;
-  trackIds: string[];
-  sourceLabel: string;
-};
-
-type RootWorkspace = {
-  id: string;
-  label: string;
-  /** The storage seam. Nothing above this line knows which backend is behind it. */
-  vfs: VFSAdapter;
-  /** Kept here rather than on the adapter: it is what the session store persists. */
-  rootHandle: FileSystemDirectoryHandle;
-  tracks: Mp3Track[];
-  selectedTrackId: string | null;
-  selectedTrackIds: string[];
-  selectionAnchorTrackId: string | null;
-  draft: EditableMetadata;
-  loadingMetadata: boolean;
-  loadedCount: number;
-  groupingMode: GroupingMode;
-  metaSnapshot: MetaSnapshot;
-  expandedAlbums: string[];
-  expandedDiscs: string[];
-  activeRowKey: string | null;
-};
 
 const META_FILE_PATH = ".meta/mp3-manager.json";
 
 export function Mp3ManagerView(): JSX.Element {
-  const [theme, toggleTheme] = useTheme();
-  const [roots, setRoots] = useState<RootWorkspace[]>([]);
-  const [activeRootId, setActiveRootId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [restoring, setRestoring] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const [playbackQueue, setPlaybackQueue] = useState<PlaybackQueue | null>(null);
-  const [playbackIndex, setPlaybackIndex] = useState(0);
-  const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [infoModalOpen, setInfoModalOpen] = useState(false);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  // State lives in the lib/ stores; React reads it through useStoreValue
+  // until this view is rewritten as jq79 views (see "Layers" in AGENTS.md).
+  const t = useT();
+  const [theme] = useStoreValue(preferences, "theme");
+  const [language] = useStoreValue(preferences, "language");
+  const [roots, setRoots] = useStoreValue(library, "roots");
+  const [activeRootId, setActiveRootId] = useStoreValue(library, "activeRootId");
+  const [loading, setLoading] = useStoreValue(library, "loading");
+  const [saving, setSaving] = useStoreValue(library, "saving");
+  const [restoring, setRestoring] = useStoreValue(library, "restoring");
+  const [errorMessage, setErrorMessage] = useStoreValue(library, "errorMessage");
+  const [infoMessage, setInfoMessage] = useStoreValue(library, "infoMessage");
+  const [playbackQueue, setPlaybackQueue] = useStoreValue(playback, "queue");
+  const [playbackIndex, setPlaybackIndex] = useStoreValue(playback, "index");
+  const [isAudioPlaying, setIsAudioPlaying] = useStoreValue(playback, "playing");
+  const [preferencesOpen, setPreferencesOpen] = useStoreValue(ui, "preferencesOpen");
+  const [editModalOpen, setEditModalOpen] = useStoreValue(ui, "editModalOpen");
+  const [infoModalOpen, setInfoModalOpen] = useStoreValue(ui, "infoModalOpen");
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    document.title = t("app.name");
+  }, [t]);
 
   const activeRoot = useMemo(
     () => roots.find((root) => root.id === activeRootId) ?? null,
@@ -104,15 +89,6 @@ export function Mp3ManagerView(): JSX.Element {
       };
     }
 
-    if (row?.kind === "disc" && row.disc) {
-      return {
-        label: `${row.album} - ${row.disc}`,
-        tracks: activeRoot.tracks.filter(
-          (track) =>
-            (track.metadata.album.trim() || "Sin album") === row.album && inferDiscLabel(track) === row.disc
-        )
-      };
-    }
 
     if (row?.kind === "track" && row.album) {
       return {
@@ -333,7 +309,7 @@ export function Mp3ManagerView(): JSX.Element {
     }
   ): Promise<void> {
     const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const rootLabel = options.rootLabel ?? (vfs.name || `Root ${roots.length + 1}`);
+    const rootLabel = options.rootLabel ?? (vfs.name || t("roots.fallbackName", { number: roots.length + 1 }));
     const groupingMode = options.groupingMode ?? "wizard";
 
     // ─── Phase 1: Snapshot → instant render ──────────────────────────────────
@@ -616,13 +592,13 @@ export function Mp3ManagerView(): JSX.Element {
 
     try {
       if (!isFSAAvailable()) {
-        throw new Error("Tu navegador no soporta File System Access API.");
+        throw new Error(t("message.noFsa"));
       }
 
       const vfs = await FSAAdapter.pick();
       await hydrateRoot(vfs, { rootHandle: vfs.root });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudo escanear la carpeta seleccionada.");
+      setErrorMessage(error instanceof Error ? error.message : t("message.scanFailed"));
     } finally {
       setLoading(false);
     }
@@ -721,10 +697,7 @@ export function Mp3ManagerView(): JSX.Element {
     }
 
     const count = activeRoot.selectedTrackIds.length;
-    const message =
-      count === 1
-        ? "¿Estás seguro de que deseas quitar esta pista de la biblioteca?"
-        : `¿Estás seguro de que deseas quitar las ${count} pistas seleccionadas de la biblioteca?`;
+    const message = t.n("message.removeConfirm", count);
 
     if (!window.confirm(message)) {
       return;
@@ -747,7 +720,7 @@ export function Mp3ManagerView(): JSX.Element {
       })
     );
 
-    setInfoMessage(count === 1 ? "Pista eliminada de la biblioteca." : `${count} pistas eliminadas de la biblioteca.`);
+    setInfoMessage(t.n("message.removed", count));
   }
 
   function handlePlayVisibleTrack(trackId: string): void {
@@ -828,7 +801,7 @@ export function Mp3ManagerView(): JSX.Element {
       return;
     }
 
-    setInfoMessage(`Resincronizando root ${root.label}...`);
+    setInfoMessage(t("message.resyncing", { name: root.label }));
     await hydrateRoot(root.vfs, {
       rootHandle: root.rootHandle,
       rootId: root.id,
@@ -991,13 +964,13 @@ export function Mp3ManagerView(): JSX.Element {
 
   function handleConsolidateTrack(_trackId: string): void {
     setInfoMessage(
-      "Consolidar: pendiente de definir el patron de nombre (estilo mp3tag). Boton de marcador por ahora."
+      t("message.consolidatePending")
     );
   }
 
   async function handleLoadPlaybackAudioBytes(track: Mp3Track): Promise<Uint8Array> {
     if (!playbackRoot) {
-      throw new Error("La carpeta de la lista de reproduccion ya no esta disponible.");
+      throw new Error(t("playback.folderGone"));
     }
 
     return playbackRoot.vfs.read(track.relativePath);
@@ -1159,11 +1132,11 @@ export function Mp3ManagerView(): JSX.Element {
         })
       );
 
-      const trackLabel = selectedTracks.length === 1 ? selectedTracks[0].name : `${selectedTracks.length} pistas`;
-      setInfoMessage(`Metadatos guardados en ${trackLabel}.`);
+      const trackLabel = selectedTracks.length === 1 ? selectedTracks[0].name : t.n("tracks.count", selectedTracks.length);
+      setInfoMessage(t("message.saved", { target: trackLabel }));
       setEditModalOpen(false);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
+      setErrorMessage(error instanceof Error ? error.message : t("message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -1173,12 +1146,13 @@ export function Mp3ManagerView(): JSX.Element {
     <main className="app-shell">
       <header className="app-topbar">
         <div className="header-left">
-          <h1 className="brand">MP3 Manager</h1>
-          <FolderPicker onPickFolder={handlePickFolder} disabled={loading} loading={loading} hasRoots={roots.length > 0} />
+          <h1 className="brand">{t("app.name")}</h1>
+          <FolderPicker t={t} onPickFolder={handlePickFolder} disabled={loading} loading={loading} hasRoots={roots.length > 0} />
         </div>
 
         <div className="header-right">
           <RootTabs
+            t={t}
             tabs={roots.map((root) => ({
               id: root.id,
               label: root.label,
@@ -1193,9 +1167,10 @@ export function Mp3ManagerView(): JSX.Element {
 
           <div className="header-right-actions">
             <PlaybackBar
+              t={t}
               track={playbackTrack}
               trackKey={playbackTrack && playbackQueue ? `${playbackQueue.rootId}:${playbackTrack.id}` : null}
-              sourceLabel={playbackQueue?.sourceLabel ?? "Lista"}
+              sourceLabel={playbackQueue?.sourceLabel ?? t("playback.defaultSource")}
               position={playbackIndex}
               total={playbackTracks.length}
               canGoPrevious={playbackIndex > 0}
@@ -1211,8 +1186,8 @@ export function Mp3ManagerView(): JSX.Element {
               type="button"
               className="preferences-trigger"
               onClick={() => setPreferencesOpen(true)}
-              aria-label="Abrir preferencias"
-              title="Preferencias"
+              aria-label={t("preferences.open")}
+              title={t("preferences.title")}
             >
               &#9881;
             </button>
@@ -1224,7 +1199,7 @@ export function Mp3ManagerView(): JSX.Element {
         <aside className="library-pane" onKeyDown={handleLibraryKeyDown} tabIndex={0}>
           <div className="library-head">
             <div className="library-head-title">
-              <h2>Biblioteca</h2>
+              <h2>{t("library.title")}</h2>
               <span className="library-head-count">{activeRoot?.tracks.length ?? 0}</span>
             </div>
             <div className="library-head-actions">
@@ -1233,8 +1208,8 @@ export function Mp3ManagerView(): JSX.Element {
                 className="library-head-btn"
                 onClick={handleExpandAllFolders}
                 disabled={!activeRoot || activeRoot.tracks.length === 0}
-                title="Expandir todo"
-                aria-label="Expandir todo"
+                title={t("library.expandAll")}
+                aria-label={t("library.expandAll")}
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                   <path
@@ -1251,8 +1226,8 @@ export function Mp3ManagerView(): JSX.Element {
                 className="library-head-btn"
                 onClick={handleCollapseAllFolders}
                 disabled={!activeRoot || activeRoot.expandedAlbums.length === 0}
-                title="Colapsar todo"
-                aria-label="Colapsar todo"
+                title={t("library.collapseAll")}
+                aria-label={t("library.collapseAll")}
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                   <path
@@ -1269,7 +1244,7 @@ export function Mp3ManagerView(): JSX.Element {
 
           {(errorMessage || infoMessage || restoring) && (
             <section className="panel-message">
-              {restoring && <p className="message info">Restaurando tabs...</p>}
+              {restoring && <p className="message info">{t("library.restoring")}</p>}
               {errorMessage && <p className="message error">{errorMessage}</p>}
               {infoMessage && <p className="message info">{infoMessage}</p>}
             </section>
@@ -1277,11 +1252,12 @@ export function Mp3ManagerView(): JSX.Element {
 
           {activeRoot?.loadingMetadata && (
             <p className="library-loading-status">
-              Cargando metadatos {activeRoot.loadedCount}/{activeRoot.tracks.length}...
+              {t("library.loadingMetadata", { loaded: activeRoot.loadedCount, total: activeRoot.tracks.length })}
             </p>
           )}
 
           <TrackWizardList
+            t={t}
             rows={treeRows}
             selectedTrackIds={activeRoot?.selectedTrackIds ?? []}
             activeRowKey={activeRoot?.activeRowKey ?? null}
@@ -1296,11 +1272,12 @@ export function Mp3ManagerView(): JSX.Element {
 
         <section className="detail-pane">
           {!activeRoot ? (
-            <LibraryLanding onOpenFolder={() => void handlePickFolder()} />
+            <LibraryLanding t={t} onOpenFolder={() => void handlePickFolder()} />
           ) : (
             <>
               {activeRoot.selectedTrackIds.length > 0 && (
                 <DetailActionBar
+                  t={t}
                   selectedCount={activeRoot.selectedTrackIds.length}
                   onShowInfo={() => setInfoModalOpen(true)}
                   onEdit={handleOpenEditModal}
@@ -1311,6 +1288,7 @@ export function Mp3ManagerView(): JSX.Element {
 
               {detailTracks.length > 0 ? (
                 <AlbumOverview
+                  t={t}
                   rootLabel={detailLabel}
                   tracks={detailTracks}
                   selectedTrackIds={activeRoot.selectedTrackIds}
@@ -1322,11 +1300,8 @@ export function Mp3ManagerView(): JSX.Element {
               ) : (
                 <section className="selection-prompt">
                   <span className="detail-eyebrow">{activeRoot.label}</span>
-                  <h2>Selecciona un album o una pista</h2>
-                  <p>
-                    Elige una carpeta del arbol para ver sus albumes, o usa Shift al pulsar
-                    pistas para revisar una seleccion multiple.
-                  </p>
+                  <h2>{t("detail.promptTitle")}</h2>
+                  <p>{t("detail.promptBody")}</p>
                 </section>
               )}
             </>
@@ -1334,12 +1309,17 @@ export function Mp3ManagerView(): JSX.Element {
         </section>
       </section>
       <PreferencesModal
+        t={t}
         open={preferencesOpen}
         theme={theme}
+        language={language}
+        languages={LANGUAGES.map((value) => ({ value, label: languageName(value) }))}
+        onChangeLanguage={setLanguage}
         onClose={() => setPreferencesOpen(false)}
         onToggleTheme={toggleTheme}
       />
       <MetadataEditModal
+        t={t}
         open={editModalOpen}
         tracks={selectedTracks}
         value={activeRoot?.draft ?? emptyMetadata()}
@@ -1349,6 +1329,7 @@ export function Mp3ManagerView(): JSX.Element {
         onClose={() => setEditModalOpen(false)}
       />
       <TrackInfoModal
+        t={t}
         open={infoModalOpen}
         tracks={selectedTracks}
         onClose={() => setInfoModalOpen(false)}

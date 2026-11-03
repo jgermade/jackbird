@@ -1,4 +1,7 @@
+import type { Translate } from "../lib/i18n";
+
 type DetailActionBarProps = {
+  t: Translate;
   selectedCount: number;
   onShowInfo: () => void;
   onEdit: () => void;
@@ -7,26 +10,26 @@ type DetailActionBarProps = {
 };
 
 export function DetailActionBar(props: DetailActionBarProps): JSX.Element {
-  const { selectedCount, onShowInfo, onEdit, onDelete, onClearSelection } = props;
+  const { t, selectedCount, onShowInfo, onEdit, onDelete, onClearSelection } = props;
 
   return (
     <div className="detail-action-bar">
       <div className="detail-action-info">
         <span className="detail-action-count">
-          {selectedCount} {selectedCount === 1 ? "pista seleccionada" : "pistas seleccionadas"}
+          {t.n("selection.count", selectedCount)}
         </span>
       </div>
       <div className="detail-action-buttons">
         <button type="button" className="btn btn-secondary btn-sm" onClick={onShowInfo}>
-          Mostrar info
+          {t("actions.showInfo")}
         </button>
         <button type="button" className="btn btn-primary btn-sm" onClick={onEdit}>
-          Editar
+          {t("actions.edit")}
         </button>
         <button type="button" className="btn btn-danger btn-sm" onClick={onDelete}>
-          Borrar
+          {t("actions.delete")}
         </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onClearSelection} title="Deseleccionar todo">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onClearSelection} title={t("actions.clearSelection")} aria-label={t("actions.clearSelection")}>
           ✕
         </button>
       </div>

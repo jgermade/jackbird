@@ -43,6 +43,13 @@ The one exception is UI translations. The interface is available in English and 
 English as the source and the fallback: every string is written in English first, and its
 Spanish translation lives only in the Spanish translation file.
 
+So no UI text is written inline. Each one is a key in `src/lib/locales/en.ts`, with its Spanish in
+`src/lib/locales/es.ts`, and is read with `t("key", { param })`. A counted text has `.one` and
+`.other` forms and is read with `t.n("key", count)`. The compiler rejects a Spanish catalogue
+missing a key, and `npm test` rejects one whose `{placeholders}` differ from the English. A view
+gets `t` from `src/lib/i18n.ts`; a component, which may not import `lib/`, receives it as a prop.
+The app's name is the `app.name` key.
+
 ## Project Management
 
 ### Records

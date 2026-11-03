@@ -1,4 +1,7 @@
+import type { Translate } from "../lib/i18n";
+
 type FolderPickerProps = {
+  t: Translate;
   onPickFolder: () => Promise<void>;
   disabled: boolean;
   loading: boolean;
@@ -6,17 +9,13 @@ type FolderPickerProps = {
 };
 
 export function FolderPicker(props: FolderPickerProps): JSX.Element {
-  const { onPickFolder, disabled, loading, hasRoots } = props;
+  const { t, onPickFolder, disabled, loading, hasRoots } = props;
 
   return (
     <button className="toolbar-add-btn" onClick={() => void onPickFolder()} disabled={disabled}>
       <span className="toolbar-add-icon">+</span>
       <span>
-        {loading
-          ? "Escaneando..."
-          : hasRoots
-            ? "Añadir root"
-            : "Abrir libreria"}
+        {loading ? t("picker.scanning") : hasRoots ? t("picker.addRoot") : t("picker.openLibrary")}
       </span>
     </button>
   );

@@ -15,9 +15,9 @@ gantt
     Deck in jq79                       :done, theme, 2026-11-03, 1d
   section Foundations
     Layers, helpers and tests          :done, layers, after theme, 1d
-    Stores and i18n (en, es)           :active, stores, after layers, 3d
+    Stores and i18n (en, es)           :done, stores, after layers, 1d
   section Screens in jq79
-    Faceplate                          :face, after stores, 2d
+    Faceplate                          :active, face, after stores, 2d
     Library                            :lib, after face, 3d
     Modals and forms                   :forms, after lib, 2d
   section Clean-up

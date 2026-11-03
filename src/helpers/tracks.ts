@@ -2,11 +2,11 @@ import type { Mp3Track } from "../types.ts";
 
 /**
  * The disc a track sits on, from a `CD2`, `disc 2` or `Disc_2` folder in its
- * path; disc 1 when there is none.
+ * path; disc 1 when there is none. A number, not a label: the view words it.
  */
-export function inferDiscLabel(track: Mp3Track): string {
+export function inferDiscNumber(track: Mp3Track): number {
   const byPath = track.relativePath.match(/(?:^|\/)(?:cd|disc)[ _-]?(\d+)(?:\/|$)/i);
-  return `Disco ${byPath?.[1] ?? "1"}`;
+  return byPath ? Number(byPath[1]) : 1;
 }
 
 /** The first number in a track number (`"03/12"` is 3); tracks without one sort last. */
@@ -25,7 +25,7 @@ export function orderDetailPlaylist(tracks: Mp3Track[]): Mp3Track[] {
   return [...tracks].sort(
     (left, right) =>
       albumKey(left).localeCompare(albumKey(right), "es") ||
-      inferDiscLabel(left).localeCompare(inferDiscLabel(right), "es", { numeric: true }) ||
+      inferDiscNumber(left) - inferDiscNumber(right) ||
       trackNumberOrder(left) - trackNumberOrder(right) ||
       left.name.localeCompare(right.name, "es")
   );

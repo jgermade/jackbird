@@ -1,3 +1,5 @@
+import type { Translate } from "../lib/i18n";
+
 type RootTab = {
   id: string;
   label: string;
@@ -7,6 +9,7 @@ type RootTab = {
 };
 
 type RootTabsProps = {
+  t: Translate;
   tabs: RootTab[];
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
@@ -14,10 +17,10 @@ type RootTabsProps = {
 };
 
 export function RootTabs(props: RootTabsProps): JSX.Element {
-  const { tabs, activeTabId, onSelectTab, onCloseTab } = props;
+  const { t, tabs, activeTabId, onSelectTab, onCloseTab } = props;
 
   if (tabs.length === 0) {
-    return <div className="empty-tabs">Sin roots abiertas</div>;
+    return <div className="empty-tabs">{t("roots.empty")}</div>;
   }
 
   return (
@@ -36,7 +39,7 @@ export function RootTabs(props: RootTabsProps): JSX.Element {
               type="button"
               className="root-tab-close"
               onClick={() => onCloseTab(tab.id)}
-              aria-label={`Cerrar ${tab.label}`}
+              aria-label={t("roots.close", { name: tab.label })}
             >
               ×
             </button>

@@ -1,20 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
-import { collectFolderPaths, inferDiscLabel, orderDetailPlaylist, trackNumberOrder } from "./tracks.ts";
+import { collectFolderPaths, inferDiscNumber, orderDetailPlaylist, trackNumberOrder } from "./tracks.ts";
 
-describe("inferDiscLabel", () => {
+describe("inferDiscNumber", () => {
   it("reads the disc from a CD or Disc folder, in any case and separator", () => {
-    assert.equal(inferDiscLabel(track("Album/CD2/01.mp3")), "Disco 2");
-    assert.equal(inferDiscLabel(track("Album/disc 3/01.mp3")), "Disco 3");
-    assert.equal(inferDiscLabel(track("Album/Disc_10/01.mp3")), "Disco 10");
-    assert.equal(inferDiscLabel(track("cd-4/01.mp3")), "Disco 4");
+    assert.equal(inferDiscNumber(track("Album/CD2/01.mp3")), 2);
+    assert.equal(inferDiscNumber(track("Album/disc 3/01.mp3")), 3);
+    assert.equal(inferDiscNumber(track("Album/Disc_10/01.mp3")), 10);
+    assert.equal(inferDiscNumber(track("cd-4/01.mp3")), 4);
   });
 
   it("is disc 1 when no folder names one", () => {
-    assert.equal(inferDiscLabel(track("Album/01.mp3")), "Disco 1");
-    assert.equal(inferDiscLabel(track("Album/cd2.mp3")), "Disco 1");
-    assert.equal(inferDiscLabel(track("Album/CDs/01.mp3")), "Disco 1");
+    assert.equal(inferDiscNumber(track("Album/01.mp3")), 1);
+    assert.equal(inferDiscNumber(track("Album/cd2.mp3")), 1);
+    assert.equal(inferDiscNumber(track("Album/CDs/01.mp3")), 1);
   });
 });
 

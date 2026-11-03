@@ -50,6 +50,14 @@ This document describes the technical stack and codebase architecture implemente
   root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.
 - **Session persistence**: `src/lib/rootSessionStore.ts` persists open root handles and
   their grouping mode in IndexedDB (`mp3-manager` database) so workspaces survive a reload.
+- **State**: jq79 `$reactive` stores in `src/lib/`: `library` (roots, active root, loading and
+  saving flags, messages), `playback` (queue, position, playing), `ui` (open dialogs) and
+  `preferences` (theme and language, saved under the keys in `src/lib/storage.ts`). The React
+  view reads them through `useStoreValue` (`src/lib/react-store.ts`), which hands React plain
+  objects, until its screens become jq79 views.
+- **Languages**: English (source and fallback) and Spanish. `src/lib/i18n.ts` gives `t` and
+  `t.n` (plurals via `Intl.PluralRules`) over the catalogues in `src/lib/locales/`. The
+  language follows the browser until one is chosen in Preferences, and sets `<html lang>`.
 
 ### Build Tools & Tooling
 - **Bundler & Dev Server**: Vite (`^5.4.8`), with two entries: the app (`index.html`) and the
@@ -86,12 +94,16 @@ mp3-manager/
 │   │   ├── MetadataEditor.tsx   # ID3 field editor for the selected track
 │   │   └── CoverDropzone.tsx    # Drag & drop / pick cover art
 │   ├── views/
-│   │   └── Mp3ManagerView.tsx   # Owns all state: roots, tabs, session restore,
-│   │                            # metadata drafts, wizard tree building, saving
+│   │   └── Mp3ManagerView.tsx   # Reads the lib/ stores; handlers for roots, tabs,
+│   │                            # session restore, metadata drafts and saving
 │   ├── lib/
 │   │   ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
 │   │   ├── rootSessionStore.ts  # IndexedDB persistence of open roots
-│   │   └── ThemeService.ts      # Light/dark theme, persisted + system preference
+│   │   ├── library.ts, playback.ts, ui.ts  # jq79 stores for the app's state
+│   │   ├── preferences.ts       # Theme and language: saved, else from the system
+│   │   ├── storage.ts           # Every localStorage key, in one place
+│   │   ├── i18n.ts              # t(), t.n(), useT(); locales/en.ts (source), locales/es.ts
+│   │   └── react-store.ts       # useStoreValue: React reads the stores (until React goes)
 │   └── vfs/
 │       ├── types.ts             # VfsAdapter contract (mount/listFiles/readFile/writeFile)
 │       └── browserVfs.ts        # File System Access API implementation
@@ -142,5 +154,7 @@ mp3-manager/
   (`CoverDropzone`).
 - Session restore on load: previously opened roots (with granted permission) reopen
   automatically, keeping the last active tab.
-- Light/dark theme toggle (`ThemeToggle`), defaulting to the OS `prefers-color-scheme`
-  and persisted across reloads.
+- Light/dark theme in Preferences, defaulting to the OS `prefers-color-scheme` and
+  persisted across reloads.
+- Interface in English or Spanish, chosen in Preferences, defaulting to the browser's
+  language (English when it is neither) and persisted across reloads.

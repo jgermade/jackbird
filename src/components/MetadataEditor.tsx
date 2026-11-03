@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { getVariedFields } from "../helpers/metadata";
+import type { Translate } from "../lib/i18n";
 import type { EditableMetadata, Mp3Track } from "../types";
 import { CoverDropzone } from "./CoverDropzone";
 
 type MetadataEditorProps = {
+  t: Translate;
   track?: Mp3Track | null;
   tracks?: Mp3Track[];
   value: EditableMetadata;
@@ -39,28 +42,28 @@ function MetadataValue(props: { label: string; value: string }): JSX.Element {
   );
 }
 
-function TechnicalDetails(props: { track: Mp3Track }): JSX.Element {
-  const { track } = props;
+function TechnicalDetails(props: { track: Mp3Track; t: Translate }): JSX.Element {
+  const { track, t } = props;
 
   return (
     <details className="technical-details">
-      <summary>Datos del archivo</summary>
+      <summary>{t("editor.fileData")}</summary>
       <div className="technical-list">
         <div>
-          <span>Archivo</span>
+          <span>{t("editor.file")}</span>
           <code>{track.name}</code>
         </div>
         <div>
-          <span>Ruta</span>
+          <span>{t("editor.path")}</span>
           <code>{track.relativePath}</code>
         </div>
         <div>
-          <span>Tamaño</span>
+          <span>{t("editor.size")}</span>
           <strong>{(track.size / (1024 * 1024)).toFixed(2)} MB</strong>
         </div>
         <div>
-          <span>Checksum</span>
-          <code>{track.fullChecksum || track.checksum || "Pendiente"}</code>
+          <span>{t("editor.checksum")}</span>
+          <code>{track.fullChecksum || track.checksum || t("editor.pending")}</code>
         </div>
       </div>
     </details>
@@ -68,7 +71,7 @@ function TechnicalDetails(props: { track: Mp3Track }): JSX.Element {
 }
 
 export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
-  const { track, tracks, value, saving, onChange, onSave, isModal } = props;
+  const { t, track, tracks, value, saving, onChange, onSave, isModal } = props;
   const [editing, setEditing] = useState(Boolean(isModal));
 
   const effectiveTracks = useMemo(() => {
@@ -80,30 +83,7 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
 
   const singleTrack = effectiveTracks.length === 1 ? effectiveTracks[0] : null;
 
-  const varied = useMemo(() => {
-    if (effectiveTracks.length <= 1) {
-      return {
-        title: false,
-        artist: false,
-        album: false,
-        year: false,
-        genre: false,
-        trackNumber: false,
-        coverDataUrl: false
-      };
-    }
-
-    const first = effectiveTracks[0].metadata;
-    return {
-      title: effectiveTracks.some((t) => t.metadata.title !== first.title),
-      artist: effectiveTracks.some((t) => t.metadata.artist !== first.artist),
-      album: effectiveTracks.some((t) => t.metadata.album !== first.album),
-      year: effectiveTracks.some((t) => t.metadata.year !== first.year),
-      genre: effectiveTracks.some((t) => t.metadata.genre !== first.genre),
-      trackNumber: effectiveTracks.some((t) => t.metadata.trackNumber !== first.trackNumber),
-      coverDataUrl: effectiveTracks.some((t) => t.metadata.coverDataUrl !== first.coverDataUrl)
-    };
-  }, [effectiveTracks]);
+  const varied = useMemo(() => getVariedFields(effectiveTracks), [effectiveTracks]);
 
   useEffect(() => {
     setEditing(Boolean(isModal));
@@ -112,21 +92,21 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
   if (effectiveTracks.length === 0) {
     return (
       <section className="panel panel-editor empty">
-        <h2>Detalles</h2>
-        <p>Selecciona una pista para ver su ficha y editar metadatos.</p>
+        <h2>{t("editor.details")}</h2>
+        <p>{t("editor.empty")}</p>
       </section>
     );
   }
 
   const heroTitle = singleTrack
     ? value.title || singleTrack.name
-    : `${effectiveTracks.length} pistas seleccionadas`;
+    : t.n("selection.count", effectiveTracks.length);
 
   const heroSubtitle = singleTrack
-    ? value.artist || "Artista desconocido"
+    ? value.artist || t("album.unknownArtist")
     : varied.artist
-      ? "(Varios artistas)"
-      : value.artist || "Artista común";
+      ? t("editor.variousArtists")
+      : value.artist || t("editor.sharedArtist");
 
   if (!editing && !isModal) {
     return (
@@ -134,9 +114,9 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
         <header className="metadata-hero">
           <figure className="cover-hero">
             {value.coverDataUrl ? (
-              <img className="cover-image" src={value.coverDataUrl} alt="Caratula" />
+              <img className="cover-image" src={value.coverDataUrl} alt={t("editor.cover")} />
             ) : (
-              <div className="cover-empty">Sin carátula</div>
+              <div className="cover-empty">{t("album.noCover")}</div>
             )}
           </figure>
 
@@ -152,22 +132,22 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
         </header>
 
         <section className="metadata-section">
-          <h3>Metadatos</h3>
+          <h3>{t("editor.metadata")}</h3>
           <div className="metadata-values">
-            <MetadataValue label="Título" value={value.title} />
-            <MetadataValue label="Artista" value={value.artist} />
-            <MetadataValue label="Álbum" value={value.album} />
-            <MetadataValue label="Año" value={value.year} />
-            <MetadataValue label="Género" value={value.genre} />
-            <MetadataValue label="Pista" value={value.trackNumber} />
+            <MetadataValue label={t("field.title")} value={value.title} />
+            <MetadataValue label={t("field.artist")} value={value.artist} />
+            <MetadataValue label={t("field.album")} value={value.album} />
+            <MetadataValue label={t("field.year")} value={value.year} />
+            <MetadataValue label={t("field.genre")} value={value.genre} />
+            <MetadataValue label={t("field.track")} value={value.trackNumber} />
           </div>
         </section>
 
-        {singleTrack && <TechnicalDetails track={singleTrack} />}
+        {singleTrack && <TechnicalDetails track={singleTrack} t={t} />}
 
         <footer className="metadata-actions">
           <button className="btn btn-primary" type="button" onClick={() => setEditing(true)}>
-            Editar metadatos
+            {t("editor.editMetadata")}
           </button>
         </footer>
       </section>
@@ -179,6 +159,7 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
       <header className="metadata-hero">
         <figure className="cover-hero">
           <CoverDropzone
+            t={t}
             coverDataUrl={value.coverDataUrl}
             onSetCover={(coverDataUrl) => onChange({ ...value, coverDataUrl })}
             compact
@@ -196,57 +177,57 @@ export function MetadataEditor(props: MetadataEditorProps): JSX.Element {
       </header>
 
       <section className="metadata-section">
-        <h3>Metadatos</h3>
+        <h3>{t("editor.metadata")}</h3>
         <div className="metadata-values">
           <Field
-            label="Título"
+            label={t("field.title")}
             value={value.title}
             onChange={(title) => onChange({ ...value, title })}
-            placeholder={varied.title ? "(Varios valores)" : "Ej: Bohemian Rhapsody"}
+            placeholder={varied.title ? t("editor.multipleValues") : t("editor.example", { value: "Bohemian Rhapsody" })}
           />
           <Field
-            label="Artista"
+            label={t("field.artist")}
             value={value.artist}
             onChange={(artist) => onChange({ ...value, artist })}
-            placeholder={varied.artist ? "(Varios valores)" : "Ej: Queen"}
+            placeholder={varied.artist ? t("editor.multipleValues") : t("editor.example", { value: "Queen" })}
           />
           <Field
-            label="Álbum"
+            label={t("field.album")}
             value={value.album}
             onChange={(album) => onChange({ ...value, album })}
-            placeholder={varied.album ? "(Varios valores)" : "Ej: A Night at the Opera"}
+            placeholder={varied.album ? t("editor.multipleValues") : t("editor.example", { value: "A Night at the Opera" })}
           />
           <Field
-            label="Año"
+            label={t("field.year")}
             value={value.year}
             onChange={(year) => onChange({ ...value, year })}
-            placeholder={varied.year ? "(Varios valores)" : "1975"}
+            placeholder={varied.year ? t("editor.multipleValues") : "1975"}
           />
           <Field
-            label="Género"
+            label={t("field.genre")}
             value={value.genre}
             onChange={(genre) => onChange({ ...value, genre })}
-            placeholder={varied.genre ? "(Varios valores)" : "Rock"}
+            placeholder={varied.genre ? t("editor.multipleValues") : "Rock"}
           />
           <Field
-            label="Pista"
+            label={t("field.track")}
             value={value.trackNumber}
             onChange={(trackNumber) => onChange({ ...value, trackNumber })}
-            placeholder={varied.trackNumber ? "(Varios valores)" : "1/12"}
+            placeholder={varied.trackNumber ? t("editor.multipleValues") : "1/12"}
           />
         </div>
       </section>
 
-      {singleTrack && <TechnicalDetails track={singleTrack} />}
+      {singleTrack && <TechnicalDetails track={singleTrack} t={t} />}
 
       <div className="editor-actions">
         {!isModal && (
           <button className="btn btn-ghost" type="button" disabled={saving} onClick={() => setEditing(false)}>
-            Cancelar
+            {t("editor.cancel")}
           </button>
         )}
         <button className="btn btn-primary" type="button" disabled={saving} onClick={() => void onSave()}>
-          {saving ? "Guardando..." : "Guardar cambios"}
+          {saving ? t("editor.saving") : t("editor.save")}
         </button>
       </div>
     </section>

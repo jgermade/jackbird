@@ -1,20 +1,23 @@
+import type { Translate } from "../lib/i18n";
+
 type CoverDropzoneProps = {
+  t: Translate;
   coverDataUrl: string | null;
   onSetCover: (dataUrl: string | null) => void;
   compact?: boolean;
 };
 
-async function fileToDataUrl(file: File): Promise<string> {
+async function fileToDataUrl(file: File, failure: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
+    reader.onerror = () => reject(new Error(failure));
     reader.readAsDataURL(file);
   });
 }
 
 export function CoverDropzone(props: CoverDropzoneProps): JSX.Element {
-  const { coverDataUrl, onSetCover, compact = false } = props;
+  const { t, coverDataUrl, onSetCover, compact = false } = props;
 
   async function useFileList(fileList: FileList | null): Promise<void> {
     if (!fileList || fileList.length === 0) {
@@ -24,7 +27,7 @@ export function CoverDropzone(props: CoverDropzoneProps): JSX.Element {
     if (!file.type.startsWith("image/")) {
       return;
     }
-    const dataUrl = await fileToDataUrl(file);
+    const dataUrl = await fileToDataUrl(file, t("cover.readFailed"));
     onSetCover(dataUrl);
   }
 
@@ -39,12 +42,12 @@ export function CoverDropzone(props: CoverDropzoneProps): JSX.Element {
         void useFileList(event.dataTransfer.files);
       }}
     >
-      {coverDataUrl ? <img src={coverDataUrl} alt="Caratula" className="cover-image" /> : <span>Arrastra una imagen aqui</span>}
+      {coverDataUrl ? <img src={coverDataUrl} alt={t("editor.cover")} className="cover-image" /> : <span>{t("cover.dropHere")}</span>}
 
       {compact ? (
-        <label className="cover-edit-overlay" title="Cambiar caratula">
+        <label className="cover-edit-overlay" title={t("cover.change")}>
           <span aria-hidden="true">{"\u270e"}</span>
-          <span className="sr-only">Cambiar caratula</span>
+          <span className="sr-only">{t("cover.change")}</span>
           <input
             type="file"
             accept="image/*"
@@ -57,7 +60,7 @@ export function CoverDropzone(props: CoverDropzoneProps): JSX.Element {
       ) : (
         <div className="cover-actions">
           <label className="btn btn-secondary">
-            Elegir imagen
+            {t("cover.choose")}
             <input
               type="file"
               accept="image/*"
@@ -68,7 +71,7 @@ export function CoverDropzone(props: CoverDropzoneProps): JSX.Element {
             />
           </label>
           <button className="btn btn-ghost" type="button" onClick={() => onSetCover(null)}>
-            Quitar
+            {t("cover.remove")}
           </button>
         </div>
       )}

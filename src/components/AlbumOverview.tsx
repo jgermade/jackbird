@@ -1,6 +1,9 @@
+import { inferDiscNumber, trackNumberOrder } from "../helpers/tracks";
+import type { Translate } from "../lib/i18n";
 import type { Mp3Track } from "../types";
 
 type AlbumOverviewProps = {
+  t: Translate;
   rootLabel: string;
   tracks: Mp3Track[];
   selectedTrackIds?: string[];
@@ -17,56 +20,39 @@ type AlbumGroup = {
   year: string;
   genre: string;
   coverDataUrl: string | null;
-  discs: Map<string, Mp3Track[]>;
+  /** Tracks by disc number. */
+  discs: Map<number, Mp3Track[]>;
 };
 
-function discLabel(track: Mp3Track): string {
-  const fromPath = track.relativePath.match(/(?:^|\/)(?:cd|disc)[ _-]?(\d+)(?:\/|$)/i);
-  if (fromPath?.[1]) {
-    return `Disco ${fromPath[1]}`;
-  }
-
-  return "Disco 1";
-}
-
-function trackOrder(track: Mp3Track): number {
-  const match = track.metadata.trackNumber.match(/\d+/);
-  return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
-}
-
-function groupAlbums(tracks: Mp3Track[]): AlbumGroup[] {
+/** Albums by artist and album tag; a track with no album tag goes under `untitled`. */
+function groupAlbums(tracks: Mp3Track[], untitled: string, locale: string): AlbumGroup[] {
   const groups = new Map<string, AlbumGroup>();
 
   for (const track of tracks) {
-    const title = track.metadata.album.trim() || "Sin album";
+    const album = track.metadata.album.trim();
     const artist = track.metadata.artist.trim();
-    const key = `${artist.toLocaleLowerCase("es")}::${title.toLocaleLowerCase("es")}`;
-    const existing = groups.get(key);
-    const group = existing ?? {
+    const key = `${artist.toLocaleLowerCase(locale)}::${album.toLocaleLowerCase(locale)}`;
+    const group = groups.get(key) ?? {
       key,
-      title,
+      title: album || untitled,
       artist,
       year: track.metadata.year,
       genre: track.metadata.genre,
       coverDataUrl: track.metadata.coverDataUrl,
-      discs: new Map<string, Mp3Track[]>()
+      discs: new Map<number, Mp3Track[]>()
     };
+    groups.set(key, group);
 
-    const disc = discLabel(track);
-    const discTracks = group.discs.get(disc) ?? [];
-    discTracks.push(track);
-    group.discs.set(disc, discTracks);
-
-    if (!existing) {
-      groups.set(key, group);
-    }
+    const disc = inferDiscNumber(track);
+    group.discs.set(disc, [...(group.discs.get(disc) ?? []), track]);
   }
 
-  return [...groups.values()].sort((left, right) => left.title.localeCompare(right.title, "es"));
+  return [...groups.values()].sort((left, right) => left.title.localeCompare(right.title, locale));
 }
 
 export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
   const {
+    t,
     rootLabel,
     tracks,
     selectedTrackIds = [],
@@ -75,26 +61,26 @@ export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
     playingTrackId,
     isAudioPlaying = false
   } = props;
-  const albums = groupAlbums(tracks);
+  const albums = groupAlbums(tracks, t("album.untitled"), t.language);
   const selectedSet = new Set(selectedTrackIds);
 
   return (
     <section className="album-overview">
       <header className="album-overview-header">
-        <span className="detail-eyebrow">Carpeta</span>
+        <span className="detail-eyebrow">{t("album.folder")}</span>
         <h2>{rootLabel}</h2>
-        <p>{albums.length} albumes, {tracks.length} pistas</p>
+        <p>{t.n("album.count", albums.length)}, {t.n("tracks.count", tracks.length)}</p>
       </header>
 
       <div className="album-overview-list">
         {albums.map((album) => (
           <article key={album.key} className="album-summary">
             <div className="album-summary-cover">
-              {album.coverDataUrl ? <img src={album.coverDataUrl} alt={`Caratula de ${album.title}`} /> : <span>Sin caratula</span>}
+              {album.coverDataUrl ? <img src={album.coverDataUrl} alt={t("album.coverOf", { title: album.title })} /> : <span>{t("album.noCover")}</span>}
             </div>
             <div className="album-summary-content">
               <h3>{album.title}</h3>
-              <p>{album.artist || "Artista desconocido"}</p>
+              <p>{album.artist || t("album.unknownArtist")}</p>
               <div className="metadata-tags">
                 {album.year && <span className="tag">{album.year}</span>}
                 {album.genre && <span className="tag">{album.genre}</span>}
@@ -103,12 +89,12 @@ export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
                 {[...album.discs.entries()].map(([disc, discTracks]) => (
                   <section key={disc} className="album-disc">
                     <header>
-                      <strong>{disc}</strong>
-                      <span>{discTracks.length} pistas</span>
+                      <strong>{t("album.disc", { number: disc })}</strong>
+                      <span>{t.n("tracks.count", discTracks.length)}</span>
                     </header>
                     <ol>
                       {[...discTracks]
-                        .sort((left, right) => trackOrder(left) - trackOrder(right))
+                        .sort((left, right) => trackNumberOrder(left) - trackNumberOrder(right))
                         .map((track) => {
                           const isSelected = selectedSet.has(track.id);
                           const isCurrentPlayback = playingTrackId === track.id;
@@ -154,12 +140,8 @@ export function AlbumOverview(props: AlbumOverviewProps): JSX.Element {
                                     event.stopPropagation();
                                     onPlayTrack(track.id);
                                   }}
-                                  aria-label={
-                                    showPauseIcon
-                                      ? `Pausar ${track.metadata.title || track.name}`
-                                      : `Reproducir ${track.metadata.title || track.name}`
-                                  }
-                                  title={showPauseIcon ? "Pausar" : "Reproducir desde esta pista"}
+                                  aria-label={t(showPauseIcon ? "album.pause" : "album.play", { title: track.metadata.title || track.name })}
+                                  title={showPauseIcon ? t("album.pauseShort") : t("album.playFromHere")}
                                 >
                                   {showPauseIcon ? "⏸" : "▶"}
                                 </button>

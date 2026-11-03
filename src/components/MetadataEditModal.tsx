@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
+import type { Translate } from "../lib/i18n";
 import type { EditableMetadata, Mp3Track } from "../types";
 import { MetadataEditor } from "./MetadataEditor";
 
 type MetadataEditModalProps = {
+  t: Translate;
   open: boolean;
   tracks: Mp3Track[];
   value: EditableMetadata;
@@ -13,7 +15,7 @@ type MetadataEditModalProps = {
 };
 
 export function MetadataEditModal(props: MetadataEditModalProps): JSX.Element {
-  const { open, tracks, value, saving, onChange, onSave, onClose } = props;
+  const { t, open, tracks, value, saving, onChange, onSave, onClose } = props;
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -34,8 +36,8 @@ export function MetadataEditModal(props: MetadataEditModalProps): JSX.Element {
     tracks.length === 1
       ? tracks[0].metadata.title || tracks[0].name
       : tracks.length > 1
-        ? `Editar ${tracks.length} pistas seleccionadas`
-        : "Editar pista";
+        ? t("editModal.titleMany", { count: tracks.length })
+        : t("editModal.titleOne");
 
   return (
     <dialog
@@ -51,16 +53,17 @@ export function MetadataEditModal(props: MetadataEditModalProps): JSX.Element {
     >
       <header className="modal-header">
         <div>
-          <span className="detail-eyebrow">Edición de metadatos</span>
+          <span className="detail-eyebrow">{t("editModal.eyebrow")}</span>
           <h2 id="edit-modal-title">{titleText}</h2>
         </div>
-        <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar modal de edición" title="Cerrar">
+        <button type="button" className="modal-close" onClick={onClose} aria-label={t("editModal.close")} title={t("common.close")}>
           ✕
         </button>
       </header>
       <div className="modal-body">
         {tracks.length > 0 ? (
           <MetadataEditor
+            t={t}
             tracks={tracks}
             value={value}
             saving={saving}
@@ -69,7 +72,7 @@ export function MetadataEditModal(props: MetadataEditModalProps): JSX.Element {
             isModal
           />
         ) : (
-          <p>No hay pistas seleccionadas para editar.</p>
+          <p>{t("editModal.none")}</p>
         )}
       </div>
     </dialog>

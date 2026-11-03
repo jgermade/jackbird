@@ -1,3 +1,5 @@
+import type { VFSAdapter } from "@cloudauthn/vfs-sync";
+
 export type TrackMetadata = {
   title: string;
   artist: string;
@@ -55,4 +57,40 @@ export type MetaRecord = {
 export type MetaSnapshot = {
   version: 1;
   tracks: Record<string, MetaRecord>;
+};
+
+export type Theme = "light" | "dark";
+
+/** The interface languages; English is the source and the fallback. */
+export type Language = "en" | "es";
+
+export type GroupingMode = "flat" | "wizard";
+
+/** One open folder ("root") and everything the library shows of it. */
+export type RootWorkspace = {
+  id: string;
+  label: string;
+  /** The storage seam. Nothing above this line knows which backend is behind it. */
+  vfs: VFSAdapter;
+  /** Kept here rather than on the adapter: it is what the session store persists. */
+  rootHandle: FileSystemDirectoryHandle;
+  tracks: Mp3Track[];
+  selectedTrackId: string | null;
+  selectedTrackIds: string[];
+  selectionAnchorTrackId: string | null;
+  draft: EditableMetadata;
+  loadingMetadata: boolean;
+  loadedCount: number;
+  groupingMode: GroupingMode;
+  metaSnapshot: MetaSnapshot;
+  expandedAlbums: string[];
+  expandedDiscs: string[];
+  activeRowKey: string | null;
+};
+
+/** What is playing: tracks of one root, in order, and where they came from. */
+export type PlaybackQueue = {
+  rootId: string;
+  trackIds: string[];
+  sourceLabel: string;
 };

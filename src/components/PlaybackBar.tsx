@@ -1,7 +1,9 @@
 import { useEffect, useState, type RefObject } from "react";
+import type { Translate } from "../lib/i18n";
 import type { Mp3Track } from "../types";
 
 type PlaybackBarProps = {
+  t: Translate;
   track: Mp3Track | null;
   trackKey: string | null;
   sourceLabel: string;
@@ -25,6 +27,7 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
   const {
+    t,
     track,
     trackKey,
     sourceLabel,
@@ -64,7 +67,7 @@ export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
       })
       .catch((cause) => {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "No se pudo cargar el audio.");
+          setError(cause instanceof Error ? cause.message : t("playback.loadFailed"));
           onPlaybackStateChange?.(false);
         }
       })
@@ -92,24 +95,24 @@ export function PlaybackBar(props: PlaybackBarProps): JSX.Element | null {
   }
 
   return (
-    <div className="playback-bar" aria-label="Reproductor de lista">
-      <button type="button" className="playback-icon" disabled={!canGoPrevious} onClick={onPrevious} aria-label="Pista anterior" title="Pista anterior">
+    <div className="playback-bar" aria-label={t("playback.label")}>
+      <button type="button" className="playback-icon" disabled={!canGoPrevious} onClick={onPrevious} aria-label={t("playback.previous")} title={t("playback.previous")}>
         &#9664;&#9664;
       </button>
-      <button type="button" className="playback-icon" disabled={!canGoNext} onClick={onNext} aria-label="Pista siguiente" title="Pista siguiente">
+      <button type="button" className="playback-icon" disabled={!canGoNext} onClick={onNext} aria-label={t("playback.next")} title={t("playback.next")}>
         &#9654;&#9654;
       </button>
       <button
         type="button"
         className="playback-return"
         onClick={onReturnToList}
-        aria-label={`Volver a ${sourceLabel}, pista ${position + 1} de ${total}`}
-        title={`Volver a ${sourceLabel}, pista ${position + 1} de ${total}`}
+        aria-label={t("playback.returnTo", { source: sourceLabel, position: position + 1, total })}
+        title={t("playback.returnTo", { source: sourceLabel, position: position + 1, total })}
       >
         &#9776;
       </button>
       {loading ? (
-        <span className="playback-status">Cargando...</span>
+        <span className="playback-status">{t("playback.loading")}</span>
       ) : (
         audioUrl && (
           <audio

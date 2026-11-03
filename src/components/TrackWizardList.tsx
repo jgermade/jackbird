@@ -1,9 +1,11 @@
 import { formatTrackNumber } from "../helpers/format";
+import type { Translate } from "../lib/i18n";
 import type { WizardTreeRow } from "../types";
 
 export type { WizardTreeRow };
 
 type TrackWizardListProps = {
+  t: Translate;
   rows: WizardTreeRow[];
   selectedTrackIds: string[];
   activeRowKey: string | null;
@@ -94,6 +96,7 @@ function RenameGlyph(): JSX.Element {
 
 export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
   const {
+    t,
     rows,
     selectedTrackIds,
     activeRowKey,
@@ -110,7 +113,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
       <section className="panel panel-list">
         <div className="wizard-wrap">
           <p className="tree-empty">
-            {loadingMetadata ? "Cargando biblioteca..." : "Sin pistas en este root."}
+            {loadingMetadata ? t("tree.loadingLibrary") : t("tree.empty")}
           </p>
         </div>
       </section>
@@ -140,11 +143,11 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                   <button
                     type="button"
                     className="tree-caret"
-                    aria-label={`${row.expanded ? "Colapsar" : "Expandir"} ${row.label}`}
+                    aria-label={t(row.expanded ? "tree.collapse" : "tree.expand", { name: row.label })}
                     aria-expanded={row.expanded}
                     onClick={() => {
                       if (isDisc) {
-                        onToggleDisc(row.album, row.disc ?? "Disco 1");
+                        onToggleDisc(row.album, row.disc ?? "1");
                       } else {
                         onToggleAlbum(row.album);
                       }
@@ -192,7 +195,7 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                   </span>
                   <span className="wizard-track-meta">
                     <span className="wizard-track-title">
-                      {row.label || (loadingMetadata ? "Cargando metadatos…" : "—")}
+                      {row.label || (loadingMetadata ? t("tree.loadingMetadata") : "—")}
                     </span>
                     {row.artist ? <span className="wizard-track-artist">{row.artist}</span> : null}
                   </span>
@@ -200,8 +203,8 @@ export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
                 <button
                   type="button"
                   className="tree-rename"
-                  title="Renombrar (patrón pendiente de definir)"
-                  aria-label="Renombrar pista"
+                  title={t("tree.renameTitle")}
+                  aria-label={t("tree.rename")}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (row.trackId) {
