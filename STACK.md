@@ -20,8 +20,9 @@ This document describes the technical stack and codebase architecture implemente
   keeps its own track list, metadata draft, and grouping mode.
 - **Small, reusable components / stateful views**: `src/components/` holds presentational
   components with no store coupling; views compose them over the `src/lib/` stores. The top bar
-  is a jq79 view (`src/views/faceplate.html`); the rest is still the React
-  `src/views/Mp3ManagerView.tsx`, which mounts the faceplate through `Jq79Island`.
+  and the library (tree and album sheet) are jq79 views (`src/views/faceplate.html`,
+  `src/views/workspace.html`); the React `src/views/Mp3ManagerView.tsx` mounts them through
+  `Jq79Island` and keeps the dialogs, saving and the session until they move too.
 
 ---
 
@@ -85,23 +86,27 @@ mp3-manager/
 │   ├── types.ts                 # Track, metadata, tree row and .meta snapshot types
 │   ├── html-modules.d.ts        # *.html imports are jq79 components
 │   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
-│   │                            # metadata, tracks, tree, snapshot, format
+│   │                            # metadata, tracks, tree, snapshot, format, i18n,
+│   │                            # selection, scope, albums
 │   ├── styles.css               # Single stylesheet, CSS variables in :root
 │   ├── assets/brand/            # jackbird-metal.svg: the logo (faceplate, favicon)
 │   ├── components/              # Presentational, store-free UI components (React, until moved)
-│   │   ├── TrackWizardList.tsx  # Wizard-mode tree (album/disc/track rows)
 │   │   ├── MetadataEditor.tsx   # ID3 field editor for the selected track
 │   │   └── CoverDropzone.tsx    # Drag & drop / pick cover art
 │   ├── views/
-│   │   ├── faceplate.html       # jq79: brand, folder key, transport, display, root tabs
+│   │   ├── faceplate.html       # jq79: brand, transport, display, root tabs + folder key
+│   │   ├── workspace.html       # jq79: the two panes (swipeable on phones), Escape
+│   │   ├── library.html         # jq79: the tree, its head, messages and scan meter
+│   │   ├── album-sheet.html     # jq79: landing, action bar, albums and discs
 │   │   ├── Jq79Island.tsx       # Mounts a jq79 view inside React (until React goes)
-│   │   └── Mp3ManagerView.tsx   # React: library, album sheet, dialogs; session restore
+│   │   └── Mp3ManagerView.tsx   # React: dialogs, saving, session restore, verifier
 │   ├── lib/
 │   │   ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
 │   │   ├── rootSessionStore.ts  # IndexedDB persistence of open roots
 │   │   ├── meta.ts              # Reads and writes .meta/mp3-manager.json in a root
 │   │   ├── roots.ts             # hydrateRoot, openFolder, selectRoot, closeRoot, …
 │   │   ├── player.ts            # The one Audio element; nowPlaying, playQueue, next, …
+│   │   ├── workspace.ts         # The active root: tree, scope, selection, and actions
 │   │   ├── library.ts, playback.ts, ui.ts  # jq79 stores for the app's state
 │   │   ├── preferences.ts       # Theme and language: saved, else from the system
 │   │   ├── storage.ts           # Every localStorage key, in one place

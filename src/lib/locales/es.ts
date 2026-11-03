@@ -30,6 +30,9 @@ export const es: Record<MessageKey, string> = {
   "library.restoring": "Restaurando tabs...",
   "library.loadingMetadata": "Cargando metadatos {loaded}/{total}...",
 
+  "tree.label": "Carpetas y pistas",
+  "panels.label": "Paneles",
+  "panels.details": "Detalle",
   "tree.loadingLibrary": "Cargando biblioteca...",
   "tree.empty": "Sin pistas en este root.",
   "tree.expand": "Expandir {name}",

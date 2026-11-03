@@ -1,0 +1,161 @@
+<script :setup lang="ts">
+  // The library pane: the active root's folders and tracks as a tree, with
+  // its head, its messages and the scan meter. A view over lib/workspace.ts.
+  // See RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
+
+  const Key = await import("../../theme/default/components/key.html")
+  const ListRow = await import("../../theme/default/components/list-row.html")
+  const Meter = await import("../../theme/default/components/meter.html")
+  const Reel = await import("../../theme/default/components/reel.html")
+
+  const { formatTrackNumber } = await import("../helpers/format")
+  const { t } = await import("../lib/i18n")
+  const { library } = await import("../lib/library")
+  const { playback } = await import("../lib/playback")
+  const { nowPlaying } = await import("../lib/player")
+  const {
+    activeRoot,
+    collapseAllFolders,
+    consolidateTrack,
+    expandAllFolders,
+    navigateTree,
+    selectTrack,
+    selectTreeRow,
+    toggleFolder,
+    treeRows
+  } = await import("../lib/workspace")
+
+  type Row = { key: string; kind: string; album: string; label: string; trackId?: string; trackNumber?: string; artist?: string }
+
+  // Read through functions, not `$:` copies: the derived values are boxed
+  // (see Opaque in lib/workspace.ts) and must not land in this store.
+  const rowDomId = (rowKey: string): string => `tree-row-${rowKey.replace(/[^\w-]/g, "_")}`
+  const root = () => activeRoot.value.data
+  const rows = () => treeRows.value.data
+  const isLoading = (): boolean => !!root()?.loadingMetadata
+  const playingId = (): string | null => {
+    const playing = nowPlaying.value
+    const current = root()
+    return playing && current && playing.rootId === current.id ? playing.trackId : null
+  }
+  const activeId = (): string | null => {
+    const key = root()?.activeRowKey
+    return key ? rowDomId(key) : null
+  }
+
+  const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
+  const rowLead = (row: Row): string => (row.kind === "track" ? formatTrackNumber(row.trackNumber) || (isLoading() ? "…" : "—") : "")
+  const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
+
+  const pick = (row: Row, event: MouseEvent) => {
+    if (row.kind === "track" && row.trackId) {
+      selectTrack(row.trackId, event?.shiftKey ? "range" : "toggle")
+    } else {
+      selectTreeRow(row.key)
+    }
+  }
+
+  const onKey = (event: KeyboardEvent) => {
+    if (!navigateTree(event.key)) return
+    event.preventDefault()
+    requestAnimationFrame(() => {
+      const id = activeId()
+      if (id) document.getElementById(id)?.scrollIntoView({ block: "nearest" })
+    })
+  }
+</script>
+
+<section class="library" :aria-label="t('library.title')">
+  <header class="head">
+    <h2 class="mm-legend is-ink title">{{ t("library.title") }}</h2>
+    <span class="count">{{ root() ? root().tracks.length : 0 }}</span>
+    <span class="tools">
+      <Key square size="sm" variant="ghost" :label="t('library.expandAll')" :title="t('library.expandAll')" :disabled="!root() || root().tracks.length === 0" @click="expandAllFolders()">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M3 5.5h10M3 10.5h10M8 3v5M8 8v5" /></svg>
+      </Key>
+      <Key square size="sm" variant="ghost" :label="t('library.collapseAll')" :title="t('library.collapseAll')" :disabled="!root() || root().expandedAlbums.length === 0" @click="collapseAllFolders()">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M3 5.5h10M3 10.5h10" /></svg>
+      </Key>
+    </span>
+  </header>
+
+  <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
+    <p :if="library.restoring" class="notice"><Reel :size="14" /> {{ t("library.restoring") }}</p>
+    <p :if="library.errorMessage" class="notice is-error" role="alert">{{ library.errorMessage }}</p>
+    <p :if="library.infoMessage" class="notice" role="status">{{ library.infoMessage }}</p>
+  </div>
+
+  <div :if="isLoading()" class="scan">
+    <Meter :segments="24" :level="root().loadedCount" :max="root().tracks.length" :label="t('library.loadingMetadata', { loaded: root().loadedCount, total: root().tracks.length })" />
+    <span class="mm-legend">{{ t("library.loadingMetadata", { loaded: root().loadedCount, total: root().tracks.length }) }}</span>
+  </div>
+
+  <p :if="rows().length === 0" class="no-tracks">{{ isLoading() ? t("tree.loadingLibrary") : t("tree.empty") }}</p>
+  <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
+    <ListRow :each="row in rows()"
+             :key="row.key"
+             :kind="row.kind === 'album' ? 'folder' : 'item'"
+             :depth="row.depth"
+             :label="rowLabel(row)"
+             :lead="rowLead(row)"
+             :meta="row.kind === 'track' ? row.artist || '' : ''"
+             :expanded="!!row.expanded"
+             :chosen="isChosen(row)"
+             :current="row.key === root()?.activeRowKey"
+             :playing="row.kind === 'track' && row.trackId === playingId()"
+             :playing-active="playback.playing"
+             :row-id="rowDomId(row.key)"
+             @select="pick(row, $event.detail)"
+             @toggle="toggleFolder(row.album)">
+      <template :slot.action>
+        <span :if="row.kind === 'track'" class="rename" @click.stop="null">
+          <Key square size="sm" variant="ghost" :label="t('tree.rename')" :title="t('tree.renameTitle')" @click="consolidateTrack()">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9z" /><path d="M8.35 4.15 11.85 7.65" stroke-linecap="round" /></svg>
+          </Key>
+        </span>
+      </template>
+    </ListRow>
+  </div>
+</section>
+
+<style scoped>
+  .library { display: flex; flex-direction: column; color: var(--mm-fg); }
+  .head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    min-height: 2.75rem;
+    padding: var(--mm-space-1) var(--mm-space-2) var(--mm-space-1) var(--mm-space-4);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-surface);
+  }
+  .title { margin: 0; }
+  .count { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  .tools { display: flex; gap: var(--mm-space-1); margin-left: auto; }
+  .icon { width: .875rem; height: .875rem; }
+
+  .messages { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-3) var(--mm-space-4) 0; }
+  .notice {
+    display: flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    margin: 0;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border-left: 3px solid var(--mm-accent);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-sunken);
+    color: var(--mm-fg);
+    font-size: var(--mm-text-sm);
+  }
+  .notice.is-error { border-left-color: var(--mm-bad-led); background: var(--mm-bad-soft); color: var(--mm-bad); }
+
+  .scan { display: grid; gap: var(--mm-space-2); padding: var(--mm-space-3) var(--mm-space-4) 0; }
+
+  .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }
+  .tree { padding-block: var(--mm-space-2); outline: none; }
+  .tree:focus-visible { box-shadow: inset 0 0 0 2px var(--mm-accent); }
+  .rename { display: contents; }
+</style>

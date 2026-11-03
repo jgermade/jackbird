@@ -29,6 +29,9 @@ export const en = {
   "library.restoring": "Restoring tabs…",
   "library.loadingMetadata": "Loading metadata {loaded}/{total}…",
 
+  "tree.label": "Folders and tracks",
+  "panels.label": "Panels",
+  "panels.details": "Details",
   "tree.loadingLibrary": "Loading library…",
   "tree.empty": "No tracks in this root.",
   "tree.expand": "Expand {name}",

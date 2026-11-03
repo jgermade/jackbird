@@ -22,9 +22,19 @@ assets such as styles, fonts and images):
 (Node's own runner, no framework), and a coverage check that holds **every** helper file to the
 90% floor and fails on a helper no test loads. Run it before every commit.
 
-`src/types.ts` holds types only and may be imported from anywhere. In a jq79 component, a prop
-can't be called `value`, `checked`, `selected`, `text`, `html` or `class`: those are jq79
-directives and are ignored on a component tag.
+`src/types.ts` holds types only and may be imported from anywhere.
+
+jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.md`):
+
+- A prop can't be called `value`, `checked`, `selected`, `text`, `html` or `class`: those are
+  jq79 directives and are ignored on a component tag.
+- A `$computed` must not read another `$computed`'s object value: it wakes itself again and jq79
+  gives up after 100 rounds. Derive from the source store, as `derive()` in
+  `src/lib/workspace.ts` does.
+- A derived value that holds nested objects is handed out boxed (`Opaque`) and read through
+  functions in views, never copied into a component's store with `$:`.
+- Until `src/styles.css` is gone, a class used in a jq79 view must not also be a selector there:
+  scoped styles do not keep a global stylesheet out.
 
 ### Sizes
 

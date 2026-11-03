@@ -77,13 +77,30 @@ input {
   box-shadow: none;
 }
 
-/* The jq79 faceplate (src/views/faceplate.html) sits in this React-owned
-   element, which keeps it at the top as the old header did. */
+/* The shell is a full-height column, on phones too: the jq79 faceplate
+   (src/views/faceplate.html) always on top, then the jq79 workspace
+   (src/views/workspace.html), whose panes scroll on their own (and swipe
+   sideways on phones). Both sit in React-owned elements (Jq79Island). */
+.app-shell.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+
 .faceplate-island {
-  position: sticky;
-  top: 0;
+  flex: none;
+  position: relative;
   z-index: 20;
 }
+
+.workspace-island {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+
 
 .app-topbar {
   position: sticky;

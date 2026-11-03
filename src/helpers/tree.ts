@@ -61,3 +61,39 @@ export function buildWizardRows(tracks: Mp3Track[], expandedFolders: readonly st
   append(root, "", null, 0);
   return rows;
 }
+
+/** What an arrow key does in the tree: select a row, or open or close a folder. */
+export type TreeKeyAction = { select: string } | { toggle: string } | null;
+
+const ARROWS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+
+/**
+ * The arrow keys over the visible rows. Up and down move. Right opens a closed
+ * folder, else moves down. Left closes an open folder, else goes to the
+ * parent. With no current row, any arrow selects the first. Anything else is
+ * not the tree's.
+ */
+export function treeKeyAction(rows: readonly WizardTreeRow[], activeKey: string | null, key: string): TreeKeyAction {
+  if (rows.length === 0 || !ARROWS.has(key)) {
+    return null;
+  }
+  const index = rows.findIndex((row) => row.key === activeKey);
+  if (index === -1) {
+    return { select: rows[0].key };
+  }
+  const row = rows[index];
+  const below = rows[Math.min(rows.length - 1, index + 1)].key;
+  if (key === "ArrowUp") {
+    return { select: rows[Math.max(0, index - 1)].key };
+  }
+  if (key === "ArrowDown") {
+    return { select: below };
+  }
+  if (key === "ArrowRight") {
+    return row.kind === "album" && !row.expanded ? { toggle: row.album } : { select: below };
+  }
+  if (row.kind === "album" && row.expanded) {
+    return { toggle: row.album };
+  }
+  return row.parentKey ? { select: row.parentKey } : null;
+}

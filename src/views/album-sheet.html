@@ -1,0 +1,220 @@
+<script :setup lang="ts">
+  // The album sheet: what the active tree row scopes, grouped into albums and
+  // discs, with the action bar over a selection; the landing when no root is
+  // open. A view over lib/workspace.ts. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
+
+  const EqBars = await import("../../theme/default/components/eq-bars.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Stripes = await import("../../theme/default/components/stripes.html")
+
+  const { t, tn } = await import("../lib/i18n")
+  const { library } = await import("../lib/library")
+  const { playback } = await import("../lib/playback")
+  const { nowPlaying } = await import("../lib/player")
+  const { openFolder } = await import("../lib/roots")
+  const {
+    activeRoot,
+    clearSelection,
+    detail,
+    detailAlbums,
+    openEditor,
+    playFromDetail,
+    removeSelectedTracks,
+    selectTrack,
+    showInfo
+  } = await import("../lib/workspace")
+  const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
+
+  type Track = { id: string; name: string; metadata: { title: string; trackNumber: string } }
+
+  // Read through functions, not `$:` copies: the derived values are boxed
+  // (see Opaque in lib/workspace.ts) and must not land in this store.
+  const root = () => activeRoot.value.data
+  const scope = () => detail.value.data
+  const albums = () => detailAlbums.value.data
+  const selectedCount = (): number => root()?.selectedTrackIds.length ?? 0
+  const isChosen = (track: Track): boolean => !!root()?.selectedTrackIds.includes(track.id)
+  const playingId = (): string | null => {
+    const playing = nowPlaying.value
+    const current = root()
+    return playing && current && playing.rootId === current.id ? playing.trackId : null
+  }
+
+  const titleOf = (track: Track): string => track.metadata.title || track.name
+  const isPausable = (track: Track): boolean => track.id === playingId() && playback.playing
+  const pick = (track: Track, event: MouseEvent | KeyboardEvent) => selectTrack(track.id, event.shiftKey ? "range" : "toggle")
+  const onKey = (track: Track, event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      pick(track, event)
+    }
+  }
+  const remove = () => {
+    if (window.confirm(tn("message.removeConfirm", selectedCount()))) removeSelectedTracks()
+  }
+</script>
+
+<section class="sheet">
+  <div :if="!root()" class="landing">
+    <img class="logo" :src="logoUrl" alt="" />
+    <h2>{{ t("landing.title") }}</h2>
+    <p>{{ t("landing.body") }}</p>
+    <Key variant="primary" size="lg" :disabled="library.loading" @click="openFolder()">{{ t("landing.open") }}</Key>
+    <small class="mm-legend">{{ t("landing.note") }}</small>
+  </div>
+
+  <div :else class="scoped">
+    <div :if="selectedCount() > 0" class="action-bar">
+      <span class="mm-legend is-accent">{{ tn("selection.count", selectedCount()) }}</span>
+      <span class="keys">
+        <Key size="sm" @click="showInfo()">{{ t("actions.showInfo") }}</Key>
+        <Key size="sm" variant="primary" @click="openEditor()">{{ t("actions.edit") }}</Key>
+        <Key size="sm" variant="danger" @click="remove()">{{ t("actions.delete") }}</Key>
+        <Key size="sm" variant="ghost" square :label="t('actions.clearSelection')" :title="t('actions.clearSelection')" @click="clearSelection()">
+          <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+        </Key>
+      </span>
+    </div>
+
+    <div :if="scope().tracks.length > 0" class="albums">
+      <header class="scope-head">
+        <span class="mm-legend">{{ t("album.folder") }}</span>
+        <h2>{{ scope().label }}</h2>
+        <p>{{ tn("album.count", albums().length) }}, {{ tn("tracks.count", scope().tracks.length) }}</p>
+      </header>
+
+      <article :each="album in albums()" :key="album.key" class="album">
+        <div class="cover">
+          <img :if="album.coverDataUrl" :src="album.coverDataUrl" :alt="t('album.coverOf', { title: album.title })" />
+          <div :else class="no-cover">
+            <span class="band"><Stripes variant="band" /></span>
+            <span class="mm-legend">{{ t("album.noCover") }}</span>
+          </div>
+        </div>
+        <div class="album-body">
+          <h3>{{ album.title }}</h3>
+          <p class="artist">{{ album.artist || t("album.unknownArtist") }}</p>
+          <div :if="album.year || album.genre" class="tags">
+            <span :if="album.year" class="album-tag">{{ album.year }}</span>
+            <span :if="album.genre" class="album-tag">{{ album.genre }}</span>
+          </div>
+          <section :each="disc in album.discs" :key="disc.number" class="disc">
+            <header class="disc-head">
+              <span class="mm-legend">{{ t("album.disc", { number: disc.number }) }}</span>
+              <span class="mm-legend">{{ tn("tracks.count", disc.tracks.length) }}</span>
+            </header>
+            <div class="mm-table-wrap">
+              <table class="mm-table" :aria-label="`${album.title} — ${t('album.disc', { number: disc.number })}`">
+                <tbody>
+                  <tr :each="track in disc.tracks"
+                      :key="track.id"
+                      tabindex="0"
+                      :aria-selected="String(isChosen(track))"
+                      :data-playing="String(track.id === playingId())"
+                      @click="pick(track, $event)"
+                      @keydown="onKey(track, $event)">
+                    <td class="mm-num">{{ track.metadata.trackNumber || "-" }}</td>
+                    <td><span class="mm-title"><EqBars :if="track.id === playingId()" :active="playback.playing" />{{ titleOf(track) }}</span></td>
+                    <td class="mm-num mm-end">
+                      <span class="play" @click.stop="null">
+                        <Key square size="sm" variant="ghost"
+                             :label="t(isPausable(track) ? 'album.pause' : 'album.play', { title: titleOf(track) })"
+                             :title="isPausable(track) ? t('album.pauseShort') : t('album.playFromHere')"
+                             @click="playFromDetail(track.id)">
+                          <svg :if="isPausable(track)" class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" /><rect x="9.5" y="3" width="3" height="10" /></svg>
+                          <svg :else class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
+                        </Key>
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </article>
+    </div>
+
+    <div :else class="prompt">
+      <span class="mm-legend">{{ root().label }}</span>
+      <h2>{{ t("detail.promptTitle") }}</h2>
+      <p>{{ t("detail.promptBody") }}</p>
+    </div>
+  </div>
+</section>
+
+<style scoped>
+  .sheet { color: var(--mm-fg); }
+  .icon { width: .875rem; height: .875rem; }
+  h2, h3 { margin: 0; font-family: var(--mm-font-label); font-stretch: var(--mm-stretch-heading); font-weight: 700; line-height: var(--mm-leading-tight); }
+
+  .landing {
+    display: grid;
+    justify-items: center;
+    gap: var(--mm-space-4);
+    max-width: 32rem;
+    margin: 0 auto;
+    padding: var(--mm-space-8) var(--mm-space-5);
+    text-align: center;
+  }
+  .landing .logo { width: 8rem; height: auto; }
+  .landing h2 { font-size: var(--mm-text-2xl); text-wrap: balance; }
+  .landing p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); line-height: var(--mm-leading); }
+
+  .action-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mm-space-2) var(--mm-space-3);
+    min-height: 2.75rem;
+    padding: var(--mm-space-1) var(--mm-space-4);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-accent-soft);
+  }
+  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+
+  .albums { display: grid; gap: var(--mm-space-5); padding: var(--mm-space-5); }
+  .scope-head { display: grid; gap: var(--mm-space-1); }
+  .scope-head h2 { font-size: var(--mm-text-2xl); overflow-wrap: anywhere; }
+  .scope-head p { margin: 0; color: var(--mm-fg-muted); }
+
+  .album {
+    display: grid;
+    grid-template-columns: 8.25rem minmax(0, 1fr);
+    gap: var(--mm-space-5);
+    padding: var(--mm-space-4);
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-md);
+    background: var(--mm-surface);
+  }
+  .cover { width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
+  .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .no-cover { position: relative; display: grid; place-items: end start; height: 100%; padding: var(--mm-space-2); background: var(--mm-display-bezel); }
+  .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
+  .no-cover .mm-legend { position: relative; color: var(--mm-chassis-hi); }
+  .album-body { display: grid; align-content: start; gap: var(--mm-space-2); min-width: 0; }
+  .album-body h3 { font-size: var(--mm-text-xl); }
+  .artist { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
+  .tags { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+  .album-tag { padding: 1px var(--mm-space-2); border-radius: var(--mm-radius-full); background: var(--mm-sunken); color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); }
+  .disc { display: grid; gap: var(--mm-space-1); margin-top: var(--mm-space-2); }
+  .disc-head { display: flex; justify-content: space-between; gap: var(--mm-space-3); }
+  .mm-table tr { cursor: pointer; }
+  .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .play { display: inline-flex; }
+
+  .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
+  .prompt h2 { font-size: var(--mm-text-xl); }
+  .prompt p { margin: 0; color: var(--mm-fg-muted); }
+
+  @media (max-width: 720px) {
+    .albums { padding: var(--mm-space-4); }
+    .album { grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--mm-space-3); padding: var(--mm-space-3); }
+    .cover { width: 5.5rem; }
+  }
+</style>

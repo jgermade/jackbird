@@ -15,20 +15,20 @@
   type Props = { label?: string; control?: string; hint?: string; error?: string }
 </script>
 
-<div class="field">
+<div class="field-box">
   <label class="mm-legend" :for="control || null">{{ label }}</label>
   <slot />
-  <span :if="error" class="note error" :id="control ? `${control}-note` : null" role="alert">{{ error }}</span>
+  <span :if="error" class="note is-error" :id="control ? `${control}-note` : null" role="alert">{{ error }}</span>
   <span :elseif="hint" class="note" :id="control ? `${control}-note` : null">{{ hint }}</span>
 </div>
 
 <style scoped>
-  .field {
+  .field-box {
     display: grid;
     align-content: start;
     gap: .3125rem;
     min-width: 0;
   }
   .note { font-size: var(--mm-text-sm); color: var(--mm-fg-muted); }
-  .error { color: var(--mm-bad); }
+  .is-error { color: var(--mm-bad); }
 </style>
