@@ -1,0 +1,17 @@
+/* The J-card stripes: the brand mark and the active tab. */
+.mm-stripes {
+  display: grid;
+  grid-template-rows: repeat(3, 3px);
+  gap: 2px;
+  width: 28px;
+}
+.mm-stripes > i:nth-child(1) { background: var(--mm-stripe-1); }
+.mm-stripes > i:nth-child(2) { background: var(--mm-stripe-2); }
+.mm-stripes > i:nth-child(3) { background: var(--mm-stripe-3); }
+
+.mm-stripes--band {
+  display: block;
+  width: auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--mm-stripe-1) 0 33.33%, var(--mm-stripe-2) 0 66.66%, var(--mm-stripe-3) 0);
+}

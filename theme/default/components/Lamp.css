@@ -1,0 +1,34 @@
+.mm-lamp {
+  --mm-lamp-led: var(--mm-led-off);
+  --mm-lamp-ground: var(--mm-sunken);
+  --mm-lamp-ink: var(--mm-fg-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px 0 8px;
+  border-radius: var(--mm-radius-full);
+  background: var(--mm-lamp-ground);
+  color: var(--mm-lamp-ink);
+  font-family: var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  font-weight: 700;
+  font-size: var(--mm-text-label-sm);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mm-lamp::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--mm-radius-full);
+  background: var(--mm-lamp-led);
+  box-shadow: 0 0 5px var(--mm-lamp-led);
+}
+.mm-lamp--neutral::before { box-shadow: var(--mm-led-inset); }
+.mm-lamp--accent { --mm-lamp-led: var(--mm-accent); --mm-lamp-ground: var(--mm-accent-soft); --mm-lamp-ink: var(--mm-accent-ink); }
+.mm-lamp--ok { --mm-lamp-led: var(--mm-ok-led); --mm-lamp-ground: var(--mm-ok-soft); --mm-lamp-ink: var(--mm-ok); }
+.mm-lamp--warn { --mm-lamp-led: var(--mm-warn-led); --mm-lamp-ground: var(--mm-warn-soft); --mm-lamp-ink: var(--mm-warn); }
+.mm-lamp--bad { --mm-lamp-led: var(--mm-bad-led); --mm-lamp-ground: var(--mm-bad-soft); --mm-lamp-ink: var(--mm-bad); }

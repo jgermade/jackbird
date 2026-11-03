@@ -1,0 +1,36 @@
+.mm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mm-space-2);
+  color: var(--mm-fg);
+  font-size: var(--mm-text-md);
+  cursor: pointer;
+}
+.mm-check-box {
+  appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: var(--mm-border-width) solid var(--mm-border-strong);
+  border-radius: 2px;
+  background: var(--mm-field);
+  box-shadow: var(--mm-well-shadow);
+  cursor: pointer;
+}
+.mm-check-box::after {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid var(--mm-on-accent);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+  opacity: 0;
+}
+.mm-check-box:checked { background: var(--mm-accent); border-color: var(--mm-accent-hover); box-shadow: none; }
+.mm-check-box:checked::after { opacity: 1; }
+.mm-check-box:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+.mm-check-box:disabled,
+.mm-check-box:disabled + span { opacity: .45; cursor: default; }

@@ -31,6 +31,11 @@ This document describes the technical stack and codebase architecture implemente
 - **UI Library**: React 18 (`^18.3.1`) with `react-dom`.
 - **Styling**: a single vanilla CSS file (`src/styles.css`) using CSS custom properties
   (`:root` variables) for colors, spacing and fonts.
+- **Design system**: "Deck", the default theme in `theme/default/`: `tokens.css` (every
+  `--mm-*` value, Silver light tone and Graphite dark tone), `fonts.css` with self-hosted
+  woff2 files (IBM Plex Sans/Mono, Archivo, Doto; SIL OFL), and React components that draw
+  only with the tokens. Its demo is served at `/theme/default/`. The app's screens move over
+  to it one at a time (see `ROADMAP/2026-11-03/deck-design-system.md`).
 
 ### Web APIs & Metadata
 - **File System Access API**: directory picking, permission checks, file streaming and
@@ -42,7 +47,8 @@ This document describes the technical stack and codebase architecture implemente
   their grouping mode in IndexedDB (`mp3-manager` database) so workspaces survive a reload.
 
 ### Build Tools & Tooling
-- **Bundler & Dev Server**: Vite (`^5.4.8`).
+- **Bundler & Dev Server**: Vite (`^5.4.8`), with two entries: the app (`index.html`) and the
+  theme demo (`theme/default/index.html`).
 - **Type checking**: `tsc --noEmit` (the `build` script runs it before `vite build`; the
   project has `"noEmit": true` in `tsconfig.json`, so `tsc` never writes `.js` files —
   Vite/esbuild handles all transpilation).
@@ -77,6 +83,11 @@ mp3-manager/
 │   └── vfs/
 │       ├── types.ts             # VfsAdapter contract (mount/listFiles/readFile/writeFile)
 │       └── browserVfs.ts        # File System Access API implementation
+├── theme/default/               # Deck design system (served at /theme/default/)
+│   ├── tokens.css               # Every --mm-* value, Silver and Graphite
+│   ├── fonts.css, fonts/        # Self-hosted woff2 + OFL licences
+│   ├── components/              # Key, KeyBank, Display, Meter, Lamp, Tabs, Modal, …
+│   └── index.html, demo.tsx     # The demo page
 ├── RECORD/                      # Specs, plans, walkthroughs & audit trail (see AGENTS.md)
 └── ROADMAP/                     # Dated roadmaps with Mermaid Gantt charts (see AGENTS.md)
 ```

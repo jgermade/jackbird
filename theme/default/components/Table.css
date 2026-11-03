@@ -1,0 +1,32 @@
+.mm-table-wrap { min-width: 0; overflow-x: auto; }
+.mm-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--mm-fg);
+  font-size: var(--mm-text-md);
+}
+/* Column heads are printed legends. */
+.mm-table th {
+  padding: 6px 8px;
+  border-bottom: var(--mm-border-width) solid var(--mm-border-strong);
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  font-weight: var(--mm-weight-bold);
+  font-size: var(--mm-text-label);
+  letter-spacing: var(--mm-tracking-label);
+  text-transform: uppercase;
+  color: var(--mm-fg-muted);
+}
+.mm-table td { padding: 7px 8px; border-bottom: var(--mm-border-width) solid var(--mm-border); }
+.mm-table tbody tr:hover td { background: var(--mm-hover); }
+.mm-table tr[aria-selected="true"] td { background: var(--mm-accent-soft); }
+.mm-table tr[aria-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--mm-accent); }
+.mm-table tr[data-playing="true"] .mm-title { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
+
+/* Cells: `mm-num` for numbers (mono, tight), `mm-end` to right-align, `mm-title` for the name a
+   playing row lights up. */
+.mm-table .mm-num { width: 1%; white-space: nowrap; font-family: var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-muted); }
+.mm-table .mm-end { text-align: right; }
+.mm-table .mm-title { display: inline-flex; align-items: center; gap: var(--mm-space-2); }

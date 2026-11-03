@@ -1,0 +1,24 @@
+.mm-eq {
+  display: inline-flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 2px;
+  width: 13px;
+  height: 12px;
+}
+.mm-eq > i {
+  width: 3px;
+  height: 100%;
+  background: var(--mm-accent);
+  transform-origin: bottom;
+  transform: scaleY(.4);
+}
+/* Durations scale --mm-duration-slow, so reduced motion holds the bars still. */
+.mm-eq.is-active > i { animation: mm-eq calc(var(--mm-duration-slow) * 2.8) ease-in-out infinite alternate; }
+.mm-eq.is-active > i:nth-child(2) { animation-delay: calc(var(--mm-duration-slow) * -.9); }
+.mm-eq.is-active > i:nth-child(3) { animation-delay: calc(var(--mm-duration-slow) * -1.9); }
+@keyframes mm-eq {
+  0% { transform: scaleY(.25); }
+  50% { transform: scaleY(1); }
+  100% { transform: scaleY(.55); }
+}

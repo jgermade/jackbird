@@ -1,0 +1,31 @@
+.mm-panel {
+  min-width: 0;
+  border: var(--mm-border-width) solid var(--mm-border);
+  border-radius: var(--mm-radius-md);
+  background: var(--mm-surface);
+  color: var(--mm-fg);
+}
+/* The head is a strip of chassis with the title printed on it. */
+.mm-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mm-space-3);
+  min-height: 36px;
+  padding: var(--mm-space-1) var(--mm-space-4);
+  border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
+  border-radius: calc(var(--mm-radius-md) - 1px) calc(var(--mm-radius-md) - 1px) 0 0;
+  background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+}
+.mm-panel-actions { display: flex; align-items: center; gap: var(--mm-space-2); }
+.mm-panel-body { padding: var(--mm-space-4); }
+.mm-panel--flush > .mm-panel-body { padding: 0; }
+.mm-panel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mm-space-3);
+  padding: var(--mm-space-3) var(--mm-space-4);
+  border-top: var(--mm-border-width) solid var(--mm-border);
+}

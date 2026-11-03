@@ -1,0 +1,7 @@
+/* Durations scale --mm-duration-slow, so reduced motion stops the reel. */
+.mm-reel {
+  flex: none;
+  animation: mm-reel-spin calc(var(--mm-duration-slow) * 7.5) linear infinite;
+}
+.mm-reel--fast { animation-duration: calc(var(--mm-duration-slow) * 3); }
+@keyframes mm-reel-spin { to { transform: rotate(1turn); } }

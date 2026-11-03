@@ -1,0 +1,58 @@
+/* The display window: a frame, and behind it an LCD (Silver) or a VFD
+   (Graphite) with its grid of unlit dots. */
+.mm-bezel {
+  min-width: 0;
+  padding: 4px;
+  border-radius: calc(var(--mm-radius-md) + 2px);
+  background: var(--mm-display-bezel);
+}
+.mm-display {
+  position: relative;
+  display: grid;
+  gap: var(--mm-space-1);
+  min-width: 0;
+  padding: var(--mm-space-2) var(--mm-space-3) 10px;
+  border-radius: calc(var(--mm-radius-key) + 1px);
+  background-color: var(--mm-display-bg);
+  background-image: radial-gradient(var(--mm-display-dim) .9px, transparent 1.1px);
+  background-size: 3px 3px;
+  box-shadow: var(--mm-display-inset);
+  color: var(--mm-display-fg);
+  text-shadow: var(--mm-display-glow);
+}
+.mm-display-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mm-space-3);
+  min-width: 0;
+}
+.mm-display-label {
+  font-family: var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  font-weight: 700;
+  font-size: var(--mm-text-label-sm);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mm-display-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mm-font-mono);
+  font-weight: var(--mm-weight-bold);
+  font-size: var(--mm-text-md);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.mm-counter {
+  font-family: var(--mm-font-display);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mm-counter--sm { font-size: var(--mm-text-display-sm); }
+.mm-counter--lg { font-size: var(--mm-text-display-lg); }

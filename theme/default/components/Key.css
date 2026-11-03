@@ -1,0 +1,72 @@
+.mm-key {
+  --mm-key-h: var(--mm-control-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mm-space-2);
+  height: var(--mm-key-h);
+  min-width: var(--mm-key-h);
+  padding: 0 var(--mm-space-3);
+  border: var(--mm-border-width) solid var(--mm-border-strong);
+  border-radius: var(--mm-radius-key);
+  background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+  box-shadow: var(--mm-key-shadow);
+  color: var(--mm-fg);
+  font-family: var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  font-weight: var(--mm-weight-bold);
+  font-size: var(--mm-text-label);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--mm-duration-key) ease,
+              box-shadow var(--mm-duration-key) ease,
+              background var(--mm-duration-key) ease,
+              border-color var(--mm-duration-key) ease;
+}
+.mm-key > svg { flex: none; width: 14px; height: 14px; }
+.mm-key:hover:not(:disabled) { border-color: var(--mm-fg-subtle); }
+.mm-key:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+.mm-key:disabled { opacity: .45; cursor: default; }
+
+/* Pressed, and latched: the key travels down and its face goes into shadow. */
+.mm-key:active:not(:disabled),
+.mm-key[aria-pressed="true"] {
+  transform: translateY(1px);
+  background: var(--mm-key-down);
+  box-shadow: var(--mm-key-pressed);
+}
+
+.mm-key--primary {
+  background: var(--mm-accent);
+  border-color: var(--mm-accent-hover);
+  color: var(--mm-on-accent);
+  box-shadow: var(--mm-key-shadow-signal);
+}
+.mm-key--primary:hover:not(:disabled) { background: var(--mm-accent-hover); border-color: var(--mm-accent-hover); }
+.mm-key--primary:active:not(:disabled) { background: var(--mm-accent-hover); box-shadow: var(--mm-key-pressed-signal); }
+
+.mm-key--danger {
+  background: var(--mm-bad);
+  border-color: var(--mm-bad);
+  color: var(--mm-on-bad);
+  box-shadow: var(--mm-key-shadow-signal);
+}
+.mm-key--danger:hover:not(:disabled) { border-color: var(--mm-fg); }
+.mm-key--danger:active:not(:disabled) { background: var(--mm-bad); box-shadow: var(--mm-key-pressed-signal); }
+
+.mm-key--ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--mm-fg-muted);
+}
+.mm-key--ghost:hover:not(:disabled) { background: var(--mm-hover); border-color: transparent; color: var(--mm-fg); }
+.mm-key--ghost:active:not(:disabled) { background: var(--mm-sunken); box-shadow: none; }
+
+.mm-key--sm { --mm-key-h: var(--mm-control-sm); padding: 0 var(--mm-space-2); font-size: var(--mm-text-label-sm); }
+.mm-key--lg { --mm-key-h: var(--mm-control-lg); padding: 0 var(--mm-space-4); }
+.mm-key--square { padding: 0; width: calc(var(--mm-key-h) + 6px); }

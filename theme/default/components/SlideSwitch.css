@@ -1,0 +1,44 @@
+.mm-slide { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
+.mm-slide-legend { cursor: pointer; user-select: none; }
+.mm-slide-legend.is-current { color: var(--mm-fg); }
+
+.mm-slide-track {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 22px;
+  padding: 0;
+  border: var(--mm-border-width) solid var(--mm-border-strong);
+  border-radius: var(--mm-radius-key);
+  background: var(--mm-sunken);
+  box-shadow: var(--mm-well-shadow);
+  overflow: hidden;
+  cursor: pointer;
+}
+/* The signal colour shows under the thumb once it has moved, like a hold switch. */
+.mm-slide-track::before {
+  content: "";
+  position: absolute;
+  inset: 0 50% 0 0;
+  background: var(--mm-accent);
+  opacity: 0;
+  transition: opacity var(--mm-duration) var(--mm-ease);
+}
+.mm-slide-track[aria-checked="true"]::before { opacity: 1; }
+.mm-slide-track:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+.mm-slide-track:disabled { opacity: .45; cursor: default; }
+
+.mm-slide-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 16px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4px, var(--mm-chassis-lo) 4px 5px) 6px 4px / 11px 8px no-repeat,
+    linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+  box-shadow: var(--mm-thumb-shadow);
+  transition: left var(--mm-duration) var(--mm-ease);
+}
+.mm-slide-track[aria-checked="true"] .mm-slide-thumb { left: 22px; }

@@ -1,0 +1,17 @@
+.mm-led {
+  display: inline-block;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--mm-radius-full);
+  background: var(--mm-led-off);
+  box-shadow: var(--mm-led-inset);
+}
+.mm-led--on {
+  background: var(--mm-led-color);
+  box-shadow: 0 0 6px var(--mm-led-color);
+}
+.mm-led--accent { --mm-led-color: var(--mm-accent); }
+.mm-led--ok { --mm-led-color: var(--mm-ok-led); }
+.mm-led--warn { --mm-led-color: var(--mm-warn-led); }
+.mm-led--bad { --mm-led-color: var(--mm-bad-led); }

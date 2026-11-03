@@ -9,7 +9,7 @@ gantt
   dateFormat YYYY-MM-DD
   axisFormat %d %b
   section Theme
-    Tokens, fonts, components, demo   :active, theme, 2026-11-03, 2d
+    Tokens, fonts, components, demo   :done, theme, 2026-11-03, 1d
   section Languages
     i18n layer, English and Spanish   :i18n, after theme, 3d
   section Screens
