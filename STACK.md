@@ -28,14 +28,19 @@ This document describes the technical stack and codebase architecture implemente
 
 ### Frontend & UI
 - **Language**: TypeScript (`^5.6.2`).
-- **UI Library**: React 18 (`^18.3.1`) with `react-dom`.
+- **UI Library**: React 18 (`^18.3.1`) with `react-dom`, moving screen by screen to
+  [jq79](https://github.com/jgermade/jq79) (`^0.7.7`): single-file `.html` components with
+  TypeScript setup scripts, imported through its Vite plugin (`jq79/vite`, with `safeEval`, so
+  no `'unsafe-eval'` is needed). See the layers in `AGENTS.md`.
 - **Styling**: a single vanilla CSS file (`src/styles.css`) using CSS custom properties
   (`:root` variables) for colors, spacing and fonts.
 - **Design system**: "Deck", the default theme in `theme/default/`: `tokens.css` (every
   `--mm-*` value, Silver light tone and Graphite dark tone), `fonts.css` with self-hosted
-  woff2 files (IBM Plex Sans/Mono, Archivo, Doto; SIL OFL), and React components that draw
-  only with the tokens. Its demo is served at `/theme/default/`. The app's screens move over
-  to it one at a time (see `ROADMAP/2026-11-03/deck-design-system.md`).
+  woff2 files (IBM Plex Sans/Mono, Archivo, Doto; SIL OFL), `content.css` (classes for plain
+  markup: `.mm-legend`, `.mm-table`, the display's rows), and jq79 components that draw only
+  with the tokens. Sizes are in rem; on phones (≤ 480px) the root font size is `4vw`, so the
+  interface scales linearly with the screen. Its demo is served at `/theme/default/`. The
+  app's screens move over to it one at a time (see `ROADMAP/2026-11-03/deck-design-system.md`).
 
 ### Web APIs & Metadata
 - **File System Access API**: directory picking, permission checks, file streaming and
@@ -86,8 +91,9 @@ mp3-manager/
 ├── theme/default/               # Deck design system (served at /theme/default/)
 │   ├── tokens.css               # Every --mm-* value, Silver and Graphite
 │   ├── fonts.css, fonts/        # Self-hosted woff2 + OFL licences
-│   ├── components/              # Key, KeyBank, Display, Meter, Lamp, Tabs, Modal, …
-│   └── index.html, demo.tsx     # The demo page
+│   ├── content.css              # Classes for plain markup (legend, table, display rows)
+│   ├── components/*.html        # jq79: key, key-bank, display, meter, lamp, tabs, modal, …
+│   └── index.html, demo.ts/.html # The demo page
 ├── RECORD/                      # Specs, plans, walkthroughs & audit trail (see AGENTS.md)
 └── ROADMAP/                     # Dated roadmaps with Mermaid Gantt charts (see AGENTS.md)
 ```

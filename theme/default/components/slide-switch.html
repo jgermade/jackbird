@@ -1,0 +1,88 @@
+<script :setup="{ model = false, label = '', offLegend = '', onLegend = '', disabled = false }: Props" lang="ts">
+  // A slide switch, like the hold switch on a portable player: the signal
+  // colour shows under the thumb when it is on. Printed legends either side
+  // move it there when clicked.
+  //
+  //   <SlideSwitch label="Dark tone" off-legend="Silver" on-legend="Graphite" :model="dark" />
+  //
+  // A `role="switch"` button: Space and Enter flip it. The value goes up
+  // through `:model` and as `change`.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css` (and `content.css` for the legends). See
+  // `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { model?: boolean | ""; label?: string; offLegend?: string; onLegend?: string; disabled?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: on = flag(model)
+  $: isDisabled = flag(disabled)
+
+  const set = (next: boolean) => {
+    if (isDisabled || next === on) return
+    $updateModel(next)
+    $emit("change", next)
+  }
+</script>
+
+<span class="slide" :class.disabled="isDisabled">
+  <span :if="offLegend" class="mm-legend legend" :class.current="!on" aria-hidden="true" @click="set(false)">{{ offLegend }}</span>
+  <button type="button"
+          role="switch"
+          class="track"
+          :class.on="on"
+          :aria-checked="on ? 'true' : 'false'"
+          :aria-label="label || null"
+          :disabled="isDisabled"
+          @click="set(!on)"><span class="thumb"></span></button>
+  <span :if="onLegend" class="mm-legend legend" :class.current="on" aria-hidden="true" @click="set(true)">{{ onLegend }}</span>
+</span>
+
+<style scoped>
+  .slide { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
+  .legend { cursor: pointer; user-select: none; }
+  .legend.current { color: var(--mm-fg); }
+  .disabled { opacity: .45; }
+  .disabled .legend { cursor: default; }
+
+  .track {
+    position: relative;
+    flex: none;
+    width: 3rem;
+    height: 1.375rem;
+    padding: 0;
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-sunken);
+    box-shadow: var(--mm-well-shadow);
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .track:disabled { cursor: default; }
+  .track:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+  /* The signal colour under the thumb once it has moved, like a hold switch. */
+  .track::before {
+    content: "";
+    position: absolute;
+    inset: 0 50% 0 0;
+    background: var(--mm-accent);
+    opacity: 0;
+    transition: opacity var(--mm-duration) var(--mm-ease);
+  }
+  .track.on::before { opacity: 1; }
+
+  .thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 1.375rem;
+    height: 1rem;
+    border-radius: 2px;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 .25rem, var(--mm-chassis-lo) .25rem .3125rem) .375rem .25rem / .6875rem .5rem no-repeat,
+      linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+    box-shadow: var(--mm-thumb-shadow);
+    transition: left var(--mm-duration) var(--mm-ease);
+  }
+  .track.on .thumb { left: 1.375rem; }
+</style>

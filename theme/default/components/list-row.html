@@ -1,0 +1,107 @@
+<script :setup="{
+  kind = 'item',
+  depth = 0,
+  expanded = false,
+  chosen = false,
+  playing = false,
+  playingActive = false,
+  focusable = false,
+  label = '',
+  meta = ''
+}: Props" lang="ts">
+  // One row of the library tree: a folder or a track. It is a `treeitem`;
+  // the tree around it owns focus and the arrow keys, which reach it as
+  // native `keydown` events.
+  //
+  //   <ListRow kind="item" :depth="2" label="So What" meta="01" :chosen="sel"
+  //     :playing="current" :playing-active="isPlaying" @select="pick($event.detail)" />
+  //
+  // A click emits `select` (the native event as `$event.detail`, for its
+  // modifier keys), a double click `activate`, and a click on a folder's
+  // caret `toggle` instead of `select`. The row being played shows moving
+  // bars in place of `meta`. `focusable` puts it in the tab order. `chosen`
+  // is its selection (not `selected`, which jq79 keeps for an `<option>`'s
+  // own state and ignores on a component tag).
+  //
+  // **Part of the default theme**: imports `EqBars`, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = {
+    kind?: "folder" | "item"
+    depth?: number
+    expanded?: boolean | ""
+    chosen?: boolean | ""
+    playing?: boolean | ""
+    playingActive?: boolean | ""
+    focusable?: boolean | ""
+    label?: string
+    meta?: string | number
+  }
+
+  const EqBars = await import("./eq-bars.html")
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: isFolder = kind === "folder"
+  $: level = Math.max(0, Number(depth) || 0)
+
+  const caret = (event: MouseEvent) => {
+    if (!isFolder) return
+    event.stopPropagation()
+    $emit("toggle", event)
+  }
+</script>
+
+<div class="row"
+     :class.folder="isFolder"
+     :class.playing="flag(playing)"
+     role="treeitem"
+     :aria-level="level + 1"
+     :aria-expanded="isFolder ? String(flag(expanded)) : null"
+     :aria-selected="String(flag(chosen))"
+     :tabindex="flag(focusable) ? 0 : -1"
+     :style="`--depth: ${level}`"
+     @click="$emit('select', $event)"
+     @dblclick="$emit('activate', $event)">
+  <span class="caret" @click="caret($event)">
+    <svg :if="isFolder" viewBox="0 0 8 8" aria-hidden="true"><path d="M2 1l4 3-4 3z" fill="currentColor" /></svg>
+  </span>
+  <span class="icon">
+    <svg :if="isFolder" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4.2l1.4 1.6h7.4v8.4h-13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
+    <svg :else viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
+  </span>
+  <span class="label">{{ label }}</span>
+  <span class="end">
+    <EqBars :if="flag(playing)" :active="flag(playingActive)" />
+    <span :else class="meta">{{ meta }}</span>
+  </span>
+</div>
+
+<style scoped>
+  .row {
+    display: grid;
+    grid-template-columns: .875rem 1.125rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--mm-space-2);
+    min-height: 1.75rem;
+    padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + var(--depth) * .875rem);
+    border-left: .1875rem solid transparent;
+    color: var(--mm-fg);
+    font: var(--mm-text-sm) / var(--mm-leading-tight) var(--mm-font-sans);
+    cursor: pointer;
+    user-select: none;
+  }
+  .row:hover { background: var(--mm-hover); }
+  .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
+  .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+
+  .caret { display: grid; place-items: center; color: var(--mm-fg-subtle); }
+  .caret svg { width: .5rem; height: .5rem; transition: transform var(--mm-duration) var(--mm-ease); }
+  .row[aria-expanded="true"] .caret svg { transform: rotate(90deg); }
+  .icon { display: grid; place-items: center; color: var(--mm-fg-muted); }
+  .icon svg { width: 1rem; height: 1rem; }
+  .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .folder .label { font-weight: var(--mm-weight-bold); }
+  .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
+  .end { display: inline-flex; align-items: center; justify-content: flex-end; }
+  .meta { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+</style>

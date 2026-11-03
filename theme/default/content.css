@@ -1,0 +1,83 @@
+/* What a component cannot style: classes for plain markup that a view
+   writes itself, inside a component's slot or on its own. jq79's scoped
+   styles stop at a component's edge, and slot content keeps the stamp of the
+   file it was written in; a <table> cannot hold a <slot> either. A page loads
+   this once, after tokens.css. See RECORD/2026-11-03.deck-design-system.WIP.md. */
+
+/* Printed lettering, as on a faceplate: section heads, column heads, the
+   name under a control. */
+.mm-legend {
+  margin: 0;
+  font-family: var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  font-weight: var(--mm-weight-bold);
+  font-size: var(--mm-text-label);
+  line-height: var(--mm-leading-tight);
+  letter-spacing: var(--mm-tracking-label);
+  text-transform: uppercase;
+  color: var(--mm-fg-muted);
+}
+.mm-legend.is-ink { color: var(--mm-fg); }
+.mm-legend.is-accent { color: var(--mm-accent-ink); }
+
+/* Inside a Display: a row with its ends apart, a small printed label, and a
+   line of text that ellipsises. */
+.mm-display-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mm-space-3);
+  min-width: 0;
+}
+.mm-display-label {
+  font-family: var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  font-weight: 700;
+  font-size: var(--mm-text-label-sm);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mm-display-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mm-font-mono);
+  font-weight: var(--mm-weight-bold);
+  font-size: var(--mm-text-md);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* A data table that scrolls sideways in its own box (`mm-table-wrap`). Rows
+   take `aria-selected` and `data-playing`; cells take `mm-num` (mono, tight),
+   `mm-end` (right-aligned) and `mm-title` (what a playing row lights up). */
+.mm-table-wrap { min-width: 0; overflow-x: auto; }
+.mm-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--mm-fg);
+  font-size: var(--mm-text-md);
+}
+.mm-table th {
+  padding: .375rem .5rem;
+  border-bottom: var(--mm-border-width) solid var(--mm-border-strong);
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  font-weight: var(--mm-weight-bold);
+  font-size: var(--mm-text-label);
+  letter-spacing: var(--mm-tracking-label);
+  text-transform: uppercase;
+  color: var(--mm-fg-muted);
+}
+.mm-table td { padding: .4375rem .5rem; border-bottom: var(--mm-border-width) solid var(--mm-border); }
+.mm-table tbody tr:hover td { background: var(--mm-hover); }
+.mm-table tr[aria-selected="true"] td { background: var(--mm-accent-soft); }
+.mm-table tr[aria-selected="true"] td:first-child { box-shadow: inset .1875rem 0 0 var(--mm-accent); }
+.mm-table tr[data-playing="true"] .mm-title { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
+.mm-table .mm-num { width: 1%; white-space: nowrap; font-family: var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-muted); }
+.mm-table .mm-end { text-align: right; }
+.mm-table .mm-title { display: inline-flex; align-items: center; gap: var(--mm-space-2); }

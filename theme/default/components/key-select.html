@@ -1,0 +1,36 @@
+<script :setup="{ label = '', options = [], model = '', size = 'sm' }: Props" lang="ts">
+  // A bank where exactly one key is down, with its LED lit: the function
+  // selector of a deck, and the theme's segmented control.
+  //
+  //   <KeySelect label="Library view" :model="mode" :options="[
+  //     { value: 'flat', label: 'Flat' }, { value: 'wizard', label: 'Wizard' },
+  //   ]" />
+  //
+  // An option is `{ value, label, title }`. The choice goes up through
+  // `:model` and as `change`.
+  //
+  // **Part of the default theme**: imports `Key` and `KeyBank`, and draws
+  // only with `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Option = { value: string; label: string; title?: string }
+  type Props = { label?: string; options?: Option[]; model?: string; size?: "sm" | "md" | "lg" }
+
+  const Key = await import("./key.html")
+  const KeyBank = await import("./key-bank.html")
+
+  const choose = (value: string) => {
+    if (value === model) return
+    $updateModel(value)
+    $emit("change", value)
+  }
+</script>
+
+<KeyBank :label="label">
+  <Key :each="option in options"
+       :key="option.value"
+       :size="size"
+       led
+       :pressed="option.value === model"
+       :title="option.title || ''"
+       @click="choose(option.value)">{{ option.label }}</Key>
+</KeyBank>

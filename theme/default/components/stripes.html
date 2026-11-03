@@ -1,0 +1,32 @@
+<script :setup="{ variant = 'stack', width = '1.75rem' }: Props" lang="ts">
+  // The three J-card stripes. `stack` is the brand mark: three bars, one
+  // above the other. `band` is one line split in three, as wide as its
+  // container unless `width` says otherwise.
+  //
+  //   <Stripes width="2.75rem" />  <Stripes variant="band" />
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { variant?: "stack" | "band"; width?: string }
+</script>
+
+<span :if="variant === 'band'" class="band" aria-hidden="true"></span>
+<span :else class="stack" :style="`width: ${width}`" aria-hidden="true"><i></i><i></i><i></i></span>
+
+<style scoped>
+  .stack {
+    display: grid;
+    grid-template-rows: repeat(3, .1875rem);
+    gap: 2px;
+  }
+  .stack i:nth-child(1) { background: var(--mm-stripe-1); }
+  .stack i:nth-child(2) { background: var(--mm-stripe-2); }
+  .stack i:nth-child(3) { background: var(--mm-stripe-3); }
+  .band {
+    display: block;
+    height: 100%;
+    min-height: .25rem;
+    background: linear-gradient(90deg, var(--mm-stripe-1) 0 33.33%, var(--mm-stripe-2) 0 66.66%, var(--mm-stripe-3) 0);
+  }
+</style>

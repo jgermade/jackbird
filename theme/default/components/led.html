@@ -1,0 +1,38 @@
+<script :setup="{ on = false, tone = 'accent' }: Props" lang="ts">
+  // A small indicator light. Decorative: what it means is said in words
+  // beside it.
+  //
+  //   <Led :on="playing" />
+  //   <Led on tone="ok" />
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { on?: boolean | ""; tone?: "accent" | "ok" | "warn" | "bad" }
+
+  // A bare attribute (`<Led on>`) arrives as "", and means on.
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: lit = flag(on)
+</script>
+
+<span class="led" :class.on="lit" :class="`tone-${tone}`" aria-hidden="true"></span>
+
+<style scoped>
+  .led {
+    display: inline-block;
+    flex: none;
+    width: .375rem;
+    height: .375rem;
+    border-radius: var(--mm-radius-full);
+    background: var(--mm-led-off);
+    box-shadow: var(--mm-led-inset);
+  }
+  .tone-accent { --color: var(--mm-accent); }
+  .tone-ok { --color: var(--mm-ok-led); }
+  .tone-warn { --color: var(--mm-warn-led); }
+  .tone-bad { --color: var(--mm-bad-led); }
+  .on {
+    background: var(--color);
+    box-shadow: 0 0 .375rem var(--color);
+  }
+</style>

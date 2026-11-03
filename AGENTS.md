@@ -17,7 +17,15 @@ at a time. Code lives in four layers, and an import that crosses them the wrong 
 | `src/components/`, `theme/default/components/` | jq79 components that depend on no store: only on themselves and on helpers. | `src/helpers/`, components |
 | `src/views/` | jq79 components that bring data (`src/lib/`) and components together. | all of the above |
 
-`src/types.ts` holds types only and may be imported from anywhere. Setup scripts are written in
+`src/types.ts` holds types only and may be imported from anywhere. In a jq79 component, a prop
+can't be called `value`, `checked`, `selected`, `text`, `html` or `class`: those are jq79
+directives and are ignored on a component tag.
+
+### Sizes
+
+Sizes are in `rem`, never in `px`, so the interface scales with the root font size: 16px on a
+desktop and `4vw` on a phone (`theme/default/tokens.css`), which scales every component
+linearly with the screen. Only hairlines (1–2px borders, focus rings) stay in `px`. Setup scripts are written in
 TypeScript (`lang="ts"`); since templates are not type-checked, keep them thin and put the logic
 in helpers and `lib/`.
 

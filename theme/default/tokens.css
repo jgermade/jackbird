@@ -8,7 +8,13 @@
    a VFD. `:root` is Silver and `[data-theme="dark"]` re-points the colours:
    the attribute ThemeService sets on <html>. Any element can be an island of
    the other tone with `data-tone="dark"` or `data-tone="light"`. Shape, type
-   and motion are the same in both. */
+   and motion are the same in both.
+
+   Sizes are in rem, so everything scales with the root font size: 16px on
+   a desktop, and on a phone a share of the viewport's width
+   (`--mm-root-phone`, near the end), so the whole interface scales
+   linearly with the screen. Only hairlines (1-2px borders, focus rings)
+   stay in px. */
 
 :root, [data-tone="light"] {
   /* ---- grounds ------------------------------------------------------------ */
@@ -107,16 +113,16 @@
   /* The dot-matrix display. */
   --mm-font-display: "Doto", "IBM Plex Mono", ui-monospace, monospace;
 
-  --mm-text-label-sm: 9px;
-  --mm-text-label: 10px;
-  --mm-text-xs: 11px;
-  --mm-text-sm: 12px;
-  --mm-text-md: 13px;
-  --mm-text-lg: 15px;
-  --mm-text-xl: 20px;
-  --mm-text-2xl: 28px;
-  --mm-text-display-sm: 17px;
-  --mm-text-display-lg: 30px;
+  --mm-text-label-sm: .5625rem;
+  --mm-text-label: .625rem;
+  --mm-text-xs: .6875rem;
+  --mm-text-sm: .75rem;
+  --mm-text-md: .8125rem;
+  --mm-text-lg: .9375rem;
+  --mm-text-xl: 1.25rem;
+  --mm-text-2xl: 1.75rem;
+  --mm-text-display-sm: 1.0625rem;
+  --mm-text-display-lg: 1.875rem;
   --mm-weight-regular: 400;
   --mm-weight-medium: 500;
   --mm-weight-bold: 600;
@@ -137,16 +143,16 @@
   --mm-space-7: 2rem;
   --mm-space-8: 3rem;
 
-  --mm-radius-key: 3px;
-  --mm-radius-md: 6px;
-  --mm-radius-lg: 14px;
+  --mm-radius-key: .1875rem;
+  --mm-radius-md: .375rem;
+  --mm-radius-lg: .875rem;
   --mm-radius-full: 999px;
   --mm-border-width: 1px;
 
   /* A control's height, so a key, a field and a select on one row line up. */
-  --mm-control-sm: 24px;
-  --mm-control-md: 30px;
-  --mm-control-lg: 36px;
+  --mm-control-sm: 1.5rem;
+  --mm-control-md: 1.875rem;
+  --mm-control-lg: 2.25rem;
 
   /* ---- motion ------------------------------------------------------------- */
 
@@ -219,6 +225,14 @@
   --mm-brush: rgba(255, 255, 255, .025);
 
   color-scheme: dark;
+}
+
+/* Phones: the root font size follows the viewport's width, and with it
+   every size in rem. 4vw is 16px on a 400px-wide screen, the size the
+   theme is drawn at; a 360px phone gets 14.4px and a 430px one 17.2px. */
+:root { --mm-root-phone: 4vw; }
+@media (max-width: 480px) {
+  html { font-size: var(--mm-root-phone); }
 }
 
 /* Once, here, instead of a media query in every component: every transition

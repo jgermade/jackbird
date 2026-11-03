@@ -1,0 +1,49 @@
+<script :setup="{ tone = 'neutral' }: Props" lang="ts">
+  // A state as a lit lamp and a word: never a colour alone.
+  //
+  //   <Lamp tone="warn">Unsaved</Lamp>
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { tone?: "neutral" | "accent" | "ok" | "warn" | "bad" }
+</script>
+
+<span class="lamp" :class="`tone-${tone}`"><slot /></span>
+
+<style scoped>
+  .lamp {
+    --led: var(--mm-led-off);
+    --ground: var(--mm-sunken);
+    --ink: var(--mm-fg-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    height: 1.375rem;
+    padding: 0 .5625rem 0 .5rem;
+    border-radius: var(--mm-radius-full);
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-weight: 700;
+    font-size: var(--mm-text-label-sm);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .lamp::before {
+    content: "";
+    flex: none;
+    width: .375rem;
+    height: .375rem;
+    border-radius: var(--mm-radius-full);
+    background: var(--led);
+    box-shadow: 0 0 .3125rem var(--led);
+  }
+  .tone-neutral::before { box-shadow: var(--mm-led-inset); }
+  .tone-accent { --led: var(--mm-accent); --ground: var(--mm-accent-soft); --ink: var(--mm-accent-ink); }
+  .tone-ok { --led: var(--mm-ok-led); --ground: var(--mm-ok-soft); --ink: var(--mm-ok); }
+  .tone-warn { --led: var(--mm-warn-led); --ground: var(--mm-warn-soft); --ink: var(--mm-warn); }
+  .tone-bad { --led: var(--mm-bad-led); --ground: var(--mm-bad-soft); --ink: var(--mm-bad); }
+</style>

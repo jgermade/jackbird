@@ -1,0 +1,897 @@
+<script :setup lang="ts">
+  // The default theme's demo: every token read back from the computed style,
+  // and every component in its variants and states. Mounted by demo.ts,
+  // served at /theme/default/. It imports the theme and nothing of the app's.
+  // See RECORD/2026-11-03.deck-design-system.WIP.md.
+
+  const Checkbox = await import("./components/checkbox.html")
+  const Counter = await import("./components/counter.html")
+  const Display = await import("./components/display.html")
+  const EqBars = await import("./components/eq-bars.html")
+  const Field = await import("./components/field.html")
+  const Key = await import("./components/key.html")
+  const KeyBank = await import("./components/key-bank.html")
+  const KeySelect = await import("./components/key-select.html")
+  const Lamp = await import("./components/lamp.html")
+  const ListRow = await import("./components/list-row.html")
+  const Meter = await import("./components/meter.html")
+  const Modal = await import("./components/modal.html")
+  const Panel = await import("./components/panel.html")
+  const Reel = await import("./components/reel.html")
+  const Select = await import("./components/select.html")
+  const SlideSwitch = await import("./components/slide-switch.html")
+  const Stripes = await import("./components/stripes.html")
+  const Tabs = await import("./components/tabs.html")
+  const TextInput = await import("./components/text-input.html")
+
+  type Track = { n: string; title: string; secs: number }
+  type TreeNode = { id: string; kind: "folder" | "item"; depth: number; label: string; meta: string; parent?: string; track?: number }
+
+  const THEME_KEY = "mp3-manager.theme-demo"
+  const ALBUM = { artist: "Miles Davis", title: "Kind of Blue", year: "1959" }
+  const TRACKS: Track[] = [
+    { n: "01", title: "So What", secs: 562 },
+    { n: "02", title: "Freddie Freeloader", secs: 586 },
+    { n: "03", title: "Blue in Green", secs: 337 },
+    { n: "04", title: "All Blues", secs: 693 },
+    { n: "05", title: "Flamenco Sketches", secs: 566 }
+  ]
+  const TOTAL_SECS = TRACKS.reduce((sum, track) => sum + track.secs, 0)
+
+  const RULES = [
+    { legend: "Evoke, don't copy", strong: "No real product's look.", text: "No click wheels, logos or chrome photos. The references are materials and habits, not a device." },
+    { legend: "One signal colour", strong: "Orange means \"this one\".", text: "The primary key, the selection, a lit LED and the playing track. Nothing decorative is orange." },
+    { legend: "Displays show state", strong: "Status lives in a window.", text: "Now playing, counters and scan progress go in an LCD by day and a VFD by night." },
+    { legend: "Keys travel", strong: "A press moves 1px down.", text: "Keys sit in banks; a latched key stays down with its LED lit." },
+    { legend: "Printed labels", strong: "Small, wide, uppercase.", text: "Section heads, column heads and field labels are set like the print on a faceplate." }
+  ]
+
+  const TONES = [
+    { id: "light", name: "Silver", kind: "Light · LCD" },
+    { id: "dark", name: "Graphite", kind: "Dark · VFD" }
+  ]
+  const COLOUR_GROUPS = [
+    { name: "Grounds", tokens: ["bg", "chassis", "chassis-hi", "chassis-lo", "surface", "sunken", "field", "hover", "border", "border-strong", "key-top", "key-bottom", "key-down"] },
+    { name: "Ink", tokens: ["fg", "fg-muted", "fg-subtle"] },
+    { name: "Signal", tokens: ["accent", "accent-hover", "accent-ink", "on-accent", "accent-soft"] },
+    { name: "States", tokens: ["ok", "ok-led", "ok-soft", "warn", "warn-led", "warn-soft", "bad", "bad-led", "bad-soft", "on-bad", "led-off"] },
+    { name: "Display", tokens: ["display-bg", "display-fg", "display-bezel", "stripe-1", "stripe-2", "stripe-3"] }
+  ]
+  const TYPE_ROWS = [
+    { role: "Label", token: "--mm-font-label", face: "Archivo · 125% · 600", sample: "Track · Artist · Album · Year · Genre", kind: "label" },
+    { role: "Body", token: "--mm-font-sans", face: "IBM Plex Sans", sample: "Freddie Freeloader, from Kind of Blue (1959), 9 min 46 s", kind: "sans" },
+    { role: "Data", token: "--mm-font-mono", face: "IBM Plex Mono", sample: "Jazz/Miles Davis/1959 - Kind of Blue/02 - Freddie Freeloader.mp3", kind: "mono" },
+    { role: "Display", token: "--mm-font-display", face: "Doto · 700", sample: "02/05 09:46", kind: "display" }
+  ]
+  const SPACES = [1, 2, 3, 4, 5, 6, 7, 8]
+  const RADII = ["key", "md", "lg", "full"]
+  const GENRES = ["Jazz", "Modal jazz", "Hard bop"]
+  const TREE: TreeNode[] = [
+    { id: "miles", kind: "folder", depth: 0, label: "Miles Davis", meta: "5" },
+    { id: "kob", kind: "folder", depth: 1, label: "1959 - Kind of Blue", meta: "5", parent: "miles" },
+    ...TRACKS.map((track, index): TreeNode => ({ id: `t${index}`, kind: "item", depth: 2, label: track.title, meta: track.n, parent: "kob", track: index })),
+    { id: "heads", kind: "folder", depth: 0, label: "Talking Heads", meta: "8" },
+    { id: "bjork", kind: "folder", depth: 0, label: "Björk", meta: "10" },
+    { id: "nina", kind: "folder", depth: 0, label: "Nina Simone", meta: "14" }
+  ]
+
+  const formatTime = (seconds: number): string =>
+    `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`
+
+  // ---- tone ------------------------------------------------------------------
+
+  let dark: boolean = document.documentElement.dataset.theme === "dark"
+  const applyTone = (isDark: boolean) => {
+    document.documentElement.dataset.theme = isDark ? "dark" : "light"
+    try {
+      localStorage.setItem(THEME_KEY, isDark ? "dark" : "light")
+    } catch {
+      // Private browsing: the choice still applies to this page.
+    }
+  }
+  $: applyTone(dark)
+
+  // ---- playback, shared by the faceplate and the library ---------------------
+
+  let index: number = 0
+  let position: number = 192
+  let playing: boolean = false
+  $: track = TRACKS[index]
+
+  const tick = () => {
+    position += 1
+    if (position >= TRACKS[index].secs) {
+      index = (index + 1) % TRACKS.length
+      position = 0
+    }
+  }
+  // The interval handle is bookkeeping, not state: it lives in a closure.
+  const clock = (() => {
+    let timer = 0
+    return (on: boolean) => {
+      window.clearInterval(timer)
+      if (on) timer = window.setInterval(tick, 1000)
+    }
+  })()
+  $: clock(playing)
+  $destroyed(() => clock(false))
+
+  const next = () => { index = (index + 1) % TRACKS.length; position = 0 }
+  const prev = () => { index = (index + TRACKS.length - 1) % TRACKS.length; position = 0 }
+  const playTrack = (at: number) => { index = at; position = 0; playing = true }
+
+  let mode: string = "wizard"
+  let shuffle: boolean = false
+  let repeat: boolean = true
+
+  // ---- specimens ---------------------------------------------------------------
+
+  let latched: boolean = false
+  let groupBy: string = "album"
+  let hold: boolean = true
+
+  let year: string = "1959"
+  let title: string = ""
+  let genre: string = "Jazz"
+  let renameFiles: boolean = true
+  let saved: boolean = false
+  $: yearInvalid = !/^\d{4}$/.test(year)
+  const markDirty = (..._fields: unknown[]) => { saved = false }
+  $: markDirty(year, title, genre, renameFiles)
+  const save = () => { if (!yearInvalid) saved = true }
+
+  let scanned: number = 603
+  const scan = (() => {
+    let timer = 0
+    const step = () => {
+      scanned = Math.min(739, scanned + 7)
+      if (scanned < 739) timer = window.setTimeout(step, 60)
+    }
+    return {
+      start: () => { window.clearTimeout(timer); scanned = 0; step() },
+      stop: () => window.clearTimeout(timer)
+    }
+  })()
+  $destroyed(() => scan.stop())
+
+  // ---- in context --------------------------------------------------------------
+
+  let roots = [
+    { id: "music", label: "Music", meta: "739", closeLabel: "Close Music" },
+    { id: "jazz", label: "Jazz archive", meta: "2 114", closeLabel: "Close Jazz archive" },
+    { id: "usb", label: "Car USB", meta: "96", closeLabel: "Close Car USB" }
+  ]
+  let activeRoot: string | null = "music"
+  const closeRoot = (id: string) => {
+    roots = roots.filter((root) => root.id !== id)
+    if (activeRoot === id) activeRoot = roots[0]?.id ?? null
+  }
+
+  let expanded: string[] = ["miles", "kob"]
+  let selected: number[] = [0, 2]
+
+  const isVisible = (node: TreeNode, open: string[]): boolean => {
+    let parent = node.parent
+    while (parent) {
+      if (!open.includes(parent)) return false
+      parent = TREE.find((candidate) => candidate.id === parent)?.parent
+    }
+    return true
+  }
+  $: visible = TREE.filter((node) => isVisible(node, expanded))
+
+  const toggleFolder = (id: string) => {
+    expanded = expanded.includes(id) ? expanded.filter((open) => open !== id) : [...expanded, id]
+  }
+  const toggleTrack = (at: number) => {
+    selected = selected.includes(at) ? selected.filter((one) => one !== at) : [...selected, at]
+  }
+  const pickRow = (node: TreeNode) => {
+    if (node.track === undefined) toggleFolder(node.id)
+    else toggleTrack(node.track)
+  }
+  const playSelection = () => { if (selected.length > 0) playTrack(Math.min(...selected)) }
+
+  let infoOpen: boolean = false
+
+  // ---- swatches, read back once the islands are on the page ------------------
+
+  let swatches: Record<string, Record<string, string>> = { light: {}, dark: {} }
+  const readSwatches = (): Record<string, Record<string, string>> => {
+    const read: Record<string, Record<string, string>> = {}
+    for (const island of Array.from($$self(".tone")) as HTMLElement[]) {
+      const style = getComputedStyle(island)
+      const values: Record<string, string> = {}
+      for (const group of COLOUR_GROUPS) {
+        for (const token of group.tokens) values[token] = style.getPropertyValue(`--mm-${token}`).trim()
+      }
+      read[island.dataset.tone ?? ""] = values
+    }
+    return read
+  }
+  await $mounted()
+  swatches = readSwatches()
+</script>
+
+<header class="mast">
+  <div class="wrap mast-row">
+    <div class="brand">
+      <Stripes />
+      <div>
+        <div class="brand-name">MP3 Manager</div>
+        <span class="mm-legend">Deck · default theme</span>
+      </div>
+    </div>
+    <SlideSwitch label="Dark tone (Graphite)" off-legend="Silver" on-legend="Graphite" :model="dark" />
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>A library manager with the feel of a tape deck</h1>
+    <p>Deck borrows the parts of old portable audio gear that still work as interface: a display window that shows state, keys that look pressable, printed labels and one signal colour. Everything else stays flat and quiet.</p>
+
+    <div class="faceplate">
+      <div class="brand brand-column">
+        <Stripes width="2.75rem" />
+        <div>
+          <div class="brand-name">MP3 Manager</div>
+          <span class="mm-legend">Library deck</span>
+        </div>
+      </div>
+
+      <div class="stack">
+        <KeyBank label="Transport">
+          <Key square label="Previous track" @click="prev()">
+            <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="2" y="3" width="2" height="10" /><path d="M14 3v10L5 8z" /></svg>
+          </Key>
+          <Key square :label="playing ? 'Pause' : 'Play'" :pressed="playing" @click="playing = !playing">
+            <svg :if="playing" class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" /><rect x="9.5" y="3" width="3" height="10" /></svg>
+            <svg :else class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
+          </Key>
+          <Key square label="Next track" @click="next()">
+            <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="12" y="3" width="2" height="10" /><path d="M2 3v10l9-5z" /></svg>
+          </Key>
+        </KeyBank>
+        <span class="mm-legend">Transport</span>
+      </div>
+
+      <div class="fp-display">
+        <Display live>
+          <div class="mm-display-row">
+            <span class="mm-display-label">{{ playing ? "▶ Play" : "■ Stop" }}</span>
+            <span class="mm-display-label">Track <Counter size="sm">{{ track.n }}/05</Counter></span>
+          </div>
+          <div class="mm-display-row">
+            <span class="mm-display-title" :title="`${track.title} — ${ALBUM.artist}`">{{ track.title }} — {{ ALBUM.artist }}</span>
+            <Counter>{{ formatTime(position) }}</Counter>
+          </div>
+          <Meter variant="display" :segments="48" :level="position" :max="track.secs" label="Position" :level-text="`${formatTime(position)} of ${formatTime(track.secs)}`" />
+        </Display>
+      </div>
+
+      <div class="fp-right">
+        <KeySelect label="Library view" :model="mode" :options="[{ value: 'flat', label: 'Flat' }, { value: 'wizard', label: 'Wizard' }]" />
+        <KeyBank label="Playback modes">
+          <Key size="sm" led :pressed="shuffle" @click="shuffle = !shuffle">Shuffle</Key>
+          <Key size="sm" led :pressed="repeat" @click="repeat = !repeat">Repeat</Key>
+        </KeyBank>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" aria-labelledby="h-rules">
+    <div class="head">
+      <h2 id="h-rules">Five rules</h2>
+      <p>What makes it feel like the gear without turning into a costume.</p>
+    </div>
+    <ul class="rules">
+      <li :each="rule in RULES" :key="rule.legend">
+        <span class="mm-legend">{{ rule.legend }}</span>
+        <strong>{{ rule.strong }}</strong>
+        <span class="muted">{{ rule.text }}</span>
+      </li>
+    </ul>
+  </section>
+
+  <section class="section" aria-labelledby="h-materials">
+    <div class="head">
+      <h2 id="h-materials">Materials</h2>
+      <p>Every colour token in both tones, read back from the computed style. Silver is the light tone, Graphite the dark one.</p>
+    </div>
+    <div class="grid-2">
+      <div :each="tone in TONES" :key="tone.id" class="tone" :data-tone="tone.id">
+        <div class="tone-head">
+          <span class="tone-name">{{ tone.name }}</span>
+          <span class="mm-legend">{{ tone.kind }}</span>
+        </div>
+        <div :each="group in COLOUR_GROUPS" :key="group.name" class="swatch-group">
+          <span class="mm-legend">{{ group.name }}</span>
+          <div class="swatches">
+            <div :each="token in group.tokens" :key="token" class="swatch">
+              <b :style="`background: var(--mm-${token})`"></b>
+              <span>{{ token }}</span>
+              <code>{{ swatches[tone.id]?.[token] ?? "" }}</code>
+            </div>
+          </div>
+        </div>
+        <div class="tone-sample">
+          <Display>
+            <div class="mm-display-row">
+              <span class="mm-display-label">Scan</span>
+              <Counter size="sm">603/739</Counter>
+            </div>
+            <Meter variant="display" :level="603" :max="739" label="Scan progress" />
+          </Display>
+          <Key variant="primary">Save</Key>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="h-type">
+    <div class="head">
+      <h2 id="h-type">Type, space and shape</h2>
+      <p>Four faces with one job each, served from theme/default/fonts/. Spacing and radii are tokens too.</p>
+    </div>
+    <div class="spec">
+      <div class="type-table">
+        <div :each="row in TYPE_ROWS" :key="row.role" class="type-row">
+          <div>
+            <span class="mm-legend">{{ row.role }}</span>
+            <code>{{ row.token }}</code>
+            <code>{{ row.face }}</code>
+          </div>
+          <div class="sample" :class="`sample-${row.kind}`">{{ row.sample }}</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <Panel title="Space · --mm-space-1 … 8">
+          <div class="scale">
+            <div :each="step in SPACES" :key="step">
+              <span class="space" :style="`width: var(--mm-space-${step})`"></span>
+              <span class="state">{{ step }}</span>
+            </div>
+          </div>
+        </Panel>
+        <Panel title="Radii · key, md, lg, full">
+          <div class="scale">
+            <div :each="radius in RADII" :key="radius">
+              <span class="radius" :style="`border-radius: var(--mm-radius-${radius})`"></span>
+              <span class="state">{{ radius }}</span>
+            </div>
+          </div>
+        </Panel>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="h-keys">
+    <div class="head">
+      <h2 id="h-keys">Keys, banks and switches</h2>
+      <p>Key is the theme's button. KeyBank sets keys in a recess; KeySelect is a bank with one key down.</p>
+    </div>
+    <div class="grid-2">
+      <Panel title="Keys">
+        <div class="spec">
+          <div class="spec-row">
+            <span class="mm-legend">Variants</span>
+            <div class="items">
+              <Key variant="primary">Save</Key>
+              <Key>Rename</Key>
+              <Key variant="ghost">Cancel</Key>
+              <Key variant="danger">Delete</Key>
+              <Key disabled>Undo</Key>
+            </div>
+          </div>
+          <div class="spec-row">
+            <span class="mm-legend">Sizes</span>
+            <div class="items">
+              <Key size="sm">Small</Key>
+              <Key>Medium</Key>
+              <Key size="lg">Large</Key>
+            </div>
+          </div>
+          <div class="spec-row">
+            <span class="mm-legend">Square · icon only</span>
+            <div class="items">
+              <Key square size="sm" label="Play"><svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg></Key>
+              <Key square label="Preferences"><svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.4" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke-linecap="round" /></svg></Key>
+              <Key square size="lg" variant="ghost" label="Next track"><svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="12" y="3" width="2" height="10" /><path d="M2 3v10l9-5z" /></svg></Key>
+            </div>
+          </div>
+          <div class="spec-row">
+            <span class="mm-legend">Latching · with LED</span>
+            <div class="items">
+              <Key led :pressed="latched" @click="latched = !latched">Loop</Key>
+              <span class="state">pressed: {{ latched }}</span>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Banks and switches">
+        <div class="spec">
+          <div class="spec-row">
+            <span class="mm-legend">KeyBank · transport</span>
+            <div class="items">
+              <KeyBank label="Transport">
+                <Key square label="Previous track"><svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="2" y="3" width="2" height="10" /><path d="M14 3v10L5 8z" /></svg></Key>
+                <Key square label="Play"><svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg></Key>
+                <Key square label="Next track"><svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="12" y="3" width="2" height="10" /><path d="M2 3v10l9-5z" /></svg></Key>
+              </KeyBank>
+            </div>
+          </div>
+          <div class="spec-row">
+            <span class="mm-legend">KeySelect · one key down</span>
+            <div class="items">
+              <KeySelect label="Group by" :model="groupBy" :options="[{ value: 'album', label: 'Album' }, { value: 'artist', label: 'Artist' }, { value: 'folder', label: 'Folder' }]" />
+              <span class="state">value: {{ groupBy }}</span>
+            </div>
+          </div>
+          <div class="spec-row">
+            <span class="mm-legend">SlideSwitch</span>
+            <div class="items">
+              <SlideSwitch label="Lock editing" off-legend="Edit" on-legend="Hold" :model="hold" />
+              <span class="state">checked: {{ hold }}</span>
+            </div>
+            <div class="items">
+              <SlideSwitch label="Disabled switch" off-legend="Off" on-legend="On" disabled />
+            </div>
+          </div>
+        </div>
+      </Panel>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="h-fields">
+    <div class="head">
+      <h2 id="h-fields">Fields</h2>
+      <p>Field, TextInput, Select and Checkbox, shown as the batch metadata editor. Clear the year to see an error.</p>
+    </div>
+    <form autocomplete="off" @submit.prevent="save()">
+      <Panel title="Edit metadata · 2 tracks">
+        <template :slot.actions>
+          <Lamp :if="saved" tone="ok">Saved</Lamp>
+          <Lamp :else tone="warn">Unsaved</Lamp>
+        </template>
+        <div class="form">
+          <div class="c6">
+            <Field label="Title" control="f-title" hint="The two tracks have different titles; leave it empty to keep each one.">
+              <TextInput id="f-title" :model="title" placeholder="(Multiple values)" describedby="f-title-note" />
+            </Field>
+          </div>
+          <div class="c3">
+            <Field label="Artist" control="f-artist"><TextInput id="f-artist" model="Miles Davis" /></Field>
+          </div>
+          <div class="c3">
+            <Field label="Album" control="f-album"><TextInput id="f-album" model="Kind of Blue" /></Field>
+          </div>
+          <div class="c2">
+            <Field label="Year" control="f-year" :error="yearInvalid ? 'Four digits, like 1959.' : ''">
+              <TextInput id="f-year" numeric inputmode="numeric" :model="year" :invalid="yearInvalid" :describedby="yearInvalid ? 'f-year-note' : ''" />
+            </Field>
+          </div>
+          <div class="c2">
+            <Field label="Track" control="f-track"><TextInput id="f-track" numeric placeholder="(Multiple)" /></Field>
+          </div>
+          <div class="c2">
+            <Field label="Genre" control="f-genre"><Select id="f-genre" :model="genre" :options="GENRES" /></Field>
+          </div>
+          <div class="c6">
+            <Field label="Path" control="f-path" hint="Read only: renaming happens on save.">
+              <TextInput id="f-path" numeric disabled model="Jazz/Miles Davis/1959 - Kind of Blue/" describedby="f-path-note" />
+            </Field>
+          </div>
+        </div>
+        <template :slot.foot>
+          <Checkbox :model="renameFiles">Rename files from tags</Checkbox>
+          <div class="keys">
+            <Key variant="ghost">Cancel</Key>
+            <Key variant="primary" type="submit" :disabled="yearInvalid">Save 2 tracks</Key>
+          </div>
+        </template>
+      </Panel>
+    </form>
+  </section>
+
+  <section class="section" aria-labelledby="h-indicators">
+    <div class="head">
+      <h2 id="h-indicators">Indicators</h2>
+      <p>Lamp, Meter, Reel and EqBars. Rescan runs the meter from zero.</p>
+    </div>
+    <div class="grid-3">
+      <Panel title="Lamps">
+        <div class="ind">
+          <div class="items">
+            <Lamp tone="ok">Saved</Lamp>
+            <Lamp tone="warn">Unsaved</Lamp>
+            <Lamp tone="bad">Write failed</Lamp>
+            <Lamp tone="accent">Playing</Lamp>
+            <Lamp>Not scanned</Lamp>
+          </div>
+          <p>A state is a lamp and a word, never a colour alone.</p>
+        </div>
+      </Panel>
+      <Panel title="Meter">
+        <template :slot.actions>
+          <Key size="sm" :disabled="scanned < 739" @click="scan.start()">Rescan</Key>
+        </template>
+        <div class="ind">
+          <Meter :segments="24" :level="scanned" :max="739" label="Reading tags" :level-text="`${scanned} of 739 tracks`" />
+          <div class="row">
+            <span class="mm-legend">Reading tags</span>
+            <span class="mono">{{ scanned }} / 739</span>
+          </div>
+          <p>On the chassis, as LEDs. Inside a display it takes the display's ink.</p>
+        </div>
+      </Panel>
+      <Panel title="Busy and playing">
+        <div class="ind">
+          <div class="items">
+            <Reel :size="32" />
+            <Reel speed="fast" label="Writing" />
+            <EqBars active />
+            <EqBars />
+            <span class="mono">Writing 2 files…</span>
+          </div>
+          <p>The reel turns while work runs; the bars mark the track that is playing. Both stop under reduced motion.</p>
+        </div>
+      </Panel>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="h-context">
+    <div class="head">
+      <h2 id="h-context">In context</h2>
+      <p>Tabs, ListRow and a table as the library and album sheet. Example data; double-click a track to play it.</p>
+    </div>
+    <div class="app">
+      <Tabs label="Open folders" :items="roots" :model="activeRoot" closable @close="closeRoot($event.detail)" />
+      <div class="panes">
+        <aside class="library" aria-label="Library">
+          <div class="lib-head">
+            <div class="row">
+              <span class="mm-legend">Library · 739 tracks</span>
+              <Lamp tone="ok">Synced</Lamp>
+            </div>
+            <TextInput label="Filter" placeholder="Filter by title, artist or album" />
+          </div>
+          <div class="tree" role="tree" aria-label="Folders and tracks" aria-multiselectable="true">
+            <ListRow :each="node in visible"
+                     :key="node.id"
+                     :kind="node.kind"
+                     :depth="node.depth"
+                     :label="node.label"
+                     :meta="node.meta"
+                     :expanded="expanded.includes(node.id)"
+                     :chosen="node.track !== undefined && selected.includes(node.track)"
+                     :playing="node.track === index"
+                     :playing-active="playing"
+                     :focusable="node.id === 'miles'"
+                     @select="pickRow(node)"
+                     @toggle="toggleFolder(node.id)"
+                     @activate="node.track !== undefined && playTrack(node.track)" />
+          </div>
+        </aside>
+
+        <div class="detail">
+          <div class="action-bar">
+            <span class="mm-legend is-accent">{{ selected.length }} selected</span>
+            <div class="keys">
+              <Key size="sm" :disabled="selected.length === 0" @click="playSelection()">Play</Key>
+              <Key size="sm" :disabled="selected.length === 0">Edit</Key>
+              <Key size="sm" variant="ghost" @click="selected = []">Clear</Key>
+            </div>
+          </div>
+          <div class="jcard">
+            <div class="cover" aria-hidden="true">
+              <span class="cover-band"><Stripes variant="band" /></span>
+              <span class="cover-disc"></span>
+            </div>
+            <div>
+              <span class="mm-legend">Album · {{ ALBUM.year }}</span>
+              <h3>{{ ALBUM.title }}</h3>
+              <p>{{ ALBUM.artist }}</p>
+              <div class="items">
+                <Lamp>5 tracks</Lamp>
+                <Lamp>{{ formatTime(TOTAL_SECS) }}</Lamp>
+                <Lamp>MP3 · 320 kbps</Lamp>
+              </div>
+            </div>
+          </div>
+          <div class="tracks mm-table-wrap">
+            <table class="mm-table" :aria-label="`${ALBUM.title} tracks`">
+              <thead>
+                <tr><th>#</th><th>Title</th><th>Artist</th><th class="mm-end">Time</th></tr>
+              </thead>
+              <tbody>
+                <tr :each="song, at in TRACKS"
+                    :key="song.n"
+                    :aria-selected="String(selected.includes(at))"
+                    :data-playing="String(at === index)"
+                    @click="toggleTrack(at)">
+                  <td class="mm-num">{{ song.n }}</td>
+                  <td><span class="mm-title"><EqBars :if="at === index" :active="playing" />{{ song.title }}</span></td>
+                  <td>{{ ALBUM.artist }}</td>
+                  <td class="mm-num mm-end">{{ formatTime(song.secs) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="h-modal">
+    <div class="head">
+      <h2 id="h-modal">Modal</h2>
+      <p>On the native dialog: Escape, the close key and a click outside all ask the owner to close it.</p>
+    </div>
+    <div class="items">
+      <Key @click="infoOpen = true">Open track info</Key>
+    </div>
+    <Modal :open="infoOpen" eyebrow="Track info" title="So What" @close="infoOpen = false">
+      <div class="spec">
+        <div class="row"><span class="mm-legend">Path</span><span class="mono">Jazz/Miles Davis/1959 - Kind of Blue/01 - So What.mp3</span></div>
+        <div class="row"><span class="mm-legend">Duration</span><span class="mono">09:22</span></div>
+        <div class="row"><span class="mm-legend">Audio checksum</span><span class="mono">3f9a…c21e</span></div>
+        <div class="row"><span class="mm-legend">State</span><Lamp tone="ok">Saved</Lamp></div>
+      </div>
+      <template :slot.foot>
+        <Key variant="primary" @click="infoOpen = false">Done</Key>
+      </template>
+    </Modal>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    Tokens in <code>theme/default/tokens.css</code>, components in <code>theme/default/components/</code>,
+    classes for plain markup in <code>theme/default/content.css</code>. See <code>RECORD/2026-11-03.deck-design-system.WIP.md</code>.
+  </div>
+</footer>
+
+<style scoped>
+  .wrap {
+    max-width: 70rem;
+    margin: 0 auto;
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+  .muted { color: var(--mm-fg-muted); }
+  .mono { font-family: var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-muted); }
+  .state { font: var(--mm-text-xs) var(--mm-font-mono); color: var(--mm-fg-muted); }
+  .icon { width: .875rem; height: .875rem; }
+  code { font: var(--mm-text-xs) var(--mm-font-mono); color: var(--mm-fg-muted); }
+
+  .mast {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
+    background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+  }
+  .mast-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mm-space-3) var(--mm-space-4);
+    padding-block: var(--mm-space-3);
+  }
+  .brand { display: flex; align-items: center; gap: var(--mm-space-3); }
+  .brand-column { flex-direction: column; align-items: flex-start; gap: var(--mm-space-2); }
+  .brand-name {
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-weight: 800;
+    font-size: var(--mm-text-lg);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    line-height: var(--mm-leading-tight);
+  }
+
+  .hero { padding-block: var(--mm-space-8) var(--mm-space-7); }
+  .hero h1 {
+    max-width: 24ch;
+    margin: 0 0 var(--mm-space-3);
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-heading);
+    font-weight: 700;
+    font-size: clamp(1.625rem, 4.4vw, 2.5rem);
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+  .hero p { max-width: 64ch; margin: 0 0 var(--mm-space-6); color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
+
+  /* The faceplate: the app's top bar as a piece of hardware. */
+  .faceplate {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--mm-space-4);
+    padding: var(--mm-space-4);
+    border: var(--mm-border-width) solid var(--mm-chassis-lo);
+    border-radius: var(--mm-radius-lg);
+    background:
+      repeating-linear-gradient(90deg, var(--mm-brush) 0 1px, transparent 1px .1875rem),
+      linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+    box-shadow: var(--mm-shadow-md);
+  }
+  .stack { display: grid; justify-items: start; gap: var(--mm-space-2); }
+  .fp-display { min-width: 0; }
+  .fp-right { display: grid; justify-items: end; gap: var(--mm-space-3); }
+
+  .section { padding-block: var(--mm-space-7); border-top: var(--mm-border-width) solid var(--mm-border); }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mm-space-2) var(--mm-space-4);
+    margin-bottom: var(--mm-space-5);
+  }
+  .head h2 {
+    margin: 0;
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-heading);
+    font-weight: 700;
+    font-size: var(--mm-text-xl);
+  }
+  .head p { max-width: 62ch; margin: 0; color: var(--mm-fg-muted); }
+
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(11.875rem, 1fr)); gap: var(--mm-space-4); margin: 0; padding: 0; list-style: none; }
+  .rules li { display: grid; align-content: start; gap: var(--mm-space-1); }
+  .rules strong { font-weight: var(--mm-weight-bold); }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mm-space-4); align-items: start; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: var(--mm-space-4); align-items: start; }
+
+  /* Materials: each tone as an island. */
+  .tone {
+    display: grid;
+    gap: var(--mm-space-4);
+    min-width: 0;
+    padding: var(--mm-space-5);
+    border: var(--mm-border-width) solid var(--mm-chassis-lo);
+    border-radius: var(--mm-radius-lg);
+    background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+    color: var(--mm-fg);
+  }
+  .tone-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--mm-space-3); }
+  .tone-name {
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-weight: 800;
+    font-size: var(--mm-text-lg);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .swatch-group { display: grid; gap: var(--mm-space-2); }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.375rem, 1fr)); gap: var(--mm-space-2); }
+  .swatch {
+    display: grid;
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 1px var(--mm-space-2);
+    padding: .3125rem;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-md);
+    background: var(--mm-surface);
+  }
+  .swatch b { grid-row: span 2; width: 1.5rem; height: 1.5rem; border: var(--mm-border-width) solid var(--mm-border); border-radius: .25rem; }
+  .swatch span, .swatch code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--mm-text-xs) / 1.2 var(--mm-font-mono); }
+  .swatch code { color: var(--mm-fg-muted); }
+  .tone-sample { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--mm-space-3); }
+
+  /* Type, space and shape */
+  .type-table { border: var(--mm-border-width) solid var(--mm-border); border-radius: var(--mm-radius-md); background: var(--mm-surface); overflow: hidden; }
+  .type-row { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr); align-items: center; gap: var(--mm-space-4); padding: var(--mm-space-4); border-top: var(--mm-border-width) solid var(--mm-border); }
+  .type-row:first-child { border-top: 0; }
+  .type-row code { display: block; }
+  .sample { min-width: 0; overflow-wrap: anywhere; }
+  .sample-label { font-family: var(--mm-font-label); font-stretch: var(--mm-stretch-label); font-weight: var(--mm-weight-bold); font-size: var(--mm-text-md); letter-spacing: var(--mm-tracking-label); text-transform: uppercase; }
+  .sample-sans { font-size: var(--mm-text-lg); }
+  .sample-mono { font-family: var(--mm-font-mono); }
+  .sample-display { font-family: var(--mm-font-display); font-weight: 700; font-size: 2.125rem; line-height: 1; }
+  .scale { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--mm-space-4); }
+  .scale > div { display: grid; justify-items: start; gap: var(--mm-space-1); }
+  .space { display: block; height: .625rem; background: var(--mm-accent); border-radius: 1px; }
+  .radius { display: block; width: 2.75rem; height: 2rem; border: var(--mm-border-width) solid var(--mm-border-strong); background: var(--mm-sunken); }
+
+  /* Specimens */
+  .spec { display: grid; gap: var(--mm-space-4); }
+  .spec-row { display: grid; gap: var(--mm-space-2); }
+  .items { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-3); }
+  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+  .form { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--mm-space-3); }
+  .c6 { grid-column: span 6; }
+  .c3 { grid-column: span 3; }
+  .c2 { grid-column: span 2; }
+  .ind { display: grid; align-content: start; gap: var(--mm-space-3); }
+  .ind p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-3); }
+
+  /* In context */
+  .app {
+    overflow: hidden;
+    border: var(--mm-border-width) solid var(--mm-chassis-lo);
+    border-radius: var(--mm-radius-lg);
+    background: var(--mm-surface);
+    box-shadow: var(--mm-shadow-md);
+  }
+  .panes { display: grid; grid-template-columns: 18.75rem minmax(0, 1fr); }
+  .library { display: grid; align-content: start; min-width: 0; border-right: var(--mm-border-width) solid var(--mm-border); }
+  .lib-head { display: grid; gap: var(--mm-space-2); padding: var(--mm-space-3); border-bottom: var(--mm-border-width) solid var(--mm-border); background: var(--mm-hover); }
+  .tree { padding-block: var(--mm-space-2); }
+  .detail { display: grid; align-content: start; min-width: 0; }
+  .action-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mm-space-2) var(--mm-space-3);
+    padding: var(--mm-space-2) var(--mm-space-4);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-accent-soft);
+  }
+  .jcard { display: grid; grid-template-columns: 8.25rem minmax(0, 1fr); align-items: end; gap: var(--mm-space-5); padding: var(--mm-space-5); }
+  .cover {
+    position: relative;
+    width: 8.25rem;
+    max-width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: .25rem;
+    background: var(--mm-display-bezel);
+    box-shadow: var(--mm-shadow-md);
+  }
+  .cover-band { position: absolute; right: 0; bottom: 22%; left: 0; height: 18%; }
+  .cover-disc {
+    position: absolute;
+    top: 14%;
+    right: 12%;
+    width: 40%;
+    aspect-ratio: 1;
+    border: 2px solid var(--mm-chassis-hi);
+    border-radius: 50%;
+    opacity: .7;
+  }
+  .jcard h3 {
+    margin: .25rem 0 2px;
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-heading);
+    font-weight: 700;
+    font-size: var(--mm-text-2xl);
+    line-height: 1.1;
+  }
+  .jcard p { margin: 0 0 var(--mm-space-3); color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
+  .tracks { padding: 0 var(--mm-space-5) var(--mm-space-5); }
+  .tracks table { min-width: 28.75rem; }
+
+  .foot { padding-block: var(--mm-space-7) var(--mm-space-8); border-top: var(--mm-border-width) solid var(--mm-border); color: var(--mm-fg-muted); }
+
+  @media (max-width: 900px) {
+    .faceplate { grid-template-columns: auto minmax(0, 1fr); }
+    .fp-display { grid-column: 1 / -1; grid-row: 2; }
+    .fp-right { grid-column: 1 / -1; grid-row: 3; grid-auto-flow: column; justify-content: space-between; align-items: center; }
+    .grid-2 { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 720px) {
+    .panes { grid-template-columns: minmax(0, 1fr); }
+    .library { border-right: 0; border-bottom: var(--mm-border-width) solid var(--mm-border); }
+    .type-row { grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-2); }
+    .jcard { grid-template-columns: 6rem minmax(0, 1fr); gap: var(--mm-space-4); }
+    .cover { width: 6rem; }
+    .jcard h3 { font-size: var(--mm-text-xl); }
+  }
+  @media (max-width: 480px) {
+    .faceplate { grid-template-columns: minmax(0, 1fr); padding: var(--mm-space-3); }
+    .brand-column { flex-direction: row; align-items: center; }
+    .fp-display, .fp-right { grid-row: auto; }
+    .fp-right { grid-auto-flow: row; justify-items: start; }
+    .c2, .c3 { grid-column: span 6; }
+  }
+</style>

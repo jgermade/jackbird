@@ -1,0 +1,63 @@
+<script :setup="{ title = '', flush = false }: Props" lang="ts">
+  // A panel with a chassis head: the title printed on a strip at the top,
+  // the `actions` slot at its right, the body, and a `foot` slot. `flush`
+  // drops the body's padding, for a list or a table.
+  //
+  //   <Panel title="Edit metadata · 2 tracks">
+  //     <template :slot.actions><Lamp tone="warn">Unsaved</Lamp></template>
+  //     …
+  //     <template :slot.foot><Key variant="primary" type="submit">Save</Key></template>
+  //   </Panel>
+  //
+  // A panel is a `<section>`; a view that needs a form wraps it in one.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css` (and `content.css` for the title). See
+  // `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { title?: string; flush?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+</script>
+
+<section class="panel">
+  <header :if="title || $slots.actions" class="head">
+    <span class="mm-legend">{{ title }}</span>
+    <div :if="$slots.actions" class="actions"><slot.actions /></div>
+  </header>
+  <div class="body" :class.flush="flag(flush)"><slot /></div>
+  <footer :if="$slots.foot" class="foot"><slot.foot /></footer>
+</section>
+
+<style scoped>
+  .panel {
+    min-width: 0;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-md);
+    background: var(--mm-surface);
+    color: var(--mm-fg);
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mm-space-3);
+    min-height: 2.25rem;
+    padding: var(--mm-space-1) var(--mm-space-4);
+    border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
+    border-radius: calc(var(--mm-radius-md) - 1px) calc(var(--mm-radius-md) - 1px) 0 0;
+    background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+  }
+  .actions { display: flex; align-items: center; gap: var(--mm-space-2); }
+  .body { padding: var(--mm-space-4); }
+  .body.flush { padding: 0; }
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mm-space-3);
+    padding: var(--mm-space-3) var(--mm-space-4);
+    border-top: var(--mm-border-width) solid var(--mm-border);
+  }
+</style>

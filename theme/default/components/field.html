@@ -1,0 +1,34 @@
+<script :setup="{ label = '', control = '', hint = '', error = '' }: Props" lang="ts">
+  // A control and what is said about it: its printed name above, a hint
+  // under it, and an error in place of the hint, announced. `control` is the
+  // control's id; the note under it gets `${control}-note`, for the control's
+  // `describedby`.
+  //
+  //   <Field label="Year" control="year" :error="yearError">
+  //     <TextInput id="year" numeric :model="year" :invalid="!!yearError" describedby="year-note" />
+  //   </Field>
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css` (and `content.css` for the label). See
+  // `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { label?: string; control?: string; hint?: string; error?: string }
+</script>
+
+<div class="field">
+  <label class="mm-legend" :for="control || null">{{ label }}</label>
+  <slot />
+  <span :if="error" class="note error" :id="control ? `${control}-note` : null" role="alert">{{ error }}</span>
+  <span :elseif="hint" class="note" :id="control ? `${control}-note` : null">{{ hint }}</span>
+</div>
+
+<style scoped>
+  .field {
+    display: grid;
+    align-content: start;
+    gap: .3125rem;
+    min-width: 0;
+  }
+  .note { font-size: var(--mm-text-sm); color: var(--mm-fg-muted); }
+  .error { color: var(--mm-bad); }
+</style>
