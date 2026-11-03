@@ -4,6 +4,23 @@ Check [STACK.md](STACK.md)
 
 Check [THESAURUS.md](THESAURUS.md)
 
+### Layers
+
+The UI is moving from React to [jq79](https://github.com/jgermade/jq79) components, one screen
+at a time. Code lives in four layers, and an import that crosses them the wrong way fails
+`npm test` (`scripts/check-layers.mjs`):
+
+| Folder | What | May import |
+| --- | --- | --- |
+| `src/helpers/` | Pure TypeScript functions, ideally with no package dependencies. Every helper has a `.test.ts` beside it; coverage stays at 90% or more of lines, branches and functions. | `src/helpers/` |
+| `src/lib/` | Factories, services and stores (`$reactive`). | `src/helpers/`, `src/lib/`, packages |
+| `src/components/`, `theme/default/components/` | jq79 components that depend on no store: only on themselves and on helpers. | `src/helpers/`, components |
+| `src/views/` | jq79 components that bring data (`src/lib/`) and components together. | all of the above |
+
+`src/types.ts` holds types only and may be imported from anywhere. Setup scripts are written in
+TypeScript (`lang="ts"`); since templates are not type-checked, keep them thin and put the logic
+in helpers and `lib/`.
+
 ## Language
 
 **All repository content is written in English**: code, identifiers, comments, UI strings,

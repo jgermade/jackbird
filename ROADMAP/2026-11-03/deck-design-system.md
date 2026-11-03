@@ -1,30 +1,35 @@
-# Deck design system and languages
+# Deck design system, jq79 and languages
 
 What is planned, in order. The reasoning lives in
 [RECORD/2026-11-03.deck-design-system.WIP.md](../../RECORD/2026-11-03.deck-design-system.WIP.md).
+Rewritten the same day the UI moved to jq79: the theme was first built in React (done, then
+superseded), and the screens now move to jq79 views one at a time.
 
 ```mermaid
 gantt
-  title Deck design system
+  title Deck design system and jq79
   dateFormat YYYY-MM-DD
   axisFormat %d %b
   section Theme
-    Tokens, fonts, components, demo   :done, theme, 2026-11-03, 1d
-  section Languages
-    i18n layer, English and Spanish   :i18n, after theme, 3d
-  section Screens
-    Faceplate                         :face, after i18n, 2d
-    Library                           :lib, after face, 3d
-    Modals and forms                  :forms, after lib, 2d
+    Deck in React (superseded)         :done, react, 2026-11-03, 1d
+    Deck in jq79                       :active, theme, 2026-11-03, 1d
+  section Foundations
+    Layers, helpers and tests          :layers, after theme, 2d
+    Stores and i18n (en, es)           :stores, after layers, 3d
+  section Screens in jq79
+    Faceplate                          :face, after stores, 2d
+    Library                            :lib, after face, 3d
+    Modals and forms                   :forms, after lib, 2d
   section Clean-up
-    Remove old variables and colours  :clean, after forms, 1d
+    Remove React and old styles        :clean, after forms, 1d
 ```
 
 | Step | Scope | Done when |
 | --- | --- | --- |
-| Theme | `theme/default/`: `tokens.css`, fonts, components, demo at `/theme/default/` | the demo shows every component in both tones; `npm run build` passes |
-| Languages | i18n layer with English and Spanish dictionaries, English fallback, language in Preferences | the current Spanish strings are English in source with Spanish translations |
-| Faceplate | top bar, `PlaybackBar`, `RootTabs`, `ThemeToggle` | they use theme components and no old variables |
-| Library | `TrackWizardList`, `AlbumOverview`, `DetailActionBar`, scan progress | same |
-| Modals and forms | `MetadataEditModal`, `MetadataEditor`, `TrackInfoModal`, `PreferencesModal` | same |
-| Clean-up | `src/styles.css` | no old colour variables and no hard-coded colours remain |
+| Deck in jq79 | `theme/default/`: components as `.html`, `content.css`, demo at `/theme/default/` | the demo shows every component in both tones; `npm run build` passes |
+| Layers, helpers and tests | `src/helpers/` with tests, layer check, coverage floor | `npm test` passes with ≥ 90% lines, branches and functions in `helpers/` |
+| Stores and i18n | `lib/` stores for the view's state, preferences (theme, language), i18n with English fallback | the React view reads its state from the stores; Spanish strings are English in source with Spanish translations |
+| Faceplate | top bar, playback, root tabs, theme toggle as jq79 views | they render from stores with theme components |
+| Library | library tree, album sheet, action bar, scan progress | same |
+| Modals and forms | metadata editor, track info, preferences | same |
+| Clean-up | React, `src/styles.css` | no React dependency, no old colour variables, no hard-coded colours |
