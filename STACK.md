@@ -58,6 +58,11 @@ This document describes the technical stack and codebase architecture implemente
   project has `"noEmit": true` in `tsconfig.json`, so `tsc` never writes `.js` files —
   Vite/esbuild handles all transpilation).
 - **Scripts Runtime**: Node.js, `"type": "module"`.
+- **Tests**: `npm test`, with no test framework: the layer check (`scripts/check-layers.mjs`),
+  a type check of the helpers and their tests (`tsconfig.test.json`), Node's own runner on
+  `src/helpers/**/*.test.ts` with type stripping, and a per-file coverage floor of 90% of lines,
+  branches and functions (`scripts/check-coverage.mjs`, reading the LCOV report the runner
+  writes to `.tmp/coverage/`).
 
 ---
 
@@ -68,7 +73,10 @@ mp3-manager/
 ├── src/
 │   ├── App.tsx                  # Root component, renders Mp3ManagerView
 │   ├── main.tsx                 # DOM mounting & root entrypoint
-│   ├── types.ts                 # Track / TrackMetadata / EditableMetadata types
+│   ├── types.ts                 # Track, metadata, tree row and .meta snapshot types
+│   ├── html-modules.d.ts        # *.html imports are jq79 components
+│   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
+│   │                            # metadata, tracks, tree, snapshot, format
 │   ├── styles.css               # Single stylesheet, CSS variables in :root
 │   ├── components/              # Presentational, store-free UI components
 │   │   ├── FolderPicker.tsx     # "Open folder" button + loading state
@@ -82,8 +90,7 @@ mp3-manager/
 │   │                            # metadata drafts, wizard tree building, saving
 │   ├── lib/
 │   │   ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
-│   │   └── rootSessionStore.ts  # IndexedDB persistence of open roots
-│   ├── services/
+│   │   ├── rootSessionStore.ts  # IndexedDB persistence of open roots
 │   │   └── ThemeService.ts      # Light/dark theme, persisted + system preference
 │   └── vfs/
 │       ├── types.ts             # VfsAdapter contract (mount/listFiles/readFile/writeFile)
@@ -94,6 +101,7 @@ mp3-manager/
 │   ├── content.css              # Classes for plain markup (legend, table, display rows)
 │   ├── components/*.html        # jq79: key, key-bank, display, meter, lamp, tabs, modal, …
 │   └── index.html, demo.ts/.html # The demo page
+├── scripts/                     # check-layers.mjs, check-coverage.mjs (run by npm test)
 ├── RECORD/                      # Specs, plans, walkthroughs & audit trail (see AGENTS.md)
 └── ROADMAP/                     # Dated roadmaps with Mermaid Gantt charts (see AGENTS.md)
 ```

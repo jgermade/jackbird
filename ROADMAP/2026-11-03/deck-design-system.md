@@ -14,8 +14,8 @@ gantt
     Deck in React (superseded)         :done, react, 2026-11-03, 1d
     Deck in jq79                       :done, theme, 2026-11-03, 1d
   section Foundations
-    Layers, helpers and tests          :active, layers, after theme, 2d
-    Stores and i18n (en, es)           :stores, after layers, 3d
+    Layers, helpers and tests          :done, layers, after theme, 1d
+    Stores and i18n (en, es)           :active, stores, after layers, 3d
   section Screens in jq79
     Faceplate                          :face, after stores, 2d
     Library                            :lib, after face, 3d

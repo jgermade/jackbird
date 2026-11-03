@@ -8,35 +8,22 @@ import { PlaybackBar } from "../components/PlaybackBar";
 import { PreferencesModal } from "../components/PreferencesModal";
 import { RootTabs } from "../components/RootTabs";
 import { TrackInfoModal } from "../components/TrackInfoModal";
-import { TrackWizardList, type WizardTreeRow } from "../components/TrackWizardList";
+import { TrackWizardList } from "../components/TrackWizardList";
+import { computeCommonMetadata, emptyMetadata, getVariedFields } from "../helpers/metadata";
+import { emptySnapshot, parseMetaSnapshot, serializeMetaSnapshot } from "../helpers/snapshot";
+import { collectFolderPaths, inferDiscLabel, orderDetailPlaylist } from "../helpers/tracks";
+import { buildWizardRows } from "../helpers/tree";
 import {
   calculateDualChecksums,
   readTrackMetadataFromBytes,
   writeTrackMetadataToBytes
 } from "../lib/id3";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
-import { useTheme } from "../services/ThemeService";
-import type { EditableMetadata, Mp3Track, TrackMetadata } from "../types";
+import { useTheme } from "../lib/ThemeService";
+import type { EditableMetadata, MetaSnapshot, Mp3Track, TrackMetadata } from "../types";
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 
-
 type GroupingMode = "flat" | "wizard";
-
-type MetaRecord = {
-  checksum: string;
-  fullChecksum?: string;
-  audioChecksum?: string;
-  size?: number;
-  lastModified?: number;
-  lastVerifiedAt?: string;
-  metadata: TrackMetadata;
-  updatedAt: string;
-};
-
-type MetaSnapshot = {
-  version: 1;
-  tracks: Record<string, MetaRecord>;
-};
 
 type PlaybackQueue = {
   rootId: string;
@@ -67,25 +54,6 @@ type RootWorkspace = {
 
 const META_FILE_PATH = ".meta/mp3-manager.json";
 
-function emptyMetadata(): TrackMetadata {
-  return {
-    title: "",
-    artist: "",
-    album: "",
-    year: "",
-    genre: "",
-    trackNumber: "",
-    coverDataUrl: null
-  };
-}
-
-function emptySnapshot(): MetaSnapshot {
-  return {
-    version: 1,
-    tracks: {}
-  };
-}
-
 export function Mp3ManagerView(): JSX.Element {
   const [theme, toggleTheme] = useTheme();
   const [roots, setRoots] = useState<RootWorkspace[]>([]);
@@ -108,8 +76,6 @@ export function Mp3ManagerView(): JSX.Element {
     [roots, activeRootId]
   );
 
-
-
   const selectedTracks = useMemo(() => {
     if (!activeRoot || activeRoot.selectedTrackIds.length === 0) {
       return [];
@@ -118,7 +84,7 @@ export function Mp3ManagerView(): JSX.Element {
     return activeRoot.tracks.filter((track) => set.has(track.id));
   }, [activeRoot]);
 
-  const treeRows = useMemo(() => buildWizardRows(activeRoot?.tracks ?? [], activeRoot), [activeRoot]);
+  const treeRows = useMemo(() => buildWizardRows(activeRoot?.tracks ?? [], activeRoot?.expandedAlbums ?? []), [activeRoot]);
 
   const rowByKey = useMemo(
     () => new Map(treeRows.map((row) => [row.key, row])),
@@ -642,9 +608,6 @@ export function Mp3ManagerView(): JSX.Element {
       }
     })();
   }
-
-
-
 
   async function handlePickFolder(): Promise<void> {
     setLoading(true);
@@ -1394,206 +1357,16 @@ export function Mp3ManagerView(): JSX.Element {
   );
 }
 
-
-
-function computeCommonMetadata(tracks: Mp3Track[]): EditableMetadata {
-  if (tracks.length === 0) {
-    return emptyMetadata();
-  }
-
-  const first = tracks[0].metadata;
-  const result: EditableMetadata = { ...first };
-
-  for (let i = 1; i < tracks.length; i++) {
-    const meta = tracks[i].metadata;
-    if (meta.title !== result.title) result.title = "";
-    if (meta.artist !== result.artist) result.artist = "";
-    if (meta.album !== result.album) result.album = "";
-    if (meta.year !== result.year) result.year = "";
-    if (meta.genre !== result.genre) result.genre = "";
-    if (meta.trackNumber !== result.trackNumber) result.trackNumber = "";
-    if (meta.coverDataUrl !== result.coverDataUrl) result.coverDataUrl = null;
-  }
-
-  return result;
-}
-
-function getVariedFields(tracks: Mp3Track[]): {
-  title: boolean;
-  artist: boolean;
-  album: boolean;
-  year: boolean;
-  genre: boolean;
-  trackNumber: boolean;
-  coverDataUrl: boolean;
-} {
-  if (tracks.length <= 1) {
-    return {
-      title: false,
-      artist: false,
-      album: false,
-      year: false,
-      genre: false,
-      trackNumber: false,
-      coverDataUrl: false
-    };
-  }
-
-  const first = tracks[0].metadata;
-  return {
-    title: tracks.some((t) => t.metadata.title !== first.title),
-    artist: tracks.some((t) => t.metadata.artist !== first.artist),
-    album: tracks.some((t) => t.metadata.album !== first.album),
-    year: tracks.some((t) => t.metadata.year !== first.year),
-    genre: tracks.some((t) => t.metadata.genre !== first.genre),
-    trackNumber: tracks.some((t) => t.metadata.trackNumber !== first.trackNumber),
-    coverDataUrl: tracks.some((t) => t.metadata.coverDataUrl !== first.coverDataUrl)
-  };
-}
-
-
-
-function inferDiscLabel(track: Mp3Track): string {
-  const byPath = track.relativePath.match(/(?:^|\/)(?:cd|disc)[ _-]?(\d+)(?:\/|$)/i);
-  if (byPath?.[1]) {
-    return `Disco ${byPath[1]}`;
-  }
-
-  return "Disco 1";
-}
-
-function trackNumberOrder(track: Mp3Track): number {
-  const match = track.metadata.trackNumber.match(/\d+/);
-  return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
-}
-
-function orderDetailPlaylist(tracks: Mp3Track[]): Mp3Track[] {
-  return [...tracks].sort((left, right) => {
-    const albumOrder = (left.metadata.album || left.relativePath.split("/")[0]).localeCompare(
-      right.metadata.album || right.relativePath.split("/")[0],
-      "es"
-    );
-    if (albumOrder !== 0) {
-      return albumOrder;
-    }
-
-    const discOrder = inferDiscLabel(left).localeCompare(inferDiscLabel(right), "es", { numeric: true });
-    if (discOrder !== 0) {
-      return discOrder;
-    }
-
-    const trackOrder = trackNumberOrder(left) - trackNumberOrder(right);
-    if (trackOrder !== 0) {
-      return trackOrder;
-    }
-
-    return left.name.localeCompare(right.name, "es");
-  });
-}
-
 async function readMetaSnapshot(vfs: VFSAdapter): Promise<MetaSnapshot> {
   const exists = await vfs.stat(META_FILE_PATH);
   if (!exists) {
     return emptySnapshot();
   }
 
-  const raw = new TextDecoder().decode(await vfs.read(META_FILE_PATH)).trim();
-  if (!raw) {
-    return emptySnapshot();
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as MetaSnapshot;
-    return parsed?.version === 1 && parsed?.tracks ? parsed : emptySnapshot();
-  } catch {
-    return emptySnapshot();
-  }
+  return parseMetaSnapshot(new TextDecoder().decode(await vfs.read(META_FILE_PATH)));
 }
 
 async function writeMetaSnapshot(vfs: VFSAdapter, snapshot: MetaSnapshot): Promise<void> {
-  const encoded = new TextEncoder().encode(JSON.stringify(snapshot, null, 2));
+  const encoded = new TextEncoder().encode(serializeMetaSnapshot(snapshot));
   await vfs.write(META_FILE_PATH, encoded);
-}
-
-function collectFolderPaths(tracks: Mp3Track[]): string[] {
-  const paths = new Set<string>();
-
-  for (const track of tracks) {
-    const folders = track.relativePath.split("/").slice(0, -1);
-    let current = "";
-
-    for (const folder of folders) {
-      current = current ? `${current}/${folder}` : folder;
-      paths.add(current);
-    }
-  }
-
-  return [...paths];
-}
-
-function buildWizardRows(tracks: Mp3Track[], root: RootWorkspace | null): WizardTreeRow[] {
-  type FolderNode = {
-    folders: Map<string, FolderNode>;
-    tracks: Mp3Track[];
-  };
-
-  const rootNode: FolderNode = { folders: new Map(), tracks: [] };
-
-  for (const track of tracks) {
-    const folders = track.relativePath.split("/").slice(0, -1);
-    let node = rootNode;
-
-    for (const folder of folders) {
-      if (!node.folders.has(folder)) {
-        node.folders.set(folder, { folders: new Map(), tracks: [] });
-      }
-      node = node.folders.get(folder)!;
-    }
-
-    node.tracks.push(track);
-  }
-
-  const expandedAlbums = new Set(root?.expandedAlbums ?? []);
-  const rows: WizardTreeRow[] = [];
-
-  function appendNode(node: FolderNode, parentPath: string, parentKey: string | null, depth: number): void {
-    for (const [folder, child] of [...node.folders.entries()].sort(([left], [right]) => left.localeCompare(right, "es"))) {
-      const folderPath = parentPath ? `${parentPath}/${folder}` : folder;
-      const folderKey = `folder:${folderPath}`;
-      const expanded = expandedAlbums.has(folderPath);
-
-      rows.push({
-        key: folderKey,
-        kind: "album",
-        album: folderPath,
-        label: folder,
-        expanded,
-        parentKey,
-        depth
-      });
-
-      if (expanded) {
-        appendNode(child, folderPath, folderKey, depth + 1);
-      }
-    }
-
-    for (const track of [...node.tracks].sort((left, right) => left.relativePath.localeCompare(right.relativePath, "es"))) {
-      rows.push({
-        key: `track:${track.id}`,
-        kind: "track",
-        album: parentPath,
-        label: track.metadata.title || track.name,
-        trackId: track.id,
-        trackNumber: track.metadata.trackNumber,
-        artist: track.metadata.artist,
-        relativePath: track.relativePath,
-        parentKey,
-        depth
-      });
-    }
-  }
-
-  appendNode(rootNode, "", null, 0);
-
-  return rows;
 }

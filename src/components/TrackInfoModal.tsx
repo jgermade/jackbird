@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { formatBytes } from "../helpers/format";
 import type { Mp3Track } from "../types";
 
 type TrackInfoModalProps = {
@@ -7,13 +8,6 @@ type TrackInfoModalProps = {
   onClose: () => void;
 };
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-}
 
 export function TrackInfoModal(props: TrackInfoModalProps): JSX.Element {
   const { open, tracks, onClose } = props;

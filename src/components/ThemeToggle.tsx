@@ -1,4 +1,4 @@
-import type { Theme } from "../services/ThemeService";
+import type { Theme } from "../lib/ThemeService";
 
 type ThemeToggleProps = {
   theme: Theme;

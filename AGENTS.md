@@ -8,7 +8,7 @@ Check [THESAURUS.md](THESAURUS.md)
 
 The UI is moving from React to [jq79](https://github.com/jgermade/jq79) components, one screen
 at a time. Code lives in four layers, and an import that crosses them the wrong way fails
-`npm test` (`scripts/check-layers.mjs`):
+`npm test` (`scripts/check-layers.mjs`; `import type` is exempt, since it is erased):
 
 | Folder | What | May import |
 | --- | --- | --- |
@@ -16,6 +16,10 @@ at a time. Code lives in four layers, and an import that crosses them the wrong 
 | `src/lib/` | Factories, services and stores (`$reactive`). | `src/helpers/`, `src/lib/`, packages |
 | `src/components/`, `theme/default/components/` | jq79 components that depend on no store: only on themselves and on helpers. | `src/helpers/`, components |
 | `src/views/` | jq79 components that bring data (`src/lib/`) and components together. | all of the above |
+
+`npm test` runs the layer check, a type check of the helpers and their tests, the unit tests
+(Node's own runner, no framework), and a coverage check that holds **every** helper file to the
+90% floor and fails on a helper no test loads. Run it before every commit.
 
 `src/types.ts` holds types only and may be imported from anywhere. In a jq79 component, a prop
 can't be called `value`, `checked`, `selected`, `text`, `html` or `class`: those are jq79

@@ -1,17 +1,7 @@
-export type WizardTreeRow = {
-  key: string;
-  kind: "album" | "disc" | "track";
-  album: string;
-  label: string;
-  parentKey: string | null;
-  depth: number;
-  disc?: string;
-  expanded?: boolean;
-  trackId?: string;
-  trackNumber?: string;
-  artist?: string;
-  relativePath?: string;
-};
+import { formatTrackNumber } from "../helpers/format";
+import type { WizardTreeRow } from "../types";
+
+export type { WizardTreeRow };
 
 type TrackWizardListProps = {
   rows: WizardTreeRow[];
@@ -101,15 +91,6 @@ function RenameGlyph(): JSX.Element {
   );
 }
 
-function formatTrackNumber(value: string | undefined): string {
-  if (!value) {
-    return "";
-  }
-
-  const trimmed = value.trim();
-  const slash = trimmed.indexOf("/");
-  return slash === -1 ? trimmed : trimmed.slice(0, slash).trim();
-}
 
 export function TrackWizardList(props: TrackWizardListProps): JSX.Element {
   const {

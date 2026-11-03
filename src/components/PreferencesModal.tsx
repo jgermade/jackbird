@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Theme } from "../services/ThemeService";
+import type { Theme } from "../lib/ThemeService";
 
 type PreferencesModalProps = {
   open: boolean;
