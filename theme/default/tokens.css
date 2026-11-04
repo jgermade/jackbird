@@ -86,10 +86,12 @@
   /* The hairline around the display window. Same in both tones. */
   --mm-display-rim: #777777;
 
-  /* The J-card stripes: the brand mark, the active tab. Same in both tones. */
-  --mm-stripe-1: #f05a1a;
+  /* The J-card stripes, in the order green, orange, red: the brand mark, the
+     active tab, the splash; and one each on the tabs that carry a tone (go,
+     edit, danger). Same in both tones. */
+  --mm-stripe-1: #2bb39f;
   --mm-stripe-2: #f2a900;
-  --mm-stripe-3: #2bb39f;
+  --mm-stripe-3: #f05a1a;
 
   /* What a modal lays over the page. */
   --mm-overlay: rgba(27, 29, 29, .42);

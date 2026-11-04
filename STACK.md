@@ -115,7 +115,7 @@ mp3-manager/
 │   │   ├── workspace.html       # The two panes (swipeable on phones, the keys in a footer), Escape
 │   │   ├── library.html         # The tree, its head, messages and scan meter
 │   │   ├── album-sheet.html     # Landing, albums and discs
-│   │   ├── selection-dialog.html # The selection: Edit, Info and Danger tabs
+│   │   ├── selection-dialog.html # The selection: Info, Edit and Delete tabs
 │   │   └── preferences-dialog.html # Tone and language
 │   └── lib/
 │       ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
@@ -184,10 +184,10 @@ mp3-manager/
   still being read.
 - In the tree and the album sheet, a click (or Enter) on a track plays it, and a box at its left
   selects it (Shift-click for a range, Space and Shift+Space, Escape to clear).
-- The selection's key in the tab bar opens one dialog with Edit, Info and Danger tabs. The editor
+- The selection's key in the tab bar opens one dialog with Info, Edit and Delete tabs (green, orange, red on top). The editor
   works on one track or many: a field that varies across the selection keeps each track's value
   unless typed over or its "Override" box is ticked (then even an empty value is written); cover art by
-  drag & drop or file choice. Danger removes the tracks from the library (not from disk).
+  drag & drop or file choice. Delete removes the tracks from the library (not from disk).
 - Session restore on load: previously opened roots (with granted permission) reopen
   automatically, keeping the last active tab, each root's open folders and current row, and (for
   the tab, in `sessionStorage`) the phone's panel, the panes' scroll and the music: the same track

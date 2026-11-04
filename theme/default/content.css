@@ -74,7 +74,7 @@
   color: var(--mm-fg-muted);
 }
 .mm-table td { padding: .4375rem .5rem; border-bottom: var(--mm-border-width) solid var(--mm-border); }
-.mm-table tbody tr:hover td { background: var(--mm-hover); }
+@media (hover: hover) { .mm-table tbody tr:hover td { background: var(--mm-hover); } }
 .mm-table tr[aria-selected="true"] td { background: var(--mm-accent-soft); }
 .mm-table tr[aria-selected="true"] td:first-child { box-shadow: inset .1875rem 0 0 var(--mm-accent); }
 .mm-table tr[data-playing="true"] .mm-title { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }

@@ -11,6 +11,11 @@
 // Checks the `<style>` blocks of every `.html` jq79 component and view
 // under src/ and theme/ (the pages, `index.html`, are plain HTML, not
 // scoped).
+//
+// Also fails on a `:hover` rule outside `@media (hover: hover)`, in those
+// blocks and in theme/'s stylesheets: a touch screen has no hover, and keeps
+// a tapped element "hovered" until the next tap. See
+// RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00, W2).
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -46,13 +51,37 @@ const SHORTHANDS = {
   overflow: (prop) => prop === "overflow-x" || prop === "overflow-y"
 };
 
-function* htmlFiles(dir) {
+function* htmlFiles(dir, extension = ".html") {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) {
-      yield* htmlFiles(path);
-    } else if (name.endsWith(".html") && name !== "index.html") {
+      yield* htmlFiles(path, extension);
+    } else if (name.endsWith(extension) && name !== "index.html") {
       yield path;
+    }
+  }
+}
+
+const HOVER_MEDIA = /^@media\b[^{]*\(\s*hover\s*:\s*hover\s*\)/;
+
+/** Every rule's selector that holds `:hover` with no `@media (hover: hover)` around it. */
+function* hoversOutsideMedia(css) {
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const open = [];
+  let prelude = "";
+  for (const char of text) {
+    if (char === "{") {
+      const selector = prelude.trim().replace(/\s+/g, " ");
+      if (selector.includes(":hover") && !open.some((outer) => HOVER_MEDIA.test(outer))) yield selector;
+      open.push(selector);
+      prelude = "";
+    } else if (char === "}") {
+      open.pop();
+      prelude = "";
+    } else if (char === ";") {
+      prelude = "";
+    } else {
+      prelude += char;
     }
   }
 }
@@ -93,9 +122,25 @@ for (const base of ["src", "theme"]) {
   }
 }
 
+const hovers = [];
+for (const base of ["src", "theme"]) {
+  for (const file of htmlFiles(join(root, base))) {
+    for (const style of readFileSync(file, "utf8").matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
+      for (const selector of hoversOutsideMedia(style[1])) hovers.push(`${relative(root, file)}: ${selector}`);
+    }
+  }
+}
+for (const file of htmlFiles(join(root, "theme"), ".css")) {
+  for (const selector of hoversOutsideMedia(readFileSync(file, "utf8"))) hovers.push(`${relative(root, file)}: ${selector}`);
+}
+
 if (problems.length > 0) {
   console.error("A shorthand with var() is overridden by its own longhand in the same block; jq79's scoping would drop it. Write the longhands:");
   for (const problem of problems) console.error(`  ${problem}`);
-  process.exit(1);
 }
-console.log("Style check passed: no var() shorthand overridden in its own block.");
+if (hovers.length > 0) {
+  console.error("A :hover rule outside @media (hover: hover); touch screens must not get hover states:");
+  for (const hover of hovers) console.error(`  ${hover}`);
+}
+if (problems.length > 0 || hovers.length > 0) process.exit(1);
+console.log("Style check passed: no var() shorthand overridden in its own block, every :hover inside @media (hover: hover).");

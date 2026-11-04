@@ -25,10 +25,13 @@ older than `package-lock.json`. A bare `make` lists them.
 
 1. **`test:layers`** (`scripts/check-layers.mjs`): no import crosses the layers the wrong way (see
    [Architecture](architecture.md#layers)). `import type` and assets are exempt.
-2. **`test:types`**: a type check of the helpers and their tests (`tsconfig.test.json`).
-3. **`test:unit`**: the helpers' tests (`src/**/*.test.ts`), on Node's own test runner, with no
+2. **`test:styles`** (`scripts/check-styles.mjs`): no shorthand with `var()` overridden by its own
+   longhand in one block (jq79's scoping would drop it), and no `:hover` rule outside
+   `@media (hover: hover)`, so touch screens get no hover states.
+3. **`test:types`**: a type check of the helpers and their tests (`tsconfig.test.json`).
+4. **`test:unit`**: the helpers' tests (`src/**/*.test.ts`), on Node's own test runner, with no
    framework. It also writes coverage to `.tmp/coverage/lcov.info`.
-4. **`test:coverage`** (`scripts/check-coverage.mjs`): every helper file must reach 90% of lines,
+5. **`test:coverage`** (`scripts/check-coverage.mjs`): every helper file must reach 90% of lines,
    branches and functions, and a helper that no test loads fails the check.
 
 ## The tag crates

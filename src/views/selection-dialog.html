@@ -6,7 +6,7 @@
   // inside it (ticked, the value goes to every track, even an empty one;
   // unticked, each track keeps its own), and the file's data for one track. **Info**:
   // one track's tags, file and checksums, or a selection's totals and its
-  // tracks. **Danger**: removing the tracks from the library. A view over
+  // tracks. **Delete**: removing the tracks from the library. A view over
   // lib/editor.ts (the form, saving it) and the selection in
   // lib/workspace.ts. See RECORD/2026-11-04.github-actions-workflows.WIP.md
   // (11:46).
@@ -56,10 +56,11 @@
   const single = (): Track | null => (tracks().length === 1 ? tracks()[0] : null)
   const varied = () => getVariedFields(selectedTracks.value.data)
 
+  // In the order Info, Edit, Delete, each with its stripe colour: green, orange, red.
   const tabs = () => [
-    { id: "edit", label: t("actions.edit") },
-    { id: "info", label: t("selection.tab.info") },
-    { id: "danger", label: t("selection.tab.danger") }
+    { id: "info", label: t("selection.tab.info"), tone: "go" },
+    { id: "edit", label: t("actions.edit"), tone: "edit" },
+    { id: "danger", label: t("selection.tab.danger"), tone: "danger" }
   ]
   const heading = (): string => {
     const one = single()
@@ -103,7 +104,7 @@
     ]
   }
 
-  // Danger: the tab is the confirmation, so its key removes at once.
+  // Delete: the tab is the confirmation, so its key removes at once.
   const remove = () => {
     removeSelectedTracks()
     closeSelection()
@@ -286,7 +287,7 @@
   .info-facts div { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--mm-space-3); }
   .artist { color: var(--mm-fg-muted); }
 
-  /* Danger */
+  /* Delete */
   .danger { display: grid; gap: var(--mm-space-2); max-width: 34rem; }
   .danger-title { margin: 0; color: var(--mm-bad); font-family: var(--mm-font-label); font-stretch: var(--mm-stretch-heading); font-weight: 700; font-size: var(--mm-text-lg); }
   .danger p { margin: 0; color: var(--mm-fg-muted); }

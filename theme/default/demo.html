@@ -888,7 +888,8 @@
   .tracks .pick { width: 1%; padding-right: 0; }
   .tracks .cue { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
   .tracks .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; }
-  .tracks tr:hover .cue-play { opacity: 1; }
+  @media (hover: hover) { .tracks tr:hover .cue-play { opacity: 1; } }
+  @media (hover: none) { .tracks .cue-play { opacity: 1; } }
 
   .foot { padding-block: var(--mm-space-7) var(--mm-space-8); border-top: var(--mm-border-width) solid var(--mm-border); color: var(--mm-fg-muted); }
 

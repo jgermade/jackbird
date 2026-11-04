@@ -205,10 +205,12 @@
   .mm-table tr { cursor: pointer; user-select: none; }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .mm-table .pick-cell { width: 1%; padding-right: 0; }
-  /* The cue at the row's end: ▶ on hover and on keyboard focus, the bars on the track playing. */
+  /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   .mm-table .cue-cell { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .mm-table tr:hover .cue-play, .mm-table tr:focus-visible .cue-play { opacity: 1; }
+  .mm-table tr:focus-visible .cue-play { opacity: 1; }
+  @media (hover: hover) { .mm-table tr:hover .cue-play { opacity: 1; } }
+  @media (hover: none) { .cue-play { opacity: 1; } }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }

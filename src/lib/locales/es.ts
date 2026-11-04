@@ -48,7 +48,7 @@ export const es: Record<MessageKey, string> = {
   "selection.close": "Cerrar",
   "selection.tabs": "Qué hacer con la selección",
   "selection.tab.info": "Info",
-  "selection.tab.danger": "Peligro",
+  "selection.tab.danger": "Eliminar",
   "selection.none": "No hay pistas seleccionadas.",
   "danger.title": "Quitar de la biblioteca",
   "danger.body.one": "La pista sale de la biblioteca. Su archivo sigue en el disco, y vuelve la próxima vez que se abra la carpeta.",

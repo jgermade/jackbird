@@ -125,7 +125,7 @@
     cursor: pointer;
     user-select: none;
   }
-  .row:hover { background: var(--mm-hover); }
+  @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
   .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .row.current:not([aria-selected="true"]) { background: var(--mm-hover); box-shadow: inset 0 0 0 1px var(--mm-border-strong); }
@@ -140,7 +140,7 @@
   }
   .folder .caret, .folder .icon { cursor: pointer; }
   /* The ink, near black in Silver; black itself would vanish in Graphite. */
-  .folder .caret:hover { color: var(--mm-fg); }
+  @media (hover: hover) { .folder .caret:hover { color: var(--mm-fg); } }
   .folder .icon { align-self: stretch; }
   .caret svg { width: .5rem; height: .5rem; transition: transform var(--mm-duration) var(--mm-ease); }
   .row[aria-expanded="true"] .caret svg { transform: rotate(90deg); }
@@ -149,14 +149,17 @@
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lead { display: inline-block; min-width: 1.5em; margin-right: var(--mm-space-2); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .action { display: grid; place-items: center; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .row:hover .action, .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
-  /* A key revealed on hover cannot be found without one. */
-  @media (hover: none) { .action { opacity: 1; } }
+  .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
+  @media (hover: hover) { .row:hover .action { opacity: 1; } }
   .folder .label { font-weight: var(--mm-weight-bold); }
   .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; }
   .cue { display: grid; place-items: center; }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .row:hover .cue-play { opacity: 1; }
+  @media (hover: hover) { .row:hover .cue-play { opacity: 1; } }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  /* A key revealed on hover cannot be found without one: on a touch screen the
+     keys and the ▶ are always there, and nothing has a hover state (W2).
+     Last, so it wins over the rules that hide them. */
+  @media (hover: none) { .action, .cue-play { opacity: 1; } }
 </style>

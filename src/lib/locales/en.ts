@@ -47,7 +47,7 @@ export const en = {
   "selection.close": "Close",
   "selection.tabs": "What to do with the selection",
   "selection.tab.info": "Info",
-  "selection.tab.danger": "Danger",
+  "selection.tab.danger": "Delete",
   "selection.none": "No tracks selected.",
   "danger.title": "Remove from the library",
   "danger.body.one": "The track leaves the library. Its file stays on disk, and comes back the next time the folder is opened.",

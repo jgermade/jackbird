@@ -92,13 +92,13 @@ it is, so tracks from several folders can be selected together. **Escape** clear
 
 While tracks are selected, the right end of the tab bar shows a key with their number (✎ "3 tracks
 selected"; on a phone, the number alone), and a × that clears the selection. The key opens the
-selection's dialog, whose tabs are:
+selection's dialog, whose tabs are, each marked on top with its colour:
 
-- **Edit**: the tags and the cover, below. It is the one the key opens.
-- **Info**: each file's relative path, name and size, its full checksum, its audio checksum
+- **Info** (green): each file's relative path, name and size, its full checksum, its audio checksum
   (without the ID3 tag) and when it was last verified; for several tracks, the totals and the list.
-- **Danger**: removes the tracks from the library with its **Remove** key. The files stay on disk,
-  and come back the next time the folder is opened.
+- **Edit** (orange): the tags and the cover, below. It is the one the key opens.
+- **Delete** (red): removes the tracks from the library with its **Remove** key. The files stay on
+  disk, and come back the next time the folder is opened.
 
 Switching tabs keeps what you typed in Edit. **Escape**, the dialog's × or a click outside it close it.
 On a phone the dialogs rise from the bottom and take the whole width; drag one down by its top to

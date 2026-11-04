@@ -53,6 +53,10 @@ jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.m
 
 ### Sizes
 
+Hover states live only inside `@media (hover: hover)`: a touch screen has none, so whatever a
+hover reveals (a row's keys, its ▶) is always shown under `(hover: none)`. `npm test` fails on a
+`:hover` rule outside that media query.
+
 Sizes are in `rem`, never in `px`, so the interface scales with the root font size: 16px on a
 desktop and `4vw` on a phone (`theme/default/tokens.css`), which scales every component
 linearly with the screen. Only hairlines (1–2px borders, focus rings) stay in `px`. Setup scripts are written in
