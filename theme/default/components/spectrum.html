@@ -1,0 +1,115 @@
+<script :setup="{ source = null, bands = 16, active = false }: Props" lang="ts">
+  // A spectrum analyser for the display: columns of segments, lit in the
+  // display's ink over unlit ones, like the meter's. Decorative: the music
+  // is what it shows.
+  //
+  //   <Spectrum :source="readSpectrum" :bands="16" :active="playing" />
+  //
+  // `source(bands)` returns the levels, from 0 to 1, low frequencies first
+  // (or `null` when there are none yet). While `active`, it is read and drawn
+  // on every animation frame, and four times a second under reduced motion;
+  // when not, the columns fall to nothing and the drawing stops. It draws
+  // only while it is shown (a canvas with no width costs nothing). It fills
+  // the box it is put in and adds no height of its own.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-04.github-actions-workflows.WIP.md`
+  // (12:00).
+
+  type Props = { source?: ((bands: number) => number[] | null) | null; bands?: number; active?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+
+  // The drawing's state lives in this closure, not in the component's store:
+  // a top-level `let` would be a reactive field, written on every frame.
+  const painter = (() => {
+    const SEGMENTS = 8
+    const FALL = 0.06
+    let shown: number[] = []
+    let frame = 0
+    let timer = 0
+    let colours: { lit: string; unlit: string } | null = null
+    let coloursAge = 0
+
+    const still = (): boolean => matchMedia("(prefers-reduced-motion: reduce)").matches
+
+    // The ink, read from the tokens, again now and then (the tone can change).
+    const ink = (element: HTMLElement) => {
+      if (!colours || coloursAge++ > 60) {
+        const style = getComputedStyle(element)
+        colours = { lit: style.getPropertyValue("--mm-display-fg").trim(), unlit: style.getPropertyValue("--mm-display-dim").trim() }
+        coloursAge = 0
+      }
+      return colours
+    }
+
+    // One frame; true while some column is still up.
+    const draw = (): boolean => {
+      const element = $self("canvas") as HTMLCanvasElement | null
+      const count = Math.max(1, Number(bands) || 16)
+      if (!element || element.clientWidth === 0) return false
+      const ratio = window.devicePixelRatio || 1
+      const width = Math.round(element.clientWidth * ratio)
+      const height = Math.round(element.clientHeight * ratio)
+      if (element.width !== width || element.height !== height) {
+        element.width = width
+        element.height = height
+      }
+      const read = flag(active) && typeof source === "function" ? source(count) : null
+      // Up at once, down slowly, as a meter's needle falls.
+      shown = Array.from({ length: count }, (_, band) => Math.max(read?.[band] ?? 0, (shown[band] ?? 0) - FALL))
+      const context = element.getContext("2d")
+      if (!context) return false
+      const { lit, unlit } = ink(element)
+      const gap = Math.max(1, Math.round(ratio))
+      const columnWidth = (width - gap * (count - 1)) / count
+      const segmentHeight = (height - gap * (SEGMENTS - 1)) / SEGMENTS
+      context.clearRect(0, 0, width, height)
+      shown.forEach((level, band) => {
+        const litSegments = Math.round(level * SEGMENTS)
+        const x = band * (columnWidth + gap)
+        for (let segment = 0; segment < SEGMENTS; segment += 1) {
+          context.fillStyle = segment < litSegments ? lit : unlit
+          context.fillRect(x, height - (segment + 1) * segmentHeight - segment * gap, columnWidth, segmentHeight)
+        }
+      })
+      return shown.some((level) => level > 0)
+    }
+
+    const stop = () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+      frame = 0
+      timer = 0
+    }
+
+    // Draws while active, and after that until the columns have fallen.
+    const loop = () => {
+      frame = 0
+      timer = 0
+      const moving = draw()
+      if (!flag(active) && !moving) return
+      if (still()) timer = window.setTimeout(loop, 250)
+      else frame = requestAnimationFrame(loop)
+    }
+
+    const run = (on: boolean) => {
+      if (frame || timer) return
+      if (on) loop()
+      else requestAnimationFrame(() => draw())
+    }
+
+    return { run, stop }
+  })()
+
+  $destroyed(() => painter.stop())
+  $: painter.run(flag(active))
+</script>
+
+<span class="spectrum" aria-hidden="true"><canvas></canvas></span>
+
+<style scoped>
+  /* It fills its box and adds no height of its own: the box decides. */
+  .spectrum { position: relative; display: block; width: 100%; height: 100%; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>

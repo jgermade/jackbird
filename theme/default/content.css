@@ -24,7 +24,7 @@
    line of text that ellipsises. */
 .mm-display-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--mm-space-3);
   min-width: 0;

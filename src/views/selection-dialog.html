@@ -11,7 +11,6 @@
   // lib/workspace.ts. See RECORD/2026-11-04.github-actions-workflows.WIP.md
   // (11:46).
 
-  const Checkbox = await import("../../theme/default/components/checkbox.html")
   const Field = await import("../../theme/default/components/field.html")
   const Key = await import("../../theme/default/components/key.html")
   const Modal = await import("../../theme/default/components/modal.html")
@@ -151,9 +150,12 @@
                          :numeric="'numeric' in field"
                          :inputmode="field.key === 'year' ? 'numeric' : ''">
                 <template :slot.end>
-                  <span :if="varied()[field.key]" class="override" :title="t('editor.overrideTitle')">
-                    <Checkbox :model="isConfirmed(field)" @change="confirmField(field.key, $event.detail)">{{ t("editor.override") }}</Checkbox>
-                  </span>
+                  <label :if="varied()[field.key]" class="override" :class.on="isConfirmed(field)" :title="t('editor.overrideTitle')">
+                    <input type="checkbox" class="override-input" :checked="isConfirmed(field)" @change="confirmField(field.key, $event.target.checked)">
+                    <svg :if="isConfirmed(field)" class="warn" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 15.2 14.4H.8z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><path d="M8 6v3.6" stroke="var(--mm-on-accent)" stroke-width="1.6" stroke-linecap="round" /><circle cx="8" cy="11.9" r=".95" fill="var(--mm-on-accent)" /></svg>
+                    <span>{{ t("editor.override") }}</span>
+                    <svg class="box" viewBox="0 0 16 16" aria-hidden="true"><rect class="box-frame" x="1.5" y="1.5" width="13" height="13" rx="2" /><path :if="isConfirmed(field)" class="box-tick" d="M4.4 8.3 6.9 10.8 11.7 5.6" /></svg>
+                  </label>
                 </template>
               </TextInput>
             </Field>
@@ -257,8 +259,19 @@
   .tag-fields h4 { margin: 0; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mm-space-4) var(--mm-space-4); }
   .cell.wide { grid-column: 1 / -1; }
-  /* A varied field's "Override" box, inside the input at its right. */
-  .override { display: inline-flex; font-size: var(--mm-text-sm); }
+  /* A varied field's "Override" box, inside the input at its right: the word,
+     then the box, both drawn in SVG so they look the same everywhere; a warning
+     sign before them while it is ticked (the value goes to every track). The
+     native checkbox stays, unseen, for the keyboard and screen readers. */
+  .override { position: relative; display: inline-flex; align-items: center; gap: var(--mm-space-1); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); cursor: pointer; user-select: none; }
+  .override.on { color: var(--mm-fg); }
+  .override-input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+  .warn { width: .875rem; height: .875rem; color: var(--mm-warn-led); }
+  .box { width: 1rem; height: 1rem; border-radius: 3px; }
+  .box-frame { fill: var(--mm-field); stroke: var(--mm-border-strong); stroke-width: 1.2; }
+  .on .box-frame { fill: var(--mm-accent); stroke: var(--mm-accent-hover); }
+  .box-tick { fill: none; stroke: var(--mm-on-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .override-input:focus-visible ~ .box { outline: 2px solid var(--mm-accent); outline-offset: 1px; }
   .file-data { border-top: var(--mm-border-width) solid var(--mm-border); padding-top: var(--mm-space-3); }
   .file-data summary { cursor: pointer; }
   .facts { display: grid; gap: var(--mm-space-2); margin: var(--mm-space-3) 0 0; }

@@ -46,6 +46,8 @@ This document describes the technical stack and codebase architecture implemente
 ### Web APIs & Metadata
 - **File System Access API**: directory picking, permission checks, file reads and in-place
   writes, through the VFS adapter.
+- **Web Audio API**: the player's audio element goes through an `AnalyserNode` on its way to the
+  speakers, for the display's spectrum analyser (above 1024px wide).
 - **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
   `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
   root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.

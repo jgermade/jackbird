@@ -4,6 +4,7 @@
 // writes back whether it plays, where it is and how long the track is.
 
 import { $computed, $toRaw } from "jq79";
+import { spectrumBands } from "../helpers/spectrum";
 import type { PlaybackQueue } from "../types";
 import { t } from "./i18n";
 import { library } from "./library";
@@ -57,6 +58,52 @@ const audio: HTMLAudioElement | null = typeof Audio === "function" ? new Audio()
 // Bookkeeping, not state: which track the element holds, and its object URL.
 let loadedKey: string | null = null;
 let objectUrl: string | null = null;
+
+// The spectrum: the element routed through an analyser on its way to the
+// speakers, built on the first play (a context needs the person to have
+// interacted with the page) and resumed on each one. Once routed, the
+// element sounds only through the context, so a context that cannot be made
+// leaves the element as it was.
+let context: AudioContext | null = null;
+let analyser: AnalyserNode | null = null;
+let bins: Uint8Array<ArrayBuffer> | null = null;
+
+function routeThroughAnalyser(element: HTMLAudioElement): void {
+  if (!context) {
+    if (typeof AudioContext !== "function") {
+      return;
+    }
+    try {
+      const made = new AudioContext();
+      const node = made.createAnalyser();
+      node.fftSize = 1024;
+      node.smoothingTimeConstant = 0.8;
+      made.createMediaElementSource(element).connect(node);
+      node.connect(made.destination);
+      context = made;
+      analyser = node;
+      bins = new Uint8Array(node.frequencyBinCount);
+    } catch {
+      return;
+    }
+  }
+  if (context.state === "suspended") {
+    void context.resume().catch(() => undefined);
+  }
+}
+
+/**
+ * What the music sounds like now, in `bands` levels from 0 to 1, low
+ * frequencies first (see spectrumBands); `null` before the first play, or
+ * where the browser has no Web Audio.
+ */
+export function readSpectrum(bands: number): number[] | null {
+  if (!analyser || !bins) {
+    return null;
+  }
+  analyser.getByteFrequencyData(bins);
+  return spectrumBands(bins, bands);
+}
 
 function release(): void {
   if (objectUrl) {
@@ -114,6 +161,7 @@ async function load(current: NowPlaying | null): Promise<void> {
 
 if (audio) {
   audio.addEventListener("play", () => {
+    routeThroughAnalyser(audio);
     playback.playing = true;
   });
   audio.addEventListener("pause", () => {

@@ -12,13 +12,14 @@
   const KeyBank = await import("../../theme/default/components/key-bank.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
+  const Spectrum = await import("../../theme/default/components/spectrum.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
 
   const { formatTime } = await import("../helpers/format")
   const { t, tn } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
-  const { nowPlaying, next, previous, togglePlay } = await import("../lib/player")
+  const { nowPlaying, next, previous, readSpectrum, togglePlay } = await import("../lib/player")
   const { closeRoot, openFolder, selectRoot, showQueueInLibrary } = await import("../lib/roots")
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
@@ -26,6 +27,14 @@
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   $: current = nowPlaying.value
+  // Above 1024px the display shows the spectrum, moving while the music plays.
+  const WIDE = matchMedia("(min-width: 1025px)")
+  let wide: boolean = WIDE.matches
+  const onWidth = (event: MediaQueryListEvent) => {
+    wide = event.matches
+  }
+  WIDE.addEventListener("change", onWidth)
+  $destroyed(() => WIDE.removeEventListener("change", onWidth))
   $: hasRoots = library.roots.length > 0
   $: folderLabel = library.loading ? t("picker.scanning") : hasRoots ? t("picker.addRoot") : t("picker.openLibrary")
   // On a computer the key reads "+ Folder" once a root is open; on a phone, the + alone.
@@ -62,15 +71,20 @@
 
     <div class="screen">
       <Display live>
-        <div class="mm-display-row">
-          <span class="now">
-            <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
-            <span class="visually-hidden">{{ stateLabel }}</span>
-            <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
-          </span>
-          <Counter>{{ formatTime(playback.position) }}</Counter>
+        <div class="lcd">
+          <span class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="16" :active="wide && playback.playing" /></span>
+          <div class="lcd-main">
+            <div class="mm-display-row">
+              <span class="now">
+                <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
+                <span class="visually-hidden">{{ stateLabel }}</span>
+                <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+              </span>
+              <Counter>{{ formatTime(playback.position) }}</Counter>
+            </div>
+            <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+          </div>
         </div>
-        <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
       </Display>
     </div>
 
@@ -181,6 +195,15 @@
   /* While no root is open, opening one is the thing to do: its glyph is printed in orange. */
   .icon.signal { color: var(--mm-accent-ink); }
   .selection { display: flex; align-items: center; gap: var(--mm-space-1); }
+
+  /* The display: the spectrum at the left above 1024px, the title row and the meter beside it. */
+  .lcd { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
+  .lcd-spectrum { display: none; }
+  @media (min-width: 1025px) {
+    .lcd { grid-template-columns: 7rem minmax(0, 1fr); column-gap: var(--mm-space-3); }
+    .lcd-spectrum { display: block; }
+  }
   .count-narrow { display: none; }
 
   /* Narrow screens: the brand and the keys share the first row, the display
