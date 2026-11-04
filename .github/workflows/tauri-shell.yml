@@ -32,6 +32,11 @@ jobs:
           node-version: 22
           cache: npm
 
+      # For src-tauri/e0/http-server.py: the same `python` on the three systems.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
       - name: Linux packages (Tauri's, a virtual display, and GStreamer's decoders)
         if: runner.os == 'Linux'
         run: |
@@ -62,9 +67,15 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
 
+      # The check also plays the fixtures from a local HTTP server (JACKBIRD_E0_HTTP), to compare
+      # with the asset protocol.
       - name: Unattended check
         shell: bash
+        env:
+          JACKBIRD_E0_HTTP: http://127.0.0.1:8765/
         run: |
+          python src-tauri/e0/http-server.py src-tauri/e0/fixtures 8765 &
+          sleep 2
           case "$RUNNER_OS" in
             Linux) xvfb-run -a node src-tauri/e0/run-check.mjs src-tauri/target/release/jackbird ;;
             Windows) node src-tauri/e0/run-check.mjs src-tauri/target/release/jackbird.exe ;;
