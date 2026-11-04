@@ -51,11 +51,14 @@
   /* ---- signal ------------------------------------------------------------- */
 
   /* The one signal colour. `accent` is a fill (a primary key, a lit LED),
-     `accent-ink` the same colour as text, `accent-soft` the selection. */
+     `accent-ink` the same colour as text, `accent-soft` the selection.
+     `on-accent` marks drawn on it (a tick); `on-accent-key` a primary key's
+     label, white in both tones. */
   --mm-accent: #f05a1a;
   --mm-accent-hover: #e04e10;
   --mm-accent-ink: #b33f0b;
   --mm-on-accent: #1a1410;
+  --mm-on-accent-key: #ffffff;
   --mm-accent-soft: #fde5d8;
 
   /* Each state has an ink, an LED and a soft ground for a lamp. */
@@ -193,6 +196,7 @@
   --mm-accent-hover: #ff7f47;
   --mm-accent-ink: #ff8a55;
   --mm-on-accent: #140c08;
+  --mm-on-accent-key: #ffffff;
   --mm-accent-soft: #3a2015;
 
   --mm-ok: #6fd27a;

@@ -14,7 +14,8 @@
   const { playback } = await import("../lib/playback")
   const { nowPlaying } = await import("../lib/player")
   const { openFolder } = await import("../lib/roots")
-  const { activeRoot, detail, detailAlbums, playFromDetail, selectTrack } = await import("../lib/workspace")
+  const { activeRoot, detail, detailAlbums, playFromDetail, selectTrack, selectTracks } = await import("../lib/workspace")
+  const { chosenState } = await import("../helpers/selection")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   type Track = { id: string; name: string; metadata: { title: string; trackNumber: string } }
@@ -32,6 +33,14 @@
   }
 
   const titleOf = (track: Track): string => track.metadata.title || track.name
+
+  // A disc's box, by its track count: ticked when all its tracks are
+  // selected, a dash when some are. A click selects them all, or, when all
+  // are, none; the rest of the selection stays.
+  type Disc = { tracks: Track[] }
+  const discIds = (disc: Disc): string[] => disc.tracks.map((track) => track.id)
+  const discState = (disc: Disc) => chosenState(root()?.selectedTrackIds ?? [], discIds(disc))
+  const pickDisc = (disc: Disc) => selectTracks(discIds(disc), discState(disc) !== "all")
 
   // A click on a track plays the sheet from it (on the one playing, pauses
   // or resumes); the second click of a double click is not another one. The
@@ -96,7 +105,13 @@
           <section :each="disc in album.discs" :key="disc.number" class="disc">
             <header class="disc-head">
               <span class="mm-legend">{{ t("album.disc", { number: disc.number }) }}</span>
-              <span class="mm-legend">{{ tn("tracks.count", disc.tracks.length) }}</span>
+              <span class="disc-pick">
+                <SelectBox :chosen="discState(disc) === 'all'"
+                           :mixed="discState(disc) === 'some'"
+                           :label="t('album.selectDisc', { number: disc.number })"
+                           @pick="pickDisc(disc)" />
+                <span class="mm-legend">{{ tn("tracks.count", disc.tracks.length) }}</span>
+              </span>
             </header>
             <div class="mm-table-wrap">
               <table class="mm-table" :aria-label="`${album.title} — ${t('album.disc', { number: disc.number })}`">
@@ -185,7 +200,8 @@
   .tags { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
   .album-tag { padding: 1px var(--mm-space-2); border-radius: var(--mm-radius-full); background: var(--mm-sunken); color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); }
   .disc { display: grid; gap: var(--mm-space-1); margin-top: var(--mm-space-2); }
-  .disc-head { display: flex; justify-content: space-between; gap: var(--mm-space-3); }
+  .disc-head { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-3); }
+  .disc-pick { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
   .mm-table tr { cursor: pointer; user-select: none; }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .mm-table .pick-cell { width: 1%; padding-right: 0; }

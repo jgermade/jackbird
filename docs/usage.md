@@ -72,14 +72,20 @@ The display shows the state (▶ playing, ❚❚ paused, ■ stopped), the title
 and how far into the track it is.
 
 On a screen wider than 900px, the display also has a spectrum analyser at its left: its columns move
-with the music, and fall still when it pauses.
+with the music, from 40 Hz to 16 kHz, and fall still when it pauses.
+
+A track plays straight from its file, without being loaded into memory first. Saving its tags
+while it plays, or another program changing the file, does not stop it: it carries on from the
+same second.
 
 ## Selecting tracks
 
 Click the box at the left of a track to select it, and click it again to deselect it. Clicks add
 to the selection, and a **Shift**-click selects every track between the first one you ticked and
 this one. With the keyboard, **Space** selects or deselects the track you are on, and
-**Shift+Space** selects up to it. Moving through the library, or playing, leaves the selection as
+**Shift+Space** selects up to it. On the right, the box beside a disc's number of tracks selects
+all of them (the whole album, when it has one disc), or deselects them when they all are; it shows
+a dash when only some are. Moving through the library, or playing, leaves the selection as
 it is, so tracks from several folders can be selected together. **Escape** clears it.
 
 While tracks are selected, the right end of the tab bar shows a key with their number (✎ "3 tracks

@@ -7,7 +7,7 @@
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { detailScope, type Scope } from "../helpers/scope";
-import { nextSelection } from "../helpers/selection";
+import { nextSelection, selectMany } from "../helpers/selection";
 import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
 import type { Mp3Track, RootWorkspace, WizardTreeRow } from "../types";
@@ -117,6 +117,24 @@ export function selectTrack(trackId: string, mode: "toggle" | "range" = "toggle"
       selectedTrackId: selected.length === 1 ? selected[0] : null,
       selectedTrackIds: [...selected],
       selectionAnchorTrackId: anchor
+    };
+  });
+  library.infoMessage = null;
+  library.errorMessage = null;
+}
+
+/**
+ * Selects all of `trackIds` (`on`) or none of them (a disc's box in the album
+ * sheet), the rest of the selection as it was. The current row stays.
+ */
+export function selectTracks(trackIds: readonly string[], on: boolean): void {
+  updateActive((item) => {
+    const { selected, anchor } = selectMany({ selected: item.selectedTrackIds, anchor: item.selectionAnchorTrackId }, trackIds, on);
+    return {
+      ...item,
+      selectedTrackId: selected.length === 1 ? selected[0] : null,
+      selectedTrackIds: [...selected],
+      selectionAnchorTrackId: selected.length > 0 ? anchor : null
     };
   });
   library.infoMessage = null;
