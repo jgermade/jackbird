@@ -14,8 +14,8 @@ your changes.
 
 Each folder you open is a **root**, shown as a tab with its number of tracks. You can keep several
 open at once with **+ Folder**, switch between them with their tabs, and close one with its ×. On a
-phone the tabs are a dropdown: pick a root in it, close the chosen one with the × beside it, and add
-one with **+**.
+phone only the open root's tab shows, with a ⌄: tap it to pick another root from its list; its ×
+closes it, and **+** adds one.
 
 jackbird reads every `.mp3` file in the folder and its subfolders. The first time, it reads all of
 their tags. It then keeps what it learned in `.meta/mp3-manager.json` inside the folder, so the
@@ -46,8 +46,8 @@ With the keyboard, the arrows move through the tree and open and close folders, 
 the row you are on (on a folder, from its first track), and **Space** selects or deselects the
 track you are on.
 
-On a phone, the two panels take turns: the **Library** and **Details** keys at the bottom switch
-between them.
+On a phone, the two panels take turns: swipe between them, or use the **Library** and **Details**
+keys at the top right.
 
 ## Albums
 
@@ -66,7 +66,8 @@ that track. **Enter** does the same on the track you are on.
 At the top right, the transport keys go to the previous track, play or pause, and go to the next
 one. The list key (≡) beside them takes you back to the track that is playing, wherever you are
 in the library: its folders open in the tree and the right panel shows its folder; its tooltip
-says which list and which track. The gear key opens the preferences.
+says which list and which track. The gear key opens the preferences. On a phone these keys sit in
+a bar at the bottom: the gear, the transport keys, then the list key.
 
 The display shows the state (▶ playing, ❚❚ paused, ■ stopped), the title and artist, the time,
 and how far into the track it is.
@@ -93,6 +94,8 @@ selection's dialog, whose tabs are:
   and come back the next time the folder is opened.
 
 Switching tabs keeps what you typed in Edit. **Escape**, the dialog's × or a click outside it close it.
+On a phone the dialogs rise from the bottom and take the whole width; drag one down by its top to
+close it.
 
 ## Editing tags and covers
 

@@ -11,28 +11,41 @@
   // `close` with the item's id, and the owner decides what goes. Only the
   // tabs scroll sideways; the `end` slot sits right after them (a key that
   // adds one, say) and stays in view, and the `aside` slot is pushed to the
-  // bar's right end. `compact` turns the tabs into a dropdown (`Select`) at
-  // 720px and below, with a close key for the chosen item when `closable`.
+  // bar's right end. `compact` turns the tabs into one at 720px and below:
+  // the chosen item as the open tab, with a caret, its × when `closable`, and
+  // the others in its drop-down. That tab is a customizable `<select>`
+  // (`appearance: base-select`): its `<button>` shows the chosen `<option>`
+  // through `<selectedcontent>`, and where the browser has no base-select it
+  // is a plain native select that still works.
   // `plain` drops the bar's own chassis, for a bar inside another one (a
   // modal's header).
   //
-  // **Part of the default theme**: imports `Led` and `Select`, and draws only with
+  // **Part of the default theme**: imports `Led`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
   type Item = { id: string; label: string; meta?: string | number; closeLabel?: string }
   type Props = { items?: Item[]; model?: string | null; label?: string; closable?: boolean | ""; compact?: boolean | ""; plain?: boolean | "" }
 
   const Led = await import("./led.html")
-  const Select = await import("./select.html")
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: canClose = flag(closable)
   $: focusable = items.some((item: Item) => item.id === model) ? model : items[0]?.id
   $: chosen = items.find((item: Item) => item.id === model) ?? null
-  $: choices = items.map((item: Item) => ({
-    value: item.id,
-    label: item.meta !== undefined && item.meta !== null && item.meta !== "" ? `${item.label} · ${item.meta}` : item.label
-  }))
+  const hasMeta = (item: Item): boolean => item.meta !== undefined && item.meta !== null && item.meta !== ""
+
+  // `<selectedcontent>` copies the chosen option when the choice changes, not
+  // when the option's text does (a count while a folder loads): copy it again.
+  const refresh = () => {
+    const select = $self("select.pick") as HTMLSelectElement | null
+    if (!select || select.selectedIndex < 0) return
+    const index = select.selectedIndex
+    select.selectedIndex = -1
+    select.selectedIndex = index
+  }
+  // The `$:` reads what is shown, so it runs again whenever any of it changes.
+  const refreshSoon = (_shown: string) => requestAnimationFrame(refresh)
+  $: refreshSoon(items.map((item: Item) => `${item.id} ${item.label} ${item.meta ?? ""}`).join("|") + model)
 
   const choose = (id: string) => {
     if (id === model) return
@@ -81,15 +94,27 @@
   </div>
   </div>
   <div :if="flag(compact) && items.length > 0" class="picker">
-    <span class="pick"><Select :label="label" :model="model || ''" :options="choices" @change="choose($event.detail)" /></span>
-    <button :if="canClose && chosen"
-            type="button"
-            class="close"
-            :aria-label="chosen.closeLabel || 'Close tab'"
-            :title="chosen.closeLabel || null"
-            @click="$emit('close', chosen.id)">
-      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
-    </button>
+    <div class="tab on picked">
+      <select class="pick" :aria-label="label || null" @change="choose($event.target.value)">
+        <button type="button" class="pick-button">
+          <selectedcontent></selectedcontent>
+          <svg class="pick-caret" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+        <option :each="item in items" :key="item.id" class="pick-option" :value="item.id" :selected="item.id === model">
+          <Led :on="item.id === model" />
+          <span class="pick-label">{{ item.label }}</span>
+          <span :if="hasMeta(item)" class="meta">{{ item.meta }}</span>
+        </option>
+      </select>
+      <button :if="canClose && chosen"
+              type="button"
+              class="close"
+              :aria-label="chosen.closeLabel || 'Close tab'"
+              :title="chosen.closeLabel || null"
+              @click="$emit('close', chosen.id)">
+        <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+      </button>
+    </div>
   </div>
   <div :if="$slots.end" class="end"><slot.end /></div>
   <div :if="$slots.aside" class="aside"><slot.aside /></div>
@@ -129,17 +154,64 @@
   }
   @media (max-width: 720px) {
     .compact .strip { display: none; }
-    .compact .picker {
-      display: flex;
-      flex: 0 1 14rem;
-      align-items: center;
-      gap: var(--mm-space-1);
-      min-width: 0;
-      padding-bottom: var(--mm-space-1);
-    }
-    .compact .pick { flex: 1 1 auto; min-width: 0; }
-    .compact .picker .close { margin: 0; }
+    .compact .picker { display: flex; flex: 0 1 18rem; align-items: flex-end; min-width: 0; }
   }
+
+  /* The compact picker: the open tab, a customizable select inside it. */
+  .picked { flex: 1 1 auto; min-width: 0; }
+  .pick, .pick::picker(select) { appearance: base-select; }
+  .pick {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    cursor: pointer;
+  }
+  .pick::picker-icon { display: none; }
+  .pick:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; border-radius: var(--mm-radius-key); }
+  .pick-button {
+    display: flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    width: 100%;
+    height: 2rem;
+    padding: 0 var(--mm-space-2) 0 var(--mm-space-4);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    font: var(--mm-weight-medium) var(--mm-text-sm) var(--mm-font-sans);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pick-button selectedcontent { display: flex; align-items: center; gap: var(--mm-space-2); min-width: 0; overflow: hidden; }
+  .pick-caret { flex: none; width: .625rem; height: .625rem; margin-left: auto; color: var(--mm-fg-muted); transition: transform var(--mm-duration) var(--mm-ease); }
+  .pick:open .pick-caret { transform: rotate(180deg); }
+  .pick::picker(select) {
+    margin-top: 2px;
+    padding: var(--mm-space-1);
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-surface);
+    box-shadow: var(--mm-shadow-lg);
+    color: var(--mm-fg);
+  }
+  .pick-option {
+    display: flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    min-height: 2.5rem;
+    padding: 0 var(--mm-space-3);
+    border-radius: var(--mm-radius-key);
+    color: var(--mm-fg-muted);
+    font: var(--mm-weight-medium) var(--mm-text-sm) var(--mm-font-sans);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pick-option:hover, .pick-option:focus-visible { outline: none; background: var(--mm-hover); color: var(--mm-fg); }
+  .pick-option:checked { color: var(--mm-fg); }
+  .pick-option::checkmark { display: none; }
   .end {
     display: flex;
     flex: none;

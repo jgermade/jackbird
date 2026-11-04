@@ -98,9 +98,10 @@ mp3-manager/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove
 │   ├── views/
 │   │   ├── app.html             # Root: faceplate, workspace, the two dialogs
-│   │   ├── faceplate.html       # Brand, transport, display, root tabs (a dropdown on phones),
-│   │   │                        # folder key, the selection's key
-│   │   ├── workspace.html       # The two panes (swipeable on phones, footer selector), Escape
+│   │   ├── faceplate.html       # Brand, the deck's keys (the panel selector on phones), display,
+│   │   │                        # root tabs (one tab with a picker on phones), folder key, selection
+│   │   ├── deck-keys.html       # Transport, list and preferences keys (header, or phones' footer)
+│   │   ├── workspace.html       # The two panes (swipeable on phones, the keys in a footer), Escape
 │   │   ├── library.html         # The tree, its head, messages and scan meter
 │   │   ├── album-sheet.html     # Landing, albums and discs
 │   │   ├── selection-dialog.html # The selection: Edit, Info and Danger tabs
@@ -177,5 +178,6 @@ mp3-manager/
   defaulting to the OS `prefers-color-scheme` and persisted across reloads.
 - Interface in English or Spanish, chosen in Preferences, defaulting to the browser's
   language (English when it is neither) and persisted across reloads.
-- On phones, the faceplate stays on top and the tree and the album sheet are full-screen panes
-  that are swiped between, with a selector in a footer at the bottom.
+- On phones, the faceplate stays on top with the panel selector, the tree and the album sheet are
+  full-screen panes that are swiped between, the deck's keys sit in a footer, and dialogs are bottom
+  sheets that can be dragged down to close.

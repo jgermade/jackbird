@@ -12,6 +12,12 @@
   // is the close key's accessible name. The `nav` slot sits in the header,
   // under the title, edge to edge: `Tabs` (`plain`) that switch the body.
   //
+  // At 720px and below it is a bottom sheet: the whole width, from the
+  // bottom, rounded at the top, sliding in and out. Its header can be dragged
+  // down: past a quarter of its height, or with a flick, it slides out and
+  // emits `close`; short of that it springs back. Keys and tabs in the header
+  // still take their clicks, unless the press turned into a drag.
+  //
   // **Part of the default theme**: imports `Key`, and draws only with
   // `tokens.css` (and `content.css` for the eyebrow). See
   // `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -27,8 +33,14 @@
   const sync = () => {
     const dialog = $self("dialog") as HTMLDialogElement | null
     if (!dialog) return
-    if (isOpen && !dialog.open) dialog.showModal()
-    if (!isOpen && dialog.open) dialog.close()
+    if (isOpen && !dialog.open) {
+      drag.reset()
+      dialog.showModal()
+    }
+    if (!isOpen && dialog.open) {
+      dialog.close()
+      drag.reset()
+    }
   }
   $: sync(isOpen)
 
@@ -37,6 +49,69 @@
     event.preventDefault()
     $emit("close")
   }
+
+  // Dragging the sheet down (phones). The state lives in this closure, not
+  // in the store: a top-level `let` would be a reactive field written on
+  // every move.
+  const drag = (() => {
+    const SHEET = matchMedia("(max-width: 720px)")
+    let start: { y: number; t: number; id: number } | null = null
+    let moved = 0
+    let dragging = false
+
+    const dialog = () => $self("dialog") as HTMLDialogElement | null
+    const reset = () => {
+      const element = dialog()
+      if (element) {
+        element.style.transition = ""
+        element.style.transform = ""
+      }
+    }
+    // A press that became a drag does not also click what it started on.
+    const swallowClick = () => {
+      const stop = (event: Event) => {
+        event.stopPropagation()
+        event.preventDefault()
+      }
+      window.addEventListener("click", stop, { capture: true, once: true })
+      window.setTimeout(() => window.removeEventListener("click", stop, { capture: true }), 0)
+    }
+
+    const down = (event: PointerEvent) => {
+      if (!SHEET.matches || event.button !== 0) return
+      start = { y: event.clientY, t: event.timeStamp, id: event.pointerId }
+      moved = 0
+      dragging = false
+    }
+    const move = (event: PointerEvent) => {
+      const element = dialog()
+      if (!start || !element || event.pointerId !== start.id) return
+      moved = Math.max(0, event.clientY - start.y)
+      if (!dragging && moved > 6) {
+        dragging = true
+        ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+        element.style.transition = "none"
+      }
+      if (dragging) element.style.transform = `translateY(${moved}px)`
+    }
+    const up = (event: PointerEvent) => {
+      const element = dialog()
+      if (!start || !element || event.pointerId !== start.id) return
+      const speed = moved / Math.max(1, event.timeStamp - start.t)
+      start = null
+      if (!dragging) return
+      dragging = false
+      swallowClick()
+      if (moved > element.offsetHeight / 4 || speed > 0.6) {
+        element.style.transition = ""
+        element.style.transform = "translateY(100%)"
+        window.setTimeout(() => $emit("close"), 180)
+      } else {
+        reset()
+      }
+    }
+    return { down, move, up, reset }
+  })()
 
   await $mounted()
   sync()
@@ -47,7 +122,9 @@
         :aria-labelledby="titleId"
         @cancel="cancel($event)"
         @click.self="$emit('close')">
-  <header class="head" :class.with-nav="$slots.nav">
+  <header class="head" :class.with-nav="$slots.nav"
+          @pointerdown="drag.down($event)" @pointermove="drag.move($event)" @pointerup="drag.up($event)" @pointercancel="drag.up($event)">
+    <span class="grab" aria-hidden="true"></span>
     <div class="titles">
       <span :if="eyebrow" class="mm-legend">{{ eyebrow }}</span>
       <h2 class="title" :id="titleId">{{ title }}</h2>
@@ -102,6 +179,7 @@
     line-height: var(--mm-leading-tight);
   }
   .close-icon { width: .75rem; height: .75rem; }
+  .grab { display: none; }
   .body { flex: 1 1 auto; padding: var(--mm-space-5); overflow: auto; }
   .foot {
     display: flex;
@@ -112,5 +190,53 @@
     gap: var(--mm-space-2);
     padding: var(--mm-space-3) var(--mm-space-5);
     border-top: var(--mm-border-width) solid var(--mm-border);
+  }
+
+  /* Phones: a bottom sheet. It slides up as it opens and down as it closes
+     (display and overlay transition as discrete steps); the theme's
+     durations are zero under reduced motion, so then it simply appears. */
+  @media (max-width: 720px) {
+    .modal {
+      width: 100%;
+      max-width: none;
+      max-height: 90dvh;
+      margin: auto 0 0;
+      border-bottom-width: 0;
+      border-radius: var(--mm-radius-lg) var(--mm-radius-lg) 0 0;
+      transform: translateY(100%);
+      transition:
+        transform var(--mm-duration-slow) var(--mm-ease),
+        overlay var(--mm-duration-slow) allow-discrete,
+        display var(--mm-duration-slow) allow-discrete;
+    }
+    .modal[open] { transform: translateY(0); }
+    @starting-style {
+      .modal[open] { transform: translateY(100%); }
+    }
+    .modal::backdrop {
+      opacity: 0;
+      transition:
+        opacity var(--mm-duration-slow) var(--mm-ease),
+        overlay var(--mm-duration-slow) allow-discrete,
+        display var(--mm-duration-slow) allow-discrete;
+    }
+    .modal[open]::backdrop { opacity: 1; }
+    @starting-style {
+      .modal[open]::backdrop { opacity: 0; }
+    }
+    /* The header is where the sheet is dragged from: its handle says so. */
+    .head { touch-action: none; padding-top: var(--mm-space-4); }
+    .grab {
+      position: absolute;
+      top: var(--mm-space-2);
+      left: 50%;
+      display: block;
+      width: 2.25rem;
+      height: .25rem;
+      border-radius: var(--mm-radius-full);
+      background: var(--mm-border-strong);
+      transform: translateX(-50%);
+    }
+    .head { position: relative; }
   }
 </style>
