@@ -1,0 +1,60 @@
+# Deploys a released build to GitHub Pages. It does not rebuild: it publishes the
+# <repo>-vX.Y.Z.zip attached to the release, which is what release.yml tested and built.
+#
+# Needs Settings → Pages → Source: GitHub Actions.
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to deploy (vX.Y.Z), or "latest" for the latest release
+        type: string
+        required: true
+        default: latest
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to deploy (vX.Y.Z), or "latest" for the latest release
+        type: string
+        required: false
+        default: latest
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download the release build
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$TAG" ] || [ "$TAG" = latest ]; then
+            TAG="$(gh release view --json tagName --jq .tagName)"
+          fi
+          gh release download "$TAG" --pattern "${GITHUB_REPOSITORY#*/}-*.zip" --dir release
+          unzip -q release/*.zip -d site
+          echo "Deploying \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
