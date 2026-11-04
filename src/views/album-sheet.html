@@ -94,13 +94,15 @@
             <span class="band"><Stripes variant="band" /></span>
           </div>
         </div>
-        <div class="album-body">
+        <div class="album-head">
           <h3>{{ album.title }}</h3>
           <p class="artist">{{ album.artist || t("album.unknownArtist") }}</p>
           <div :if="album.year || album.genre" class="tags">
             <span :if="album.year" class="album-tag">{{ album.year }}</span>
             <span :if="album.genre" class="album-tag">{{ album.genre }}</span>
           </div>
+        </div>
+        <div class="album-discs">
           <section :each="disc in album.discs" :key="disc.number" class="disc">
             <header class="disc-head">
               <span class="mm-legend">{{ t("album.disc", { number: disc.number }) }}</span>
@@ -187,21 +189,27 @@
   .scope-head h2 { font-size: var(--mm-text-2xl); overflow-wrap: anywhere; }
   .scope-head p { margin: 0; color: var(--mm-fg-muted); }
 
+  /* The cover beside the head and the discs; on phones the discs go under both. */
   .album {
     display: grid;
     grid-template-columns: 8.25rem minmax(0, 1fr);
-    gap: var(--mm-space-5);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "cover head"
+      "cover discs";
+    gap: var(--mm-space-2) var(--mm-space-5);
     padding: var(--mm-space-4);
     border: var(--mm-border-width) solid var(--mm-border);
     border-radius: var(--mm-radius-md);
     background: var(--mm-surface);
   }
-  .cover { width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
+  .cover { grid-area: cover; width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .no-cover { position: relative; height: 100%; background: var(--mm-display-bezel); }
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
-  .album-body { display: grid; align-content: start; gap: var(--mm-space-2); min-width: 0; }
-  .album-body h3 { font-size: var(--mm-text-xl); }
+  .album-head { grid-area: head; display: grid; align-content: start; gap: var(--mm-space-2); min-width: 0; }
+  .album-head h3 { font-size: var(--mm-text-xl); }
+  .album-discs { grid-area: discs; display: grid; align-content: start; min-width: 0; }
   .artist { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
   .tags { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
   .album-tag { padding: 1px var(--mm-space-2); border-radius: var(--mm-radius-full); background: var(--mm-sunken); color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); }
@@ -217,7 +225,16 @@
 
   @media (max-width: 720px) {
     .albums { padding: var(--mm-space-4); }
-    .album { grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--mm-space-3); padding: var(--mm-space-3); }
+    .album {
+      grid-template-columns: 5.5rem minmax(0, 1fr);
+      grid-template-rows: auto auto;
+      grid-template-areas:
+        "cover head"
+        "discs discs";
+      gap: var(--mm-space-3);
+      padding: var(--mm-space-3);
+    }
+    .album-head { align-self: center; }
     .cover { width: 5.5rem; }
   }
 </style>

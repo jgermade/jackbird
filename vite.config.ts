@@ -7,7 +7,9 @@ export default defineConfig({
   // (see .github/workflows/deploy.yml). The dev server still serves from /.
   base: "./",
   // jq79 components (.html) import as modules; safeEval precompiles their
-  // scripts so the page runs without 'unsafe-eval'.
+  // scripts so the page runs without 'unsafe-eval'. Since jq79 0.7.8 the
+  // precompiled functions are one script per build, which the plugin also
+  // preloads from each page that needs it.
   plugins: [jq79({ safeEval: true })],
   server: {
     port: 8666

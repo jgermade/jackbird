@@ -19,6 +19,7 @@
     consolidateTrack,
     expandAllFolders,
     navigateTree,
+    playFromTree,
     selectTrack,
     selectTreeRow,
     toggleFolder,
@@ -46,6 +47,15 @@
   const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
   const rowLead = (row: Row): string => (row.kind === "track" ? formatTrackNumber(row.trackNumber) || (isLoading() ? "…" : "—") : "")
   const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
+  const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey
+
+  // Playing from the tree: a track plays its folder from it, a folder plays from its first track.
+  const canPlay = (row: Row): boolean => row.kind === "track" || row.kind === "album"
+  const isPausable = (row: Row): boolean => row.kind === "track" && row.trackId === playingId() && playback.playing
+  const playLabel = (row: Row): string => t(isPausable(row) ? "album.pause" : "album.play", { title: rowLabel(row) })
+  const activate = (row: Row) => {
+    if (row.kind === "track") playFromTree(row.key)
+  }
 
   const pick = (row: Row, event: MouseEvent) => {
     if (row.kind === "track" && row.trackId) {
@@ -101,15 +111,20 @@
              :meta="row.kind === 'track' ? row.artist || '' : ''"
              :expanded="!!row.expanded"
              :chosen="isChosen(row)"
-             :current="row.key === root()?.activeRowKey"
+             :current="isCurrent(row)"
              :playing="row.kind === 'track' && row.trackId === playingId()"
              :playing-active="playback.playing"
              :row-id="rowDomId(row.key)"
              @select="pick(row, $event.detail)"
-             @toggle="toggleFolder(row.album)">
+             @toggle="toggleFolder(row.album)"
+             @activate="activate(row)">
       <template :slot.action>
-        <span :if="row.kind === 'track'" class="rename" @click.stop="null">
-          <Key square size="sm" variant="ghost" :label="t('tree.rename')" :title="t('tree.renameTitle')" @click="consolidateTrack()">
+        <span :if="canPlay(row)" class="row-keys" @click.stop="null">
+          <Key square size="sm" variant="ghost" :label="playLabel(row)" :title="playLabel(row)" @click="playFromTree(row.key)">
+            <svg :if="isPausable(row)" class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" /><rect x="9.5" y="3" width="3" height="10" /></svg>
+            <svg :else class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
+          </Key>
+          <Key :if="row.kind === 'track' && (isChosen(row) || isCurrent(row))" square size="sm" variant="ghost" :label="t('tree.rename')" :title="t('tree.renameTitle')" @click="consolidateTrack()">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9z" /><path d="M8.35 4.15 11.85 7.65" stroke-linecap="round" /></svg>
           </Key>
         </span>
@@ -157,5 +172,5 @@
   .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }
   .tree { padding-block: var(--mm-space-2); outline: none; }
   .tree:focus-visible { box-shadow: inset 0 0 0 2px var(--mm-accent); }
-  .rename { display: contents; }
+  .row-keys { display: flex; align-items: center; gap: var(--mm-space-1); }
 </style>

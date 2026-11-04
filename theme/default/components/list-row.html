@@ -28,8 +28,9 @@
   // keyboard is on, apart from the selection, and `rowId` is its id for the
   // tree's `aria-activedescendant`. `lead` is a small mono prefix (a track
   // number). The `action` slot is a key at the row's end, shown on hover, on
-  // the current row and on chosen ones; give it `@click.stop` so it does not
-  // also select the row.
+  // the current, chosen and playing rows, and always where there is no hover
+  // (a touch screen); give it `@click.stop` so it does not also select the
+  // row.
   //
   // **Part of the default theme**: imports `EqBars`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -119,7 +120,9 @@
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lead { display: inline-block; min-width: 1.5em; margin-right: var(--mm-space-2); font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .action { display: grid; place-items: center; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .row:hover .action, .row:focus-within .action, .row.current .action, .row[aria-selected="true"] .action { opacity: 1; }
+  .row:hover .action, .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
+  /* A key revealed on hover cannot be found without one. */
+  @media (hover: none) { .action { opacity: 1; } }
   .folder .label { font-weight: var(--mm-weight-bold); }
   .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; }

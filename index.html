@@ -5,9 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>jackbird</title>
     <link rel="icon" type="image/svg+xml" href="/src/assets/brand/jackbird-metal.svg" />
+    <script>
+      // The saved tone, else the system's, before the first paint, so the splash is drawn in it.
+      // src/lib/preferences.ts applies the same once the app loads; the key is in src/lib/storage.ts.
+      try {
+        var tone = localStorage.getItem("mp3-manager.theme");
+        if (tone !== "light" && tone !== "dark") tone = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = tone;
+      } catch (error) {}
+    </script>
+    <style>
+      /* The splash: shown until the app puts something in #app. */
+      .splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 1.5rem;
+        background: var(--mm-bg);
+      }
+      #app:not(:empty) ~ .splash { display: none; }
+      /* Its box is kept while the logo loads, so the bars do not jump when it arrives. */
+      .splash img { display: block; width: 6rem; height: auto; aspect-ratio: 1152 / 1061; }
+      .splash-bars { display: flex; align-items: flex-end; gap: .25rem; height: 1.25rem; }
+      .splash-bars i {
+        width: .3rem;
+        height: 100%;
+        border-radius: 1px;
+        background: var(--mm-stripe-1);
+        transform-origin: bottom;
+        animation: splash-bar .9s ease-in-out infinite alternate;
+      }
+      /* Two bars per stripe colour, in the tab band's order. */
+      .splash-bars i:nth-child(n + 3) { background: var(--mm-stripe-2); }
+      .splash-bars i:nth-child(n + 5) { background: var(--mm-stripe-3); }
+      .splash-bars i:nth-child(2) { animation-delay: -.45s; }
+      .splash-bars i:nth-child(3) { animation-delay: -.2s; }
+      .splash-bars i:nth-child(4) { animation-delay: -.7s; }
+      .splash-bars i:nth-child(5) { animation-delay: -.35s; }
+      .splash-bars i:nth-child(6) { animation-delay: -.6s; }
+      @keyframes splash-bar { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
+      @media (prefers-reduced-motion: reduce) {
+        .splash-bars i { animation: none; transform: scaleY(.6); }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
+    <div class="splash" aria-hidden="true">
+      <img src="/src/assets/brand/jackbird-metal.svg" alt="" width="1152" height="1061" fetchpriority="high" />
+      <span class="splash-bars"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

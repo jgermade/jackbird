@@ -199,6 +199,30 @@ export function playFromDetail(trackId: string): void {
   }
 }
 
+/**
+ * Plays from a tree row. A track plays its folder (what the album sheet shows
+ * for that row) from that track, or pauses and resumes it if it is the one
+ * playing; a folder plays the tracks under it from the first.
+ */
+export function playFromTree(rowKey: string): void {
+  const { root, rows } = derive();
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row || (row.kind !== "track" && row.kind !== "album")) {
+    return;
+  }
+  const playing = $toRaw(nowPlaying.value);
+  if (row.kind === "track" && playing && playing.rootId === root.id && playing.trackId === row.trackId) {
+    togglePlay();
+    return;
+  }
+  const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
+  const trackIds = orderDetailPlaylist(scope.tracks).map((track) => track.id);
+  const index = row.kind === "track" && row.trackId ? trackIds.indexOf(row.trackId) : 0;
+  if (trackIds.length > 0 && index !== -1) {
+    playQueue({ rootId: root.id, trackIds, sourceLabel: scope.label }, index);
+  }
+}
+
 /** The per-track rename key: a placeholder until the naming pattern exists. */
 export function consolidateTrack(): void {
   library.infoMessage = t("message.consolidatePending");

@@ -11,7 +11,7 @@
 | --- | --- |
 | `npm run dev` | The dev server, on <http://localhost:8666>. |
 | `npm test` | Every check (below). Run it before every commit. |
-| `npm run build` | Type check, then the production build into `dist/`. |
+| `npm run build` | Type check, then the production build into `dist/`. Under `safeEval`, jq79 precompiles every component's functions into one script, which each page preloads. |
 | `npm run preview` | Serves `dist/` as it will be deployed. |
 | `npm run type-check` | The TypeScript check alone. |
 

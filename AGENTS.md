@@ -34,6 +34,10 @@ jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.m
   `src/lib/workspace.ts` does.
 - A derived value that holds nested objects is handed out boxed (`Opaque`) and read through
   functions in views, never copied into a component's store with `$:`.
+- Several components fetched at runtime go through one `Component79.fetchAll([...])`, never
+  consecutive `Component79.fetch()` calls: they leave in the same moment and share the HTTP/2
+  connection. (A setup script's `await import("….html")` fetches nothing: jq79/vite hoists it into
+  the bundle.)
 
 ### Sizes
 
