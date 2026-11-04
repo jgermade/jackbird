@@ -52,7 +52,9 @@ This document describes the technical stack and codebase architecture implemente
   device's rate with `latencyHint: "playback"`; the bands span 40 Hz–16 kHz whatever the rate.
 - **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
   `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
-  root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.
+  root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back. Their
+  replacement is built (E1) and not yet wired in (E2): jackbird's own tag crates in `crates/`
+  (below), with no tag dependency.
 - **Session persistence**: `src/lib/session.ts` restores the open roots on load and saves them
   whenever they change; `src/lib/rootSessionStore.ts` keeps their handles and grouping mode in
   IndexedDB (`mp3-manager` database).
@@ -75,6 +77,13 @@ This document describes the technical stack and codebase architecture implemente
 - **Makefile**: `make up`, `make test` and `make build` run `npm run dev`, `npm test` and
   `npm run build`, installing the dependencies first (`npm ci`) when they are missing or older
   than `package-lock.json`.
+- **Rust** (stable; only to work on `crates/` until E2 builds them into the app): a Cargo
+  workspace at the root with jackbird's tag crates, `jackbird-id3` (ID3v2 tags as frames kept byte
+  for byte, text and picture codecs), `jackbird-flac` (FLAC metadata blocks, Vorbis comment
+  entries, pictures) and `jackbird-tags` (the six fields and the cover over both, the audio region,
+  safe writes). No I/O and no dependencies but each other; `cargo test` runs them on the shared
+  fixtures in `fixtures/tags/`, and CI (`tags.yml`) adds `rustfmt` and `clippy`. `src-tauri/` is
+  its own Cargo project until E4.
 - **Tests**: `npm test`, with no test framework: the layer check (`scripts/check-layers.mjs`),
   a type check of the helpers and their tests (`tsconfig.test.json`), Node's own runner on
   `src/helpers/**/*.test.ts` with type stripping, and a per-file coverage floor of 90% of lines,
@@ -130,6 +139,12 @@ mp3-manager/
 │   ├── base.css                 # Box sizing; the body's ground, ink and type
 │   ├── components/*.html        # jq79: key, key-bank, display, meter, lamp, tabs, modal, …
 │   └── index.html, demo.ts/.html # The demo page
+├── crates/                      # Rust: jackbird's tag engine (Cargo.toml at the root is its workspace)
+│   ├── id3/                     # jackbird-id3: ID3v2 frames, text and picture codecs
+│   ├── flac/                    # jackbird-flac: FLAC blocks, Vorbis comments, pictures
+│   └── tags/                    # jackbird-tags: fields, cover, audio region, safe writes
+├── fixtures/tags/               # Shared tag fixtures, cases.json, and make.mjs that makes them
+├── src-tauri/                   # The Tauri v2 shell (E0), its own Cargo project
 ├── scripts/                     # check-layers.mjs, check-coverage.mjs (run by npm test)
 ├── RECORD/                      # Specs, plans, walkthroughs & audit trail (see AGENTS.md)
 └── ROADMAP/                     # Dated roadmaps with Mermaid Gantt charts (see AGENTS.md)

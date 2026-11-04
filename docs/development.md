@@ -5,6 +5,8 @@
 - Node.js 22.6 or later: the unit tests run TypeScript directly with `--experimental-strip-types`.
 - A Chromium-based browser to run the app.
 - `make`, for the shortcuts below (optional: the npm scripts do the same).
+- Rust (stable, with `rustfmt` and `clippy`), only to work on the tag crates in `crates/` until
+  the app builds them in (E2).
 
 ## Scripts
 
@@ -28,6 +30,21 @@ older than `package-lock.json`. A bare `make` lists them.
    framework. It also writes coverage to `.tmp/coverage/lcov.info`.
 4. **`test:coverage`** (`scripts/check-coverage.mjs`): every helper file must reach 90% of lines,
    branches and functions, and a helper that no test loads fails the check.
+
+## The tag crates
+
+`crates/` holds jackbird's own tag engine, in Rust, with no tag dependency (see
+[Architecture](architecture.md#the-tag-engine)): `jackbird-id3`, `jackbird-flac` and
+`jackbird-tags`, one Cargo workspace whose `Cargo.toml` is at the root.
+
+| Command | What it does |
+| --- | --- |
+| `cargo test --workspace` (`make test-crates`, with the two below) | The crates' unit tests, and `jackbird-tags`' tests on every fixture in `fixtures/tags/`. |
+| `cargo fmt --all --check` | The formatting (`rustfmt.toml`). |
+| `cargo clippy --workspace --all-targets -- -D warnings` | The lints, with warnings as errors, as CI runs them (`tags.yml`). |
+
+The fixtures are small MP3 and FLAC files built byte by byte, committed with `cases.json`, which
+says what each must give; [their README](../fixtures/tags/README.md) says how to make them again.
 
 ## Translations
 

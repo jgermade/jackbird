@@ -43,6 +43,24 @@ Beside that flow, `src/main.ts` starts three things:
   missing or more than a day old.
 - **The root view** (`src/views/app.html`).
 
+## The tag engine
+
+`src/lib/id3.ts` still reads and writes tags (MP3 only) with `jsmediatags` and
+`browser-id3-writer`. Its replacement is built and not yet wired in: three Rust crates in
+`crates/`, which E2 brings into the web app as WebAssembly and E4 into the desktop app natively.
+
+- **`jackbird-id3`** reads an ID3v2 tag (v2.2 to v2.4) into its frames as they are stored, and
+  writes frames back; only the frames jackbird edits are decoded (text, pictures). A frame nobody
+  edits goes back byte for byte, in its place.
+- **`jackbird-flac`** does the same for FLAC's metadata blocks, and keeps Vorbis comments entry by
+  entry, whatever bytes each holds.
+- **`jackbird-tags`** is jackbird's layer: the six fields and the cover over both formats, the
+  audio region the checksums hash (for MP3 exactly `getAudioFrameSlice`'s, so existing `.meta/`
+  checksums stay valid), and writes that keep the audio where it was when the tag fits. Every
+  write is checked before its bytes are given back: the result must read back as asked, its audio
+  must be byte-identical, and every frame, block and comment it did not touch must be there, byte
+  for byte and in order; otherwise it is refused, with a code for the interface.
+
 ## Layers
 
 The UI is made of [jq79](https://github.com/jgermade/jq79) components, and the code lives in four
