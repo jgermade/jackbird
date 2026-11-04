@@ -60,7 +60,10 @@
     <img class="logo" :src="logoUrl" alt="" />
     <h2>{{ t("landing.title") }}</h2>
     <p>{{ t("landing.body") }}</p>
-    <Key variant="primary" size="lg" :disabled="library.loading" @click="openFolder()">{{ t("landing.open") }}</Key>
+    <Key size="lg" :disabled="library.loading" @click="openFolder()">
+      <svg class="icon signal" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z" /></svg>
+      {{ t("landing.open") }}
+    </Key>
     <small class="mm-legend">{{ t("landing.note") }}</small>
   </div>
 
@@ -146,6 +149,8 @@
 <style scoped>
   .sheet { color: var(--mm-fg); }
   .icon { width: .875rem; height: .875rem; }
+  /* Orange only as the glyph: the key itself stays a chassis key, like the rest of the deck. */
+  .icon.signal { color: var(--mm-accent-ink); }
   h2, h3 { margin: 0; font-family: var(--mm-font-label); font-stretch: var(--mm-stretch-heading); font-weight: 700; line-height: var(--mm-leading-tight); }
 
   .landing {
