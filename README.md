@@ -1,57 +1,55 @@
-# MP3 Manager
+<p align="center">
+  <img src="src/assets/brand/jackbird-metal.svg" alt="" width="120">
+</p>
 
-Aplicacion web cliente para gestionar metadatos ID3 y caratulas de una coleccion MP3 local.
+<h1 align="center">jackbird</h1>
 
-## Objetivos
+<p align="center"><strong>Your library, right where it is.</strong></p>
 
-- Escanear carpetas locales con la File System Access API.
-- Mostrar lista de archivos MP3 encontrados.
-- Editar metadatos basicos (titulo, artista, album, ano, genero, pista).
-- Editar caratula por arrastrar y soltar o seleccion local.
-- Guardar cambios directamente en el archivo MP3.
-- Integrar una capa VFS desacoplada para futura sincronizacion remota.
+jackbird is a browser app for a local MP3 collection. Open a music folder and it lays out your
+albums with their covers, plays them, and lets you fix their tags and covers, one track or many at
+once. Changes are written straight into your MP3 files: there is no server, and nothing is
+uploaded anywhere.
 
-## Arquitectura (inspirada en rom-manager)
+Its interface, **Deck**, takes after old portable audio gear: keys that travel when pressed, a
+dot-matrix display, labels printed like a faceplate's, and two tones, Silver and Graphite.
 
-- Cliente puro, sin backend.
-- UI desacoplada del acceso a ficheros.
-- Capa VFS por interfaz:
-  - `src/vfs/types.ts`: contrato `VfsAdapter`.
-  - `src/vfs/browserVfs.ts`: implementacion local con File System Access API.
-- Motor de metadata sobre bytes:
-  - `src/lib/id3.ts` no depende de handles directos.
-  - La lectura/escritura se hace sobre `Uint8Array` para facilitar otras VFS.
+## Screenshots
 
-## Flujo
+![The library in Silver, with a track playing](docs/screenshots/library-silver.png)
 
-1. Montar VFS (`BrowserVfs.mount`).
-2. Listar MP3 (`BrowserVfs.listFiles`).
-3. Leer bytes por archivo (`BrowserVfs.readFile`).
-4. Parsear ID3 (`readTrackMetadataFromBytes`).
-5. Editar en UI.
-6. Serializar ID3 (`writeTrackMetadataToBytes`).
-7. Persistir (`BrowserVfs.writeFile`).
-8. Registrar operacion de escritura (`getWriteOperations`).
+| Graphite | Editing three tracks at once |
+| --- | --- |
+| ![A two-disc album in Graphite, with a track playing](docs/screenshots/library-graphite.png) | ![The edit dialog with three tracks selected](docs/screenshots/edit-dialog.png) |
 
-## Requisitos
+<p align="center">
+  <img src="docs/screenshots/phone.png" alt="jackbird on a phone, playing a track" width="300">
+</p>
 
-- Node.js 20+
-- Navegador Chromium moderno (Chrome, Edge, Brave) para File System Access API
+<sub>The albums, artists and covers in the screenshots are made up.</sub>
 
-## Desarrollo
+## Quick start
+
+You need [Node.js](https://nodejs.org/) 22.6 or later and a Chromium-based desktop browser
+(Chrome, Edge, Brave, Opera). jackbird reads and writes your files through the File System Access
+API, which Firefox and Safari do not have.
 
 ```bash
 npm install
+```
+
+```bash
 npm run dev
 ```
 
-## Build
+Open <http://localhost:8666>, choose **Open folder** and pick a folder with MP3 files. The browser
+asks for permission to edit the files in it; jackbird needs it to save your changes.
 
-```bash
-npm run build
-npm run preview
-```
+Run the checks with `npm test`, and build for production with `npm run build` (into `dist/`).
 
-## Nota sobre sincronizacion futura
+## Documentation
 
-La UI ya consume la abstraccion `VfsAdapter`. Para sincronizar con nube o repositorio remoto, puedes crear otra implementacion (por ejemplo `RemoteSyncVfs`) sin reescribir los componentes de pantalla.
+- [Using jackbird](docs/usage.md)
+- [Architecture](docs/architecture.md)
+- [Development](docs/development.md)
+- [Releases and deployment](docs/releases.md)
