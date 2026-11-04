@@ -109,9 +109,9 @@
     <template :slot.end>
       <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
       <span class="open-folder">
-        <Key size="sm" :variant="hasRoots ? 'secondary' : 'primary'" :disabled="library.loading" :title="folderLabel" @click="openFolder()">
+        <Key size="sm" :disabled="library.loading" :title="folderLabel" @click="openFolder()">
           <Reel :if="library.loading" :size="12" speed="fast" />
-          <svg :else class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
           {{ folderLabel }}
         </Key>
       </span>
@@ -154,6 +154,8 @@
     white-space: nowrap;
   }
   .icon { width: .875rem; height: .875rem; }
+  /* While no root is open, opening one is the thing to do: its glyph is printed in orange. */
+  .icon.signal { color: var(--mm-accent-ink); }
 
   @media (max-width: 1100px) {
     .deck {

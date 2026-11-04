@@ -1,0 +1,111 @@
+# Bumps the version, builds the new tag (build.yml), publishes a GitHub release with the build
+# attached as <repo>-vX.Y.Z.zip and, if the `deploy` box is ticked, deploys it (deploy.yml).
+#
+# Pushes and releases made with the workflow token start no other workflow, which is why
+# build.yml and deploy.yml are called here instead of reacting to the push or the release.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      deploy:
+        description: Deploy the release to GitHub Pages
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Bump version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - name: Check the branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "::error::Releases run on $DEFAULT_BRANCH only, not on $GITHUB_REF."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Bump, commit and tag
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "$BUMP" -m "chore(release): %s"
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Version: \`$tag\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push the commit and the tag
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+        run: git push --atomic origin "HEAD:$GITHUB_REF" "refs/tags/$TAG"
+
+  build:
+    name: Build
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+
+  release:
+    name: Publish release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+
+      - name: Zip the build
+        run: |
+          asset="${GITHUB_REPOSITORY#*/}-$TAG.zip"
+          (cd dist && zip -qr "../$asset" .)
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+
+      - name: Create the release
+        run: gh release create "$TAG" "$ASSET" --title "$TAG" --generate-notes --verify-tag
+
+  deploy:
+    name: Deploy
+    needs: [version, release]
+    if: inputs.deploy
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ needs.version.outputs.tag }}

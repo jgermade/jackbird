@@ -3,6 +3,9 @@ import { jq79 } from "jq79/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  // Relative URLs, so one build serves from any path: GitHub Pages serves it under /jackbird/
+  // (see .github/workflows/deploy.yml). The dev server still serves from /.
+  base: "./",
   // jq79 components (.html) import as modules; safeEval precompiles their
   // scripts so the page runs without 'unsafe-eval'.
   plugins: [jq79({ safeEval: true })],
