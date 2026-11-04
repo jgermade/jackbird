@@ -1,15 +1,13 @@
-// Translation: `t(key, params)` and `t.n(key, count, params)` in the chosen
+// Translation: `t(key, params)` and `tn(key, count, params)` in the chosen
 // language, English as the fallback. The catalogues are ./locales/; English
-// is the source. React components get a `t` from the view, since components
-// may not import lib/ (see "Layers" in AGENTS.md).
+// is the source. Views import them; components, which may not import lib/,
+// take their texts as props (see "Layers" in AGENTS.md).
 
-import { useMemo } from "react";
 import { translate, translatePlural, type Params } from "../helpers/i18n";
 import type { Language } from "../types";
 import { en, type MessageKey, type PluralKey } from "./locales/en";
 import { es } from "./locales/es";
 import { preferences } from "./preferences";
-import { useStoreValue } from "./react-store";
 
 export type { MessageKey, PluralKey };
 
@@ -43,10 +41,4 @@ export function t(key: MessageKey, params?: Params): string {
 /** A counted text in the current language (`key.one` / `key.other`). */
 export function tn(key: PluralKey, count: number, params?: Params): string {
   return createTranslate(preferences.language).n(key, count, params);
-}
-
-/** A translator for React that changes when the language does. */
-export function useT(): Translate {
-  const [language] = useStoreValue(preferences, "language");
-  return useMemo(() => createTranslate(language), [language]);
 }

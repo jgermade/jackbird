@@ -1,0 +1,47 @@
+<script :setup lang="ts">
+  // The preferences, in a dialog: the tone (Silver or Graphite) and the
+  // interface language, each language named in itself. A view over
+  // lib/preferences.ts. See RECORD/2026-11-03.deck-design-system.WIP.md
+  // (steps 6 and 7).
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const Select = await import("../../theme/default/components/select.html")
+  const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
+
+  const { languageName, t } = await import("../lib/i18n")
+  const { LANGUAGES, preferences, setLanguage, setTheme } = await import("../lib/preferences")
+  const { ui } = await import("../lib/ui")
+
+  $: isDark = preferences.theme === "dark"
+  const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
+</script>
+
+<div class="preferences-dialog">
+  <Modal :open="ui.preferencesOpen" :eyebrow="t('app.name')" :title="t('preferences.title')" size="sm" :close-label="t('preferences.close')" @close="ui.preferencesOpen = false">
+    <div class="prefs">
+      <section class="pref">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("preferences.appearance") }}</h3>
+          <p>{{ isDark ? t("preferences.darkOn") : t("preferences.lightOn") }}</p>
+        </div>
+        <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
+      </section>
+      <section class="pref">
+        <Field :label="t('preferences.language')" control="preferences-language" :hint="t('preferences.languageHint')">
+          <Select id="preferences-language" describedby="preferences-language-note" :model="preferences.language" :options="languages()" @change="setLanguage($event.detail)" />
+        </Field>
+      </section>
+    </div>
+  </Modal>
+</div>
+
+<style scoped>
+  .preferences-dialog { display: contents; }
+  .prefs { display: grid; gap: var(--mm-space-5); }
+  .pref + .pref { padding-top: var(--mm-space-5); border-top: var(--mm-border-width) solid var(--mm-border); }
+  .pref:first-child { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--mm-space-3); }
+  .text { display: grid; gap: var(--mm-space-1); }
+  .text h3 { margin: 0; }
+  .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+</style>

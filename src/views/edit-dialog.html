@@ -1,0 +1,165 @@
+<script :setup lang="ts">
+  // The metadata editor, in a dialog over the selection: the cover, the six
+  // tags, and the file's data for one track. A field the selection varies in
+  // says "(Multiple values)" and, left empty, keeps each track's own value. A
+  // view over lib/editor.ts, which holds the form and saves it. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+  const CoverDrop = await import("../components/cover-drop.html")
+
+  const { formatBytes } = await import("../helpers/format")
+  const { getVariedFields } = await import("../helpers/metadata")
+  const { closeEditor, editor, saveEdits } = await import("../lib/editor")
+  const { t, tn } = await import("../lib/i18n")
+  const { library } = await import("../lib/library")
+  const { ui } = await import("../lib/ui")
+  const { selectedTracks } = await import("../lib/workspace")
+
+  type Track = { id: string; name: string; relativePath: string; size: number; checksum: string; fullChecksum?: string; metadata: { title: string } }
+
+  // `plain` examples are shown as they are; the others as "e.g. …".
+  const FIELDS = [
+    { key: "title", label: "field.title", example: "Bohemian Rhapsody", wide: true },
+    { key: "artist", label: "field.artist", example: "Queen" },
+    { key: "album", label: "field.album", example: "A Night at the Opera" },
+    { key: "year", label: "field.year", example: "1975", plain: true, numeric: true },
+    { key: "genre", label: "field.genre", example: "Rock", plain: true },
+    { key: "trackNumber", label: "field.track", example: "1/12", plain: true, numeric: true }
+  ] as const
+  type FieldSpec = (typeof FIELDS)[number]
+
+  // Read through functions, not `$:` copies: the selection is boxed (see
+  // Opaque in lib/workspace.ts) and must not land in this store.
+  const tracks = (): Track[] => selectedTracks.value.data
+  const single = (): Track | null => (tracks().length === 1 ? tracks()[0] : null)
+  const varied = () => getVariedFields(selectedTracks.value.data)
+
+  const heading = (): string => {
+    const list = tracks()
+    if (list.length === 1) return list[0].metadata.title || list[0].name
+    return list.length > 1 ? t("editModal.titleMany", { count: list.length }) : t("editModal.titleOne")
+  }
+  const heroTitle = (): string => {
+    const one = single()
+    return one ? editor.form.title || one.name : tn("selection.count", tracks().length)
+  }
+  const heroSubtitle = (): string => {
+    if (single()) return editor.form.artist || t("album.unknownArtist")
+    return varied().artist ? t("editor.variousArtists") : editor.form.artist || t("editor.sharedArtist")
+  }
+  const placeholder = (field: FieldSpec): string =>
+    varied()[field.key] ? t("editor.multipleValues") : "plain" in field ? field.example : t("editor.example", { value: field.example })
+
+  const coverFailed = (message: string) => {
+    library.errorMessage = message
+  }
+</script>
+
+<div class="edit-dialog">
+  <Modal :open="ui.editModalOpen" :eyebrow="t('editModal.eyebrow')" :title="heading()" size="lg" :close-label="t('editModal.close')" @close="closeEditor()">
+    <div :if="tracks().length > 0" class="editor">
+      <div class="hero">
+        <CoverDrop :model="editor.form.coverDataUrl"
+                   :alt="t('editor.cover')"
+                   :drop-label="t('cover.dropHere')"
+                   :choose-label="t('cover.choose')"
+                   :remove-label="t('cover.remove')"
+                   :fail-label="t('cover.readFailed')"
+                   @error="coverFailed($event.detail)" />
+        <div class="hero-info">
+          <h3 class="hero-title">{{ heroTitle() }}</h3>
+          <p class="subtitle">{{ heroSubtitle() }}</p>
+          <div :if="editor.form.album || editor.form.year" class="tags">
+            <span :if="editor.form.album" class="tag-chip">{{ editor.form.album }}</span>
+            <span :if="editor.form.year" class="tag-chip">{{ editor.form.year }}</span>
+          </div>
+        </div>
+      </div>
+
+      <p :if="library.errorMessage" class="failure" role="alert">{{ library.errorMessage }}</p>
+
+      <section class="tag-fields" :aria-label="t('editor.metadata')">
+        <h4 class="mm-legend">{{ t("editor.metadata") }}</h4>
+        <div class="grid">
+          <div :each="field in FIELDS" :key="field.key" class="cell" :class.wide="'wide' in field">
+            <Field :label="t(field.label)" :control="`edit-${field.key}`">
+              <TextInput :id="`edit-${field.key}`"
+                         :model="editor.form[field.key]"
+                         :placeholder="placeholder(field)"
+                         :numeric="'numeric' in field"
+                         :inputmode="field.key === 'year' ? 'numeric' : ''" />
+            </Field>
+          </div>
+        </div>
+      </section>
+
+      <details :if="single()" class="file-data">
+        <summary class="mm-legend">{{ t("editor.fileData") }}</summary>
+        <dl class="facts">
+          <div><dt>{{ t("editor.file") }}</dt><dd class="mono">{{ single().name }}</dd></div>
+          <div><dt>{{ t("editor.path") }}</dt><dd class="mono">{{ single().relativePath }}</dd></div>
+          <div><dt>{{ t("editor.size") }}</dt><dd>{{ formatBytes(single().size) }}</dd></div>
+          <div><dt>{{ t("editor.checksum") }}</dt><dd class="mono">{{ single().fullChecksum || single().checksum || t("editor.pending") }}</dd></div>
+        </dl>
+      </details>
+    </div>
+    <p :else class="none">{{ t("editModal.none") }}</p>
+
+    <template :slot.foot>
+      <Key variant="ghost" :disabled="library.saving" @click="closeEditor()">{{ t("editor.cancel") }}</Key>
+      <Key variant="primary" :disabled="library.saving || tracks().length === 0" @click="saveEdits()">{{ library.saving ? t("editor.saving") : t("editor.save") }}</Key>
+    </template>
+  </Modal>
+</div>
+
+<style scoped>
+  .edit-dialog { display: contents; }
+  .editor { display: grid; gap: var(--mm-space-5); }
+  .hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--mm-space-5); align-items: start; }
+  .hero-info { display: grid; gap: var(--mm-space-2); min-width: 0; }
+  .hero-title {
+    margin: 0;
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-heading);
+    font-weight: 700;
+    font-size: var(--mm-text-xl);
+    line-height: var(--mm-leading-tight);
+    overflow-wrap: anywhere;
+  }
+  .subtitle { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
+  .tags { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+  .tag-chip { padding: 1px var(--mm-space-2); border-radius: var(--mm-radius-full); background: var(--mm-sunken); color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); }
+
+  .failure {
+    margin: 0;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border-left: 3px solid var(--mm-bad-led);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-bad-soft);
+    color: var(--mm-bad);
+    font-size: var(--mm-text-sm);
+  }
+
+  .tag-fields { display: grid; gap: var(--mm-space-3); }
+  .tag-fields h4 { margin: 0; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mm-space-4) var(--mm-space-4); }
+  .cell.wide { grid-column: 1 / -1; }
+
+  .file-data { border-top: var(--mm-border-width) solid var(--mm-border); padding-top: var(--mm-space-3); }
+  .file-data summary { cursor: pointer; }
+  .facts { display: grid; gap: var(--mm-space-2); margin: var(--mm-space-3) 0 0; }
+  .facts div { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: var(--mm-space-3); }
+  .facts dt { color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .mono { font-family: var(--mm-font-mono); font-size: var(--mm-text-sm); }
+  .none { margin: 0; color: var(--mm-fg-muted); }
+
+  @media (max-width: 640px) {
+    .hero { grid-template-columns: 1fr; justify-items: start; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>

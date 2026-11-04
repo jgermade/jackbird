@@ -1,6 +1,6 @@
-// The library: the open folders (roots) and the state around them. Its
-// handlers still live in the React view; they move here as the screens
-// become jq79 views (ROADMAP/2026-11-03/deck-design-system.md).
+// The library: the open folders (roots) and the state around them. The
+// actions that change it live beside it in lib/ (roots, workspace, editor,
+// session, verifier); the views read it.
 
 import { $reactive } from "jq79";
 import type { RootWorkspace } from "../types";

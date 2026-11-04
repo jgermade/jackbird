@@ -43,3 +43,20 @@ export function collectFolderPaths(tracks: Mp3Track[]): string[] {
   }
   return [...paths];
 }
+
+/** How long a verification stays fresh: a day. */
+export const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The tracks the background verifier should check, in the order it should
+ * check them: those with no audio checksum first, then by oldest
+ * verification (never verified counts as oldest). A track with both an audio
+ * checksum and a verification younger than `VERIFICATION_TTL_MS` at `now` is
+ * left out.
+ */
+export function tracksToVerify(tracks: readonly Mp3Track[], now: number): Mp3Track[] {
+  const verifiedAt = (track: Mp3Track): number => (track.lastVerifiedAt ? new Date(track.lastVerifiedAt).getTime() : 0);
+  return tracks
+    .filter((track) => !track.audioChecksum || !track.lastVerifiedAt || now - verifiedAt(track) > VERIFICATION_TTL_MS)
+    .sort((a, b) => Number(!!a.audioChecksum) - Number(!!b.audioChecksum) || verifiedAt(a) - verifiedAt(b));
+}

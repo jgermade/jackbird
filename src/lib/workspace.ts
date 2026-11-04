@@ -6,7 +6,6 @@
 
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
-import { computeCommonMetadata, emptyMetadata } from "../helpers/metadata";
 import { detailScope, type Scope } from "../helpers/scope";
 import { nextSelection } from "../helpers/selection";
 import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
@@ -95,13 +94,13 @@ function updateActive(update: (root: RootWorkspace) => RootWorkspace): void {
 }
 
 function clearedSelection(root: RootWorkspace): RootWorkspace {
-  return { ...root, selectedTrackId: null, selectedTrackIds: [], selectionAnchorTrackId: null, draft: emptyMetadata() };
+  return { ...root, selectedTrackId: null, selectedTrackIds: [], selectionAnchorTrackId: null };
 }
 
 /**
  * A click on a track: `toggle` (plain) adds or removes it, `range` (Shift)
  * selects from the anchor to it, in the tree's order. It becomes the active
- * row, and a single selection becomes the draft.
+ * row.
  */
 export function selectTrack(trackId: string, mode: "toggle" | "range" = "toggle"): void {
   const root = current();
@@ -120,8 +119,7 @@ export function selectTrack(trackId: string, mode: "toggle" | "range" = "toggle"
       selectedTrackId: single ? activeTrackId : null,
       selectedTrackIds: [...selected],
       selectionAnchorTrackId: anchor,
-      activeRowKey: `track:${activeTrackId}`,
-      draft: single ? item.tracks.find((one) => one.id === activeTrackId)?.metadata ?? emptyMetadata() : emptyMetadata()
+      activeRowKey: `track:${activeTrackId}`
     };
   });
   library.infoMessage = null;
@@ -204,16 +202,6 @@ export function playFromDetail(trackId: string): void {
 /** The per-track rename key: a placeholder until the naming pattern exists. */
 export function consolidateTrack(): void {
   library.infoMessage = t("message.consolidatePending");
-}
-
-/** Opens the editor on the selection, with the values the tracks share as the draft. */
-export function openEditor(): void {
-  const tracks = selectedTracks.value.data;
-  if (tracks.length === 0) {
-    return;
-  }
-  updateActive((root) => ({ ...root, draft: computeCommonMetadata(tracks) }));
-  ui.editModalOpen = true;
 }
 
 export function showInfo(): void {

@@ -78,7 +78,6 @@ export type RootWorkspace = {
   selectedTrackId: string | null;
   selectedTrackIds: string[];
   selectionAnchorTrackId: string | null;
-  draft: EditableMetadata;
   loadingMetadata: boolean;
   loadedCount: number;
   groupingMode: GroupingMode;

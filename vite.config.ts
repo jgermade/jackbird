@@ -6,9 +6,6 @@ export default defineConfig({
   // jq79 components (.html) import as modules; safeEval precompiles their
   // scripts so the page runs without 'unsafe-eval'.
   plugins: [jq79({ safeEval: true })],
-  resolve: {
-    extensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"]
-  },
   server: {
     port: 8666
   },

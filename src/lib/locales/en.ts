@@ -7,7 +7,6 @@ export const en = {
   "app.name": "jackbird",
   "language.self": "English",
 
-  "common.close": "Close",
   "common.none": "-",
 
   "picker.scanning": "Scanning…",
@@ -34,8 +33,6 @@ export const en = {
   "panels.details": "Details",
   "tree.loadingLibrary": "Loading library…",
   "tree.empty": "No tracks in this root.",
-  "tree.expand": "Expand {name}",
-  "tree.collapse": "Collapse {name}",
   "tree.loadingMetadata": "Loading metadata…",
   "tree.renameTitle": "Rename (pattern still to be defined)",
   "tree.rename": "Rename track",
@@ -56,7 +53,6 @@ export const en = {
   "tracks.count.one": "{count} track",
   "tracks.count.other": "{count} tracks",
   "album.coverOf": "Cover of {title}",
-  "album.noCover": "No cover",
   "album.untitled": "No album",
   "album.unknownArtist": "Unknown artist",
   "album.disc": "Disc {number}",
@@ -83,11 +79,9 @@ export const en = {
   "faceplate.roots": "Open roots",
 
   "playback.label": "Playlist player",
-  "playback.defaultSource": "List",
   "playback.previous": "Previous track",
   "playback.next": "Next track",
   "playback.returnTo": "Back to {source}, track {position} of {total}",
-  "playback.loading": "Loading…",
   "playback.loadFailed": "Could not load the audio.",
   "playback.folderGone": "The playlist's folder is no longer available.",
 
@@ -98,8 +92,6 @@ export const en = {
   "field.genre": "Genre",
   "field.track": "Track",
 
-  "editor.details": "Details",
-  "editor.empty": "Select a track to see its sheet and edit its metadata.",
   "editor.variousArtists": "(Various artists)",
   "editor.sharedArtist": "Shared artist",
   "editor.cover": "Cover",
@@ -112,7 +104,6 @@ export const en = {
   "editor.size": "Size",
   "editor.checksum": "Checksum",
   "editor.pending": "Pending",
-  "editor.editMetadata": "Edit metadata",
   "editor.cancel": "Cancel",
   "editor.saving": "Saving…",
   "editor.save": "Save changes",
@@ -125,7 +116,6 @@ export const en = {
 
   "cover.readFailed": "Could not read the image.",
   "cover.dropHere": "Drop an image here",
-  "cover.change": "Change cover",
   "cover.choose": "Choose image",
   "cover.remove": "Remove",
 
@@ -145,8 +135,6 @@ export const en = {
   "preferences.appearance": "Appearance",
   "preferences.darkOn": "Dark theme on",
   "preferences.lightOn": "Light theme on",
-  "preferences.useLight": "Use light theme",
-  "preferences.useDark": "Use dark theme",
   "preferences.language": "Language",
   "preferences.languageHint": "Interface language. Where a text has no translation, it is shown in English.",
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
-import { computeCommonMetadata, emptyMetadata, getVariedFields } from "./metadata.ts";
+import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "./metadata.ts";
 
 const kindOfBlue = { artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", coverDataUrl: "data:cover" };
 
@@ -59,5 +59,34 @@ describe("getVariedFields", () => {
       track("c.mp3", { ...kindOfBlue, title: "All Blues", trackNumber: "2", coverDataUrl: null })
     ]);
     assert.deepEqual(varied, { ...none, title: true, trackNumber: true, coverDataUrl: true });
+  });
+});
+
+describe("mergeDraft", () => {
+  const original = { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", trackNumber: "1", coverDataUrl: "data:cover" };
+  const nothingVaried = getVariedFields([]);
+  const everythingVaried = { title: true, artist: true, album: true, year: true, genre: true, trackNumber: true, coverDataUrl: true };
+
+  it("takes the draft whole when nothing varied, empty fields and no cover included", () => {
+    assert.deepEqual(mergeDraft(original, emptyMetadata(), nothingVaried), emptyMetadata());
+  });
+
+  it("keeps the track's value where the selection varied and the draft is empty", () => {
+    assert.deepEqual(mergeDraft(original, emptyMetadata(), everythingVaried), original);
+  });
+
+  it("writes what the draft says over a varied field", () => {
+    const draft = { ...emptyMetadata(), title: "Freddie Freeloader", year: "1960", coverDataUrl: "data:new" };
+    assert.deepEqual(mergeDraft(original, draft, everythingVaried), { ...original, title: "Freddie Freeloader", year: "1960", coverDataUrl: "data:new" });
+  });
+
+  it("clears a shared field the draft emptied, and a shared cover it removed", () => {
+    const varied = { ...nothingVaried, title: true };
+    const draft = { ...original, title: "", genre: "", coverDataUrl: null };
+    assert.deepEqual(mergeDraft(original, draft, varied), { ...original, genre: "", coverDataUrl: null });
+  });
+
+  it("returns a new object", () => {
+    assert.notEqual(mergeDraft(original, original, nothingVaried), original);
   });
 });

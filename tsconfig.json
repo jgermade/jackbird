@@ -17,7 +17,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "jsx": "react-jsx",
     "types": [
       "vite/client"
     ],

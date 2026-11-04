@@ -5,21 +5,21 @@
 // - helpers/    may import helpers/ only, and no package.
 // - lib/        may import helpers/, lib/ and packages.
 // - components/ (src/ and theme/default/) may import helpers/, components/
-//               and the UI frameworks (react, jq79).
+//               and the UI framework (jq79).
 // - views/      may import anything.
 //
 // `src/types.ts` (types only) may be imported from anywhere, and so may any
 // `import type`, which is erased before anything runs. Tests (*.test.ts and
 // *.test-support.ts) may also import Node's built-ins (`node:…`).
-// Files outside the four layers (entry points, src/services/ until it moves
-// to lib/, the theme demo) are not checked.
+// Files outside the four layers (the entry point, the theme demo) are not
+// checked.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const FRAMEWORKS = new Set(["react", "react-dom", "jq79"]);
+const FRAMEWORKS = new Set(["jq79"]);
 const SOURCE = /\.(ts|tsx|mts|js|mjs|html)$/;
 
 const LAYERS = [

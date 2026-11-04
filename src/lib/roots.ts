@@ -64,7 +64,6 @@ export async function hydrateRoot(
       selectedTrackId: null,
       selectedTrackIds: [],
       selectionAnchorTrackId: null,
-      draft: emptyMetadata(),
       loadingMetadata: true, // walk is pending
       loadedCount: initialTracks.length,
       groupingMode,
@@ -395,8 +394,7 @@ export function showQueueInLibrary(): void {
             selectedTrackId: null,
             selectedTrackIds: queue.trackIds,
             selectionAnchorTrackId: null,
-            activeRowKey: null,
-            draft: emptyMetadata()
+            activeRowKey: null
           }
         : root
     )

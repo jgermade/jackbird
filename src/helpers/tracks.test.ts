@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
-import { collectFolderPaths, inferDiscNumber, orderDetailPlaylist, trackNumberOrder } from "./tracks.ts";
+import { collectFolderPaths, inferDiscNumber, orderDetailPlaylist, trackNumberOrder, tracksToVerify, VERIFICATION_TTL_MS } from "./tracks.ts";
 
 describe("inferDiscNumber", () => {
   it("reads the disc from a CD or Disc folder, in any case and separator", () => {
@@ -83,5 +83,44 @@ describe("collectFolderPaths", () => {
 
   it("has nothing for tracks at the root", () => {
     assert.deepEqual(collectFolderPaths([track("01.mp3")]), []);
+  });
+});
+
+describe("tracksToVerify", () => {
+  const now = Date.parse("2026-11-04T12:00:00Z");
+  const at = (msAgo: number): string => new Date(now - msAgo).toISOString();
+  const verified = (path: string, audioChecksum: string | undefined, lastVerifiedAt: string | undefined) => ({ ...track(path), audioChecksum, lastVerifiedAt });
+
+  it("leaves out tracks verified within the last day", () => {
+    const fresh = verified("fresh.mp3", "a", at(VERIFICATION_TTL_MS - 1));
+    assert.deepEqual(tracksToVerify([fresh], now), []);
+  });
+
+  it("keeps stale tracks, and those missing a checksum or a date", () => {
+    const stale = verified("stale.mp3", "a", at(VERIFICATION_TTL_MS + 1));
+    const noChecksum = verified("no-checksum.mp3", undefined, at(1000));
+    const noDate = verified("no-date.mp3", "a", undefined);
+    assert.deepEqual(tracksToVerify([stale, noChecksum, noDate], now).map((one) => one.id).sort(), ["no-checksum.mp3", "no-date.mp3", "stale.mp3"]);
+  });
+
+  it("puts tracks with no audio checksum first, then the oldest verification first", () => {
+    const old = verified("old.mp3", "a", at(10 * VERIFICATION_TTL_MS));
+    const older = verified("older.mp3", "a", at(20 * VERIFICATION_TTL_MS));
+    const never = verified("never.mp3", "a", undefined);
+    const bare = verified("bare.mp3", undefined, undefined);
+    const bareRecent = verified("bare-recent.mp3", undefined, at(1000));
+    assert.deepEqual(tracksToVerify([old, bareRecent, older, never, bare], now).map((one) => one.id), [
+      "bare.mp3",
+      "bare-recent.mp3",
+      "never.mp3",
+      "older.mp3",
+      "old.mp3"
+    ]);
+  });
+
+  it("does not reorder the list it is given", () => {
+    const list = [verified("b.mp3", "a", undefined), verified("a.mp3", undefined, undefined)];
+    tracksToVerify(list, now);
+    assert.deepEqual(list.map((one) => one.id), ["b.mp3", "a.mp3"]);
   });
 });

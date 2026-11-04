@@ -58,3 +58,24 @@ export function getVariedFields(tracks: Mp3Track[]): VariedFields {
     coverDataUrl: differs("coverDataUrl")
   };
 }
+
+/**
+ * One track's tags after a batch edit: the draft's, except that a field the
+ * selection varied in and the draft left empty keeps the track's own value,
+ * and so does a varied cover the draft left unset. With one track, nothing
+ * varies and the draft is taken whole.
+ */
+export function mergeDraft(original: TrackMetadata, draft: EditableMetadata, varied: VariedFields): TrackMetadata {
+  const text = (field: Exclude<keyof TrackMetadata, "coverDataUrl">): string =>
+    varied[field] && !draft[field] ? original[field] : draft[field];
+
+  return {
+    title: text("title"),
+    artist: text("artist"),
+    album: text("album"),
+    year: text("year"),
+    genre: text("genre"),
+    trackNumber: text("trackNumber"),
+    coverDataUrl: varied.coverDataUrl && draft.coverDataUrl === null ? original.coverDataUrl : draft.coverDataUrl
+  };
+}

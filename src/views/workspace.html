@@ -2,9 +2,9 @@
   // The body under the faceplate: the library pane and the album sheet. Side
   // by side on wider screens, each scrolling on its own. On phones each pane
   // fills the screen below the faceplate and they sit in a row that snaps:
-  // a horizontal swipe moves from one to the other, and a small selector
-  // shows which one is in view and jumps to the other. Escape clears the
-  // selection when no dialog is open. See
+  // a horizontal swipe moves from one to the other, and a small selector in
+  // a footer, always at the bottom, shows which one is in view and jumps to
+  // the other. Escape clears the selection when no dialog is open. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
 
   const Library = await import("./library.html")
@@ -39,14 +39,14 @@
 </script>
 
 <div class="workspace">
-  <nav class="pager" :aria-label="t('panels.label')">
-    <KeySelect :label="t('panels.label')" :model="panel" @change="show($event.detail)"
-               :options="[{ value: 'library', label: t('library.title') }, { value: 'details', label: t('panels.details') }]" />
-  </nav>
   <div class="panes" @scroll="track($event)">
     <div class="pane tree-pane"><Library /></div>
     <div class="pane sheet-pane"><AlbumSheet /></div>
   </div>
+  <nav class="pager" :aria-label="t('panels.label')">
+    <KeySelect :label="t('panels.label')" :model="panel" @change="show($event.detail)"
+               :options="[{ value: 'library', label: t('library.title') }, { value: 'details', label: t('panels.details') }]" />
+  </nav>
 </div>
 
 <style scoped>
@@ -76,8 +76,8 @@
       display: flex;
       flex: none;
       justify-content: center;
-      padding: var(--mm-space-2) var(--mm-space-3);
-      border-bottom: var(--mm-border-width) solid var(--mm-border);
+      padding: var(--mm-space-2) var(--mm-space-3) max(var(--mm-space-2), env(safe-area-inset-bottom));
+      border-top: var(--mm-border-width) solid var(--mm-border);
       background: var(--mm-surface);
     }
     .panes {

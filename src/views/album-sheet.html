@@ -12,13 +12,13 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying } = await import("../lib/player")
+  const { openEditor } = await import("../lib/editor")
   const { openFolder } = await import("../lib/roots")
   const {
     activeRoot,
     clearSelection,
     detail,
     detailAlbums,
-    openEditor,
     playFromDetail,
     removeSelectedTracks,
     selectTrack,
@@ -87,9 +87,8 @@
       <article :each="album in albums()" :key="album.key" class="album">
         <div class="cover">
           <img :if="album.coverDataUrl" :src="album.coverDataUrl" :alt="t('album.coverOf', { title: album.title })" />
-          <div :else class="no-cover">
+          <div :else class="no-cover" aria-hidden="true">
             <span class="band"><Stripes variant="band" /></span>
-            <span class="mm-legend">{{ t("album.noCover") }}</span>
           </div>
         </div>
         <div class="album-body">
@@ -194,9 +193,8 @@
   }
   .cover { width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
-  .no-cover { position: relative; display: grid; place-items: end start; height: 100%; padding: var(--mm-space-2); background: var(--mm-display-bezel); }
+  .no-cover { position: relative; height: 100%; background: var(--mm-display-bezel); }
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
-  .no-cover .mm-legend { position: relative; color: var(--mm-chassis-hi); }
   .album-body { display: grid; align-content: start; gap: var(--mm-space-2); min-width: 0; }
   .album-body h3 { font-size: var(--mm-text-xl); }
   .artist { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }

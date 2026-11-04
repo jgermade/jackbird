@@ -8,7 +8,6 @@ export const es: Record<MessageKey, string> = {
   "app.name": "jackbird",
   "language.self": "Español",
 
-  "common.close": "Cerrar",
   "common.none": "-",
 
   "picker.scanning": "Escaneando...",
@@ -35,8 +34,6 @@ export const es: Record<MessageKey, string> = {
   "panels.details": "Detalle",
   "tree.loadingLibrary": "Cargando biblioteca...",
   "tree.empty": "Sin pistas en este root.",
-  "tree.expand": "Expandir {name}",
-  "tree.collapse": "Colapsar {name}",
   "tree.loadingMetadata": "Cargando metadatos…",
   "tree.renameTitle": "Renombrar (patrón pendiente de definir)",
   "tree.rename": "Renombrar pista",
@@ -57,7 +54,6 @@ export const es: Record<MessageKey, string> = {
   "tracks.count.one": "{count} pista",
   "tracks.count.other": "{count} pistas",
   "album.coverOf": "Carátula de {title}",
-  "album.noCover": "Sin carátula",
   "album.untitled": "Sin álbum",
   "album.unknownArtist": "Artista desconocido",
   "album.disc": "Disco {number}",
@@ -84,11 +80,9 @@ export const es: Record<MessageKey, string> = {
   "faceplate.roots": "Roots abiertas",
 
   "playback.label": "Reproductor de lista",
-  "playback.defaultSource": "Lista",
   "playback.previous": "Pista anterior",
   "playback.next": "Pista siguiente",
   "playback.returnTo": "Volver a {source}, pista {position} de {total}",
-  "playback.loading": "Cargando...",
   "playback.loadFailed": "No se pudo cargar el audio.",
   "playback.folderGone": "La carpeta de la lista de reproducción ya no está disponible.",
 
@@ -99,8 +93,6 @@ export const es: Record<MessageKey, string> = {
   "field.genre": "Género",
   "field.track": "Pista",
 
-  "editor.details": "Detalles",
-  "editor.empty": "Selecciona una pista para ver su ficha y editar metadatos.",
   "editor.variousArtists": "(Varios artistas)",
   "editor.sharedArtist": "Artista común",
   "editor.cover": "Carátula",
@@ -113,7 +105,6 @@ export const es: Record<MessageKey, string> = {
   "editor.size": "Tamaño",
   "editor.checksum": "Checksum",
   "editor.pending": "Pendiente",
-  "editor.editMetadata": "Editar metadatos",
   "editor.cancel": "Cancelar",
   "editor.saving": "Guardando...",
   "editor.save": "Guardar cambios",
@@ -126,7 +117,6 @@ export const es: Record<MessageKey, string> = {
 
   "cover.readFailed": "No se pudo leer la imagen.",
   "cover.dropHere": "Arrastra una imagen aquí",
-  "cover.change": "Cambiar carátula",
   "cover.choose": "Elegir imagen",
   "cover.remove": "Quitar",
 
@@ -146,8 +136,6 @@ export const es: Record<MessageKey, string> = {
   "preferences.appearance": "Apariencia",
   "preferences.darkOn": "Tema oscuro activo",
   "preferences.lightOn": "Tema claro activo",
-  "preferences.useLight": "Usar tema claro",
-  "preferences.useDark": "Usar tema oscuro",
   "preferences.language": "Idioma",
   "preferences.languageHint": "Idioma de la interfaz. Donde falte una traducción, se muestra en inglés.",
 

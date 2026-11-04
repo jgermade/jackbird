@@ -3,7 +3,8 @@
 What is planned, in order. The reasoning lives in
 [RECORD/2026-11-03.deck-design-system.WIP.md](../../RECORD/2026-11-03.deck-design-system.WIP.md).
 Rewritten the same day the UI moved to jq79: the theme was first built in React (done, then
-superseded), and the screens now move to jq79 views one at a time.
+superseded), and the screens moved to jq79 views one at a time. The last two steps, the dialogs
+and the clean-up, were done as one block on 2026-11-04.
 
 ```mermaid
 gantt
@@ -19,9 +20,9 @@ gantt
   section Screens in jq79
     Faceplate                          :done, face, after stores, 1d
     Library                            :done, lib, after face, 1d
-    Modals and forms                   :forms, after lib, 2d
+    Modals and forms                   :done, forms, after lib, 1d
   section Clean-up
-    Remove React and old styles        :clean, after forms, 1d
+    Remove React and old styles        :done, clean, 2026-11-04, 1d
 ```
 
 | Step | Scope | Done when |

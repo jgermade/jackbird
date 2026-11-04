@@ -6,8 +6,9 @@ Check [THESAURUS.md](THESAURUS.md)
 
 ### Layers
 
-The UI is moving from React to [jq79](https://github.com/jgermade/jq79) components, one screen
-at a time. Code lives in four layers, and an import that crosses them the wrong way fails
+The UI is built with [jq79](https://github.com/jgermade/jq79) components, and nothing else: no
+other UI framework, and no app-wide stylesheet (each view and component styles itself over the
+Deck theme's tokens). Code lives in four layers, and an import that crosses them the wrong way fails
 `npm test` (`scripts/check-layers.mjs`; `import type` is exempt, since it is erased, and so are
 assets such as styles, fonts and images):
 
@@ -33,8 +34,6 @@ jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.m
   `src/lib/workspace.ts` does.
 - A derived value that holds nested objects is handed out boxed (`Opaque`) and read through
   functions in views, never copied into a component's store with `$:`.
-- Until `src/styles.css` is gone, a class used in a jq79 view must not also be a selector there:
-  scoped styles do not keep a global stylesheet out.
 
 ### Sizes
 
