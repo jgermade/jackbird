@@ -58,9 +58,6 @@ export const es: Record<MessageKey, string> = {
   "album.unknownArtist": "Artista desconocido",
   "album.disc": "Disco {number}",
   "album.play": "Reproducir {title}",
-  "album.pause": "Pausar {title}",
-  "album.playFromHere": "Reproducir desde esta pista",
-  "album.pauseShort": "Pausar",
 
   "faceplate.transport": "Transporte",
   "faceplate.play": "Reproducir",

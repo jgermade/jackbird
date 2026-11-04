@@ -6,6 +6,7 @@
   playing = false,
   playingActive = false,
   focusable = false,
+  selectable = false,
   current = false,
   rowId = '',
   lead = '',
@@ -21,7 +22,10 @@
   //
   // A click emits `select` (the native event as `$event.detail`, for its
   // modifier keys), a double click `activate`, and a click on a folder's
-  // caret `toggle` instead of `select`. The row being played shows moving
+  // caret `toggle` instead of `select`. A `selectable` item shows a
+  // `SelectBox` in place of its glyph, for a list whose click does something
+  // else (plays): a click on the box emits `pick` (the native event as
+  // `$event.detail`) instead of `select`. The row being played shows moving
   // bars in place of `meta`. `focusable` puts it in the tab order. `chosen`
   // is its selection (not `selected`, which jq79 keeps for an `<option>`'s
   // own state and ignores on a component tag). `current` marks the row the
@@ -32,7 +36,7 @@
   // (a touch screen); give it `@click.stop` so it does not also select the
   // row.
   //
-  // **Part of the default theme**: imports `EqBars`, and draws only with
+  // **Part of the default theme**: imports `EqBars` and `SelectBox`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
   type Props = {
@@ -43,6 +47,7 @@
     playing?: boolean | ""
     playingActive?: boolean | ""
     focusable?: boolean | ""
+    selectable?: boolean | ""
     current?: boolean | ""
     rowId?: string
     lead?: string | number
@@ -51,9 +56,11 @@
   }
 
   const EqBars = await import("./eq-bars.html")
+  const SelectBox = await import("./select-box.html")
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: isFolder = kind === "folder"
+  $: isPickable = !isFolder && flag(selectable)
   $: level = Math.max(0, Number(depth) || 0)
 
   const caret = (event: MouseEvent) => {
@@ -82,6 +89,7 @@
   </span>
   <span class="icon">
     <svg :if="isFolder" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4.2l1.4 1.6h7.4v8.4h-13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
+    <SelectBox :elseif="isPickable" :chosen="flag(chosen)" @pick="$emit('pick', $event.detail)" />
     <svg :else viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
   </span>
   <span class="label"><span :if="lead !== '' && lead !== undefined && lead !== null" class="lead">{{ lead }}</span>{{ label }}</span>

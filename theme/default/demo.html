@@ -19,6 +19,7 @@
   const Panel = await import("./components/panel.html")
   const Reel = await import("./components/reel.html")
   const Select = await import("./components/select.html")
+  const SelectBox = await import("./components/select-box.html")
   const SlideSwitch = await import("./components/slide-switch.html")
   const Stripes = await import("./components/stripes.html")
   const Tabs = await import("./components/tabs.html")
@@ -186,9 +187,15 @@
   const toggleTrack = (at: number) => {
     selected = selected.includes(at) ? selected.filter((one) => one !== at) : [...selected, at]
   }
-  const pickRow = (node: TreeNode) => {
+  // A click plays a track (the second click of a double click is not
+  // another one) and opens or closes a folder; the box selects.
+  const pickRow = (node: TreeNode, event: MouseEvent) => {
+    if (event?.detail > 1) return
     if (node.track === undefined) toggleFolder(node.id)
-    else toggleTrack(node.track)
+    else playTrack(node.track)
+  }
+  const playRow = (at: number, event: MouseEvent) => {
+    if (event.detail <= 1) playTrack(at)
   }
   const playSelection = () => { if (selected.length > 0) playTrack(Math.min(...selected)) }
 
@@ -544,7 +551,7 @@
   <section class="section" aria-labelledby="h-context">
     <div class="head">
       <h2 id="h-context">In context</h2>
-      <p>Tabs, ListRow and a table as the library and album sheet. Example data; double-click a track to play it.</p>
+      <p>Tabs, ListRow and a table as the library and album sheet. Example data; click a track to play it, and its SelectBox to select it.</p>
     </div>
     <div class="app">
       <Tabs label="Open folders" :items="roots" :model="activeRoot" closable @close="closeRoot($event.detail)" />
@@ -569,9 +576,10 @@
                      :playing="node.track === index"
                      :playing-active="playing"
                      :focusable="node.id === 'miles'"
-                     @select="pickRow(node)"
-                     @toggle="toggleFolder(node.id)"
-                     @activate="node.track !== undefined && playTrack(node.track)" />
+                     :selectable="node.track !== undefined"
+                     @select="pickRow(node, $event.detail)"
+                     @pick="toggleTrack(node.track)"
+                     @toggle="toggleFolder(node.id)" />
           </div>
         </aside>
 
@@ -603,14 +611,15 @@
           <div class="tracks mm-table-wrap">
             <table class="mm-table" :aria-label="`${ALBUM.title} tracks`">
               <thead>
-                <tr><th>#</th><th>Title</th><th>Artist</th><th class="mm-end">Time</th></tr>
+                <tr><th></th><th>#</th><th>Title</th><th>Artist</th><th class="mm-end">Time</th></tr>
               </thead>
               <tbody>
                 <tr :each="song, at in TRACKS"
                     :key="song.n"
                     :aria-selected="String(selected.includes(at))"
                     :data-playing="String(at === index)"
-                    @click="toggleTrack(at)">
+                    @click="playRow(at, $event)">
+                  <td class="pick"><SelectBox :chosen="selected.includes(at)" @pick="toggleTrack(at)" /></td>
                   <td class="mm-num">{{ song.n }}</td>
                   <td><span class="mm-title"><EqBars :if="at === index" :active="playing" />{{ song.title }}</span></td>
                   <td>{{ ALBUM.artist }}</td>
@@ -870,6 +879,8 @@
   .jcard p { margin: 0 0 var(--mm-space-3); color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
   .tracks { padding: 0 var(--mm-space-5) var(--mm-space-5); }
   .tracks table { min-width: 28.75rem; }
+  .tracks tr { cursor: pointer; user-select: none; }
+  .tracks .pick { width: 1%; padding-right: 0; }
 
   .foot { padding-block: var(--mm-space-7) var(--mm-space-8); border-top: var(--mm-border-width) solid var(--mm-border); color: var(--mm-fg-muted); }
 

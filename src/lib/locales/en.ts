@@ -57,9 +57,6 @@ export const en = {
   "album.unknownArtist": "Unknown artist",
   "album.disc": "Disc {number}",
   "album.play": "Play {title}",
-  "album.pause": "Pause {title}",
-  "album.playFromHere": "Play from this track",
-  "album.pauseShort": "Pause",
 
   "faceplate.transport": "Transport",
   "faceplate.play": "Play",

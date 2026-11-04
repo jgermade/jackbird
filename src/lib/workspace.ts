@@ -98,9 +98,10 @@ function clearedSelection(root: RootWorkspace): RootWorkspace {
 }
 
 /**
- * A click on a track: `toggle` (plain) adds or removes it, `range` (Shift)
- * selects from the anchor to it, in the tree's order. It becomes the active
- * row.
+ * A click on a track's box: `toggle` (plain) adds or removes it, `range`
+ * (Shift) selects from the anchor to it, in the tree's order. It does not
+ * move the current row: selecting in the album sheet leaves what the sheet
+ * shows alone.
  */
 export function selectTrack(trackId: string, mode: "toggle" | "range" = "toggle"): void {
   const root = current();
@@ -112,40 +113,44 @@ export function selectTrack(trackId: string, mode: "toggle" | "range" = "toggle"
 
   updateActive((item) => {
     const { selected, anchor } = nextSelection({ selected: item.selectedTrackIds, anchor: item.selectionAnchorTrackId }, trackId, mode, order);
-    const single = selected.length === 1;
-    const activeTrackId = single ? selected[0] : trackId;
     return {
       ...item,
-      selectedTrackId: single ? activeTrackId : null,
+      selectedTrackId: selected.length === 1 ? selected[0] : null,
       selectedTrackIds: [...selected],
-      selectionAnchorTrackId: anchor,
-      activeRowKey: `track:${activeTrackId}`
+      selectionAnchorTrackId: anchor
     };
   });
   library.infoMessage = null;
   library.errorMessage = null;
 }
 
-/** Makes a tree row the active one: a folder scopes the album sheet, a track is selected alone. */
-export function selectTreeRow(rowKey: string): void {
-  updateActive((root) => ({ ...clearedSelection(root), activeRowKey: rowKey }));
-  const row = derive().rows.find((item) => item.key === rowKey);
-  if (row?.kind === "track" && row.trackId) {
-    selectTrack(row.trackId);
-  }
+/**
+ * Makes a tree row the current one, the row the keyboard is on: a folder
+ * scopes the album sheet, a track shows its folder. The selection stays.
+ */
+export function setCurrentRow(rowKey: string): void {
+  updateActive((root) => (root.activeRowKey === rowKey ? root : { ...root, activeRowKey: rowKey }));
 }
 
-/** An arrow key on the tree. True when the tree took it, so the view can stop the page scrolling. */
-export function navigateTree(key: string): boolean {
+/**
+ * A key on the tree: the arrows move and open or close folders, Enter plays
+ * the current row, Space picks the current track (Shift: up to it). True when
+ * the tree took it, so the view can stop the page scrolling.
+ */
+export function navigateTree(key: string, shiftKey = false): boolean {
   const root = current();
   const rows = derive().rows;
-  const action = treeKeyAction(rows, root?.activeRowKey ?? null, key);
+  const action = treeKeyAction(rows, root?.activeRowKey ?? null, key, shiftKey);
   if (action && "toggle" in action) {
     toggleFolder(action.toggle);
+  } else if (action && "move" in action) {
+    setCurrentRow(action.move);
+  } else if (action && "play" in action) {
+    playFromTree(action.play);
   } else if (action) {
-    selectTreeRow(action.select);
+    selectTrack(action.pick, action.range ? "range" : "toggle");
   }
-  return rows.length > 0 && key.startsWith("Arrow");
+  return rows.length > 0 && (key.startsWith("Arrow") || key === " " || key === "Enter");
 }
 
 export function clearSelection(): void {
