@@ -97,7 +97,9 @@
     </div>
   </div>
 
-  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
+  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
+        :add-label="folderLabel" :add-disabled="library.loading" @add="openFolder()"
+        @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
       <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
       <span class="open-folder" :class.has-roots="hasRoots">
@@ -218,11 +220,12 @@
     .logo { height: 2.25rem; }
   }
   /* Phones: the keys go to the footer and the panel selector takes their place;
-     the folder key is its + alone, and the selection's key its count. */
+     once a root is open, adding another is an option of the root picker, and
+     the selection's key is its count. */
   @media (max-width: 720px) {
     .controls { display: none; }
     .pane-pick { display: flex; }
-    .has-roots .folder-text { display: none; }
+    .open-folder.has-roots { display: none; }
     .count-wide { display: none; }
     .count-narrow { display: inline; }
   }

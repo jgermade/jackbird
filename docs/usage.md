@@ -14,8 +14,9 @@ your changes.
 
 Each folder you open is a **root**, shown as a tab with its number of tracks. You can keep several
 open at once with **+ Folder**, switch between them with their tabs, and close one with its ×. On a
-phone only the open root's tab shows, with a ⌄: tap it to pick another root from its list; its ×
-closes it, and **+** adds one.
+phone only the open root's tab shows, with a ⌄: tap it for the list of roots. Pick one to switch
+to it, close the open one with the × beside it in the list, or open another with **Add a folder**,
+at the end of the list.
 
 jackbird reads every `.mp3` file in the folder and its subfolders. The first time, it reads all of
 their tags. It then keeps what it learned in `.meta/mp3-manager.json` inside the folder, so the
