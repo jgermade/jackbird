@@ -6,6 +6,7 @@
 
   const EqBars = await import("../../theme/default/components/eq-bars.html")
   const Key = await import("../../theme/default/components/key.html")
+  const Menu = await import("../../theme/default/components/menu.html")
   const SelectBox = await import("../../theme/default/components/select-box.html")
   const Stripes = await import("../../theme/default/components/stripes.html")
 
@@ -13,6 +14,7 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying } = await import("../lib/player")
+  const { onTrackMenu, trackMenu } = await import("../lib/menus")
   const { openFolder } = await import("../lib/roots")
   const { activeRoot, detail, detailAlbums, playFromDetail, selectTrack, selectTracks } = await import("../lib/workspace")
   const { chosenState } = await import("../helpers/selection")
@@ -46,7 +48,7 @@
   // or resumes); the second click of a double click is not another one. The
   // box at its left, or the cell around it, selects it. Keys: Enter plays,
   // Space selects, Shift+Space selects up to it. The row ends in a cue: ▶ on
-  // hover, the moving bars on the track playing.
+  // hover, the moving bars on the track playing; then its menu (⋮).
   const play = (track: Track, event: MouseEvent) => {
     if (event.detail <= 1) playFromDetail(track.id)
   }
@@ -130,6 +132,9 @@
                       <EqBars :if="track.id === playingId()" :active="playback.playing" />
                       <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
                     </td>
+                    <td class="menu-cell">
+                      <Menu :label="t('menu.track', { title: titleOf(track) })" :items="trackMenu(track.id, 'sheet')" @select="onTrackMenu(track.id, $event.detail)" />
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -207,10 +212,15 @@
   .mm-table .pick-cell { width: 1%; padding-right: 0; }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   .mm-table .cue-cell { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
+  .mm-table .menu-cell { width: 1%; padding-block: 0; padding-left: 0; line-height: 0; }
+  /* The menu shows as the cue does: on hover, focus, the selected and playing rows; always on a touch screen. */
+  .menu-cell > * { opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .mm-table tr:focus-within .menu-cell > *, .mm-table tr[aria-selected="true"] .menu-cell > *, .mm-table tr[data-playing="true"] .menu-cell > * { opacity: 1; }
+  @media (hover: hover) { .mm-table tr:hover .menu-cell > * { opacity: 1; } }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
   .mm-table tr:focus-visible .cue-play { opacity: 1; }
   @media (hover: hover) { .mm-table tr:hover .cue-play { opacity: 1; } }
-  @media (hover: none) { .cue-play { opacity: 1; } }
+  @media (hover: none) { .cue-play, .menu-cell > * { opacity: 1; } }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }

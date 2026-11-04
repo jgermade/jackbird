@@ -14,7 +14,7 @@ import { buildWizardRows, treeKeyAction } from "../helpers/tree";
 import type { Mp3Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
-import { dropFromQueue, nowPlaying, playQueue, togglePlay } from "./player";
+import { addToQueue, dropFromQueue, nowPlaying, playNext, playQueue, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
 
@@ -242,7 +242,68 @@ export function playFromTree(rowKey: string): void {
   }
 }
 
-/** The per-track rename key: a placeholder until the naming pattern exists. */
-export function consolidateTrack(): void {
-  library.infoMessage = t("message.consolidatePending");
+/**
+ * What a track's menu acts on: the selection, in the order it plays, when
+ * the track is in it; else the track alone.
+ */
+export function menuTargets(trackId: string): string[] {
+  const root = current();
+  if (!root || !root.selectedTrackIds.includes(trackId)) {
+    return [trackId];
+  }
+  const chosen = new Set(root.selectedTrackIds);
+  return orderDetailPlaylist(root.tracks.filter((track) => chosen.has(track.id))).map((track) => track.id);
+}
+
+/** How many tracks a track's menu acts on (see menuTargets). */
+export function menuTargetCount(trackId: string): number {
+  const root = current();
+  return root?.selectedTrackIds.includes(trackId) ? root.selectedTrackIds.length : 1;
+}
+
+function queue(tracks: Mp3Track[], label: string, where: "next" | "end"): void {
+  const root = current();
+  if (!root || tracks.length === 0) {
+    return;
+  }
+  const items = tracks.map((track) => ({ rootId: root.id, trackId: track.id }));
+  if (where === "next") {
+    playNext(items, label);
+    library.infoMessage = tn("message.playNext", items.length, { title: label });
+  } else {
+    addToQueue(items, label);
+    library.infoMessage = tn("message.queued", items.length, { title: label });
+  }
+}
+
+/** Queues tracks of the active root (in the order they play), next or at the end. */
+export function queueTracks(trackIds: readonly string[], where: "next" | "end"): void {
+  const root = current();
+  if (!root) {
+    return;
+  }
+  const wanted = new Set(trackIds);
+  const tracks = orderDetailPlaylist(root.tracks.filter((track) => wanted.has(track.id)));
+  const label = tracks.length === 1 ? tracks[0].metadata.title || tracks[0].name : tn("tracks.count", tracks.length);
+  queue(tracks, label, where);
+}
+
+/** Queues a folder row's tracks, in the order the folder plays them, next or at the end. */
+export function queueFolder(rowKey: string, where: "next" | "end"): void {
+  const { root, rows } = derive();
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row || row.kind !== "album") {
+    return;
+  }
+  const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
+  queue(orderDetailPlaylist(scope.tracks), scope.label, where);
+}
+
+/** Makes a track the selection, unless it is in it already. */
+export function selectUnlessChosen(trackId: string): void {
+  const root = current();
+  if (!root || root.selectedTrackIds.includes(trackId)) {
+    return;
+  }
+  updateActive((item) => ({ ...item, selectedTrackId: trackId, selectedTrackIds: [trackId], selectionAnchorTrackId: trackId }));
 }

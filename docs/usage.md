@@ -86,6 +86,10 @@ when there is more than one folder.
 - **Show in library** opens the track playing in the library: its folders open in the tree and the
   right panel shows its folder.
 
+Tracks get into the queue from their menus (below): **Play next** puts them right after the one
+playing, **Add to queue** at the end. With nothing queued, they become the queue, the first one
+ready but paused: nothing starts by itself.
+
 Closing a folder takes its tracks out of the queue, and so does removing tracks from the library;
 if the one playing goes, the next one left plays. The queue comes back after a reload, without the
 tracks of folders that did not reopen.
@@ -99,6 +103,24 @@ with the music, from 40 Hz to 16 kHz, and fall still when it pauses.
 A track plays straight from its file, without being loaded into memory first. Saving its tags
 while it plays, or another program changing the file, does not stop it: it carries on from the
 same second.
+
+## Menus
+
+Every track and every folder has a menu behind its ⋮ key, at the end of its row: in the library
+when the pointer is over the row (always on a touch screen, and on the current, selected and
+playing rows), and on each track on the right.
+
+- **A track**: **Play next**, **Add to queue**, **Edit tags…**, **Info…** and **Remove from
+  library…** (the selection's dialog on that tab). On the right, also **Show in library**, which
+  opens the track in the tree. When the track is selected, the menu acts on the whole selection
+  and says how many tracks ("Add 3 tracks to queue"); when it is not, the dialog's items make it
+  the selection first.
+- **A folder**: **Play** (from its first track), **Play next**, **Add to queue** (its tracks, in
+  the order it plays them) and **Open in Details**.
+
+With the keyboard, **Tab** to a ⋮ key and press **Enter**: **Up**, **Down**, **Home** and **End**
+move through the menu, **Enter** chooses, **Escape** closes it. On a phone the menu opens as a
+sheet at the bottom of the screen. Queueing says what it did in the library's message line.
 
 ## Selecting tracks
 

@@ -360,11 +360,20 @@ if (audio) {
   nowPlaying.$on("value", (value: NowPlaying | null) => void load(value), { immediate: true });
 }
 
-/** Plays `queue` from its `index`-th track. */
+/**
+ * Plays `queue` from its `index`-th track; when that track is the one loaded
+ * (paused, say, after it was added to an empty queue), it resumes.
+ */
 export function playQueue(queue: PlaybackQueue, index: number): void {
   startPaused = null;
   playback.queue = queue;
   playback.index = index;
+  const item = queue.items[index];
+  if (audio && audio.src && audio.paused && item && keyOf(item) === loadedKey) {
+    void audio.play().catch((error: unknown) => {
+      playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
+    });
+  }
 }
 
 function position(): QueuePosition {

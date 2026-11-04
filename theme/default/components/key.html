@@ -7,7 +7,9 @@
   led = false,
   disabled = false,
   label = '',
-  title = ''
+  title = '',
+  popup = '',
+  expanded = null
 }: Props" lang="ts">
   // A key: the theme's button. It travels 1px down when pressed, and a
   // latching key (`pressed` given) stays down, with its LED lit if it has one.
@@ -22,7 +24,9 @@
   // **`click` is re-emitted**, with the native event as `$event.detail`: an
   // `@click` on a component tag hears the component's `$emit`, nothing else.
   // It is not emitted while disabled. `square` is for an icon alone, and then
-  // `label` is its accessible name.
+  // `label` is its accessible name. A key that opens something says so:
+  // `popup` (`menu`, `dialog`…) and `expanded` (whether it is open) become
+  // `aria-haspopup` and `aria-expanded`.
   //
   // **Part of the default theme**: imports only `Led`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -37,6 +41,8 @@
     disabled?: boolean | ""
     label?: string
     title?: string
+    popup?: string
+    expanded?: boolean | "" | null
   }
 
   const Led = await import("./led.html")
@@ -60,6 +66,8 @@
         :class.square="isSquare"
         :aria-pressed="latching ? String(isPressed) : null"
         :aria-label="label || null"
+        :aria-haspopup="popup || null"
+        :aria-expanded="expanded === null || expanded === undefined ? null : String(flag(expanded))"
         :title="title || null"
         :disabled="isDisabled"
         @click="press($event)">

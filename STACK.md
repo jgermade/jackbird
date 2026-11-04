@@ -126,6 +126,7 @@ mp3-manager/
 │       ├── editor.ts            # The metadata form; openEditor, saveEdits
 │       ├── player.ts            # The one Audio element; nowPlaying, the queue's actions and entries
 │       ├── opaque.ts            # Opaque: derived values handed to views boxed
+│       ├── menus.ts             # The rows' ⋮ menus: what a track's or folder's offers, and doing it
 │       ├── media.ts             # A track's file as a URL to play, without reading it
 │       ├── session.ts           # restoreSession, keepSessionSaved
 │       ├── rootSessionStore.ts  # IndexedDB persistence of open roots
@@ -139,7 +140,7 @@ mp3-manager/
 │   ├── fonts.css, fonts/        # Self-hosted woff2 + OFL licences
 │   ├── content.css              # Classes for plain markup (legend, table, display rows)
 │   ├── base.css                 # Box sizing; the body's ground, ink and type
-│   ├── components/*.html        # jq79: key, key-bank, display, meter, lamp, tabs, modal, …
+│   ├── components/*.html        # jq79: key, key-bank, display, meter, lamp, tabs, modal, menu, …
 │   └── index.html, demo.ts/.html # The demo page
 ├── crates/                      # Rust: jackbird's tag engine (Cargo.toml at the root is its workspace)
 │   ├── id3/                     # jackbird-id3: ID3v2 frames, text and picture codecs

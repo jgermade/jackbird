@@ -14,6 +14,7 @@
   const KeySelect = await import("./components/key-select.html")
   const Lamp = await import("./components/lamp.html")
   const ListRow = await import("./components/list-row.html")
+  const Menu = await import("./components/menu.html")
   const Meter = await import("./components/meter.html")
   const Modal = await import("./components/modal.html")
   const Panel = await import("./components/panel.html")
@@ -128,6 +129,7 @@
   // ---- specimens ---------------------------------------------------------------
 
   let latched: boolean = false
+  let chosen: string = "none"
   let groupBy: string = "album"
   let hold: boolean = true
 
@@ -412,6 +414,15 @@
             <div class="items">
               <Key led :pressed="latched" @click="latched = !latched">Loop</Key>
               <span class="state">pressed: {{ latched }}</span>
+            </div>
+          </div>
+          <div class="spec-row">
+            <span class="mm-legend">Menu · a key that opens a list</span>
+            <div class="items">
+              <Menu label="More for So What"
+                    :items="[{ id: 'next', label: 'Play next' }, { id: 'queue', label: 'Add to queue' }, { id: 'edit', label: 'Edit tags…', rule: true }, { id: 'remove', label: 'Remove from library…', danger: true, rule: true }]"
+                    @select="chosen = $event.detail" />
+              <span class="state">chosen: {{ chosen }}</span>
             </div>
           </div>
         </div>

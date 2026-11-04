@@ -112,8 +112,8 @@
   .row {
     display: grid;
     grid-template-columns: .875rem 1.125rem minmax(0, 1fr) auto;
-    /* The action slot and the cue, when there are, in the same row. */
-    grid-auto-columns: 1.5rem;
+    /* The action slot (as wide as its keys) and the cue, when there are, in the same row. */
+    grid-auto-columns: auto;
     grid-auto-flow: column;
     align-items: center;
     gap: var(--mm-space-2);
@@ -148,13 +148,13 @@
   .icon svg { width: 1rem; height: 1rem; }
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lead { display: inline-block; min-width: 1.5em; margin-right: var(--mm-space-2); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
-  .action { display: grid; place-items: center; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .action { display: flex; align-items: center; min-width: 1.5rem; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
   .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
   @media (hover: hover) { .row:hover .action { opacity: 1; } }
   .folder .label { font-weight: var(--mm-weight-bold); }
   .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; }
-  .cue { display: grid; place-items: center; }
+  .cue { display: grid; place-items: center; width: 1.5rem; }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
   @media (hover: hover) { .row:hover .cue-play { opacity: 1; } }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }

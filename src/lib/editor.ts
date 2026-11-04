@@ -15,7 +15,7 @@ import { library } from "./library";
 import { flushMeta } from "./meta";
 import { updateRoots } from "./roots";
 import { ui, type SelectionTab } from "./ui";
-import { activeRoot, selectedTracks } from "./workspace";
+import { activeRoot, selectUnlessChosen, selectedTracks } from "./workspace";
 
 /**
  * The form. Filled when the dialog opens and changed only by typing, so
@@ -42,6 +42,16 @@ export function openSelection(tab: SelectionTab = "edit"): void {
   library.errorMessage = null;
   ui.selectionTab = tab;
   ui.selectionOpen = true;
+}
+
+/**
+ * Opens the selection's dialog on `tab` from a track's menu: on the
+ * selection when the track is in it, else on that track alone, which becomes
+ * the selection.
+ */
+export function openSelectionFor(trackId: string, tab: SelectionTab): void {
+  selectUnlessChosen(trackId);
+  openSelection(tab);
 }
 
 export function closeSelection(): void {

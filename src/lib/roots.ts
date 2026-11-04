@@ -360,20 +360,15 @@ export function closeRoot(rootId: string): void {
 }
 
 /**
- * Opens the root of the track playing at that track: its folders open in the
- * tree and it becomes the current row, so the album sheet shows its folder.
- * The selection stays as it is.
+ * Opens a track's root at that track: its folders open in the tree and it
+ * becomes the current row, so the album sheet shows its folder. The
+ * selection stays as it is.
  */
-export function showQueueInLibrary(): void {
-  const playing = $toRaw(nowPlaying.value);
-  if (!playing) {
-    return;
-  }
-
-  library.activeRootId = playing.rootId;
+export function showInLibrary(rootId: string, trackId: string): void {
+  library.activeRootId = rootId;
   updateRoots((roots) =>
     roots.map((root) => {
-      const track = root.id === playing.rootId ? root.tracks.find((item) => item.id === playing.trackId) : undefined;
+      const track = root.id === rootId ? root.tracks.find((item) => item.id === trackId) : undefined;
       if (!track) {
         return root;
       }
@@ -384,4 +379,12 @@ export function showQueueInLibrary(): void {
       };
     })
   );
+}
+
+/** Opens the root of the track playing at that track (see showInLibrary). */
+export function showQueueInLibrary(): void {
+  const playing = $toRaw(nowPlaying.value);
+  if (playing) {
+    showInLibrary(playing.rootId, playing.trackId);
+  }
 }

@@ -5,6 +5,7 @@
 
   const Key = await import("../../theme/default/components/key.html")
   const ListRow = await import("../../theme/default/components/list-row.html")
+  const Menu = await import("../../theme/default/components/menu.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
 
@@ -14,10 +15,10 @@
   const { playback } = await import("../lib/playback")
   const { ui } = await import("../lib/ui")
   const { nowPlaying } = await import("../lib/player")
+  const { folderMenu, onFolderMenu, onTrackMenu, trackMenu } = await import("../lib/menus")
   const {
     activeRoot,
     collapseAllFolders,
-    consolidateTrack,
     expandAllFolders,
     navigateTree,
     playFromTree,
@@ -131,9 +132,8 @@
           <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
-          <Key :if="row.kind === 'track' && (isChosen(row) || isCurrent(row))" square size="sm" variant="ghost" :label="t('tree.rename')" :title="t('tree.renameTitle')" @click="consolidateTrack()">
-            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9z" /><path d="M8.35 4.15 11.85 7.65" stroke-linecap="round" /></svg>
-          </Key>
+          <Menu :if="row.kind === 'album'" :label="t('menu.folder', { title: rowLabel(row) })" :items="folderMenu()" @select="onFolderMenu(row.key, $event.detail)" />
+          <Menu :if="row.kind === 'track' && row.trackId" :label="t('menu.track', { title: rowLabel(row) })" :items="trackMenu(row.trackId, 'tree')" @select="onTrackMenu(row.trackId, $event.detail)" />
         </span>
       </template>
     </ListRow>
