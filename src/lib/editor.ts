@@ -20,7 +20,7 @@ import { activeRoot, selectedTracks } from "./workspace";
 /**
  * The form. Filled when the dialog opens and changed only by typing, so
  * nothing a background update writes to the roots resets what is being typed.
- * `confirmed` holds the varied fields whose "All" box is ticked while empty:
+ * `confirmed` holds the varied fields whose "Override" box is ticked while empty:
  * those are cleared on every track (see mergeDraft).
  */
 export const editor = $reactive({
@@ -48,7 +48,7 @@ export function closeSelection(): void {
   ui.selectionOpen = false;
 }
 
-/** The "All" box of a varied field: ticked, its value goes to every track; unticked, the field empties. */
+/** The "Override" box of a varied field: ticked, its value goes to every track; unticked, the field empties. */
 export function confirmField(field: string, on: boolean): void {
   const rest = editor.confirmed.filter((one) => one !== field);
   editor.confirmed = on ? [...rest, field] : rest;

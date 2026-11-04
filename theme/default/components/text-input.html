@@ -19,6 +19,9 @@
   //   <TextInput id="title" :model="title" placeholder="(Multiple values)" />
   //
   // The value goes up through `:model` on every keystroke, and as `input`.
+  // The `end` slot sits inside the field, at its right (a small checkbox,
+  // say): the well is then drawn around both, and lights while the input
+  // has the focus.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -47,6 +50,7 @@
   }
 </script>
 
+<span class="wrap" :class.has-end="$slots.end">
 <input class="input"
        :class.numeric="flag(numeric)"
        :type="type"
@@ -61,6 +65,8 @@
        :disabled="flag(disabled)"
        :readonly="flag(readonly)"
        @input="typed($event)">
+<span :if="$slots.end" class="end"><slot.end /></span>
+</span>
 
 <style scoped>
   .input {
@@ -85,4 +91,24 @@
   .input[aria-invalid="true"] { border-color: var(--mm-bad); }
   .input:disabled { background: var(--mm-sunken); color: var(--mm-fg-subtle); cursor: not-allowed; }
   .numeric { font-family: var(--mm-font-mono); font-variant-numeric: tabular-nums; }
+
+  /* Without an end slot the wrapper is not a box: the input is the field. */
+  .wrap { display: contents; }
+  .wrap.has-end {
+    display: flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    height: var(--mm-control-md);
+    padding-right: var(--mm-space-2);
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-field);
+    box-shadow: var(--mm-well-shadow);
+    transition: border-color var(--mm-duration) var(--mm-ease), box-shadow var(--mm-duration) var(--mm-ease);
+  }
+  .wrap.has-end:hover { border-color: var(--mm-border-strong); }
+  .wrap.has-end:focus-within { border-color: var(--mm-accent); box-shadow: var(--mm-well-shadow), 0 0 0 1px var(--mm-accent); }
+  .has-end .input { flex: 1 1 auto; min-width: 0; height: 100%; border: 0; background: transparent; box-shadow: none; }
+  .has-end .input:focus-visible { box-shadow: none; }
+  .end { display: flex; flex: none; align-items: center; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
 </style>

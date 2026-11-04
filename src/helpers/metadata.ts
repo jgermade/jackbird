@@ -62,7 +62,7 @@ export function getVariedFields(tracks: Mp3Track[]): VariedFields {
 /**
  * One track's tags after a batch edit: the draft's, except that a field the
  * selection varied in and the draft left empty keeps the track's own value,
- * unless that field is `confirmed` (the form's "All" box ticked on it): then
+ * unless that field is `confirmed` (the form's "Override" box ticked on it): then
  * the empty value is written, clearing it on every track. A varied cover the
  * draft left unset keeps the track's own too. With one track, nothing varies
  * and the draft is taken whole.

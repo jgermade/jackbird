@@ -165,7 +165,7 @@ mp3-manager/
   selects it (Shift-click for a range, Space and Shift+Space, Escape to clear).
 - The selection's key in the tab bar opens one dialog with Edit, Info and Danger tabs. The editor
   works on one track or many: a field that varies across the selection keeps each track's value
-  unless typed over or its "All" box is ticked (then even an empty value is written); cover art by
+  unless typed over or its "Override" box is ticked (then even an empty value is written); cover art by
   drag & drop or file choice. Danger removes the tracks from the library (not from disk).
 - Session restore on load: previously opened roots (with granted permission) reopen
   automatically, keeping the last active tab.

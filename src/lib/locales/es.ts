@@ -55,8 +55,8 @@ export const es: Record<MessageKey, string> = {
   "danger.body.other": "Las {count} pistas salen de la biblioteca. Sus archivos siguen en el disco, y vuelven la próxima vez que se abra la carpeta.",
   "danger.remove.one": "Quitar la pista",
   "danger.remove.other": "Quitar {count} pistas",
-  "editor.all": "Todas",
-  "editor.allTitle": "Aplicar a todas las pistas seleccionadas",
+  "editor.override": "Sobrescribir",
+  "editor.overrideTitle": "Aplicar a todas las pistas seleccionadas",
   "actions.edit": "Editar",
   "actions.clearSelection": "Deseleccionar todo",
 

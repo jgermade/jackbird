@@ -2,9 +2,9 @@
   // The selection's dialog: one dialog with three tabs in its header, opened
   // from the selection's key in the tab bar (on Edit) and switched without
   // losing what was typed. **Edit**: the cover and the six tags, a field the
-  // selection varies in saying "(Multiple values)" with an "All" box at its
-  // right (ticked, the value goes to every track, even an empty one; unticked,
-  // each track keeps its own), and the file's data for one track. **Info**:
+  // selection varies in saying "(Multiple values)" with an "Override" box
+  // inside it (ticked, the value goes to every track, even an empty one;
+  // unticked, each track keeps its own), and the file's data for one track. **Info**:
   // one track's tags, file and checksums, or a selection's totals and its
   // tracks. **Danger**: removing the tracks from the library. A view over
   // lib/editor.ts (the form, saving it) and the selection in
@@ -78,7 +78,7 @@
   }
   const placeholder = (field: FieldSpec): string =>
     varied()[field.key] ? t("editor.multipleValues") : "plain" in field ? field.example : t("editor.example", { value: field.example })
-  // A varied field's "All" box: ticked while it has text, or ticked on it empty.
+  // A varied field's "Override" box: ticked while it has text, or ticked on it empty.
   const isConfirmed = (field: FieldSpec): boolean => !!editor.form[field.key] || editor.confirmed.includes(field.key)
   const coverFailed = (message: string) => {
     library.errorMessage = message
@@ -145,18 +145,17 @@
         <div class="grid">
           <div :each="field in FIELDS" :key="field.key" class="cell" :class.wide="'wide' in field">
             <Field :label="t(field.label)" :control="`edit-${field.key}`">
-              <div class="with-all">
-                <span class="input">
-                  <TextInput :id="`edit-${field.key}`"
-                             :model="editor.form[field.key]"
-                             :placeholder="placeholder(field)"
-                             :numeric="'numeric' in field"
-                             :inputmode="field.key === 'year' ? 'numeric' : ''" />
-                </span>
-                <span :if="varied()[field.key]" class="all" :title="t('editor.allTitle')">
-                  <Checkbox :model="isConfirmed(field)" @change="confirmField(field.key, $event.detail)">{{ t("editor.all") }}</Checkbox>
-                </span>
-              </div>
+              <TextInput :id="`edit-${field.key}`"
+                         :model="editor.form[field.key]"
+                         :placeholder="placeholder(field)"
+                         :numeric="'numeric' in field"
+                         :inputmode="field.key === 'year' ? 'numeric' : ''">
+                <template :slot.end>
+                  <span :if="varied()[field.key]" class="override" :title="t('editor.overrideTitle')">
+                    <Checkbox :model="isConfirmed(field)" @change="confirmField(field.key, $event.detail)">{{ t("editor.override") }}</Checkbox>
+                  </span>
+                </template>
+              </TextInput>
             </Field>
           </div>
         </div>
@@ -258,10 +257,8 @@
   .tag-fields h4 { margin: 0; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mm-space-4) var(--mm-space-4); }
   .cell.wide { grid-column: 1 / -1; }
-  /* A varied field: its input, then the "All" box that confirms writing it to every track. */
-  .with-all { display: flex; align-items: center; gap: var(--mm-space-3); }
-  .with-all .input { flex: 1 1 auto; min-width: 0; }
-  .with-all .all { flex: none; font-size: var(--mm-text-sm); }
+  /* A varied field's "Override" box, inside the input at its right. */
+  .override { display: inline-flex; font-size: var(--mm-text-sm); }
   .file-data { border-top: var(--mm-border-width) solid var(--mm-border); padding-top: var(--mm-space-3); }
   .file-data summary { cursor: pointer; }
   .facts { display: grid; gap: var(--mm-space-2); margin: var(--mm-space-3) 0 0; }

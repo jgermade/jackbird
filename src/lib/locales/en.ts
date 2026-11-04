@@ -54,8 +54,8 @@ export const en = {
   "danger.body.other": "The {count} tracks leave the library. Their files stay on disk, and come back the next time the folder is opened.",
   "danger.remove.one": "Remove the track",
   "danger.remove.other": "Remove {count} tracks",
-  "editor.all": "All",
-  "editor.allTitle": "Apply to every selected track",
+  "editor.override": "Override",
+  "editor.overrideTitle": "Apply to every selected track",
   "actions.edit": "Edit",
   "actions.clearSelection": "Clear selection",
 

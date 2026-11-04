@@ -93,7 +93,7 @@ The Edit tab works on one track or on many. Its fields are **Title**, **Artist**
 **Year**, **Genre** and **Track**.
 
 With several tracks selected, a field they disagree on shows *(Multiple values)*, is empty, and has
-an **All** box at its right. Leave it empty and each track keeps its own value; type into it and the
+an **Override** box inside it, at its right. Leave it empty and each track keeps its own value; type into it and the
 box ticks itself: every track gets what you typed. Unticking the box empties the field again.
 Ticking it on the empty field clears that tag on every track. The cover works as before: leave it
 and each track keeps its own; drop or choose one and every track gets it.
