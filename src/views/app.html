@@ -1,12 +1,13 @@
 <script :setup lang="ts">
   // The app: the faceplate on top, the workspace in the rest of a full-height
   // column (each pane scrolls on its own, so the page never does), and the
-  // two dialogs: the selection's and the preferences. The page's title follows the language. See
+  // three dialogs: the selection's, the queue's and the preferences. The page's title follows the language. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
 
   const Faceplate = await import("./faceplate.html")
   const Workspace = await import("./workspace.html")
   const SelectionDialog = await import("./selection-dialog.html")
+  const QueueDialog = await import("./queue-dialog.html")
   const PreferencesDialog = await import("./preferences-dialog.html")
   const { t } = await import("../lib/i18n")
 
@@ -20,6 +21,7 @@
   <div class="top"><Faceplate /></div>
   <div class="body"><Workspace /></div>
   <SelectionDialog />
+  <QueueDialog />
   <PreferencesDialog />
 </main>
 

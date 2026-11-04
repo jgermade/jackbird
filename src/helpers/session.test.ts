@@ -64,21 +64,38 @@ describe("sameSession", () => {
 });
 
 describe("parsePlaybackState", () => {
-  const saved = { queue: { rootId: "1", trackIds: ["a.mp3", "b.mp3"], sourceLabel: "Jazz" }, index: 1, position: 12.5, playing: true };
+  const queue = { items: [{ rootId: "1", trackId: "a.mp3" }, { rootId: "2", trackId: "b.mp3" }], sourceLabel: "Jazz" };
+  const saved = { queue, index: 1, position: 12.5, playing: true };
 
   it("reads what was saved", () => {
     assert.deepEqual(parsePlaybackState(JSON.stringify(saved)), saved);
   });
 
+  it("reads a queue saved before queues spanned roots, as that root's tracks", () => {
+    const old = { queue: { rootId: "1", trackIds: ["a.mp3", "b.mp3"], sourceLabel: "Jazz" }, index: 1, position: 3, playing: false };
+    assert.deepEqual(parsePlaybackState(JSON.stringify(old)), {
+      queue: { items: [{ rootId: "1", trackId: "a.mp3" }, { rootId: "1", trackId: "b.mp3" }], sourceLabel: "Jazz" },
+      index: 1,
+      position: 3,
+      playing: false
+    });
+  });
+
   it("is null for nothing, broken JSON, or something that is not a saved playback", () => {
+    const old = { rootId: "1", trackIds: ["a.mp3"], sourceLabel: "Jazz" };
     assert.equal(parsePlaybackState(null), null);
     assert.equal(parsePlaybackState(""), null);
     assert.equal(parsePlaybackState("{"), null);
     assert.equal(parsePlaybackState("[]"), null);
+    assert.equal(parsePlaybackState("3"), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: null })), null);
-    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...saved.queue, trackIds: [] } })), null);
-    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...saved.queue, trackIds: [1] } })), null);
-    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...saved.queue, rootId: 1 } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, sourceLabel: 1 } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, items: [] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, items: [{ rootId: "1" }, { rootId: "2", trackId: "b" }] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, items: ["a"] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...old, trackIds: [] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...old, trackIds: [1] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...old, rootId: 1 } })), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, index: 2 })), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, index: -1 })), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, index: 0.5 })), null);

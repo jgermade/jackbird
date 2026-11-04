@@ -87,9 +87,14 @@ export type RootWorkspace = {
   activeRowKey: string | null;
 };
 
-/** What is playing: tracks of one root, in order, and where they came from. */
-export type PlaybackQueue = {
+/** One track of the queue: which open root it is in, and its id there. */
+export type QueueItem = {
   rootId: string;
-  trackIds: string[];
+  trackId: string;
+};
+
+/** What is playing: tracks of any open roots, in order, and where they came from. */
+export type PlaybackQueue = {
+  items: QueueItem[];
   sourceLabel: string;
 };

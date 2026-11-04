@@ -1,5 +1,5 @@
 <script :setup="{ place = 'header' }: Props" lang="ts">
-  // The deck's keys: the transport bank, the key back to the list playing,
+  // The deck's keys: the transport bank, the list key (the queue's dialog),
   // and the preferences key. In the faceplate's header (`place="header"`):
   // transport, list, preferences. In the phones' footer (`place="footer"`):
   // preferences, transport, list, spread across the bar. The markup follows
@@ -14,11 +14,10 @@
   const { t } = await import("../lib/i18n")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, next, previous, togglePlay } = await import("../lib/player")
-  const { showQueueInLibrary } = await import("../lib/roots")
   const { ui } = await import("../lib/ui")
 
   $: current = nowPlaying.value
-  $: returnLabel = current ? t("playback.returnTo", { source: current.sourceLabel, position: current.position, total: current.total }) : t("playback.label")
+  $: queueLabel = current ? t("queue.open", { source: current.sourceLabel || t("queue.title"), position: current.position, total: current.total }) : t("queue.title")
 </script>
 
 <div class="deck-keys" :class.footer="place === 'footer'">
@@ -39,7 +38,7 @@
       </Key>
     </KeyBank>
   </div>
-  <Key square :label="returnLabel" :title="returnLabel" :disabled="!current" @click="showQueueInLibrary()">
+  <Key square :label="queueLabel" :title="queueLabel" :disabled="!playback.queue" @click="ui.queueOpen = true">
     <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
   </Key>
   <Key :if="place !== 'footer'" square :label="t('preferences.open')" :title="t('preferences.title')" @click="ui.preferencesOpen = true">

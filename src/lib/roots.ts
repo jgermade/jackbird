@@ -12,8 +12,7 @@ import { t, tn } from "./i18n";
 import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
-import { playback } from "./playback";
-import { nowPlaying } from "./player";
+import { dropFromQueue, nowPlaying } from "./player";
 
 /** Replaces the roots with `update(current)`, as a setState updater would. */
 export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[]): void {
@@ -340,7 +339,10 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
   });
 }
 
-/** Closes a root; playback from it stops, and its neighbour becomes active. */
+/**
+ * Closes a root, and its neighbour becomes active. Its tracks leave the
+ * queue; if the one playing was one of them, the next one left plays.
+ */
 export function closeRoot(rootId: string): void {
   const { roots, activeRootId } = $toRaw(library);
   const index = roots.findIndex((root) => root.id === rootId);
@@ -348,10 +350,7 @@ export function closeRoot(rootId: string): void {
     return;
   }
 
-  if ($toRaw(playback).queue?.rootId === rootId) {
-    playback.queue = null;
-    playback.index = 0;
-  }
+  dropFromQueue((item) => item.rootId === rootId);
 
   const nextRoots = roots.filter((root) => root.id !== rootId);
   library.roots = nextRoots;

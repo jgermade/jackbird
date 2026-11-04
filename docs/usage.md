@@ -60,15 +60,35 @@ track-number order. On a computer, the cover stays in view while a long album's 
 ## Playing
 
 A click on a track, in the library or on the right, starts playback; a click on the track that is
-playing pauses it, and another resumes it. In both, the end of the row shows ▶ under the pointer,
-and moving bars on the track playing (still while it is paused). On the right, it plays the albums shown there, from
-that track. **Enter** does the same on the track you are on.
+playing pauses it, and another resumes it. In both, the end of the row shows ▶ under the pointer
+(always, on a touch screen), and moving bars on the track playing (still while it is paused). On
+the right, it plays the albums shown there, from that track. **Enter** does the same on the track
+you are on.
 
 At the top right, the transport keys go to the previous track, play or pause, and go to the next
-one. The list key (≡) beside them takes you back to the track that is playing, wherever you are
-in the library: its folders open in the tree and the right panel shows its folder; its tooltip
-says which list and which track. The gear key opens the preferences. On a phone these keys sit in
-a bar at the bottom: the gear, the transport keys, then the list key.
+one. The list key (≡) beside them opens the queue; its tooltip says where the queue comes from and
+which track of it is playing. The gear key opens the preferences. On a phone these keys sit in a
+bar at the bottom: the gear, the transport keys, then the list key.
+
+### The queue
+
+Playing a track queues its folder (or the albums on the right) from that track. The queue can hold
+tracks of every open folder: playing next and adding to the queue put tracks from anywhere right
+after the one playing, or at the end. Its dialog lists them in order: the ones already played are
+dimmed, the one playing is marked with its bars, and each folder's name follows its tracks' artist
+when there is more than one folder.
+
+- A click (or **Enter**) plays a track; on the one playing, it pauses or resumes.
+- The arrow keys of each track move it up or down, and × takes it out of the queue (not the one
+  playing). With the keyboard: **Up**, **Down**, **Home** and **End** go through the tracks,
+  **Alt+Up** and **Alt+Down** move the one you are on, and **Delete** takes it out.
+- **Clear upcoming** takes out everything after the track playing.
+- **Show in library** opens the track playing in the library: its folders open in the tree and the
+  right panel shows its folder.
+
+Closing a folder takes its tracks out of the queue, and so does removing tracks from the library;
+if the one playing goes, the next one left plays. The queue comes back after a reload, without the
+tracks of folders that did not reopen.
 
 The display shows the state (▶ playing, ❚❚ paused, ■ stopped), the title and artist, the time,
 and how far into the track it is.

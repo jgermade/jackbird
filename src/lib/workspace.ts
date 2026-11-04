@@ -6,6 +6,7 @@
 
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
+import { queueOf } from "../helpers/queue";
 import { detailScope, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
 import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
@@ -13,19 +14,13 @@ import { buildWizardRows, treeKeyAction } from "../helpers/tree";
 import type { Mp3Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
-import { nowPlaying, playQueue, togglePlay } from "./player";
+import { dropFromQueue, nowPlaying, playQueue, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
 
-/**
- * A derived value handed to views whole. jq79 passes class instances through
- * untouched, so the store that holds one never wraps it or compares it field
- * by field; a new box is simply a new value. Views read `.value.data` in their
- * bindings and never copy it into a store variable.
- */
-export class Opaque<T> {
-  constructor(readonly data: T) {}
-}
+import { Opaque } from "./opaque";
+
+export { Opaque };
 
 type Derived = {
   root: RootWorkspace | null;
@@ -198,6 +193,8 @@ export function removeSelectedTracks(): void {
     return;
   }
   const gone = new Set(root.selectedTrackIds);
+  // They leave the queue first (if the one playing goes, the next one plays), then the library.
+  dropFromQueue((item) => item.rootId === root.id && gone.has(item.trackId));
   updateActive((item) => ({ ...clearedSelection(item), tracks: item.tracks.filter((track) => !gone.has(track.id)) }));
   library.infoMessage = tn("message.removed", gone.size);
 }
@@ -217,7 +214,7 @@ export function playFromDetail(trackId: string): void {
   const trackIds = orderDetailPlaylist(scope.tracks).map((track) => track.id);
   const index = trackIds.indexOf(trackId);
   if (index !== -1) {
-    playQueue({ rootId: root.id, trackIds, sourceLabel: scope.label }, index);
+    playQueue(queueOf(root.id, trackIds, scope.label), index);
   }
 }
 
@@ -241,7 +238,7 @@ export function playFromTree(rowKey: string): void {
   const trackIds = orderDetailPlaylist(scope.tracks).map((track) => track.id);
   const index = row.kind === "track" && row.trackId ? trackIds.indexOf(row.trackId) : 0;
   if (trackIds.length > 0 && index !== -1) {
-    playQueue({ rootId: root.id, trackIds, sourceLabel: scope.label }, index);
+    playQueue(queueOf(root.id, trackIds, scope.label), index);
   }
 }
 

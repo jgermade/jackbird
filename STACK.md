@@ -59,7 +59,7 @@ This document describes the technical stack and codebase architecture implemente
   whenever they change; `src/lib/rootSessionStore.ts` keeps their handles and grouping mode in
   IndexedDB (`mp3-manager` database).
 - **State**: jq79 `$reactive` stores in `src/lib/`: `library` (roots, active root, loading and
-  saving flags, messages), `playback` (queue, position, playing), `ui` (open dialogs),
+  saving flags, messages), `playback` (the queue, of tracks of any open roots, position, playing), `ui` (open dialogs),
   `editor` (the metadata form) and `preferences` (theme and language, saved under the keys in
   `src/lib/storage.ts`). Derived values (`src/lib/workspace.ts`) are `$computed`.
 - **Languages**: English (source and fallback) and Spanish. `src/lib/i18n.ts` gives `t` and
@@ -103,7 +103,7 @@ mp3-manager/
 │   ├── html-modules.d.ts        # *.html imports are jq79 components
 │   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
 │   │                            # metadata, tracks, tree, snapshot, format, i18n,
-│   │                            # selection, scope, albums, session
+│   │                            # selection, scope, albums, session, queue, spectrum, id3v2
 │   ├── assets/brand/            # jackbird-metal.svg: the logo (faceplate, landing, favicon)
 │   ├── components/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove
@@ -116,6 +116,7 @@ mp3-manager/
 │   │   ├── library.html         # The tree, its head, messages and scan meter
 │   │   ├── album-sheet.html     # Landing, albums and discs
 │   │   ├── selection-dialog.html # The selection: Info, Edit and Delete tabs
+│   │   ├── queue-dialog.html    # The queue: play, move, remove, clear upcoming, show in library
 │   │   └── preferences-dialog.html # Tone and language
 │   └── lib/
 │       ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
@@ -123,7 +124,8 @@ mp3-manager/
 │       ├── roots.ts             # hydrateRoot, openFolder, selectRoot, closeRoot, …
 │       ├── workspace.ts         # The active root: tree, scope, selection, and actions
 │       ├── editor.ts            # The metadata form; openEditor, saveEdits
-│       ├── player.ts            # The one Audio element; nowPlaying, playQueue, next, …
+│       ├── player.ts            # The one Audio element; nowPlaying, the queue's actions and entries
+│       ├── opaque.ts            # Opaque: derived values handed to views boxed
 │       ├── media.ts             # A track's file as a URL to play, without reading it
 │       ├── session.ts           # restoreSession, keepSessionSaved
 │       ├── rootSessionStore.ts  # IndexedDB persistence of open roots
