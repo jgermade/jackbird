@@ -71,12 +71,16 @@
 </div>
 
 <style scoped>
+  /* The bottom line is drawn inside the bar, so the open tab covers it from
+     within: a tab hanging below the bar would make it scroll up and down
+     (with overflow-x set, overflow-y cannot stay visible). */
   .tabs {
     display: flex;
     gap: 2px;
     padding: var(--mm-space-2) var(--mm-space-3) 0;
     overflow-x: auto;
-    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    overflow-y: hidden;
+    box-shadow: inset 0 calc(-1 * var(--mm-border-width)) 0 var(--mm-border);
     background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
     scrollbar-width: thin;
   }
@@ -92,9 +96,11 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    margin-bottom: -1px;
-    border: var(--mm-border-width) solid transparent;
-    border-bottom: 0;
+    /* Longhands: jq79 scopes styles through the CSSOM, which drops a var()
+       shorthand that a later longhand overrides. */
+    border-style: solid;
+    border-color: transparent;
+    border-width: var(--mm-border-width) var(--mm-border-width) 0;
     border-radius: .3125rem .3125rem 0 0;
   }
   /* The open tab joins the panel under it and carries the stripes. */
@@ -123,7 +129,7 @@
     cursor: pointer;
   }
   .main:hover, .on .main { color: var(--mm-fg); }
-  .meta { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .close {
     display: inline-grid;
     place-items: center;

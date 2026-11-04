@@ -134,7 +134,7 @@
   .icon { display: grid; place-items: center; color: var(--mm-fg-muted); }
   .icon svg { width: 1rem; height: 1rem; }
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lead { display: inline-block; min-width: 1.5em; margin-right: var(--mm-space-2); font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  .lead { display: inline-block; min-width: 1.5em; margin-right: var(--mm-space-2); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .action { display: grid; place-items: center; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
   .row:hover .action, .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
   /* A key revealed on hover cannot be found without one. */
@@ -145,5 +145,5 @@
   .cue { display: grid; place-items: center; }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
   .row:hover .cue-play { opacity: 1; }
-  .meta { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
 </style>
