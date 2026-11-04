@@ -4,13 +4,18 @@
   // fills the screen below the faceplate and they sit in a row that snaps:
   // a horizontal swipe moves from one to the other, and a small selector in
   // a footer, always at the bottom, shows which one is in view and jumps to
-  // the other. Escape clears the selection when no dialog is open. See
+  // the other. Escape clears the selection when no dialog is open. The panel
+  // in view and both panes' scroll positions are kept for this tab when the
+  // page goes away, and come back once a reload has reopened the roots. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
 
   const Library = await import("./library.html")
   const AlbumSheet = await import("./album-sheet.html")
   const KeySelect = await import("../../theme/default/components/key-select.html")
+  const { parseViewState } = await import("../helpers/session")
   const { t } = await import("../lib/i18n")
+  const { library } = await import("../lib/library")
+  const { SESSION_KEYS, readSession, writeSession } = await import("../lib/storage")
   const { clearSelection } = await import("../lib/workspace")
 
   let panel: string = "library"
@@ -30,17 +35,49 @@
     if (row.clientWidth > 0) panel = Math.round(row.scrollLeft / row.clientWidth) === 0 ? "library" : "details"
   }
 
-  const show = (name: string) => {
+  const show = (name: string, instant = false) => {
     const row = $self(".panes") as HTMLElement | null
     if (!row) return
-    const still = matchMedia("(prefers-reduced-motion: reduce)").matches
+    const still = instant || matchMedia("(prefers-reduced-motion: reduce)").matches
     row.scrollTo({ left: name === "library" ? 0 : row.clientWidth, behavior: still ? "auto" : "smooth" })
   }
+
+  // Across a reload: kept as the page goes, put back once the roots are open
+  // and drawn (two frames, then once more for covers that took longer).
+  const paneOf = (name: string) => $self(name) as HTMLElement | null
+  const keepView = () => {
+    writeSession(SESSION_KEYS.view, JSON.stringify({ panel, treeScroll: paneOf(".tree-pane")?.scrollTop ?? 0, sheetScroll: paneOf(".sheet-pane")?.scrollTop ?? 0 }))
+  }
+  window.addEventListener("pagehide", keepView)
+  $destroyed(() => window.removeEventListener("pagehide", keepView))
+
+  const saved = parseViewState(readSession(SESSION_KEYS.view))
+  const putBack = () => {
+    const tree = paneOf(".tree-pane")
+    const sheet = paneOf(".sheet-pane")
+    if (tree && tree.scrollTop < saved.treeScroll) tree.scrollTop = saved.treeScroll
+    if (sheet && sheet.scrollTop < saved.sheetScroll) sheet.scrollTop = saved.sheetScroll
+    if (saved.panel === "details") show("details", true)
+  }
+  // Once, in a closure: a top-level flag would be a store field, and writing
+  // it from the `$:` that reads it would wake that `$:` again.
+  const comeBack = (() => {
+    let done = false
+    return (restoring: boolean) => {
+      if (restoring || done) return
+      done = true
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        putBack()
+        window.setTimeout(putBack, 300)
+      }))
+    }
+  })()
+  $: comeBack(library.restoring)
 </script>
 
 <div class="workspace">
   <div class="panes" @scroll="track($event)">
-    <div class="pane tree-pane"><Library /></div>
+    <div class="pane tree-pane"><Library @details="show('details')" /></div>
     <div class="pane sheet-pane"><AlbumSheet /></div>
   </div>
   <nav class="pager" :aria-label="t('panels.label')">
@@ -69,6 +106,7 @@
   }
   .pane { min-height: 0; overflow: auto; }
   .tree-pane { border-right: var(--mm-border-width) solid var(--mm-border); background: var(--mm-surface); }
+  .sheet-pane { background: var(--mm-sheet); }
 
   /* Phones: one pane per screen width, in a row that snaps as it is swiped. */
   @media (max-width: 720px) {

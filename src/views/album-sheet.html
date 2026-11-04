@@ -1,7 +1,7 @@
 <script :setup lang="ts">
   // The album sheet: what the active tree row scopes, grouped into albums and
-  // discs, with the action bar over a selection; the landing when no root is
-  // open. A view over lib/workspace.ts. See
+  // discs; the landing when no root is open. The selection's key is in the
+  // tab bar (faceplate). A view over lib/workspace.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
 
   const EqBars = await import("../../theme/default/components/eq-bars.html")
@@ -13,18 +13,8 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying } = await import("../lib/player")
-  const { openEditor } = await import("../lib/editor")
   const { openFolder } = await import("../lib/roots")
-  const {
-    activeRoot,
-    clearSelection,
-    detail,
-    detailAlbums,
-    playFromDetail,
-    removeSelectedTracks,
-    selectTrack,
-    showInfo
-  } = await import("../lib/workspace")
+  const { activeRoot, detail, detailAlbums, playFromDetail, selectTrack } = await import("../lib/workspace")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   type Track = { id: string; name: string; metadata: { title: string; trackNumber: string } }
@@ -34,7 +24,6 @@
   const root = () => activeRoot.value.data
   const scope = () => detail.value.data
   const albums = () => detailAlbums.value.data
-  const selectedCount = (): number => root()?.selectedTrackIds.length ?? 0
   const isChosen = (track: Track): boolean => !!root()?.selectedTrackIds.includes(track.id)
   const playingId = (): string | null => {
     const playing = nowPlaying.value
@@ -47,7 +36,8 @@
   // A click on a track plays the sheet from it (on the one playing, pauses
   // or resumes); the second click of a double click is not another one. The
   // box at its left, or the cell around it, selects it. Keys: Enter plays,
-  // Space selects, Shift+Space selects up to it.
+  // Space selects, Shift+Space selects up to it. The row ends in a cue: ▶ on
+  // hover, the moving bars on the track playing.
   const play = (track: Track, event: MouseEvent) => {
     if (event.detail <= 1) playFromDetail(track.id)
   }
@@ -65,9 +55,6 @@
       pick(track, event)
     }
   }
-  const remove = () => {
-    if (window.confirm(tn("message.removeConfirm", selectedCount()))) removeSelectedTracks()
-  }
 </script>
 
 <section class="sheet">
@@ -83,18 +70,6 @@
   </div>
 
   <div :else class="scoped">
-    <div :if="selectedCount() > 0" class="action-bar">
-      <span class="mm-legend is-accent">{{ tn("selection.count", selectedCount()) }}</span>
-      <span class="keys">
-        <Key size="sm" @click="showInfo()">{{ t("actions.showInfo") }}</Key>
-        <Key size="sm" variant="primary" @click="openEditor()">{{ t("actions.edit") }}</Key>
-        <Key size="sm" variant="danger" @click="remove()">{{ t("actions.delete") }}</Key>
-        <Key size="sm" variant="ghost" square :label="t('actions.clearSelection')" :title="t('actions.clearSelection')" @click="clearSelection()">
-          <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
-        </Key>
-      </span>
-    </div>
-
     <div :if="scope().tracks.length > 0" class="albums">
       <header class="scope-head">
         <span class="mm-legend">{{ t("album.folder") }}</span>
@@ -135,7 +110,11 @@
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></td>
                     <td class="mm-num">{{ track.metadata.trackNumber || "-" }}</td>
-                    <td><span class="mm-title"><EqBars :if="track.id === playingId()" :active="playback.playing" />{{ titleOf(track) }}</span></td>
+                    <td><span class="mm-title">{{ titleOf(track) }}</span></td>
+                    <td class="cue-cell" aria-hidden="true">
+                      <EqBars :if="track.id === playingId()" :active="playback.playing" />
+                      <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -173,21 +152,6 @@
   .landing h2 { font-size: var(--mm-text-2xl); text-wrap: balance; }
   .landing p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); line-height: var(--mm-leading); }
 
-  .action-bar {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--mm-space-2) var(--mm-space-3);
-    min-height: 2.75rem;
-    padding: var(--mm-space-1) var(--mm-space-4);
-    border-bottom: var(--mm-border-width) solid var(--mm-border);
-    background: var(--mm-accent-soft);
-  }
-  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
 
   .albums { display: grid; gap: var(--mm-space-5); padding: var(--mm-space-5); }
   .scope-head { display: grid; gap: var(--mm-space-1); }
@@ -209,6 +173,8 @@
     background: var(--mm-surface);
   }
   .cover { grid-area: cover; width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
+  /* On wider screens the cover stays in view while its album's tracks scroll past. */
+  .cover { position: sticky; top: var(--mm-space-4); align-self: start; }
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .no-cover { position: relative; height: 100%; background: var(--mm-display-bezel); }
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
@@ -223,6 +189,10 @@
   .mm-table tr { cursor: pointer; user-select: none; }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .mm-table .pick-cell { width: 1%; padding-right: 0; }
+  /* The cue at the row's end: ▶ on hover and on keyboard focus, the bars on the track playing. */
+  .mm-table .cue-cell { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
+  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .mm-table tr:hover .cue-play, .mm-table tr:focus-visible .cue-play { opacity: 1; }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
@@ -240,6 +210,6 @@
       padding: var(--mm-space-3);
     }
     .album-head { align-self: center; }
-    .cover { width: 5.5rem; }
+    .cover { position: static; width: 5.5rem; }
   }
 </style>

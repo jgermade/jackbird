@@ -1,4 +1,4 @@
-import type { MetaSnapshot, Mp3Track, TrackMetadata } from "../types.ts";
+import type { MetaRecord, MetaSnapshot, Mp3Track, TrackMetadata } from "../types.ts";
 
 /** A snapshot with no tracks. */
 export function emptySnapshot(): MetaSnapshot {
@@ -95,4 +95,61 @@ export function applyVerification<Root extends WithSnapshot>(
       }
     }
   };
+}
+
+/** What the initial scan read from one file. */
+export type ScanResult = {
+  trackId: string;
+  /** The checksum its track had in the library when the file was read. */
+  readFrom: string;
+  /** The file's `.meta` record, as read: checksums, size, date, tags and times. */
+  record: MetaRecord;
+};
+
+/**
+ * A root after the initial scan read a batch of files, as new objects
+ * (nothing given is changed). Each result sets its track's checksums, size,
+ * date, tags and verification time, and its `.meta` record. A result whose
+ * track is gone, or no longer has the checksum it was read from, is left out:
+ * something else (a save) wrote and recorded that track since, and its
+ * record stands. The root itself when no result applies.
+ */
+export function applyScanResults<Root extends WithSnapshot>(root: Root, results: readonly ScanResult[]): Root {
+  const byId = new Map(root.tracks.map((item) => [item.id, item]));
+  const changed = new Map<string, Mp3Track>();
+  const records: Record<string, MetaRecord> = {};
+  for (const { trackId, readFrom, record } of results) {
+    const track = changed.get(trackId) ?? byId.get(trackId);
+    if (!track || checksumOf(track) !== readFrom) {
+      continue;
+    }
+    changed.set(trackId, {
+      ...track,
+      checksum: record.checksum,
+      fullChecksum: record.fullChecksum,
+      audioChecksum: record.audioChecksum,
+      size: record.size ?? track.size,
+      lastModified: record.lastModified,
+      lastVerifiedAt: record.lastVerifiedAt,
+      metadata: record.metadata
+    });
+    records[track.relativePath] = record;
+  }
+  if (changed.size === 0) {
+    return root;
+  }
+  return {
+    ...root,
+    tracks: root.tracks.map((item) => changed.get(item.id) ?? item),
+    metaSnapshot: { ...root.metaSnapshot, tracks: { ...root.metaSnapshot.tracks, ...records } }
+  };
+}
+
+/** A snapshot without the records of `paths` (files gone from disk); the snapshot itself when it has none of them. */
+export function omitRecords(snapshot: MetaSnapshot, paths: readonly string[]): MetaSnapshot {
+  if (!paths.some((path) => path in snapshot.tracks)) {
+    return snapshot;
+  }
+  const gone = new Set(paths);
+  return { ...snapshot, tracks: Object.fromEntries(Object.entries(snapshot.tracks).filter(([path]) => !gone.has(path))) };
 }

@@ -35,17 +35,16 @@ You need [Node.js](https://nodejs.org/) 22.6 or later and a Chromium-based deskt
 API, which Firefox and Safari do not have.
 
 ```bash
-npm install
+make up
 ```
 
-```bash
-npm run dev
-```
+It installs the dependencies the first time, then starts the dev server. Open
+<http://localhost:8666>, choose **Open folder** and pick a folder with MP3 files. The browser asks
+for permission to edit the files in it; jackbird needs it to save your changes.
 
-Open <http://localhost:8666>, choose **Open folder** and pick a folder with MP3 files. The browser
-asks for permission to edit the files in it; jackbird needs it to save your changes.
-
-Run the checks with `npm test`, and build for production with `npm run build` (into `dist/`).
+Run the checks with `make test`, and build for production with `make build` (into `dist/`). Each
+one runs its npm script (`npm run dev`, `npm test`, `npm run build`), which also work on their own
+after `npm install`.
 
 ## Documentation
 

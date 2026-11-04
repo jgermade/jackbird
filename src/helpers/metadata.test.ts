@@ -86,6 +86,10 @@ describe("mergeDraft", () => {
     assert.deepEqual(mergeDraft(original, draft, varied), { ...original, genre: "", coverDataUrl: null });
   });
 
+  it("clears a varied field the draft left empty when it is confirmed", () => {
+    assert.deepEqual(mergeDraft(original, emptyMetadata(), everythingVaried, ["genre", "year"]), { ...original, genre: "", year: "" });
+  });
+
   it("returns a new object", () => {
     assert.notEqual(mergeDraft(original, original, nothingVaried), original);
   });

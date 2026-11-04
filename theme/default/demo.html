@@ -52,7 +52,7 @@
     { id: "dark", name: "Graphite", kind: "Dark · VFD" }
   ]
   const COLOUR_GROUPS = [
-    { name: "Grounds", tokens: ["bg", "chassis", "chassis-hi", "chassis-lo", "surface", "sunken", "field", "hover", "border", "border-strong", "key-top", "key-bottom", "key-down"] },
+    { name: "Grounds", tokens: ["bg", "sheet", "chassis", "chassis-hi", "chassis-lo", "surface", "sunken", "field", "hover", "border", "border-strong", "key-top", "key-bottom", "key-down"] },
     { name: "Ink", tokens: ["fg", "fg-muted", "fg-subtle"] },
     { name: "Signal", tokens: ["accent", "accent-hover", "accent-ink", "on-accent", "accent-soft"] },
     { name: "States", tokens: ["ok", "ok-led", "ok-soft", "warn", "warn-led", "warn-soft", "bad", "bad-led", "bad-soft", "on-bad", "led-off"] },
@@ -551,7 +551,7 @@
   <section class="section" aria-labelledby="h-context">
     <div class="head">
       <h2 id="h-context">In context</h2>
-      <p>Tabs, ListRow and a table as the library and album sheet. Example data; click a track to play it, and its SelectBox to select it.</p>
+      <p>Tabs, ListRow and a table as the library and album sheet. Example data; click a track to play it (▶ on hover), and its SelectBox to select it.</p>
     </div>
     <div class="app">
       <Tabs label="Open folders" :items="roots" :model="activeRoot" closable @close="closeRoot($event.detail)" />
@@ -577,6 +577,7 @@
                      :playing-active="playing"
                      :focusable="node.id === 'miles'"
                      :selectable="node.track !== undefined"
+                     :playable="node.track !== undefined"
                      @select="pickRow(node, $event.detail)"
                      @pick="toggleTrack(node.track)"
                      @toggle="toggleFolder(node.id)" />
@@ -611,7 +612,7 @@
           <div class="tracks mm-table-wrap">
             <table class="mm-table" :aria-label="`${ALBUM.title} tracks`">
               <thead>
-                <tr><th></th><th>#</th><th>Title</th><th>Artist</th><th class="mm-end">Time</th></tr>
+                <tr><th></th><th>#</th><th>Title</th><th>Artist</th><th class="mm-end">Time</th><th></th></tr>
               </thead>
               <tbody>
                 <tr :each="song, at in TRACKS"
@@ -621,9 +622,13 @@
                     @click="playRow(at, $event)">
                   <td class="pick"><SelectBox :chosen="selected.includes(at)" @pick="toggleTrack(at)" /></td>
                   <td class="mm-num">{{ song.n }}</td>
-                  <td><span class="mm-title"><EqBars :if="at === index" :active="playing" />{{ song.title }}</span></td>
+                  <td><span class="mm-title">{{ song.title }}</span></td>
                   <td>{{ ALBUM.artist }}</td>
                   <td class="mm-num mm-end">{{ formatTime(song.secs) }}</td>
+                  <td class="cue" aria-hidden="true">
+                    <EqBars :if="at === index" :active="playing" />
+                    <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -881,6 +886,9 @@
   .tracks table { min-width: 28.75rem; }
   .tracks tr { cursor: pointer; user-select: none; }
   .tracks .pick { width: 1%; padding-right: 0; }
+  .tracks .cue { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
+  .tracks .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; }
+  .tracks tr:hover .cue-play { opacity: 1; }
 
   .foot { padding-block: var(--mm-space-7) var(--mm-space-8); border-top: var(--mm-border-width) solid var(--mm-border); color: var(--mm-fg-muted); }
 

@@ -1,4 +1,4 @@
-<script :setup="{ items = [], model = null, label = '', closable = false }: Props" lang="ts">
+<script :setup="{ items = [], model = null, label = '', closable = false, compact = false, plain = false }: Props" lang="ts">
   // Tabs on the chassis: the open folders. The open one joins the panel
   // below, carries the stripes and has its LED lit. Arrow keys, Home and End
   // move between tabs and open them as they go.
@@ -8,20 +8,31 @@
   // An item is `{ id, label, meta, closeLabel }`; `meta` is small mono text
   // after the label (a count), `closeLabel` the close key's accessible name.
   // The choice goes up through `:model` and as `change`; a close key emits
-  // `close` with the item's id, and the owner decides what goes. The `end`
-  // slot sits right after the last tab: a key that adds one, say.
+  // `close` with the item's id, and the owner decides what goes. Only the
+  // tabs scroll sideways; the `end` slot sits right after them (a key that
+  // adds one, say) and stays in view, and the `aside` slot is pushed to the
+  // bar's right end. `compact` turns the tabs into a dropdown (`Select`) at
+  // 720px and below, with a close key for the chosen item when `closable`.
+  // `plain` drops the bar's own chassis, for a bar inside another one (a
+  // modal's header).
   //
-  // **Part of the default theme**: imports `Led`, and draws only with
+  // **Part of the default theme**: imports `Led` and `Select`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
   type Item = { id: string; label: string; meta?: string | number; closeLabel?: string }
-  type Props = { items?: Item[]; model?: string | null; label?: string; closable?: boolean | "" }
+  type Props = { items?: Item[]; model?: string | null; label?: string; closable?: boolean | ""; compact?: boolean | ""; plain?: boolean | "" }
 
   const Led = await import("./led.html")
+  const Select = await import("./select.html")
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: canClose = flag(closable)
   $: focusable = items.some((item: Item) => item.id === model) ? model : items[0]?.id
+  $: chosen = items.find((item: Item) => item.id === model) ?? null
+  $: choices = items.map((item: Item) => ({
+    value: item.id,
+    label: item.meta !== undefined && item.meta !== null && item.meta !== "" ? `${item.label} · ${item.meta}` : item.label
+  }))
 
   const choose = (id: string) => {
     if (id === model) return
@@ -45,7 +56,8 @@
   }
 </script>
 
-<div class="tabs" role="tablist" :aria-label="label || null">
+<div class="tabs" :class.compact="flag(compact)" :class.plain="flag(plain)">
+  <div class="strip" role="tablist" :aria-label="label || null">
   <div :each="item in items" :key="item.id" class="tab" :class.on="item.id === model">
     <button type="button"
             role="tab"
@@ -67,18 +79,66 @@
       <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
     </button>
   </div>
+  </div>
+  <div :if="flag(compact) && items.length > 0" class="picker">
+    <span class="pick"><Select :label="label" :model="model || ''" :options="choices" @change="choose($event.detail)" /></span>
+    <button :if="canClose && chosen"
+            type="button"
+            class="close"
+            :aria-label="chosen.closeLabel || 'Close tab'"
+            :title="chosen.closeLabel || null"
+            @click="$emit('close', chosen.id)">
+      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+    </button>
+  </div>
   <div :if="$slots.end" class="end"><slot.end /></div>
+  <div :if="$slots.aside" class="aside"><slot.aside /></div>
 </div>
 
 <style scoped>
+  /* The bottom line is drawn inside the bar, so the open tab covers it from
+     within: a tab hanging below the bar would make it scroll up and down
+     (with overflow-x set, overflow-y cannot stay visible). */
   .tabs {
     display: flex;
-    gap: 2px;
+    gap: var(--mm-space-2);
+    min-width: 0;
     padding: var(--mm-space-2) var(--mm-space-3) 0;
-    overflow-x: auto;
-    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    box-shadow: inset 0 calc(-1 * var(--mm-border-width)) 0 var(--mm-border);
     background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+  }
+  .tabs.plain { background: none; }
+  .strip {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: flex-end;
+    gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: thin;
+  }
+  .picker { display: none; }
+  .aside {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--mm-space-2);
+    margin-left: auto;
+    padding: 0 0 var(--mm-space-1);
+  }
+  @media (max-width: 720px) {
+    .compact .strip { display: none; }
+    .compact .picker {
+      display: flex;
+      flex: 0 1 14rem;
+      align-items: center;
+      gap: var(--mm-space-1);
+      min-width: 0;
+      padding-bottom: var(--mm-space-1);
+    }
+    .compact .pick { flex: 1 1 auto; min-width: 0; }
+    .compact .picker .close { margin: 0; }
   }
   .end {
     display: flex;
@@ -92,9 +152,11 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    margin-bottom: -1px;
-    border: var(--mm-border-width) solid transparent;
-    border-bottom: 0;
+    /* Longhands: jq79 scopes styles through the CSSOM, which drops a var()
+       shorthand that a later longhand overrides. */
+    border-style: solid;
+    border-color: transparent;
+    border-width: var(--mm-border-width) var(--mm-border-width) 0;
     border-radius: .3125rem .3125rem 0 0;
   }
   /* The open tab joins the panel under it and carries the stripes. */
@@ -123,7 +185,7 @@
     cursor: pointer;
   }
   .main:hover, .on .main { color: var(--mm-fg); }
-  .meta { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .close {
     display: inline-grid;
     place-items: center;

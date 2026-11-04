@@ -5,12 +5,13 @@
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
+import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
-import type { GroupingMode, Mp3Track, RootWorkspace, TrackMetadata } from "../types";
+import type { GroupingMode, Mp3Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
-import { readMetaSnapshot, writeMetaSnapshot } from "./meta";
+import { flushMeta, readMetaSnapshot } from "./meta";
 import { playback } from "./playback";
 import { nowPlaying } from "./player";
 
@@ -32,6 +33,9 @@ export async function hydrateRoot(
     rootLabel?: string;
     groupingMode?: GroupingMode;
     setActive?: boolean;
+    /** Where a reopened root was: its open folders and its current row. */
+    expandedAlbums?: string[];
+    activeRowKey?: string | null;
   }
 ): Promise<void> {
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -70,9 +74,9 @@ export async function hydrateRoot(
       loadedCount: initialTracks.length,
       groupingMode,
       metaSnapshot: snapshot,
-      expandedAlbums: [],
+      expandedAlbums: options.expandedAlbums ?? [],
       expandedDiscs: [],
-      activeRowKey: null
+      activeRowKey: options.activeRowKey ?? null
     };
 
     if (existingIndex === -1) {
@@ -151,17 +155,12 @@ export async function hydrateRoot(
           return {
             ...root,
             tracks,
+            metaSnapshot: omitRecords(root.metaSnapshot, removedPaths),
             loadingMetadata: !isFullyCached,
             loadedCount: tracks.length - staleOrNewFiles.length
           };
         })
       );
-
-      if (removedPaths.length > 0) {
-        for (const p of removedPaths) {
-          delete snapshot.tracks[p];
-        }
-      }
 
       if (isFullyCached) {
         updateRoots((currentRoots) =>
@@ -172,18 +171,12 @@ export async function hydrateRoot(
         return;
       }
 
-      // Process stale/new files concurrently
-      type TrackUpdate = {
-        trackId: string;
-        metadata: TrackMetadata;
-        fullChecksum: string;
-        audioChecksum: string;
-        size: number;
-        lastModified?: number;
-        lastVerifiedAt: string;
-      };
-
-      const pendingUpdates: TrackUpdate[] = [];
+      // Process stale/new files concurrently. The snapshot read at the start
+      // only says what is already known; each result is applied to the root
+      // as it is when the batch is flushed, unless a save recorded its track
+      // since its file was read (applyScanResults), and `.meta/` is written
+      // through the queue every writer uses (flushMeta).
+      const pendingUpdates: ScanResult[] = [];
       // Counted against the walk, as the root's own count above: what is
       // already known, then one per file read, ending at the total (when the
       // last batch is flushed).
@@ -196,39 +189,11 @@ export async function hydrateRoot(
         pendingUpdates.length = 0;
 
         updateRoots((currentRoots) =>
-          currentRoots.map((root) => {
-            if (root.id !== rootId) {
-              return root;
-            }
-
-            const nextTracksById = new Map(root.tracks.map((item) => [item.id, item]));
-
-            for (const update of updates) {
-              const currentTrack = nextTracksById.get(update.trackId);
-              if (!currentTrack) {
-                continue;
-              }
-
-              nextTracksById.set(update.trackId, {
-                ...currentTrack,
-                checksum: update.fullChecksum,
-                fullChecksum: update.fullChecksum,
-                audioChecksum: update.audioChecksum,
-                size: update.size,
-                lastModified: update.lastModified,
-                lastVerifiedAt: update.lastVerifiedAt,
-                metadata: update.metadata
-              });
-            }
-
-            return {
-              ...root,
-              tracks: root.tracks.map((item) => nextTracksById.get(item.id) ?? item),
-              loadedCount,
-              loadingMetadata: loadedCount < totalAfterWalk,
-              metaSnapshot: snapshot
-            };
-          })
+          currentRoots.map((root) =>
+            root.id === rootId
+              ? { ...applyScanResults(root, updates), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
+              : root
+          )
         );
       }
 
@@ -236,8 +201,15 @@ export async function hydrateRoot(
       let cursor = 0;
       let failedCount = 0;
 
-      // Reads one file's checksums and tags into the snapshot and the next flush.
+      // The checksum a track has in the library now, or "" when it is gone.
+      function checksumNow(trackId: string): string {
+        const track = $toRaw(library).roots.find((root) => root.id === rootId)?.tracks.find((item) => item.id === trackId);
+        return track ? checksumOf(track) : "";
+      }
+
+      // Reads one file's checksums and tags into the next flush.
       async function readOne(file: (typeof staleOrNewFiles)[number]): Promise<void> {
+        const readFrom = checksumNow(file.relativePath);
         const sourceBytes = await vfs.read(file.relativePath);
         const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
         const stored = snapshot.tracks[file.relativePath];
@@ -247,27 +219,21 @@ export async function hydrateRoot(
             : await readTrackMetadataFromBytes(sourceBytes, file.name);
 
         const nowIso = new Date().toISOString();
-        snapshot.tracks[file.relativePath] = {
-          checksum: fullChecksum,
-          fullChecksum,
-          audioChecksum,
-          size: file.size,
-          lastModified: file.lastModified,
-          lastVerifiedAt: nowIso,
-          metadata,
-          updatedAt: nowIso
-        };
-        snapshotDirty = true;
-
         pendingUpdates.push({
           trackId: file.relativePath,
-          metadata,
-          fullChecksum,
-          audioChecksum,
-          size: file.size,
-          lastModified: file.lastModified,
-          lastVerifiedAt: nowIso
+          readFrom,
+          record: {
+            checksum: fullChecksum,
+            fullChecksum,
+            audioChecksum,
+            size: file.size,
+            lastModified: file.lastModified,
+            lastVerifiedAt: nowIso,
+            metadata,
+            updatedAt: nowIso
+          }
         });
+        snapshotDirty = true;
       }
 
       async function worker(): Promise<void> {
@@ -300,19 +266,12 @@ export async function hydrateRoot(
       );
 
       if (snapshotDirty) {
-        await writeMetaSnapshot(vfs, snapshot);
+        await flushMeta(rootId);
       }
 
       updateRoots((currentRoots) =>
         currentRoots.map((root) =>
-          root.id === rootId
-            ? {
-                ...root,
-                loadingMetadata: false,
-                loadedCount: totalAfterWalk,
-                metaSnapshot: snapshot
-              }
-            : root
+          root.id === rootId ? { ...root, loadingMetadata: false, loadedCount: totalAfterWalk } : root
         )
       );
 

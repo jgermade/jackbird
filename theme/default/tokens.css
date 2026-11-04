@@ -19,10 +19,12 @@
 :root, [data-tone="light"] {
   /* ---- grounds ------------------------------------------------------------ */
 
-  /* The page; the chassis (bars, faceplate, panel heads) with its highlight
-     and its edge; what sits on it (panels, lists); a well cut into it (key
-     banks, switch tracks); and what is typed in. */
+  /* The page; the ground of the album sheet (the page's own in Silver);
+     the chassis (bars, faceplate, panel heads) with its highlight and its
+     edge; what sits on it (panels, lists); a well cut into it (key banks,
+     switch tracks); and what is typed in. */
   --mm-bg: #e7e9e8;
+  --mm-sheet: var(--mm-bg);
   --mm-chassis: #d4d7d6;
   --mm-chassis-hi: #eef0ef;
   --mm-chassis-lo: #b4b9b8;
@@ -167,6 +169,7 @@
 
 :root[data-theme="dark"], [data-tone="dark"] {
   --mm-bg: #121314;
+  --mm-sheet: #444444;
   --mm-chassis: #1f2022;
   --mm-chassis-hi: #2c2e31;
   --mm-chassis-lo: #0b0c0d;
@@ -211,7 +214,8 @@
   --mm-display-glow: 0 0 6px rgba(95, 242, 214, .55);
   --mm-display-bezel: #000000;
 
-  --mm-overlay: rgba(0, 0, 0, .6);
+  /* A white veil: on a dark page, a darker one would hide the modal's edges. */
+  --mm-overlay: rgba(255, 255, 255, .2);
 
   --mm-key-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 #000000, 0 2px 5px rgba(0, 0, 0, .5);
   --mm-key-pressed: inset 0 2px 5px rgba(0, 0, 0, .6);

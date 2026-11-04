@@ -53,7 +53,8 @@
   // or resumes); a click on a folder shows it in the album sheet. Either
   // becomes the current row. The second click of a double click is not
   // another one, or a double click would play and then pause. A track's box
-  // selects it, and a folder's key plays it from its first track.
+  // selects it. A folder's ❯ key shows it in the album sheet and emits
+  // `details`, so the workspace can bring that panel into view on a phone.
   const open = (row: Row, event: MouseEvent) => {
     if (event?.detail > 1) return
     setCurrentRow(row.key)
@@ -63,6 +64,10 @@
     if (!row.trackId) return
     setCurrentRow(row.key)
     selectTrack(row.trackId, event?.shiftKey ? "range" : "toggle")
+  }
+  const openFolder = (row: Row) => {
+    setCurrentRow(row.key)
+    $emit("details")
   }
 
   const onKey = (event: KeyboardEvent) => {
@@ -116,13 +121,14 @@
              :playing-active="playback.playing"
              :row-id="rowDomId(row.key)"
              :selectable="row.kind === 'track'"
+             :playable="row.kind === 'track'"
              @select="open(row, $event.detail)"
              @pick="pick(row, $event.detail)"
              @toggle="toggleFolder(row.album)">
       <template :slot.action>
         <span class="row-keys" @click.stop="null">
-          <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('album.play', { title: rowLabel(row) })" :title="t('album.play', { title: rowLabel(row) })" @click="playFromTree(row.key)">
-            <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
+          <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
           <Key :if="row.kind === 'track' && (isChosen(row) || isCurrent(row))" square size="sm" variant="ghost" :label="t('tree.rename')" :title="t('tree.renameTitle')" @click="consolidateTrack()">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9z" /><path d="M8.35 4.15 11.85 7.65" stroke-linecap="round" /></svg>
@@ -148,7 +154,7 @@
     background: var(--mm-surface);
   }
   .title { margin: 0; }
-  .count { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  .count { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .tools { display: flex; gap: var(--mm-space-1); margin-left: auto; }
   .icon { width: .875rem; height: .875rem; }
 

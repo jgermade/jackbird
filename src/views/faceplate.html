@@ -1,7 +1,8 @@
 <script :setup lang="ts">
   // The app's top bar as a Deck faceplate: the brand, the display, the keys
   // (transport, back to the list playing, preferences), and the open roots as
-  // tabs with the folder key. A view: it reads the
+  // tabs (a dropdown on phones) with the folder key and, while tracks are
+  // selected, the selection's key: it opens the selection's dialog on Edit. A view: it reads the
   // lib/ stores and calls lib/ actions, and draws with theme components. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 4).
 
@@ -11,20 +12,36 @@
   const KeyBank = await import("../../theme/default/components/key-bank.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
+  const Spectrum = await import("../../theme/default/components/spectrum.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
 
   const { formatTime } = await import("../helpers/format")
-  const { t } = await import("../lib/i18n")
+  const { t, tn } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
-  const { nowPlaying, next, previous, togglePlay } = await import("../lib/player")
+  const { nowPlaying, next, previous, readSpectrum, togglePlay } = await import("../lib/player")
   const { closeRoot, openFolder, selectRoot, showQueueInLibrary } = await import("../lib/roots")
+  const { openSelection } = await import("../lib/editor")
+  const { activeRoot, clearSelection } = await import("../lib/workspace")
   const { ui } = await import("../lib/ui")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   $: current = nowPlaying.value
+  // Above 900px the display shows the spectrum, moving while the music plays
+  // (from 901 to 1024px it takes the wordmark's room).
+  const WIDE = matchMedia("(min-width: 901px)")
+  let wide: boolean = WIDE.matches
+  const onWidth = (event: MediaQueryListEvent) => {
+    wide = event.matches
+  }
+  WIDE.addEventListener("change", onWidth)
+  $destroyed(() => WIDE.removeEventListener("change", onWidth))
   $: hasRoots = library.roots.length > 0
   $: folderLabel = library.loading ? t("picker.scanning") : hasRoots ? t("picker.addRoot") : t("picker.openLibrary")
+  // On a computer the key reads "+ Folder" once a root is open; on a phone, the + alone.
+  $: folderText = library.loading ? t("picker.scanning") : hasRoots ? t("picker.folder") : t("picker.openLibrary")
+  // Read through a function: the active root is boxed (see Opaque in lib/workspace.ts).
+  const selectedCount = (): number => activeRoot.value.data?.selectedTrackIds.length ?? 0
 
   // The state, as a glyph before the title and in words for screen readers.
   $: stateLabel =
@@ -55,15 +72,20 @@
 
     <div class="screen">
       <Display live>
-        <div class="mm-display-row">
-          <span class="now">
-            <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
-            <span class="visually-hidden">{{ stateLabel }}</span>
-            <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
-          </span>
-          <Counter>{{ formatTime(playback.position) }}</Counter>
+        <div class="lcd">
+          <span class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="16" :active="wide && playback.playing" /></span>
+          <div class="lcd-main">
+            <div class="mm-display-row">
+              <span class="now">
+                <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
+                <span class="visually-hidden">{{ stateLabel }}</span>
+                <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+              </span>
+              <Counter>{{ formatTime(playback.position) }}</Counter>
+            </div>
+            <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+          </div>
         </div>
-        <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
       </Display>
     </div>
 
@@ -91,14 +113,26 @@
     </div>
   </div>
 
-  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
+  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
       <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
-      <span class="open-folder">
-        <Key size="sm" :disabled="library.loading" :title="folderLabel" @click="openFolder()">
+      <span class="open-folder" :class.has-roots="hasRoots">
+        <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openFolder()">
           <Reel :if="library.loading" :size="12" speed="fast" />
           <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
-          {{ folderLabel }}
+          <span class="folder-text">{{ folderText }}</span>
+        </Key>
+      </span>
+    </template>
+    <template :slot.aside>
+      <span :if="selectedCount() > 0" class="selection">
+        <Key size="sm" variant="primary" :label="tn('selection.open', selectedCount())" :title="tn('selection.open', selectedCount())" @click="openSelection('edit')">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9z" /><path d="M8.35 4.15 11.85 7.65" stroke-linecap="round" /></svg>
+          <span class="count-wide">{{ tn("selection.count", selectedCount()) }}</span>
+          <span class="count-narrow">{{ selectedCount() }}</span>
+        </Key>
+        <Key size="sm" variant="ghost" square :label="t('actions.clearSelection')" :title="t('actions.clearSelection')" @click="clearSelection()">
+          <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
         </Key>
       </span>
     </template>
@@ -161,6 +195,21 @@
   .icon { width: .875rem; height: .875rem; }
   /* While no root is open, opening one is the thing to do: its glyph is printed in orange. */
   .icon.signal { color: var(--mm-accent-ink); }
+  .selection { display: flex; align-items: center; gap: var(--mm-space-1); }
+
+  /* The display: the spectrum at the left above 900px, the title row and the meter beside it.
+     From 901 to 1024px the wordmark goes, so the display keeps its room. */
+  .lcd { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
+  .lcd-spectrum { display: none; }
+  @media (min-width: 901px) {
+    .lcd { grid-template-columns: 7rem minmax(0, 1fr); column-gap: var(--mm-space-3); }
+    .lcd-spectrum { display: block; }
+  }
+  @media (min-width: 901px) and (max-width: 1024px) {
+    .wordmark { display: none; }
+  }
+  .count-narrow { display: none; }
 
   /* Narrow screens: the brand and the keys share the first row, the display
      takes the second. */
@@ -183,5 +232,11 @@
     .controls { gap: var(--mm-space-2); }
     .wordmark { display: none; }
     .logo { height: 2.25rem; }
+  }
+  /* Phones: the folder key is its + alone, and the selection's key its count. */
+  @media (max-width: 720px) {
+    .has-roots .folder-text { display: none; }
+    .count-wide { display: none; }
+    .count-narrow { display: inline; }
   }
 </style>

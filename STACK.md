@@ -46,6 +46,8 @@ This document describes the technical stack and codebase architecture implemente
 ### Web APIs & Metadata
 - **File System Access API**: directory picking, permission checks, file reads and in-place
   writes, through the VFS adapter.
+- **Web Audio API**: the player's audio element goes through an `AnalyserNode` on its way to the
+  speakers, for the display's spectrum analyser (above 900px wide).
 - **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
   `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
   root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.
@@ -68,6 +70,9 @@ This document describes the technical stack and codebase architecture implemente
   Vite/esbuild handles all transpilation). Templates are not type-checked, so setup scripts stay
   thin and the logic lives in helpers and `lib/`.
 - **Scripts Runtime**: Node.js, `"type": "module"`.
+- **Makefile**: `make up`, `make test` and `make build` run `npm run dev`, `npm test` and
+  `npm run build`, installing the dependencies first (`npm ci`) when they are missing or older
+  than `package-lock.json`.
 - **Tests**: `npm test`, with no test framework: the layer check (`scripts/check-layers.mjs`),
   a type check of the helpers and their tests (`tsconfig.test.json`), Node's own runner on
   `src/helpers/**/*.test.ts` with type stripping, and a per-file coverage floor of 90% of lines,
@@ -92,13 +97,13 @@ mp3-manager/
 │   ├── components/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove
 │   ├── views/
-│   │   ├── app.html             # Root: faceplate, workspace, the three dialogs
-│   │   ├── faceplate.html       # Brand, transport, display, root tabs + folder key
+│   │   ├── app.html             # Root: faceplate, workspace, the two dialogs
+│   │   ├── faceplate.html       # Brand, transport, display, root tabs (a dropdown on phones),
+│   │   │                        # folder key, the selection's key
 │   │   ├── workspace.html       # The two panes (swipeable on phones, footer selector), Escape
 │   │   ├── library.html         # The tree, its head, messages and scan meter
-│   │   ├── album-sheet.html     # Landing, action bar, albums and discs
-│   │   ├── edit-dialog.html     # Metadata editor (one track or many)
-│   │   ├── info-dialog.html     # File information (one track or totals)
+│   │   ├── album-sheet.html     # Landing, albums and discs
+│   │   ├── selection-dialog.html # The selection: Edit, Info and Danger tabs
 │   │   └── preferences-dialog.html # Tone and language
 │   └── lib/
 │       ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
@@ -160,10 +165,14 @@ mp3-manager/
   still being read.
 - In the tree and the album sheet, a click (or Enter) on a track plays it, and a box at its left
   selects it (Shift-click for a range, Space and Shift+Space, Escape to clear).
-- Metadata editor for one track or many: a field that varies across the selection keeps each
-  track's value unless typed over; cover art by drag & drop or file choice.
+- The selection's key in the tab bar opens one dialog with Edit, Info and Danger tabs. The editor
+  works on one track or many: a field that varies across the selection keeps each track's value
+  unless typed over or its "Override" box is ticked (then even an empty value is written); cover art by
+  drag & drop or file choice. Danger removes the tracks from the library (not from disk).
 - Session restore on load: previously opened roots (with granted permission) reopen
-  automatically, keeping the last active tab.
+  automatically, keeping the last active tab, each root's open folders and current row, and (for
+  the tab, in `sessionStorage`) the phone's panel, the panes' scroll and the music: the same track
+  at the same second, playing again, or on the first interaction when autoplay is not allowed.
 - Light (Silver) and dark (Graphite) tone, from the faceplate's switch or Preferences,
   defaulting to the OS `prefers-color-scheme` and persisted across reloads.
 - Interface in English or Spanish, chosen in Preferences, defaulting to the browser's
