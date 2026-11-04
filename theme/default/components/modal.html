@@ -11,6 +11,13 @@
   // and the close key emit `close`; the dialog follows `:open`. `closeLabel`
   // is the close key's accessible name. The `nav` slot sits in the header,
   // under the title, edge to edge: `Tabs` (`plain`) that switch the body.
+  // With it the dialog keeps one height whichever tab is open (within the
+  // viewport; the body scrolls), so the tabs never move.
+  //
+  // It comes in rising a little and fading in over a fading backdrop, and
+  // goes out the same way back (`@starting-style`, and `display` and
+  // `overlay` moved discretely); where a browser has neither, it opens and
+  // closes at once. With reduced motion the durations are 0.
   //
   // **Part of the default theme**: imports `Key`, and draws only with
   // `tokens.css` (and `content.css` for the eyebrow). See
@@ -44,6 +51,7 @@
 
 <dialog class="modal"
         :class="`size-${size}`"
+        :class.with-nav="$slots.nav"
         :aria-labelledby="titleId"
         @cancel="cancel($event)"
         @click.self="$emit('close')">
@@ -64,6 +72,8 @@
 <style scoped>
   .modal {
     --width: 35rem;
+    --height: 30rem;
+    --away: translateY(.75rem) scale(.98);
     width: min(var(--width), calc(100vw - 2 * var(--mm-space-4)));
     max-height: calc(100vh - 2 * var(--mm-space-6));
     padding: 0;
@@ -73,11 +83,28 @@
     color: var(--mm-fg);
     box-shadow: var(--mm-shadow-lg);
     overflow: hidden;
+    opacity: 0;
+    transform: var(--away);
+    transition: opacity var(--mm-duration) var(--mm-ease),
+                transform var(--mm-duration) var(--mm-ease),
+                overlay var(--mm-duration) allow-discrete,
+                display var(--mm-duration) allow-discrete;
   }
-  .modal[open] { display: flex; flex-direction: column; }
-  .size-sm { --width: 25rem; }
-  .size-lg { --width: 47.5rem; }
-  .modal::backdrop { background: var(--mm-overlay); }
+  .modal[open] { display: flex; flex-direction: column; opacity: 1; transform: none; }
+  .modal.with-nav { height: min(var(--height), calc(100vh - 2 * var(--mm-space-6))); }
+  .size-sm { --width: 25rem; --height: 24rem; }
+  .size-lg { --width: 47.5rem; --height: 48rem; }
+  .modal::backdrop {
+    background-color: transparent;
+    transition: background-color var(--mm-duration) var(--mm-ease),
+                overlay var(--mm-duration) allow-discrete,
+                display var(--mm-duration) allow-discrete;
+  }
+  .modal[open]::backdrop { background-color: var(--mm-overlay); }
+  @starting-style {
+    .modal[open] { opacity: 0; transform: var(--away); }
+    .modal[open]::backdrop { background-color: transparent; }
+  }
 
   .head {
     display: grid;

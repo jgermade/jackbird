@@ -11,7 +11,9 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
   [`@cloudauthn/vfs-sync`](https://www.npmjs.com/package/@cloudauthn/vfs-sync): `FSAAdapter` over
   a directory handle, and `walk` to list a folder. Each open root keeps its adapter
   (`RootWorkspace.vfs`), so the rest of the app never touches a file handle, and another backend
-  (a remote, synced store, for instance) can be plugged in later without touching the views.
+  (a remote, synced store, for instance) can be plugged in later without touching the views. The
+  one exception is playback: `src/lib/media.ts` gives the player the file itself, from the root's
+  directory handle, so a track is not read into memory to be played.
 - **A metadata engine over bytes.** `src/lib/id3.ts` reads and writes ID3 tags on `Uint8Array`
   buffers, not on files, so it does not depend on where the bytes come from.
 - **Several roots at once.** Each open folder keeps its own tracks, selection, expanded folders

@@ -72,6 +72,7 @@ export const es: Record<MessageKey, string> = {
   "album.untitled": "Sin álbum",
   "album.unknownArtist": "Artista desconocido",
   "album.disc": "Disco {number}",
+  "album.selectDisc": "Seleccionar todas las pistas del disco {number}",
 
   "faceplate.transport": "Transporte",
   "faceplate.play": "Reproducir",
