@@ -17,7 +17,7 @@
   "dependencies": {
     "@cloudauthn/vfs-sync": "^0.2.0",
     "browser-id3-writer": "^6.3.0",
-    "jq79": "^0.7.7",
+    "jq79": "^0.7.8",
     "jsmediatags": "^3.9.7"
   },
   "devDependencies": {
