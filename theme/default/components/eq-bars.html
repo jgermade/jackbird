@@ -1,0 +1,43 @@
+<script :setup="{ active = false }: Props" lang="ts">
+  // Three level bars that mark the current track: moving while it plays,
+  // still while paused. Decorative: say "now playing" in words elsewhere.
+  //
+  //   <EqBars :active="playing" />
+  //
+  // The movement scales `--mm-duration-slow`, so reduced motion holds it.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { active?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+</script>
+
+<span class="eq" :class.active="flag(active)" aria-hidden="true"><i></i><i></i><i></i></span>
+
+<style scoped>
+  .eq {
+    display: inline-flex;
+    flex: none;
+    align-items: flex-end;
+    gap: 2px;
+    width: .8125rem;
+    height: .75rem;
+  }
+  i {
+    width: .1875rem;
+    height: 100%;
+    background: var(--mm-accent);
+    transform-origin: bottom;
+    transform: scaleY(.4);
+  }
+  .active i { animation: mm-eq calc(var(--mm-duration-slow) * 2.8) ease-in-out infinite alternate; }
+  .active i:nth-child(2) { animation-delay: calc(var(--mm-duration-slow) * -.9); }
+  .active i:nth-child(3) { animation-delay: calc(var(--mm-duration-slow) * -1.9); }
+  @keyframes mm-eq {
+    0% { transform: scaleY(.25); }
+    50% { transform: scaleY(1); }
+    100% { transform: scaleY(.55); }
+  }
+</style>

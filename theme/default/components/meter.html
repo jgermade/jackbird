@@ -1,0 +1,66 @@
+<script :setup="{ level = 0, max = 1, segments = 32, variant = 'chassis', label = '', levelText = '' }: Props" lang="ts">
+  // A segmented meter: progress as lit segments, like a level meter. Inside a
+  // Display (`variant="display"`) it lights in the window's ink; anywhere
+  // else (`chassis`) it is a row of LEDs in a well.
+  //
+  //   <Meter :level="603" :max="739" label="Reading tags" level-text="603 of 739 tracks" />
+  //
+  // Not `value` nor `valueText`: jq79 keeps `:value` for an element's own
+  // value, and ignores it on a component tag.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = {
+    level?: number
+    max?: number
+    segments?: number
+    variant?: "display" | "chassis"
+    label?: string
+    levelText?: string
+  }
+
+  $: count = Math.max(1, Math.round(Number(segments)) || 32)
+  $: top = Number(max)
+  $: fraction = top > 0 ? Math.min(1, Math.max(0, Number(level) / top)) : 0
+  $: lit = Math.round(fraction * count)
+  $: cells = Array.from({ length: count }, (_, index) => index)
+</script>
+
+<div class="meter"
+     :class.display="variant === 'display'"
+     :class.chassis="variant !== 'display'"
+     role="progressbar"
+     :aria-label="label || null"
+     aria-valuemin="0"
+     :aria-valuemax="String(top)"
+     :aria-valuenow="String(level)"
+     :aria-valuetext="levelText || null"
+     :style="`--segments: ${count}`">
+  <i :each="cell in cells" :key="cell" :class.on="cell < lit"></i>
+</div>
+
+<style scoped>
+  .meter {
+    display: grid;
+    grid-template-columns: repeat(var(--segments), minmax(0, 1fr));
+    gap: 2px;
+    min-width: 0;
+  }
+  i { border-radius: 1px; }
+
+  .display { height: .375rem; }
+  .display i { background: var(--mm-display-dim); }
+  .display i.on { background: var(--mm-display-fg); box-shadow: var(--mm-display-glow); }
+
+  .chassis {
+    box-sizing: content-box;
+    height: .625rem;
+    padding: .1875rem;
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-sunken);
+    box-shadow: var(--mm-well-shadow);
+  }
+  .chassis i { background: var(--mm-led-off); opacity: .45; }
+  .chassis i.on { background: var(--mm-accent); opacity: 1; box-shadow: 0 0 .25rem var(--mm-accent); }
+</style>

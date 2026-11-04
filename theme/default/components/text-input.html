@@ -1,0 +1,88 @@
+<script :setup="{
+  model = '',
+  id = '',
+  type = 'text',
+  placeholder = '',
+  label = '',
+  describedby = '',
+  inputmode = '',
+  autocomplete = '',
+  disabled = false,
+  readonly = false,
+  invalid = false,
+  numeric = false
+}: Props" lang="ts">
+  // A text field set into the panel like a well. `numeric` sets it in the
+  // mono face with tabular digits, for years, track numbers and durations.
+  // `label` is its accessible name when no Field names it.
+  //
+  //   <TextInput id="title" :model="title" placeholder="(Multiple values)" />
+  //
+  // The value goes up through `:model` on every keystroke, and as `input`.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = {
+    model?: string
+    id?: string
+    type?: string
+    placeholder?: string
+    label?: string
+    describedby?: string
+    inputmode?: string
+    autocomplete?: string
+    disabled?: boolean | ""
+    readonly?: boolean | ""
+    invalid?: boolean | ""
+    numeric?: boolean | ""
+  }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+
+  const typed = (event: Event) => {
+    const value = (event.target as HTMLInputElement).value
+    $updateModel(value)
+    $emit("input", value)
+  }
+</script>
+
+<input class="input"
+       :class.numeric="flag(numeric)"
+       :type="type"
+       :id="id || null"
+       :value="model"
+       :placeholder="placeholder || null"
+       :aria-label="label || null"
+       :aria-describedby="describedby || null"
+       :aria-invalid="flag(invalid) ? 'true' : null"
+       :inputmode="inputmode || null"
+       :autocomplete="autocomplete || null"
+       :disabled="flag(disabled)"
+       :readonly="flag(readonly)"
+       @input="typed($event)">
+
+<style scoped>
+  .input {
+    width: 100%;
+    height: var(--mm-control-md);
+    padding: 0 .625rem;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-field);
+    box-shadow: var(--mm-well-shadow);
+    color: var(--mm-fg);
+    font: var(--mm-text-md) / 1 var(--mm-font-sans);
+    transition: border-color var(--mm-duration) var(--mm-ease), box-shadow var(--mm-duration) var(--mm-ease);
+  }
+  .input::placeholder { color: var(--mm-fg-subtle); font-style: italic; opacity: 1; }
+  .input:hover:not(:disabled) { border-color: var(--mm-border-strong); }
+  .input:focus-visible {
+    outline: none;
+    border-color: var(--mm-accent);
+    box-shadow: var(--mm-well-shadow), 0 0 0 1px var(--mm-accent);
+  }
+  .input[aria-invalid="true"] { border-color: var(--mm-bad); }
+  .input:disabled { background: var(--mm-sunken); color: var(--mm-fg-subtle); cursor: not-allowed; }
+  .numeric { font-family: var(--mm-font-mono); font-variant-numeric: tabular-nums; }
+</style>

@@ -1,0 +1,143 @@
+<script :setup="{
+  variant = 'secondary',
+  size = 'md',
+  type = 'button',
+  square = false,
+  pressed = null,
+  led = false,
+  disabled = false,
+  label = '',
+  title = ''
+}: Props" lang="ts">
+  // A key: the theme's button. It travels 1px down when pressed, and a
+  // latching key (`pressed` given) stays down, with its LED lit if it has one.
+  // `variant` is what it does to the page: `primary` is the one thing a view
+  // asks for, `secondary` the rest, `ghost` an action that should not compete
+  // with content, `danger` one that loses something.
+  //
+  //   <Key variant="primary" @click="save()">Save</Key>
+  //   <Key square label="Next track" @click="next()"><svg …/></Key>
+  //   <Key size="sm" led :pressed="shuffle" @click="shuffle = !shuffle">Shuffle</Key>
+  //
+  // **`click` is re-emitted**, with the native event as `$event.detail`: an
+  // `@click` on a component tag hears the component's `$emit`, nothing else.
+  // It is not emitted while disabled. `square` is for an icon alone, and then
+  // `label` is its accessible name.
+  //
+  // **Part of the default theme**: imports only `Led`, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = {
+    variant?: "primary" | "secondary" | "ghost" | "danger"
+    size?: "sm" | "md" | "lg"
+    type?: "button" | "submit" | "reset"
+    square?: boolean | ""
+    pressed?: boolean | "" | null
+    led?: boolean | ""
+    disabled?: boolean | ""
+    label?: string
+    title?: string
+  }
+
+  const Led = await import("./led.html")
+
+  // A bare attribute (`<Key disabled>`) arrives as "", and means on.
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: isDisabled = flag(disabled)
+  $: isSquare = flag(square)
+  $: hasLed = flag(led)
+  $: latching = pressed !== null && pressed !== undefined
+  $: isPressed = latching && flag(pressed)
+
+  const press = (event: MouseEvent) => {
+    if (!isDisabled) $emit("click", event)
+  }
+</script>
+
+<button class="key"
+        :type="type"
+        :class="`variant-${variant} size-${size}`"
+        :class.square="isSquare"
+        :aria-pressed="latching ? String(isPressed) : null"
+        :aria-label="label || null"
+        :title="title || null"
+        :disabled="isDisabled"
+        @click="press($event)">
+  <Led :if="hasLed" :on="isPressed" />
+  <slot />
+</button>
+
+<style scoped>
+  .key {
+    --h: var(--mm-control-md);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mm-space-2);
+    height: var(--h);
+    min-width: var(--h);
+    padding: 0 var(--mm-space-3);
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: var(--mm-radius-key);
+    background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+    box-shadow: var(--mm-key-shadow);
+    color: var(--mm-fg);
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-weight: var(--mm-weight-bold);
+    font-size: var(--mm-text-label);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: transform var(--mm-duration-key) ease,
+                box-shadow var(--mm-duration-key) ease,
+                background var(--mm-duration-key) ease,
+                border-color var(--mm-duration-key) ease;
+  }
+  /* An icon is the slot's markup, so the parent sizes it; this only keeps it from shrinking. */
+  .key:hover:not(:disabled) { border-color: var(--mm-fg-subtle); }
+  .key:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+  .key:disabled { opacity: .45; cursor: default; }
+
+  /* Pressed, and latched: the key travels down and its face goes into shadow. */
+  .key:active:not(:disabled),
+  .key[aria-pressed="true"] {
+    transform: translateY(1px);
+    background: var(--mm-key-down);
+    box-shadow: var(--mm-key-pressed);
+  }
+
+  .variant-primary {
+    background: var(--mm-accent);
+    border-color: var(--mm-accent-hover);
+    color: var(--mm-on-accent);
+    box-shadow: var(--mm-key-shadow-signal);
+  }
+  .variant-primary:hover:not(:disabled) { background: var(--mm-accent-hover); border-color: var(--mm-accent-hover); }
+  .variant-primary:active:not(:disabled) { background: var(--mm-accent-hover); box-shadow: var(--mm-key-pressed-signal); }
+
+  .variant-danger {
+    background: var(--mm-bad);
+    border-color: var(--mm-bad);
+    color: var(--mm-on-bad);
+    box-shadow: var(--mm-key-shadow-signal);
+  }
+  .variant-danger:hover:not(:disabled) { border-color: var(--mm-fg); }
+  .variant-danger:active:not(:disabled) { background: var(--mm-bad); box-shadow: var(--mm-key-pressed-signal); }
+
+  .variant-ghost {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: var(--mm-fg-muted);
+  }
+  .variant-ghost:hover:not(:disabled) { background: var(--mm-hover); border-color: transparent; color: var(--mm-fg); }
+  .variant-ghost:active:not(:disabled) { background: var(--mm-sunken); box-shadow: none; }
+
+  .size-sm { --h: var(--mm-control-sm); padding: 0 var(--mm-space-2); font-size: var(--mm-text-label-sm); }
+  .size-lg { --h: var(--mm-control-lg); padding: 0 var(--mm-space-4); }
+  .square { padding: 0; width: calc(var(--h) + .375rem); }
+</style>

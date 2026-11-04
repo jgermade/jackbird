@@ -1,0 +1,247 @@
+/* Deck, the default theme's tokens: every value its components draw with,
+   and the only place each one is written. Components read them with no
+   fallback, so a missing token looks missing instead of quietly drawing a
+   copy of this palette. See RECORD/2026-11-03.deck-design-system.WIP.md.
+
+   Two tones with the same roles. Silver (light) is satin aluminium, white
+   polycarbonate and a reflective LCD; Graphite (dark) is anodised black and
+   a VFD. `:root` is Silver and `[data-theme="dark"]` re-points the colours:
+   the attribute lib/preferences.ts sets on <html>. Any element can be an island of
+   the other tone with `data-tone="dark"` or `data-tone="light"`. Shape, type
+   and motion are the same in both.
+
+   Sizes are in rem, so everything scales with the root font size: 16px on
+   a desktop, and on a phone a share of the viewport's width
+   (`--mm-root-phone`, near the end), so the whole interface scales
+   linearly with the screen. Only hairlines (1-2px borders, focus rings)
+   stay in px. */
+
+:root, [data-tone="light"] {
+  /* ---- grounds ------------------------------------------------------------ */
+
+  /* The page; the chassis (bars, faceplate, panel heads) with its highlight
+     and its edge; what sits on it (panels, lists); a well cut into it (key
+     banks, switch tracks); and what is typed in. */
+  --mm-bg: #e7e9e8;
+  --mm-chassis: #d4d7d6;
+  --mm-chassis-hi: #eef0ef;
+  --mm-chassis-lo: #b4b9b8;
+  --mm-surface: #fbfbfa;
+  --mm-sunken: #e2e5e4;
+  --mm-field: #ffffff;
+  --mm-hover: #f0f2f1;
+
+  --mm-border: #c2c7c6;
+  --mm-border-strong: #979d9c;
+
+  /* A key's face, top to bottom, and the face of one held down. */
+  --mm-key-top: #f9fafa;
+  --mm-key-bottom: #e3e6e5;
+  --mm-key-down: #d9dcdb;
+
+  /* ---- ink ---------------------------------------------------------------- */
+
+  --mm-fg: #1b1d1d;
+  --mm-fg-muted: #535a5a;
+  /* Placeholders and what is switched off: readable, plainly not ink. */
+  --mm-fg-subtle: #858b8a;
+
+  /* ---- signal ------------------------------------------------------------- */
+
+  /* The one signal colour. `accent` is a fill (a primary key, a lit LED),
+     `accent-ink` the same colour as text, `accent-soft` the selection. */
+  --mm-accent: #f05a1a;
+  --mm-accent-hover: #e04e10;
+  --mm-accent-ink: #b33f0b;
+  --mm-on-accent: #1a1410;
+  --mm-accent-soft: #fde5d8;
+
+  /* Each state has an ink, an LED and a soft ground for a lamp. */
+  --mm-ok: #2a7a2e;
+  --mm-ok-led: #3fbf4a;
+  --mm-ok-soft: #e2f0e1;
+  --mm-warn: #8f5c00;
+  --mm-warn-led: #f2a900;
+  --mm-warn-soft: #f9eed3;
+  --mm-bad: #b82424;
+  --mm-bad-led: #e53935;
+  --mm-bad-soft: #f9e2e0;
+  --mm-on-bad: #ffffff;
+  --mm-led-off: #a3a9a8;
+
+  /* ---- display window ----------------------------------------------------- */
+
+  /* A reflective LCD: olive ground, dark segments, no glow. `dim` draws the
+     unlit dots and segments. */
+  --mm-display-bg: #bfc9ac;
+  --mm-display-fg: #1d2916;
+  --mm-display-dim: rgba(29, 41, 22, .11);
+  --mm-display-glow: none;
+  --mm-display-bezel: #2b2e2d;
+
+  /* The J-card stripes: the brand mark, the active tab. Same in both tones. */
+  --mm-stripe-1: #f05a1a;
+  --mm-stripe-2: #f2a900;
+  --mm-stripe-3: #2bb39f;
+
+  /* What a modal lays over the page. */
+  --mm-overlay: rgba(27, 29, 29, .42);
+
+  /* ---- depth -------------------------------------------------------------- */
+
+  --mm-key-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 0 var(--mm-chassis-lo), 0 2px 4px rgba(20, 24, 24, .14);
+  --mm-key-pressed: inset 0 2px 4px rgba(20, 24, 24, .22);
+  --mm-well-shadow: inset 0 1px 3px rgba(20, 24, 24, .18);
+  --mm-shadow-md: 0 6px 18px rgba(20, 24, 24, .10), 0 1px 3px rgba(20, 24, 24, .08);
+  --mm-shadow-lg: 0 24px 60px rgba(20, 24, 24, .22), 0 4px 12px rgba(20, 24, 24, .10);
+  /* A key in the signal colour (primary, danger), up and down. */
+  --mm-key-shadow-signal: inset 0 1px 0 rgba(255, 255, 255, .3), 0 1px 0 var(--mm-chassis-lo), 0 2px 4px rgba(20, 24, 24, .18);
+  --mm-key-pressed-signal: inset 0 2px 4px rgba(0, 0, 0, .3);
+  /* An unlit LED's dent, the display glass, the hold switch's thumb, and the
+     brushed lines on a faceplate. */
+  --mm-led-inset: inset 0 1px 1px rgba(0, 0, 0, .35);
+  --mm-display-inset: inset 0 2px 6px rgba(0, 0, 0, .35);
+  --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .5);
+  --mm-brush: rgba(255, 255, 255, .05);
+
+  /* ---- type --------------------------------------------------------------- */
+
+  --mm-font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Printed labels, keys and headings: Archivo at its widest. */
+  --mm-font-label: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mm-font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  /* The dot-matrix display. */
+  --mm-font-display: "Doto", "IBM Plex Mono", ui-monospace, monospace;
+
+  --mm-text-label-sm: .5625rem;
+  --mm-text-label: .625rem;
+  --mm-text-xs: .6875rem;
+  --mm-text-sm: .75rem;
+  --mm-text-md: .8125rem;
+  --mm-text-lg: .9375rem;
+  --mm-text-xl: 1.25rem;
+  --mm-text-2xl: 1.75rem;
+  --mm-text-display-sm: 1.0625rem;
+  --mm-text-display-lg: 1.875rem;
+  --mm-weight-regular: 400;
+  --mm-weight-medium: 500;
+  --mm-weight-bold: 600;
+  --mm-stretch-label: 125%;
+  --mm-stretch-heading: 112%;
+  --mm-tracking-label: .14em;
+  --mm-leading: 1.5;
+  --mm-leading-tight: 1.15;
+
+  /* ---- space and shape ---------------------------------------------------- */
+
+  --mm-space-1: .25rem;
+  --mm-space-2: .5rem;
+  --mm-space-3: .75rem;
+  --mm-space-4: 1rem;
+  --mm-space-5: 1.25rem;
+  --mm-space-6: 1.5rem;
+  --mm-space-7: 2rem;
+  --mm-space-8: 3rem;
+
+  --mm-radius-key: .1875rem;
+  --mm-radius-md: .375rem;
+  --mm-radius-lg: .875rem;
+  --mm-radius-full: 999px;
+  --mm-border-width: 1px;
+
+  /* A control's height, so a key, a field and a select on one row line up. */
+  --mm-control-sm: 1.5rem;
+  --mm-control-md: 1.875rem;
+  --mm-control-lg: 2.25rem;
+
+  /* ---- motion ------------------------------------------------------------- */
+
+  /* Mechanical: a key travels fast; a switch or a panel settles. */
+  --mm-ease: cubic-bezier(.2, .8, .2, 1);
+  --mm-duration-key: 70ms;
+  --mm-duration: 180ms;
+  --mm-duration-slow: 320ms;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"], [data-tone="dark"] {
+  --mm-bg: #121314;
+  --mm-chassis: #1f2022;
+  --mm-chassis-hi: #2c2e31;
+  --mm-chassis-lo: #0b0c0d;
+  --mm-surface: #1a1b1d;
+  --mm-sunken: #101112;
+  --mm-field: #0f1011;
+  --mm-hover: #242528;
+
+  --mm-border: #303236;
+  --mm-border-strong: #4a4d52;
+
+  --mm-key-top: #36393c;
+  --mm-key-bottom: #27292c;
+  --mm-key-down: #1d1f21;
+
+  --mm-fg: #ebe9e4;
+  --mm-fg-muted: #a3a29d;
+  --mm-fg-subtle: #74736f;
+
+  --mm-accent: #ff6a2b;
+  --mm-accent-hover: #ff7f47;
+  --mm-accent-ink: #ff8a55;
+  --mm-on-accent: #140c08;
+  --mm-accent-soft: #3a2015;
+
+  --mm-ok: #6fd27a;
+  --mm-ok-led: #5fe06b;
+  --mm-ok-soft: #15261a;
+  --mm-warn: #ffbf3c;
+  --mm-warn-led: #ffbf3c;
+  --mm-warn-soft: #2b2210;
+  --mm-bad: #ff7d73;
+  --mm-bad-led: #ff5a4f;
+  --mm-bad-soft: #2e1614;
+  --mm-on-bad: #1a0b0a;
+  --mm-led-off: #3d4044;
+
+  /* A VFD: black glass, glowing aqua. */
+  --mm-display-bg: #061210;
+  --mm-display-fg: #5ff2d6;
+  --mm-display-dim: rgba(95, 242, 214, .07);
+  --mm-display-glow: 0 0 6px rgba(95, 242, 214, .55);
+  --mm-display-bezel: #000000;
+
+  --mm-overlay: rgba(0, 0, 0, .6);
+
+  --mm-key-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 #000000, 0 2px 5px rgba(0, 0, 0, .5);
+  --mm-key-pressed: inset 0 2px 5px rgba(0, 0, 0, .6);
+  --mm-well-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+  --mm-shadow-md: 0 8px 24px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4);
+  --mm-shadow-lg: 0 24px 60px rgba(0, 0, 0, .65), 0 4px 12px rgba(0, 0, 0, .4);
+  --mm-key-shadow-signal: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 0 #000000, 0 2px 5px rgba(0, 0, 0, .5);
+  --mm-key-pressed-signal: inset 0 2px 5px rgba(0, 0, 0, .55);
+  --mm-display-inset: inset 0 2px 8px rgba(0, 0, 0, .8);
+  --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .1);
+  --mm-brush: rgba(255, 255, 255, .025);
+
+  color-scheme: dark;
+}
+
+/* Phones: the root font size follows the viewport's width, and with it
+   every size in rem. 4vw is 16px on a 400px-wide screen, the size the
+   theme is drawn at; a 360px phone gets 14.4px and a 430px one 17.2px. */
+:root { --mm-root-phone: 4vw; }
+@media (max-width: 480px) {
+  html { font-size: var(--mm-root-phone); }
+}
+
+/* Once, here, instead of a media query in every component: every transition
+   and animation a component writes takes its time from these. The looping
+   ones (Reel, EqBars) scale `--mm-duration-slow`, so they stop too. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mm-duration-key: 0ms;
+    --mm-duration: 0ms;
+    --mm-duration-slow: 0ms;
+  }
+}

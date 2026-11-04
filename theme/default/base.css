@@ -1,0 +1,16 @@
+/*
+ * Deck — the page itself: the few rules a page drawn with the theme needs
+ * outside its components. Box sizing, and the body's ground, ink and type.
+ * Load it after tokens.css. The components draw everything else themselves.
+ * See RECORD/2026-11-03.deck-design-system.WIP.md.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { background: var(--mm-bg); }
+
+body {
+  margin: 0;
+  color: var(--mm-fg);
+  font: var(--mm-text-md) / var(--mm-leading) var(--mm-font-sans);
+}

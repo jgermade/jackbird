@@ -1,0 +1,65 @@
+<script :setup="{ model = false, id = '', disabled = false }: Props" lang="ts">
+  // A checkbox with its label as the content; checked, it fills with the
+  // signal colour. A choice that is saved later with a form. One that takes
+  // effect at once is a SlideSwitch.
+  //
+  //   <Checkbox :model="renameFiles">Rename files from tags</Checkbox>
+  //
+  // The value goes up through `:model` and as `change`.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { model?: boolean | ""; id?: string; disabled?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+
+  const toggle = (event: Event) => {
+    const checked = (event.target as HTMLInputElement).checked
+    $updateModel(checked)
+    $emit("change", checked)
+  }
+</script>
+
+<label class="check" :class.disabled="flag(disabled)">
+  <input type="checkbox" class="box" :id="id || null" :checked="flag(model)" :disabled="flag(disabled)" @change="toggle($event)">
+  <span><slot /></span>
+</label>
+
+<style scoped>
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    color: var(--mm-fg);
+    font-size: var(--mm-text-md);
+    cursor: pointer;
+  }
+  .disabled { opacity: .45; cursor: default; }
+  .box {
+    appearance: none;
+    display: grid;
+    flex: none;
+    place-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: 2px;
+    background: var(--mm-field);
+    box-shadow: var(--mm-well-shadow);
+    cursor: inherit;
+  }
+  .box::after {
+    content: "";
+    width: .25rem;
+    height: .5rem;
+    border: solid var(--mm-on-accent);
+    border-width: 0 2px 2px 0;
+    transform: translateY(-1px) rotate(45deg);
+    opacity: 0;
+  }
+  .box:checked { background: var(--mm-accent); border-color: var(--mm-accent-hover); box-shadow: none; }
+  .box:checked::after { opacity: 1; }
+  .box:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+</style>

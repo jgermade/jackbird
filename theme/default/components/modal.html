@@ -1,0 +1,111 @@
+<script :setup="{ open = false, title = '', eyebrow = '', size = 'md', closeLabel = 'Close' }: Props" lang="ts">
+  // A modal on the platform's `<dialog>`, opened with `showModal()`: Escape,
+  // the focus held inside, the page behind made inert, and a backdrop.
+  //
+  //   <Modal :open="editing" eyebrow="2 tracks" title="Edit metadata" @close="editing = false">
+  //     …
+  //     <template :slot.foot><Key variant="primary" @click="save()">Save</Key></template>
+  //   </Modal>
+  //
+  // **The owner decides whether it closes.** Escape, a click on the backdrop
+  // and the close key emit `close`; the dialog follows `:open`. `closeLabel`
+  // is the close key's accessible name.
+  //
+  // **Part of the default theme**: imports `Key`, and draws only with
+  // `tokens.css` (and `content.css` for the eyebrow). See
+  // `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { open?: boolean | ""; title?: string; eyebrow?: string; size?: "sm" | "md" | "lg"; closeLabel?: string }
+
+  const Key = await import("./key.html")
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: isOpen = flag(open)
+  const titleId = `mm-modal-${Math.random().toString(36).slice(2, 10)}`
+
+  const sync = () => {
+    const dialog = $self("dialog") as HTMLDialogElement | null
+    if (!dialog) return
+    if (isOpen && !dialog.open) dialog.showModal()
+    if (!isOpen && dialog.open) dialog.close()
+  }
+  $: sync(isOpen)
+
+  // Escape: the browser would close the dialog on its own; the owner decides.
+  const cancel = (event: Event) => {
+    event.preventDefault()
+    $emit("close")
+  }
+
+  await $mounted()
+  sync()
+</script>
+
+<dialog class="modal"
+        :class="`size-${size}`"
+        :aria-labelledby="titleId"
+        @cancel="cancel($event)"
+        @click.self="$emit('close')">
+  <header class="head">
+    <div class="titles">
+      <span :if="eyebrow" class="mm-legend">{{ eyebrow }}</span>
+      <h2 class="title" :id="titleId">{{ title }}</h2>
+    </div>
+    <Key variant="ghost" square :label="closeLabel" :title="closeLabel" @click="$emit('close')">
+      <svg class="close-icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+    </Key>
+  </header>
+  <div class="body"><slot /></div>
+  <footer :if="$slots.foot" class="foot"><slot.foot /></footer>
+</dialog>
+
+<style scoped>
+  .modal {
+    --width: 35rem;
+    width: min(var(--width), calc(100vw - 2 * var(--mm-space-4)));
+    max-height: calc(100vh - 2 * var(--mm-space-6));
+    padding: 0;
+    border: var(--mm-border-width) solid var(--mm-chassis-lo);
+    border-radius: var(--mm-radius-lg);
+    background: var(--mm-surface);
+    color: var(--mm-fg);
+    box-shadow: var(--mm-shadow-lg);
+    overflow: hidden;
+  }
+  .modal[open] { display: flex; flex-direction: column; }
+  .size-sm { --width: 25rem; }
+  .size-lg { --width: 47.5rem; }
+  .modal::backdrop { background: var(--mm-overlay); }
+
+  .head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mm-space-3);
+    padding: var(--mm-space-3) var(--mm-space-3) var(--mm-space-3) var(--mm-space-5);
+    border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
+    background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+  }
+  .titles { display: grid; gap: 2px; min-width: 0; }
+  .title {
+    margin: 0;
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-heading);
+    font-weight: 700;
+    font-size: var(--mm-text-lg);
+    line-height: var(--mm-leading-tight);
+  }
+  .close-icon { width: .75rem; height: .75rem; }
+  .body { flex: 1 1 auto; padding: var(--mm-space-5); overflow: auto; }
+  .foot {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--mm-space-2);
+    padding: var(--mm-space-3) var(--mm-space-5);
+    border-top: var(--mm-border-width) solid var(--mm-border);
+  }
+</style>

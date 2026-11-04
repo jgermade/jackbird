@@ -1,0 +1,24 @@
+<script :setup="{ label = '' }: Props" lang="ts">
+  // Keys set in one recess, like a deck's transport or a radio's presets.
+  //
+  //   <KeyBank label="Transport"><Key square label="Play">…</Key>…</KeyBank>
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { label?: string }
+</script>
+
+<div class="bank" role="group" :aria-label="label || null"><slot /></div>
+
+<style scoped>
+  .bank {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .1875rem;
+    padding: .1875rem;
+    border-radius: calc(var(--mm-radius-key) + 2px);
+    background: var(--mm-sunken);
+    box-shadow: var(--mm-well-shadow);
+  }
+</style>

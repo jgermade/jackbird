@@ -1,0 +1,108 @@
+<script :setup="{ model = null, alt = '', dropLabel = '', chooseLabel = '', removeLabel = '', failLabel = '' }: Props" lang="ts">
+  // A cover being edited: the image, or the empty sleeve. An image file
+  // dropped on it, or chosen with its key, becomes the cover as a data URL;
+  // the other key removes it. While a file is dragged over it, `dropLabel`
+  // says it can be dropped there.
+  //
+  //   <CoverDrop :model="form.coverDataUrl" alt="Cover" drop-label="Drop an image here"
+  //              choose-label="Choose image" remove-label="Remove" fail-label="Could not read the image."
+  //              @error="message = $event.detail" />
+  //
+  // The data URL (or `null`) goes up through `:model` and as `change`. A file
+  // that cannot be read emits `error` with `failLabel`; one that is not an
+  // image is ignored.
+  //
+  // Store-free (src/components/): its texts come as props. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
+
+  type Props = {
+    model?: string | null
+    alt?: string
+    dropLabel?: string
+    chooseLabel?: string
+    removeLabel?: string
+    failLabel?: string
+  }
+
+  const Key = await import("../../theme/default/components/key.html")
+  const Stripes = await import("../../theme/default/components/stripes.html")
+
+  let over: boolean = false
+
+  const set = (next: string | null) => {
+    $updateModel(next)
+    $emit("change", next)
+  }
+
+  const read = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+
+  const take = async (files: FileList | null | undefined) => {
+    const file = files?.[0]
+    if (!file || !file.type.startsWith("image/")) return
+    try {
+      set(await read(file))
+    } catch {
+      $emit("error", failLabel)
+    }
+  }
+
+  const enter = (event: DragEvent) => {
+    event.preventDefault()
+    over = true
+  }
+  const drop = (event: DragEvent) => {
+    event.preventDefault()
+    over = false
+    void take(event.dataTransfer?.files)
+  }
+  const choose = () => ($self("input[type=file]") as HTMLInputElement | null)?.click()
+  const picked = (event: Event) => {
+    const input = event.target as HTMLInputElement
+    void take(input.files)
+    input.value = ""
+  }
+</script>
+
+<div class="cover-drop">
+  <div class="sleeve" :class.over="over" :title="dropLabel || null" @dragover="enter($event)" @dragleave="over = false" @drop="drop($event)">
+    <img :if="model" class="image" :src="model" :alt="alt" />
+    <span :else class="band"><Stripes variant="band" /></span>
+    <span :if="over" class="mm-legend hint">{{ dropLabel }}</span>
+  </div>
+  <div class="keys">
+    <Key size="sm" @click="choose()">{{ chooseLabel }}</Key>
+    <Key size="sm" variant="ghost" :disabled="!model" @click="set(null)">{{ removeLabel }}</Key>
+  </div>
+  <input class="file" type="file" accept="image/*" tabindex="-1" aria-hidden="true" @change="picked($event)">
+</div>
+
+<style scoped>
+  .cover-drop { display: grid; gap: var(--mm-space-2); width: 9rem; }
+  .sleeve {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-display-bezel);
+    box-shadow: var(--mm-shadow-md);
+  }
+  .sleeve.over { outline: 2px dashed var(--mm-accent); outline-offset: 2px; }
+  .image { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
+  .hint {
+    position: absolute;
+    inset: auto 0 0;
+    padding: var(--mm-space-2);
+    background: var(--mm-overlay);
+    color: var(--mm-chassis-hi);
+    text-align: center;
+  }
+  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-1); }
+  .file { display: none; }
+</style>

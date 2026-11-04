@@ -1,0 +1,82 @@
+<script :setup="{ model = '', options = [], id = '', label = '', describedby = '', disabled = false, invalid = false }: Props" lang="ts">
+  // The native select, drawn like a TextInput with a chevron. Its options
+  // come as data, strings or `{ value, label }`, because a `<select>` cannot
+  // hold a slot: the HTML parser drops anything in it that is not an option.
+  //
+  //   <Select id="genre" :model="genre" :options="['Jazz', 'Modal jazz']" />
+  //
+  // The value goes up through `:model` and as `change`.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Option = string | { value: string; label: string }
+  type Props = {
+    model?: string
+    options?: Option[]
+    id?: string
+    label?: string
+    describedby?: string
+    disabled?: boolean | ""
+    invalid?: boolean | ""
+  }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: list = options.map((option: Option) => (typeof option === "string" ? { value: option, label: option } : option))
+
+  const pick = (event: Event) => {
+    const value = (event.target as HTMLSelectElement).value
+    $updateModel(value)
+    $emit("change", value)
+  }
+</script>
+
+<span class="select">
+  <select class="control"
+          :id="id || null"
+          :aria-label="label || null"
+          :aria-describedby="describedby || null"
+          :aria-invalid="flag(invalid) ? 'true' : null"
+          :disabled="flag(disabled)"
+          :value="model"
+          @change="pick($event)">
+    <option :each="option in list" :key="option.value" :value="option.value" :selected="option.value === model">{{ option.label }}</option>
+  </select>
+</span>
+
+<style scoped>
+  .select { position: relative; display: block; min-width: 0; }
+  .select::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: .6875rem;
+    width: .375rem;
+    height: .375rem;
+    border-right: 1.5px solid var(--mm-fg-muted);
+    border-bottom: 1.5px solid var(--mm-fg-muted);
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
+  }
+  .control {
+    appearance: none;
+    width: 100%;
+    height: var(--mm-control-md);
+    padding: 0 1.75rem 0 .625rem;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-field);
+    box-shadow: var(--mm-well-shadow);
+    color: var(--mm-fg);
+    font: var(--mm-text-md) / 1 var(--mm-font-sans);
+    cursor: pointer;
+  }
+  .control:hover:not(:disabled) { border-color: var(--mm-border-strong); }
+  .control:focus-visible {
+    outline: none;
+    border-color: var(--mm-accent);
+    box-shadow: var(--mm-well-shadow), 0 0 0 1px var(--mm-accent);
+  }
+  .control[aria-invalid="true"] { border-color: var(--mm-bad); }
+  .control:disabled { background: var(--mm-sunken); color: var(--mm-fg-subtle); cursor: not-allowed; }
+</style>

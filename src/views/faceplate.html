@@ -1,0 +1,182 @@
+<script :setup lang="ts">
+  // The app's top bar as a Deck faceplate: the brand, the folder key, the
+  // transport, the display, and the open roots as tabs. A view: it reads the
+  // lib/ stores and calls lib/ actions, and draws with theme components. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (step 4).
+
+  const Counter = await import("../../theme/default/components/counter.html")
+  const Display = await import("../../theme/default/components/display.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const KeyBank = await import("../../theme/default/components/key-bank.html")
+  const Meter = await import("../../theme/default/components/meter.html")
+  const Reel = await import("../../theme/default/components/reel.html")
+  const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
+  const Tabs = await import("../../theme/default/components/tabs.html")
+
+  const { formatTime } = await import("../helpers/format")
+  const { t } = await import("../lib/i18n")
+  const { library } = await import("../lib/library")
+  const { playback } = await import("../lib/playback")
+  const { nowPlaying, next, previous, togglePlay } = await import("../lib/player")
+  const { preferences, setTheme } = await import("../lib/preferences")
+  const { closeRoot, openFolder, selectRoot, showQueueInLibrary } = await import("../lib/roots")
+  const { ui } = await import("../lib/ui")
+  const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
+
+  const pad = (n: number): string => String(n).padStart(2, "0")
+
+  $: current = nowPlaying.value
+  $: isDark = preferences.theme === "dark"
+  $: hasRoots = library.roots.length > 0
+  $: folderLabel = library.loading ? t("picker.scanning") : hasRoots ? t("picker.addRoot") : t("picker.openLibrary")
+
+  $: stateLabel =
+    playback.error ? t("faceplate.state.error")
+    : playback.loading ? t("faceplate.state.loading")
+    : playback.playing ? `▶ ${t("faceplate.state.playing")}`
+    : current ? `❚❚ ${t("faceplate.state.paused")}`
+    : `■ ${t("faceplate.state.stopped")}`
+  $: titleLine = playback.error || (current ? (current.artist ? `${current.title} — ${current.artist}` : current.title) : t("faceplate.idle"))
+  $: trackCounter = current ? `${pad(current.position)}/${pad(current.total)}` : ""
+  $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
+  $: returnLabel = current ? t("playback.returnTo", { source: current.sourceLabel, position: current.position, total: current.total }) : t("playback.label")
+
+  $: tabs = library.roots.map((root) => ({
+    id: root.id,
+    label: root.label,
+    meta: root.loadingMetadata ? `${root.loadedCount}/${root.tracks.length}` : String(root.tracks.length),
+    closeLabel: t("roots.close", { name: root.label })
+  }))
+
+  const switchTone = (dark: boolean) => setTheme(dark ? "dark" : "light")
+
+  // Phones drop the switch's printed legends, so the first row fits.
+  const phone = matchMedia("(max-width: 640px)")
+  let narrow: boolean = phone.matches
+  const onPhone = (event: MediaQueryListEvent) => { narrow = event.matches }
+  phone.addEventListener("change", onPhone)
+  $destroyed(() => phone.removeEventListener("change", onPhone))
+</script>
+
+<header class="faceplate">
+  <div class="deck">
+    <div class="brand-mark">
+      <img class="logo" :src="logoUrl" alt="" />
+      <span class="wordmark">{{ t("app.name") }}</span>
+    </div>
+
+    <div class="transport">
+      <KeyBank :label="t('faceplate.transport')">
+        <Key square :label="t('playback.previous')" :title="t('playback.previous')" :disabled="!current || current.position === 1" @click="previous()">
+          <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="2" y="3" width="2" height="10" /><path d="M14 3v10L5 8z" /></svg>
+        </Key>
+        <Key square :label="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :title="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :pressed="playback.playing" :disabled="!current" @click="togglePlay()">
+          <svg :if="playback.playing" class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" /><rect x="9.5" y="3" width="3" height="10" /></svg>
+          <svg :else class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
+        </Key>
+        <Key square :label="t('playback.next')" :title="t('playback.next')" :disabled="!current || current.position >= current.total" @click="next()">
+          <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="12" y="3" width="2" height="10" /><path d="M2 3v10l9-5z" /></svg>
+        </Key>
+      </KeyBank>
+    </div>
+
+    <div class="screen">
+      <Display live>
+        <div class="mm-display-row">
+          <span class="mm-display-label">{{ stateLabel }}</span>
+          <span :if="current" class="mm-display-label">{{ t("faceplate.track") }} <Counter size="sm">{{ trackCounter }}</Counter></span>
+        </div>
+        <div class="mm-display-row">
+          <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+          <Counter>{{ formatTime(playback.position) }}</Counter>
+        </div>
+        <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+      </Display>
+    </div>
+
+    <div class="actions">
+      <Key square :label="returnLabel" :title="returnLabel" :disabled="!current" @click="showQueueInLibrary()">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
+      </Key>
+      <SlideSwitch :label="t('faceplate.tone')" :off-legend="narrow ? '' : t('faceplate.light')" :on-legend="narrow ? '' : t('faceplate.dark')" :model="isDark" @change="switchTone($event.detail)" />
+      <Key square :label="t('preferences.open')" :title="t('preferences.title')" @click="ui.preferencesOpen = true">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.4" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke-linecap="round" /></svg>
+      </Key>
+    </div>
+  </div>
+
+  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
+    <template :slot.end>
+      <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
+      <span class="open-folder">
+        <Key size="sm" :variant="hasRoots ? 'secondary' : 'primary'" :disabled="library.loading" :title="folderLabel" @click="openFolder()">
+          <Reel :if="library.loading" :size="12" speed="fast" />
+          <svg :else class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          {{ folderLabel }}
+        </Key>
+      </span>
+    </template>
+  </Tabs>
+</header>
+
+<style scoped>
+  .faceplate {
+    border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
+    background:
+      repeating-linear-gradient(90deg, var(--mm-brush) 0 1px, transparent 1px 3px),
+      linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+    color: var(--mm-fg);
+    font-family: var(--mm-font-sans);
+  }
+
+  .deck {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "brand transport screen actions";
+    align-items: center;
+    gap: var(--mm-space-3) var(--mm-space-4);
+    padding: var(--mm-space-3) var(--mm-space-4);
+  }
+  .brand-mark { grid-area: brand; display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
+  .transport { grid-area: transport; width: max-content; }
+  .screen { grid-area: screen; min-width: 0; }
+  .actions { grid-area: actions; display: flex; align-items: center; gap: var(--mm-space-3); }
+
+  .logo { display: block; flex: none; height: 2.75rem; width: auto; }
+  .wordmark {
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-weight: 800;
+    font-size: var(--mm-text-lg);
+    letter-spacing: .08em;
+    line-height: var(--mm-leading-tight);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .icon { width: .875rem; height: .875rem; }
+
+  @media (max-width: 1100px) {
+    .deck {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        "brand . actions"
+        "transport screen screen";
+    }
+  }
+  /* Phones: the logo and the actions share the first row (the wordmark
+     goes), the transport and the display the second, so the faceplate stays
+     short while it sits on top of the panes. */
+  @media (max-width: 640px) {
+    .deck {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas:
+        "brand actions"
+        "transport screen";
+      gap: var(--mm-space-2) var(--mm-space-3);
+      padding: var(--mm-space-2) var(--mm-space-3);
+    }
+    .wordmark { display: none; }
+    .actions { justify-self: end; }
+    .logo { height: 2.25rem; }
+  }
+</style>

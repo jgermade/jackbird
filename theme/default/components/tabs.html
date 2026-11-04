@@ -1,0 +1,143 @@
+<script :setup="{ items = [], model = null, label = '', closable = false }: Props" lang="ts">
+  // Tabs on the chassis: the open folders. The open one joins the panel
+  // below, carries the stripes and has its LED lit. Arrow keys, Home and End
+  // move between tabs and open them as they go.
+  //
+  //   <Tabs label="Open folders" :model="active" closable :items="roots" @close="closeRoot($event.detail)" />
+  //
+  // An item is `{ id, label, meta, closeLabel }`; `meta` is small mono text
+  // after the label (a count), `closeLabel` the close key's accessible name.
+  // The choice goes up through `:model` and as `change`; a close key emits
+  // `close` with the item's id, and the owner decides what goes. The `end`
+  // slot sits right after the last tab: a key that adds one, say.
+  //
+  // **Part of the default theme**: imports `Led`, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Item = { id: string; label: string; meta?: string | number; closeLabel?: string }
+  type Props = { items?: Item[]; model?: string | null; label?: string; closable?: boolean | "" }
+
+  const Led = await import("./led.html")
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: canClose = flag(closable)
+  $: focusable = items.some((item: Item) => item.id === model) ? model : items[0]?.id
+
+  const choose = (id: string) => {
+    if (id === model) return
+    $updateModel(id)
+    $emit("change", id)
+  }
+
+  const STEP: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 }
+  const key = (event: KeyboardEvent, item: Item) => {
+    const index = items.indexOf(item)
+    const last = items.length - 1
+    const next =
+      event.key === "Home" ? 0 :
+      event.key === "End" ? last :
+      event.key in STEP ? (index + STEP[event.key] + items.length) % items.length :
+      -1
+    if (next < 0) return
+    event.preventDefault()
+    choose(items[next].id)
+    $$self('[role="tab"]')[next]?.focus()
+  }
+</script>
+
+<div class="tabs" role="tablist" :aria-label="label || null">
+  <div :each="item in items" :key="item.id" class="tab" :class.on="item.id === model">
+    <button type="button"
+            role="tab"
+            class="main"
+            :aria-selected="item.id === model ? 'true' : 'false'"
+            :tabindex="item.id === focusable ? 0 : -1"
+            @click="choose(item.id)"
+            @keydown="key($event, item)">
+      <Led :on="item.id === model" />
+      <span>{{ item.label }}</span>
+      <span :if="item.meta !== undefined && item.meta !== null && item.meta !== ''" class="meta">{{ item.meta }}</span>
+    </button>
+    <button :if="canClose"
+            type="button"
+            class="close"
+            :aria-label="item.closeLabel || 'Close tab'"
+            :title="item.closeLabel || null"
+            @click="$emit('close', item.id)">
+      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+    </button>
+  </div>
+  <div :if="$slots.end" class="end"><slot.end /></div>
+</div>
+
+<style scoped>
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: var(--mm-space-2) var(--mm-space-3) 0;
+    overflow-x: auto;
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+    scrollbar-width: thin;
+  }
+  .end {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--mm-space-2);
+    padding: 0 var(--mm-space-2) var(--mm-space-1);
+  }
+  .tab {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    margin-bottom: -1px;
+    border: var(--mm-border-width) solid transparent;
+    border-bottom: 0;
+    border-radius: .3125rem .3125rem 0 0;
+  }
+  /* The open tab joins the panel under it and carries the stripes. */
+  .tab.on { background: var(--mm-surface); border-color: var(--mm-border); }
+  .tab.on::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    left: -1px;
+    height: .25rem;
+    border-radius: .3125rem .3125rem 0 0;
+    background: linear-gradient(90deg, var(--mm-stripe-1) 0 33.33%, var(--mm-stripe-2) 0 66.66%, var(--mm-stripe-3) 0);
+  }
+  .main {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    height: 2rem;
+    padding: 0 var(--mm-space-4);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg-muted);
+    font: var(--mm-weight-medium) var(--mm-text-sm) var(--mm-font-sans);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .main:hover, .on .main { color: var(--mm-fg); }
+  .meta { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  .close {
+    display: inline-grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0 var(--mm-space-2) 0 calc(var(--mm-space-2) * -1);
+    padding: 0;
+    border: 0;
+    border-radius: var(--mm-radius-key);
+    background: transparent;
+    color: var(--mm-fg-subtle);
+    cursor: pointer;
+  }
+  .close:hover { background: var(--mm-hover); color: var(--mm-fg); }
+  .close svg { width: .625rem; height: .625rem; }
+  .main:focus-visible, .close:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; border-radius: var(--mm-radius-key); }
+</style>

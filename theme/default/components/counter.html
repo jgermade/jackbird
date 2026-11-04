@@ -1,0 +1,25 @@
+<script :setup="{ size = 'lg' }: Props" lang="ts">
+  // Digits in the dot-matrix face: times, track numbers, counts. It takes
+  // the colour around it, so inside a Display it lights up with the window.
+  //
+  //   <Counter>03:12</Counter>  <Counter size="sm">01/05</Counter>
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { size?: "sm" | "lg" }
+</script>
+
+<span class="counter" :class.sm="size === 'sm'"><slot /></span>
+
+<style scoped>
+  .counter {
+    font-family: var(--mm-font-display);
+    font-weight: 700;
+    font-size: var(--mm-text-display-lg);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .sm { font-size: var(--mm-text-display-sm); }
+</style>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deck — jackbird default theme</title>
+    <!-- The tone last chosen here, else the system's, before the first paint
+         so a dark page does not open light. The app keeps its own tone under
+         its own key (src/lib/preferences.ts). -->
+    <script>
+      try {
+        const chosen = localStorage.getItem("mp3-manager.theme-demo");
+        const dark = chosen ? chosen === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="demo"></div>
+    <script type="module" src="./demo.ts"></script>
+  </body>
+</html>
