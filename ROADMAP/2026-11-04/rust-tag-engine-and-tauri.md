@@ -6,7 +6,9 @@ What is planned, in order. The reasoning lives in
 first, then the desktop app, with the daemon, the SQLite index and the sync mesh deferred.
 
 Dates are estimates from the day each step starts; each step ends with its "done when" met and a
-walkthrough in the record. E0 is a spike that decides whether the rest goes ahead as written.
+walkthrough in the record. E0, the spike, is done: the rest goes ahead with the changes the record
+lists (2026-11-04, 18:30 for E1 and E2, 19:41 for E4's media URLs, the latter awaiting approval).
+After E4 comes the family instance ([family-instance.md](family-instance.md)).
 
 ```mermaid
 gantt
@@ -14,7 +16,7 @@ gantt
   dateFormat YYYY-MM-DD
   axisFormat %d %b
   section Decide
-    E0 Spike: lofty in wasm, Tauri shell      :e0, 2026-11-05, 3d
+    E0 Spike: lofty in wasm, Tauri shell      :done, e0, 2026-11-04, 1d
   section Tag engine
     E1 crates/tags (lofty, safeguards)         :e1, after e0, 5d
     E2 The engine in the web app (wasm)        :e2, after e1, 5d
@@ -28,7 +30,7 @@ gantt
 
 | Step | Scope | Done when |
 | --- | --- | --- |
-| E0 Spike | `lofty` built for `wasm32-unknown-unknown`; size and speed against today's engine on the 13 MB benchmark file; whether `lofty` keeps unedited ID3 frames, Vorbis comments and FLAC blocks; a Tauri v2 shell loading today's `dist/` on macOS, Windows and Linux (jq79, `<audio>`, the analyser) | a go / no-go with the measurements is in the record |
+| E0 Spike (**done**, 2026-11-04) | `lofty` built for `wasm32-unknown-unknown`; size and speed against today's engine on the 13 MB benchmark file; whether `lofty` keeps unedited ID3 frames, Vorbis comments and FLAC blocks; a Tauri v2 shell loading today's `dist/` on macOS, Windows and Linux (jq79, `<audio>`, the analyser) | go, with a merge layer in E1 (record, 18:30–19:41); the owner's run by hand of the CI bundles is pending |
 | E1 Tag engine | `crates/tags`: read and write tags over bytes, the audio region of each format, and the write safeguards (parse again, audio bytes unchanged, else refuse), with `cargo test` on shared fixtures | the fixtures pass, including every case the TypeScript `id3v2` tests cover |
 | E2 Engine in the web | `crates/tags-wasm` (wasm-bindgen), `src/lib/tags/` with one interface and its wasm implementation, loaded lazily; `jsmediatags`, `browser-id3-writer` and `src/helpers/id3v2.ts` retired; checksums keep their definitions | `npm test` runs the fixtures against the wasm build; an existing `.meta/` reopens without re-reading any file; the first load is no slower |
 | E3 FLAC | the walk takes `.flac`; MIME types by extension; `Mp3Track` becomes `Track`; texts no longer say MP3 only | a FLAC library opens, plays, edits and saves, and every saved file decodes with `ffmpeg` and keeps its unedited comments and blocks |
