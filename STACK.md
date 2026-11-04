@@ -48,7 +48,7 @@ This document describes the technical stack and codebase architecture implemente
   writes, through the VFS adapter. The player plays a track from its file's own object URL
   (`src/lib/media.ts`), not from its bytes, and reopens the file when it is rewritten.
 - **Web Audio API**: the player's audio element goes through an `AnalyserNode` on its way to the
-  speakers, for the display's spectrum analyser (above 900px wide), in an `AudioContext` at the
+  speakers, for the display's spectrum analyser (above 640px wide), in an `AudioContext` at the
   device's rate with `latencyHint: "playback"`; the bands span 40 Hz–16 kHz whatever the rate.
 - **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
   `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package

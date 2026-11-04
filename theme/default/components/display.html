@@ -34,16 +34,17 @@
 <style scoped>
   .bezel {
     min-width: 0;
-    padding: .25rem;
-    border-radius: calc(var(--mm-radius-md) + 2px);
-    background: var(--mm-display-bezel);
+    padding: 1px;
+    /* The window's radius plus the padding, so the rim keeps one width round the corners. */
+    border-radius: calc(var(--mm-radius-key) + 2px);
+    background: var(--mm-display-rim);
   }
   .window {
     position: relative;
     display: grid;
     gap: var(--mm-space-1);
     min-width: 0;
-    padding: var(--mm-space-2) var(--mm-space-3) .625rem;
+    padding: var(--mm-space-2) var(--mm-space-3);
     border-radius: calc(var(--mm-radius-key) + 1px);
     background-color: var(--mm-display-bg);
     background-image: radial-gradient(var(--mm-display-dim) .9px, transparent 1.1px);
