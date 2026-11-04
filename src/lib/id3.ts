@@ -1,5 +1,6 @@
 import { ID3Writer } from "browser-id3-writer";
 import jsmediatags from "jsmediatags/dist/jsmediatags.min.js";
+import { keepUneditedFrames } from "../helpers/id3v2";
 import type { EditableMetadata, TrackMetadata } from "../types";
 
 type WriterAny = {
@@ -36,7 +37,8 @@ function parseTag(file: File): Promise<TrackMetadata> {
           title: (tags.title as string) ?? "",
           artist: (tags.artist as string) ?? "",
           album: (tags.album as string) ?? "",
-          year: (tags.year as string) ?? "",
+          // jsmediatags maps the year from TYER (v2.3) only; a v2.4 tag keeps it in TDRC.
+          year: (tags.year as string) ?? (tags.TDRC as { data?: string } | undefined)?.data ?? "",
           genre: (tags.genre as string) ?? "",
           trackNumber: (tags.track as string) ?? "",
           coverDataUrl: picture ? bytesToDataUrl(picture.data, picture.format) : null
@@ -107,7 +109,8 @@ export async function writeTrackMetadataToBytes(
 
   writer.addTag();
   const blob = writer.getBlob();
-  return new Uint8Array(await blob.arrayBuffer());
+  // The writer drops the whole tag it found: put back the frames the editor does not manage.
+  return keepUneditedFrames(sourceBytes, new Uint8Array(await blob.arrayBuffer()));
 }
 
 export function getAudioFrameSlice(bytes: Uint8Array): Uint8Array {

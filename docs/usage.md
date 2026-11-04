@@ -107,7 +107,9 @@ and each track keeps its own; drop or choose one and every track gets it.
 
 For the cover, drop an image on it or use **Choose image**; **Remove** takes it away.
 
-**Save changes** writes the tags and the cover into the MP3 files themselves.
+**Save changes** writes the tags and the cover into the MP3 files themselves. Every other tag the
+files carry (album artist, disc number, comments, lyrics, ReplayGain and the like) is kept as it
+was.
 
 ## Checking files in the background
 
