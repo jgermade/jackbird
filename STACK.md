@@ -95,13 +95,13 @@ mp3-manager/
 │   ├── components/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove
 │   ├── views/
-│   │   ├── app.html             # Root: faceplate, workspace, the three dialogs
-│   │   ├── faceplate.html       # Brand, transport, display, root tabs + folder key
+│   │   ├── app.html             # Root: faceplate, workspace, the two dialogs
+│   │   ├── faceplate.html       # Brand, transport, display, root tabs (a dropdown on phones),
+│   │   │                        # folder key, the selection's key
 │   │   ├── workspace.html       # The two panes (swipeable on phones, footer selector), Escape
 │   │   ├── library.html         # The tree, its head, messages and scan meter
-│   │   ├── album-sheet.html     # Landing, action bar, albums and discs
-│   │   ├── edit-dialog.html     # Metadata editor (one track or many)
-│   │   ├── info-dialog.html     # File information (one track or totals)
+│   │   ├── album-sheet.html     # Landing, albums and discs
+│   │   ├── selection-dialog.html # The selection: Edit, Info and Danger tabs
 │   │   └── preferences-dialog.html # Tone and language
 │   └── lib/
 │       ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
@@ -163,8 +163,10 @@ mp3-manager/
   still being read.
 - In the tree and the album sheet, a click (or Enter) on a track plays it, and a box at its left
   selects it (Shift-click for a range, Space and Shift+Space, Escape to clear).
-- Metadata editor for one track or many: a field that varies across the selection keeps each
-  track's value unless typed over; cover art by drag & drop or file choice.
+- The selection's key in the tab bar opens one dialog with Edit, Info and Danger tabs. The editor
+  works on one track or many: a field that varies across the selection keeps each track's value
+  unless typed over or its "All" box is ticked (then even an empty value is written); cover art by
+  drag & drop or file choice. Danger removes the tracks from the library (not from disk).
 - Session restore on load: previously opened roots (with granted permission) reopen
   automatically, keeping the last active tab.
 - Light (Silver) and dark (Graphite) tone, from the faceplate's switch or Preferences,

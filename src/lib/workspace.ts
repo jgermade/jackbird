@@ -16,7 +16,6 @@ import { library } from "./library";
 import { nowPlaying, playQueue, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
-import { ui } from "./ui";
 
 /**
  * A derived value handed to views whole. jq79 passes class instances through
@@ -174,7 +173,7 @@ export function collapseAllFolders(): void {
   updateActive((root) => ({ ...root, expandedAlbums: [], expandedDiscs: [] }));
 }
 
-/** Drops the selected tracks from the library (not from disk). The view asks first. */
+/** Drops the selected tracks from the library (not from disk): they come back when the folder is opened again. */
 export function removeSelectedTracks(): void {
   const root = current();
   if (!root || root.selectedTrackIds.length === 0) {
@@ -231,10 +230,4 @@ export function playFromTree(rowKey: string): void {
 /** The per-track rename key: a placeholder until the naming pattern exists. */
 export function consolidateTrack(): void {
   library.infoMessage = t("message.consolidatePending");
-}
-
-export function showInfo(): void {
-  if (selectedTracks.value.data.length > 0) {
-    ui.infoModalOpen = true;
-  }
 }

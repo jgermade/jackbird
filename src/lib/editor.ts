@@ -14,30 +14,47 @@ import { calculateDualChecksums, writeTrackMetadataToBytes } from "./id3";
 import { library } from "./library";
 import { flushMeta } from "./meta";
 import { updateRoots } from "./roots";
-import { ui } from "./ui";
+import { ui, type SelectionTab } from "./ui";
 import { activeRoot, selectedTracks } from "./workspace";
 
 /**
- * The form. Filled when the editor opens and changed only by typing, so
+ * The form. Filled when the dialog opens and changed only by typing, so
  * nothing a background update writes to the roots resets what is being typed.
+ * `confirmed` holds the varied fields whose "All" box is ticked while empty:
+ * those are cleared on every track (see mergeDraft).
  */
 export const editor = $reactive({
-  form: emptyMetadata() as EditableMetadata
+  form: emptyMetadata() as EditableMetadata,
+  confirmed: [] as string[]
 });
 
-/** Opens the editor on the selection, with the values its tracks share. */
-export function openEditor(): void {
+/**
+ * Opens the selection's dialog on `tab`, the form filled with the values its
+ * tracks share. Switching tabs afterwards keeps what was typed.
+ */
+export function openSelection(tab: SelectionTab = "edit"): void {
   const tracks = selectedTracks.value.data;
   if (tracks.length === 0) {
     return;
   }
   editor.form = computeCommonMetadata(tracks);
+  editor.confirmed = [];
   library.errorMessage = null;
-  ui.editModalOpen = true;
+  ui.selectionTab = tab;
+  ui.selectionOpen = true;
 }
 
-export function closeEditor(): void {
-  ui.editModalOpen = false;
+export function closeSelection(): void {
+  ui.selectionOpen = false;
+}
+
+/** The "All" box of a varied field: ticked, its value goes to every track; unticked, the field empties. */
+export function confirmField(field: string, on: boolean): void {
+  const rest = editor.confirmed.filter((one) => one !== field);
+  editor.confirmed = on ? [...rest, field] : rest;
+  if (!on) {
+    editor.form = { ...editor.form, [field]: "" };
+  }
 }
 
 /**
@@ -57,6 +74,7 @@ export async function saveEdits(): Promise<void> {
   }
 
   const draft: EditableMetadata = { ...$toRaw(editor).form };
+  const confirmed = [...$toRaw(editor).confirmed];
   library.saving = true;
   library.errorMessage = null;
   library.infoMessage = null;
@@ -67,7 +85,7 @@ export async function saveEdits(): Promise<void> {
     const saved = new Map<string, Mp3Track>();
 
     for (const track of tracks) {
-      const metadata = mergeDraft(track.metadata, draft, varied);
+      const metadata = mergeDraft(track.metadata, draft, varied, confirmed);
       const bytes = await writeTrackMetadataToBytes(await root.vfs.read(track.relativePath), metadata);
       await root.vfs.write(track.relativePath, bytes);
       const { fullChecksum, audioChecksum } = await calculateDualChecksums(bytes);
@@ -97,7 +115,7 @@ export async function saveEdits(): Promise<void> {
 
     const target = tracks.length === 1 ? tracks[0].name : tn("tracks.count", tracks.length);
     library.infoMessage = t("message.saved", { target });
-    ui.editModalOpen = false;
+    ui.selectionOpen = false;
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : t("message.saveFailed");
   } finally {

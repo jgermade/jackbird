@@ -13,7 +13,9 @@ folder. The browser then asks for permission to edit the files in it: jackbird n
 your changes.
 
 Each folder you open is a **root**, shown as a tab with its number of tracks. You can keep several
-open at once with **Add root**, switch between them with their tabs, and close one with its ×.
+open at once with **+ Folder**, switch between them with their tabs, and close one with its ×. On a
+phone the tabs are a dropdown: pick a root in it, close the chosen one with the × beside it, and add
+one with **+**.
 
 jackbird reads every `.mp3` file in the folder and its subfolders. The first time, it reads all of
 their tags. It then keeps what it learned in `.meta/mp3-manager.json` inside the folder, so the
@@ -25,8 +27,9 @@ still grants permission for them.
 
 ## The library
 
-The left panel lists the active root's folders and tracks. **Expand all** and **Collapse all**
-open and close every folder. Choosing a folder shows what it holds on the right, and choosing a
+The left panel lists the active root's folders and tracks. A click on a folder's triangle or
+its folder glyph opens or closes it (an open folder draws an open folder). **Expand all** and
+**Collapse all** open and close every folder. Choosing a folder shows what it holds on the right, and choosing a
 track shows its folder. Until you choose one, the right panel shows the whole root.
 
 A click on a track plays it (its folder, from that track): on a computer, a ▶ at the end of the
@@ -46,7 +49,7 @@ between them.
 
 The right panel groups the chosen folder's tracks into albums, by their artist and album tags.
 Each album shows its cover, artist, year and genre (those of its first track), and its tracks in
-track-number order. An album whose files sit in folders named like `CD1`, `CD 2`, `Disc1` or
+track-number order. On a computer, the cover stays in view while a long album's tracks scroll past. An album whose files sit in folders named like `CD1`, `CD 2`, `Disc1` or
 `disc-2` is split into discs.
 
 ## Playing
@@ -72,22 +75,28 @@ this one. With the keyboard, **Space** selects or deselects the track you are on
 **Shift+Space** selects up to it. Moving through the library, or playing, leaves the selection as
 it is, so tracks from several folders can be selected together. **Escape** clears it.
 
-While tracks are selected, a bar offers:
+While tracks are selected, the right end of the tab bar shows a key with their number (✎ "3 tracks
+selected"; on a phone, the number alone), and a × that clears the selection. The key opens the
+selection's dialog, whose tabs are:
 
-- **Show info**: each file's relative path, name and size, its full checksum, its audio checksum
-  (without the ID3 tag) and when it was last verified, with the totals.
-- **Edit**: the edit dialog, below.
-- **Delete**: removes the tracks from the library. The files stay on disk.
-- **×**: clears the selection.
+- **Edit**: the tags and the cover, below. It is the one the key opens.
+- **Info**: each file's relative path, name and size, its full checksum, its audio checksum
+  (without the ID3 tag) and when it was last verified; for several tracks, the totals and the list.
+- **Danger**: removes the tracks from the library with its **Remove** key. The files stay on disk,
+  and come back the next time the folder is opened.
+
+Switching tabs keeps what you typed in Edit. **Escape**, the dialog's × or a click outside it close it.
 
 ## Editing tags and covers
 
-The edit dialog works on one track or on many. Its fields are **Title**, **Artist**, **Album**,
+The Edit tab works on one track or on many. Its fields are **Title**, **Artist**, **Album**,
 **Year**, **Genre** and **Track**.
 
-With several tracks selected, a field they disagree on shows *(Multiple values)* and is empty.
-Leave it empty and each track keeps its own value; type into it and every track gets what you
-typed. The cover works the same way.
+With several tracks selected, a field they disagree on shows *(Multiple values)*, is empty, and has
+an **All** box at its right. Leave it empty and each track keeps its own value; type into it and the
+box ticks itself: every track gets what you typed. Unticking the box empties the field again.
+Ticking it on the empty field clears that tag on every track. The cover works as before: leave it
+and each track keeps its own; drop or choose one and every track gets it.
 
 For the cover, drop an image on it or use **Choose image**; **Remove** takes it away.
 

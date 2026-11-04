@@ -11,7 +11,7 @@ export const es: Record<MessageKey, string> = {
   "common.none": "-",
 
   "picker.scanning": "Escaneando...",
-  "picker.addRoot": "Añadir root",
+  "picker.addRoot": "Añadir una carpeta",
   "picker.openLibrary": "Abrir librería",
 
   "roots.empty": "Sin roots abiertas",
@@ -41,9 +41,23 @@ export const es: Record<MessageKey, string> = {
 
   "selection.count.one": "{count} pista seleccionada",
   "selection.count.other": "{count} pistas seleccionadas",
-  "actions.showInfo": "Mostrar info",
+  "picker.folder": "Carpeta",
+  "selection.open.one": "Editar la pista seleccionada",
+  "selection.open.other": "Editar las {count} pistas seleccionadas",
+  "selection.eyebrow": "Selección",
+  "selection.close": "Cerrar",
+  "selection.tabs": "Qué hacer con la selección",
+  "selection.tab.info": "Info",
+  "selection.tab.danger": "Peligro",
+  "selection.none": "No hay pistas seleccionadas.",
+  "danger.title": "Quitar de la biblioteca",
+  "danger.body.one": "La pista sale de la biblioteca. Su archivo sigue en el disco, y vuelve la próxima vez que se abra la carpeta.",
+  "danger.body.other": "Las {count} pistas salen de la biblioteca. Sus archivos siguen en el disco, y vuelven la próxima vez que se abra la carpeta.",
+  "danger.remove.one": "Quitar la pista",
+  "danger.remove.other": "Quitar {count} pistas",
+  "editor.all": "Todas",
+  "editor.allTitle": "Aplicar a todas las pistas seleccionadas",
   "actions.edit": "Editar",
-  "actions.delete": "Borrar",
   "actions.clearSelection": "Deseleccionar todo",
 
   "detail.promptTitle": "Selecciona un álbum o una pista",
@@ -105,19 +119,12 @@ export const es: Record<MessageKey, string> = {
   "editor.saving": "Guardando...",
   "editor.save": "Guardar cambios",
 
-  "editModal.eyebrow": "Edición de metadatos",
-  "editModal.titleMany": "Editar {count} pistas seleccionadas",
-  "editModal.titleOne": "Editar pista",
-  "editModal.close": "Cerrar modal de edición",
-  "editModal.none": "No hay pistas seleccionadas para editar.",
 
   "cover.readFailed": "No se pudo leer la imagen.",
   "cover.dropHere": "Arrastra una imagen aquí",
   "cover.choose": "Elegir imagen",
   "cover.remove": "Quitar",
 
-  "info.eyebrow": "Información del archivo",
-  "info.close": "Cerrar modal de información",
   "info.relativePath": "Ruta relativa",
   "info.fileName": "Nombre del archivo",
   "info.fullChecksum": "Checksum completo",
@@ -137,8 +144,6 @@ export const es: Record<MessageKey, string> = {
 
   "message.noFsa": "Tu navegador no soporta File System Access API.",
   "message.scanFailed": "No se pudo escanear la carpeta seleccionada.",
-  "message.removeConfirm.one": "¿Estás seguro de que deseas quitar esta pista de la biblioteca?",
-  "message.removeConfirm.other": "¿Estás seguro de que deseas quitar las {count} pistas seleccionadas de la biblioteca?",
   "message.removed.one": "Pista eliminada de la biblioteca.",
   "message.removed.other": "{count} pistas eliminadas de la biblioteca.",
   "message.readFailed.one": "No se pudo leer {count} archivo de {name}.",

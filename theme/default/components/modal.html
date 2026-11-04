@@ -9,7 +9,8 @@
   //
   // **The owner decides whether it closes.** Escape, a click on the backdrop
   // and the close key emit `close`; the dialog follows `:open`. `closeLabel`
-  // is the close key's accessible name.
+  // is the close key's accessible name. The `nav` slot sits in the header,
+  // under the title, edge to edge: `Tabs` (`plain`) that switch the body.
   //
   // **Part of the default theme**: imports `Key`, and draws only with
   // `tokens.css` (and `content.css` for the eyebrow). See
@@ -46,7 +47,7 @@
         :aria-labelledby="titleId"
         @cancel="cancel($event)"
         @click.self="$emit('close')">
-  <header class="head">
+  <header class="head" :class.with-nav="$slots.nav">
     <div class="titles">
       <span :if="eyebrow" class="mm-legend">{{ eyebrow }}</span>
       <h2 class="title" :id="titleId">{{ title }}</h2>
@@ -54,6 +55,7 @@
     <Key variant="ghost" square :label="closeLabel" :title="closeLabel" @click="$emit('close')">
       <svg class="close-icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
     </Key>
+    <div :if="$slots.nav" class="nav"><slot.nav /></div>
   </header>
   <div class="body"><slot /></div>
   <footer :if="$slots.foot" class="foot"><slot.foot /></footer>
@@ -78,16 +80,19 @@
   .modal::backdrop { background: var(--mm-overlay); }
 
   .head {
-    display: flex;
+    display: grid;
     flex: none;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
     gap: var(--mm-space-3);
     padding: var(--mm-space-3) var(--mm-space-3) var(--mm-space-3) var(--mm-space-5);
     border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
     background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
   }
   .titles { display: grid; gap: 2px; min-width: 0; }
+  /* With tabs, they draw the header's bottom line, and the open one joins the body. */
+  .head.with-nav { row-gap: var(--mm-space-2); padding-bottom: 0; border-bottom: 0; }
+  .nav { grid-column: 1 / -1; margin: 0 calc(-1 * var(--mm-space-3)) 0 calc(-1 * var(--mm-space-5)); }
   .title {
     margin: 0;
     font-family: var(--mm-font-label);
