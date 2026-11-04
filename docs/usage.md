@@ -29,12 +29,15 @@ The left panel lists the active root's folders and tracks. **Expand all** and **
 open and close every folder. Choosing a folder shows what it holds on the right, and choosing a
 track shows its folder. Until you choose one, the right panel shows the whole root.
 
-A click on a track plays it (its folder, from that track). Each folder has a ▶ key at its end (on
-a computer, it shows when the pointer is over the row) that plays the folder from its first track.
-The box at the left of each track selects it (see [Selecting tracks](#selecting-tracks)).
+A click on a track plays it (its folder, from that track): on a computer, a ▶ at the end of the
+row shows when the pointer is over it, and the track playing shows moving bars there. Each folder
+has a ❯ key at its end (on a computer, it shows when the pointer is over the row) that shows the
+folder on the right; on a phone, it also takes you to the **Details** panel. The box at the left
+of each track selects it (see [Selecting tracks](#selecting-tracks)).
 
 With the keyboard, the arrows move through the tree and open and close folders, **Enter** plays
-the row you are on, and **Space** selects or deselects the track you are on.
+the row you are on (on a folder, from its first track), and **Space** selects or deselects the
+track you are on.
 
 On a phone, the two panels take turns: the **Library** and **Details** keys at the bottom switch
 between them.
@@ -49,7 +52,8 @@ track-number order. An album whose files sit in folders named like `CD1`, `CD 2`
 ## Playing
 
 A click on a track, in the library or on the right, starts playback; a click on the track that is
-playing pauses it, and another resumes it. On the right, it plays the albums shown there, from
+playing pauses it, and another resumes it. In both, the end of the row shows ▶ under the pointer,
+and moving bars on the track playing (still while it is paused). On the right, it plays the albums shown there, from
 that track. **Enter** does the same on the track you are on.
 
 At the top right, the transport keys go to the previous track, play or pause, and go to the next

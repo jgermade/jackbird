@@ -36,6 +36,7 @@ export const en = {
   "tree.loadingMetadata": "Loading metadata…",
   "tree.renameTitle": "Rename (pattern still to be defined)",
   "tree.rename": "Rename track",
+  "tree.openFolder": "Open {title} in Details",
 
   "selection.count.one": "{count} track selected",
   "selection.count.other": "{count} tracks selected",
@@ -56,7 +57,6 @@ export const en = {
   "album.untitled": "No album",
   "album.unknownArtist": "Unknown artist",
   "album.disc": "Disc {number}",
-  "album.play": "Play {title}",
 
   "faceplate.transport": "Transport",
   "faceplate.play": "Play",

@@ -40,7 +40,7 @@
 
 <div class="workspace">
   <div class="panes" @scroll="track($event)">
-    <div class="pane tree-pane"><Library /></div>
+    <div class="pane tree-pane"><Library @details="show('details')" /></div>
     <div class="pane sheet-pane"><AlbumSheet /></div>
   </div>
   <nav class="pager" :aria-label="t('panels.label')">
@@ -69,6 +69,7 @@
   }
   .pane { min-height: 0; overflow: auto; }
   .tree-pane { border-right: var(--mm-border-width) solid var(--mm-border); background: var(--mm-surface); }
+  .sheet-pane { background: var(--mm-sheet); }
 
   /* Phones: one pane per screen width, in a row that snaps as it is swiped. */
   @media (max-width: 720px) {

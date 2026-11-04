@@ -7,6 +7,7 @@
   playingActive = false,
   focusable = false,
   selectable = false,
+  playable = false,
   current = false,
   rowId = '',
   lead = '',
@@ -25,16 +26,19 @@
   // caret `toggle` instead of `select`. A `selectable` item shows a
   // `SelectBox` in place of its glyph, for a list whose click does something
   // else (plays): a click on the box emits `pick` (the native event as
-  // `$event.detail`) instead of `select`. The row being played shows moving
-  // bars in place of `meta`. `focusable` puts it in the tab order. `chosen`
+  // `$event.detail`) instead of `select`. A `playable` item ends in a cue: a
+  // ▶ shown on hover, to say a click plays it, and the moving bars on the
+  // row being played (`playing`; still unless `playing-active`). The cue is
+  // decorative: the click on the row is what plays. `focusable` puts it in
+  // the tab order. `chosen`
   // is its selection (not `selected`, which jq79 keeps for an `<option>`'s
   // own state and ignores on a component tag). `current` marks the row the
   // keyboard is on, apart from the selection, and `rowId` is its id for the
   // tree's `aria-activedescendant`. `lead` is a small mono prefix (a track
-  // number). The `action` slot is a key at the row's end, shown on hover, on
-  // the current, chosen and playing rows, and always where there is no hover
-  // (a touch screen); give it `@click.stop` so it does not also select the
-  // row.
+  // number). The `action` slot is a key at the row's end (before the cue),
+  // shown on hover, on the current, chosen and playing rows, and always where
+  // there is no hover (a touch screen); give it `@click.stop` so it does not
+  // also select the row.
   //
   // **Part of the default theme**: imports `EqBars` and `SelectBox`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -48,6 +52,7 @@
     playingActive?: boolean | ""
     focusable?: boolean | ""
     selectable?: boolean | ""
+    playable?: boolean | ""
     current?: boolean | ""
     rowId?: string
     lead?: string | number
@@ -61,6 +66,7 @@
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: isFolder = kind === "folder"
   $: isPickable = !isFolder && flag(selectable)
+  $: isCued = !isFolder && (flag(playable) || flag(playing))
   $: level = Math.max(0, Number(depth) || 0)
 
   const caret = (event: MouseEvent) => {
@@ -74,7 +80,6 @@
      :class.folder="isFolder"
      :class.playing="flag(playing)"
      :class.current="flag(current)"
-     :class.has-action="$slots.action"
      :id="rowId || null"
      role="treeitem"
      :aria-level="level + 1"
@@ -93,17 +98,21 @@
     <svg :else viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
   </span>
   <span class="label"><span :if="lead !== '' && lead !== undefined && lead !== null" class="lead">{{ lead }}</span>{{ label }}</span>
-  <span class="end">
-    <EqBars :if="flag(playing)" :active="flag(playingActive)" />
-    <span :else class="meta">{{ meta }}</span>
-  </span>
+  <span class="end"><span class="meta">{{ meta }}</span></span>
   <span :if="$slots.action" class="action"><slot.action /></span>
+  <span :if="isCued" class="cue" aria-hidden="true">
+    <EqBars :if="flag(playing)" :active="flag(playingActive)" />
+    <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
+  </span>
 </div>
 
 <style scoped>
   .row {
     display: grid;
     grid-template-columns: .875rem 1.125rem minmax(0, 1fr) auto;
+    /* The action slot and the cue, when there are, in the same row. */
+    grid-auto-columns: 1.5rem;
+    grid-auto-flow: column;
     align-items: center;
     gap: var(--mm-space-2);
     min-height: 1.75rem;
@@ -117,7 +126,6 @@
   .row:hover { background: var(--mm-hover); }
   .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
   .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
-  .row.has-action { grid-template-columns: .875rem 1.125rem minmax(0, 1fr) auto 1.5rem; }
   .row.current:not([aria-selected="true"]) { background: var(--mm-hover); box-shadow: inset 0 0 0 1px var(--mm-border-strong); }
 
   .caret { display: grid; place-items: center; color: var(--mm-fg-subtle); }
@@ -134,5 +142,8 @@
   .folder .label { font-weight: var(--mm-weight-bold); }
   .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; }
+  .cue { display: grid; place-items: center; }
+  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .row:hover .cue-play { opacity: 1; }
   .meta { font: var(--mm-text-xs) var(--mm-font-mono); font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
 </style>

@@ -37,6 +37,7 @@ export const es: Record<MessageKey, string> = {
   "tree.loadingMetadata": "Cargando metadatos…",
   "tree.renameTitle": "Renombrar (patrón pendiente de definir)",
   "tree.rename": "Renombrar pista",
+  "tree.openFolder": "Abrir {title} en Detalle",
 
   "selection.count.one": "{count} pista seleccionada",
   "selection.count.other": "{count} pistas seleccionadas",
@@ -57,7 +58,6 @@ export const es: Record<MessageKey, string> = {
   "album.untitled": "Sin álbum",
   "album.unknownArtist": "Artista desconocido",
   "album.disc": "Disco {number}",
-  "album.play": "Reproducir {title}",
 
   "faceplate.transport": "Transporte",
   "faceplate.play": "Reproducir",

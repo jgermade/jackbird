@@ -47,7 +47,8 @@
   // A click on a track plays the sheet from it (on the one playing, pauses
   // or resumes); the second click of a double click is not another one. The
   // box at its left, or the cell around it, selects it. Keys: Enter plays,
-  // Space selects, Shift+Space selects up to it.
+  // Space selects, Shift+Space selects up to it. The row ends in a cue: ▶ on
+  // hover, the moving bars on the track playing.
   const play = (track: Track, event: MouseEvent) => {
     if (event.detail <= 1) playFromDetail(track.id)
   }
@@ -135,7 +136,11 @@
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></td>
                     <td class="mm-num">{{ track.metadata.trackNumber || "-" }}</td>
-                    <td><span class="mm-title"><EqBars :if="track.id === playingId()" :active="playback.playing" />{{ titleOf(track) }}</span></td>
+                    <td><span class="mm-title">{{ titleOf(track) }}</span></td>
+                    <td class="cue-cell" aria-hidden="true">
+                      <EqBars :if="track.id === playingId()" :active="playback.playing" />
+                      <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -223,6 +228,10 @@
   .mm-table tr { cursor: pointer; user-select: none; }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .mm-table .pick-cell { width: 1%; padding-right: 0; }
+  /* The cue at the row's end: ▶ on hover and on keyboard focus, the bars on the track playing. */
+  .mm-table .cue-cell { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
+  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .mm-table tr:hover .cue-play, .mm-table tr:focus-visible .cue-play { opacity: 1; }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
