@@ -23,7 +23,11 @@ next time it shows the library at once and reads only the files that are new or 
 in the background.
 
 When you reload the page, the roots you had open come back by themselves, as long as the browser
-still grants permission for them.
+still grants permission for them: each with its open folders and the folder it showed, and the
+panel and scroll positions you were at. The track that was playing comes back at the same second
+and plays on. A reload stops the sound for a moment, since a page cannot play through its own
+reload; and if the browser does not let the page start sound by itself, the track waits, paused at
+its place, and your first click or key anywhere resumes it.
 
 ## The library
 
@@ -67,7 +71,7 @@ says which list and which track. The gear key opens the preferences.
 The display shows the state (▶ playing, ❚❚ paused, ■ stopped), the title and artist, the time,
 and how far into the track it is.
 
-On a screen wider than 1024px, the display also has a spectrum analyser at its left: its columns move
+On a screen wider than 900px, the display also has a spectrum analyser at its left: its columns move
 with the music, and fall still when it pauses.
 
 ## Selecting tracks

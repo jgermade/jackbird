@@ -1,5 +1,6 @@
-// The session: the open roots and the active one, kept in IndexedDB
-// (rootSessionStore.ts) so that a reload reopens them. The former React
+// The session: the open roots (with their open folders and current row) and
+// the active one, kept in IndexedDB (rootSessionStore.ts) so that a reload
+// reopens them where they were. The former React
 // view's restore and save effects as they were, except that a save is skipped when
 // nothing it keeps has changed. See
 // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
@@ -32,7 +33,9 @@ export async function restoreSession(): Promise<void> {
         rootId: saved.id,
         rootLabel: saved.label,
         groupingMode: saved.groupingMode,
-        setActive: false
+        setActive: false,
+        expandedAlbums: saved.expandedAlbums ?? [],
+        activeRowKey: saved.activeRowKey ?? null
       });
       reopened.push(saved.id);
     }

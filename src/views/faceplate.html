@@ -27,8 +27,9 @@
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   $: current = nowPlaying.value
-  // Above 1024px the display shows the spectrum, moving while the music plays.
-  const WIDE = matchMedia("(min-width: 1025px)")
+  // Above 900px the display shows the spectrum, moving while the music plays
+  // (from 901 to 1024px it takes the wordmark's room).
+  const WIDE = matchMedia("(min-width: 901px)")
   let wide: boolean = WIDE.matches
   const onWidth = (event: MediaQueryListEvent) => {
     wide = event.matches
@@ -196,13 +197,17 @@
   .icon.signal { color: var(--mm-accent-ink); }
   .selection { display: flex; align-items: center; gap: var(--mm-space-1); }
 
-  /* The display: the spectrum at the left above 1024px, the title row and the meter beside it. */
+  /* The display: the spectrum at the left above 900px, the title row and the meter beside it.
+     From 901 to 1024px the wordmark goes, so the display keeps its room. */
   .lcd { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
   .lcd-spectrum { display: none; }
-  @media (min-width: 1025px) {
+  @media (min-width: 901px) {
     .lcd { grid-template-columns: 7rem minmax(0, 1fr); column-gap: var(--mm-space-3); }
     .lcd-spectrum { display: block; }
+  }
+  @media (min-width: 901px) and (max-width: 1024px) {
+    .wordmark { display: none; }
   }
   .count-narrow { display: none; }
 

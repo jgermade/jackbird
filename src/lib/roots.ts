@@ -33,6 +33,9 @@ export async function hydrateRoot(
     rootLabel?: string;
     groupingMode?: GroupingMode;
     setActive?: boolean;
+    /** Where a reopened root was: its open folders and its current row. */
+    expandedAlbums?: string[];
+    activeRowKey?: string | null;
   }
 ): Promise<void> {
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -71,9 +74,9 @@ export async function hydrateRoot(
       loadedCount: initialTracks.length,
       groupingMode,
       metaSnapshot: snapshot,
-      expandedAlbums: [],
+      expandedAlbums: options.expandedAlbums ?? [],
       expandedDiscs: [],
-      activeRowKey: null
+      activeRowKey: options.activeRowKey ?? null
     };
 
     if (existingIndex === -1) {

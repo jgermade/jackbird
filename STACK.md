@@ -47,7 +47,7 @@ This document describes the technical stack and codebase architecture implemente
 - **File System Access API**: directory picking, permission checks, file reads and in-place
   writes, through the VFS adapter.
 - **Web Audio API**: the player's audio element goes through an `AnalyserNode` on its way to the
-  speakers, for the display's spectrum analyser (above 1024px wide).
+  speakers, for the display's spectrum analyser (above 900px wide).
 - **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
   `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
   root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.
@@ -170,7 +170,9 @@ mp3-manager/
   unless typed over or its "Override" box is ticked (then even an empty value is written); cover art by
   drag & drop or file choice. Danger removes the tracks from the library (not from disk).
 - Session restore on load: previously opened roots (with granted permission) reopen
-  automatically, keeping the last active tab.
+  automatically, keeping the last active tab, each root's open folders and current row, and (for
+  the tab, in `sessionStorage`) the phone's panel, the panes' scroll and the music: the same track
+  at the same second, playing again, or on the first interaction when autoplay is not allowed.
 - Light (Silver) and dark (Graphite) tone, from the faceplate's switch or Preferences,
   defaulting to the OS `prefers-color-scheme` and persisted across reloads.
 - Interface in English or Spanish, chosen in Preferences, defaulting to the browser's
