@@ -29,6 +29,10 @@ The left panel lists the active root's folders and tracks. **Expand all** and **
 open and close every folder. Choosing a folder shows what it holds on the right, and choosing a
 track shows its folder. Until you choose one, the right panel shows the whole root.
 
+Each row has a ▶ key at its end (on a computer, it shows when the pointer is over the row): on a
+track it plays that track's folder from it, and on a folder it plays the folder from its first
+track. A double click on a track plays it too.
+
 On a phone, the two panels take turns: the **Library** and **Details** keys at the bottom switch
 between them.
 
@@ -41,13 +45,16 @@ track-number order. An album whose files sit in folders named like `CD1`, `CD 2`
 
 ## Playing
 
-The ▶ key on a track plays the albums on the right, starting from that track; pressing it again
-pauses. The keys
-beside the logo go to the previous track, play or pause, and go to the next one.
+The ▶ key on a track, in the library or on the right, starts playback; on the track that is
+playing it becomes ❚❚ and pauses. On the right, it plays the albums shown there, from that track.
 
-The display shows what is playing (title and artist), its position in the list, and the time. The
-key beside the display takes you back to the list that is playing, wherever you are in the
-library.
+At the top right, the transport keys go to the previous track, play or pause, and go to the next
+one. The list key (≡) beside them takes you back to the list that is playing, wherever you are
+in the library, with its tracks selected; its tooltip says which list and which track. The gear
+key opens the preferences.
+
+The display shows the state (▶ playing, ❚❚ paused, ■ stopped), the title and artist, the time,
+and how far into the track it is.
 
 ## Selecting tracks
 
@@ -84,9 +91,9 @@ another program has its tags read again.
 
 ## Appearance and language
 
-The switch on the faceplate changes between **Silver** (light) and **Graphite** (dark).
-**Preferences** (the gear key) holds the same choice and the interface language: English or
-Spanish. Until you choose, both follow your system and your browser.
+**Preferences** (the gear key) chooses the tone, **Silver** (light) or **Graphite** (dark), and
+the interface language, English or Spanish. Until you choose, both follow your system and your
+browser.
 
 ## What jackbird writes
 

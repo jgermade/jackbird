@@ -69,7 +69,6 @@ export const en = {
   "faceplate.state.paused": "Pause",
   "faceplate.state.loading": "Loading",
   "faceplate.state.error": "Error",
-  "faceplate.track": "Track",
   "faceplate.idle": "Nothing playing",
   "faceplate.position": "Position",
   "faceplate.positionText": "{position} of {duration}",

@@ -182,9 +182,12 @@ export async function hydrateRoot(
       };
 
       const pendingUpdates: TrackUpdate[] = [];
-      let loadedCount = initialTracks.length - staleOrNewFiles.length + (removedPaths.length > 0 ? 0 : 0);
-      let snapshotDirty = removedPaths.length > 0;
+      // Counted against the walk, as the root's own count above: what is
+      // already known, then one per file read, ending at the total (when the
+      // last batch is flushed).
       const totalAfterWalk = mp3Files.length;
+      let loadedCount = totalAfterWalk - staleOrNewFiles.length;
+      let snapshotDirty = removedPaths.length > 0;
 
       function flush(): void {
         const updates = [...pendingUpdates];

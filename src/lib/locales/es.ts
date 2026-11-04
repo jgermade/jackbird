@@ -70,7 +70,6 @@ export const es: Record<MessageKey, string> = {
   "faceplate.state.paused": "Pausa",
   "faceplate.state.loading": "Cargando",
   "faceplate.state.error": "Error",
-  "faceplate.track": "Pista",
   "faceplate.idle": "Nada sonando",
   "faceplate.position": "Posición",
   "faceplate.positionText": "{position} de {duration}",
