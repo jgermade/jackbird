@@ -6,7 +6,7 @@ import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/v
 import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
 import type { GroupingMode, Mp3Track, RootWorkspace, TrackMetadata } from "../types";
-import { t } from "./i18n";
+import { t, tn } from "./i18n";
 import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
 import { readMetaSnapshot, writeMetaSnapshot } from "./meta";
@@ -232,6 +232,41 @@ export async function hydrateRoot(
 
       const READ_CONCURRENCY = 6;
       let cursor = 0;
+      let failedCount = 0;
+
+      // Reads one file's checksums and tags into the snapshot and the next flush.
+      async function readOne(file: (typeof staleOrNewFiles)[number]): Promise<void> {
+        const sourceBytes = await vfs.read(file.relativePath);
+        const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
+        const stored = snapshot.tracks[file.relativePath];
+        const metadata =
+          stored && (stored.fullChecksum || stored.checksum) === fullChecksum
+            ? stored.metadata
+            : await readTrackMetadataFromBytes(sourceBytes, file.name);
+
+        const nowIso = new Date().toISOString();
+        snapshot.tracks[file.relativePath] = {
+          checksum: fullChecksum,
+          fullChecksum,
+          audioChecksum,
+          size: file.size,
+          lastModified: file.lastModified,
+          lastVerifiedAt: nowIso,
+          metadata,
+          updatedAt: nowIso
+        };
+        snapshotDirty = true;
+
+        pendingUpdates.push({
+          trackId: file.relativePath,
+          metadata,
+          fullChecksum,
+          audioChecksum,
+          size: file.size,
+          lastModified: file.lastModified,
+          lastVerifiedAt: nowIso
+        });
+      }
 
       async function worker(): Promise<void> {
         while (true) {
@@ -242,36 +277,14 @@ export async function hydrateRoot(
           }
 
           const file = staleOrNewFiles[itemIndex];
-          const sourceBytes = await vfs.read(file.relativePath);
-          const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
-          const stored = snapshot.tracks[file.relativePath];
-          const metadata =
-            stored && (stored.fullChecksum || stored.checksum) === fullChecksum
-              ? stored.metadata
-              : await readTrackMetadataFromBytes(sourceBytes, file.name);
-
-          const nowIso = new Date().toISOString();
-          snapshot.tracks[file.relativePath] = {
-            checksum: fullChecksum,
-            fullChecksum,
-            audioChecksum,
-            size: file.size,
-            lastModified: file.lastModified,
-            lastVerifiedAt: nowIso,
-            metadata,
-            updatedAt: nowIso
-          };
-          snapshotDirty = true;
-
-          pendingUpdates.push({
-            trackId: file.relativePath,
-            metadata,
-            fullChecksum,
-            audioChecksum,
-            size: file.size,
-            lastModified: file.lastModified,
-            lastVerifiedAt: nowIso
-          });
+          try {
+            await readOne(file);
+          } catch (error) {
+            // A file that cannot be read keeps its place, untagged, and the
+            // others go on loading; the library says how many failed.
+            failedCount += 1;
+            console.error(`jackbird: could not read ${file.relativePath}`, error);
+          }
           loadedCount += 1;
 
           if (loadedCount % 10 === 0 || loadedCount === totalAfterWalk) {
@@ -300,8 +313,13 @@ export async function hydrateRoot(
             : root
         )
       );
-    } catch {
-      // Walk failed silently — snapshot data is still usable
+
+      if (failedCount > 0) {
+        library.errorMessage = tn("message.readFailed", failedCount, { name: rootLabel });
+      }
+    } catch (error) {
+      // The walk or the snapshot's write failed: what the snapshot had is still usable.
+      console.error(`jackbird: could not finish loading ${rootLabel}`, error);
       updateRoots((currentRoots) =>
         currentRoots.map((root) =>
           root.id === rootId ? { ...root, loadingMetadata: false } : root

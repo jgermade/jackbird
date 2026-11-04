@@ -143,6 +143,8 @@ export const en = {
   "message.removeConfirm.other": "Remove the {count} selected tracks from the library?",
   "message.removed.one": "Track removed from the library.",
   "message.removed.other": "{count} tracks removed from the library.",
+  "message.readFailed.one": "{count} file in {name} could not be read.",
+  "message.readFailed.other": "{count} files in {name} could not be read.",
   "message.resyncing": "Resyncing root {name}…",
   "message.consolidatePending": "Consolidate: the naming pattern is still to be defined (mp3tag style). Placeholder button for now.",
   "message.saved": "Metadata saved to {target}.",
