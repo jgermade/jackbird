@@ -11,7 +11,7 @@
 | --- | --- |
 | `npm run dev` | The dev server, on <http://localhost:8666>. |
 | `npm test` | Every check (below). Run it before every commit. |
-| `npm run build` | Type check, then the production build into `dist/`. |
+| `npm run build` | Type check, then the production build into `dist/`. Each page preloads every jq79 component script it loads (a small plugin in `vite.config.ts`), so they download in parallel instead of one after another. |
 | `npm run preview` | Serves `dist/` as it will be deployed. |
 | `npm run type-check` | The TypeScript check alone. |
 
