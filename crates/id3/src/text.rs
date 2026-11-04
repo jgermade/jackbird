@@ -54,7 +54,8 @@ pub(crate) fn latin1(bytes: &[u8]) -> String {
 /// UTF-16 strings separated by `$00 00` units. `big_endian`: `Some` for a
 /// fixed byte order (UTF-16BE), `None` to read byte order marks.
 pub(crate) fn utf16_strings(bytes: &[u8], big_endian: Option<bool>) -> Vec<String> {
-    let units: Vec<[u8; 2]> = bytes.chunks_exact(2).map(|pair| [pair[0], pair[1]]).collect();
+    // An odd last byte is no unit, and is dropped.
+    let (units, _) = bytes.as_chunks::<2>();
     let mut order = big_endian;
     units
         .split(|unit| *unit == [0, 0])
