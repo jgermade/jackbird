@@ -1,0 +1,6 @@
+# Tauri's build output, its generated schemas, and the frontend e0/prepare.mjs assembles.
+/target/
+/gen/
+/frontend/
+/e0/e0-report.json
+/e0/e0-report.jsonl

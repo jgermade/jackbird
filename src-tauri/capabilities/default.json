@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Both windows: Tauri's core, and opening files for the E0 check.",
+  "windows": ["main", "check"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}

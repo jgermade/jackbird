@@ -83,6 +83,8 @@
   --mm-display-dim: rgba(29, 41, 22, .11);
   --mm-display-glow: none;
   --mm-display-bezel: #2b2e2d;
+  /* The hairline around the display window. Same in both tones. */
+  --mm-display-rim: #777777;
 
   /* The J-card stripes: the brand mark, the active tab. Same in both tones. */
   --mm-stripe-1: #f05a1a;
