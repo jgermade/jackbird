@@ -71,6 +71,7 @@ export const en = {
   "album.untitled": "No album",
   "album.unknownArtist": "Unknown artist",
   "album.disc": "Disc {number}",
+  "album.selectDisc": "Select every track of disc {number}",
 
   "faceplate.transport": "Transport",
   "faceplate.play": "Play",

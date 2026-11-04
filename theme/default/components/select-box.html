@@ -1,4 +1,4 @@
-<script :setup="{ chosen = false }: Props" lang="ts">
+<script :setup="{ chosen = false, mixed = false, label = '' }: Props" lang="ts">
   // The box that selects a row, in a list whose row click does something
   // else (plays the track): the box `Checkbox` draws, with no label and no
   // `<input>`. Ticked, it fills with the signal colour.
@@ -14,10 +14,17 @@
   // there (Space). It takes clicks a little beyond its edges, so a finger
   // finds it.
   //
+  // `mixed` draws a dash: some of what it stands for is chosen (a box for a
+  // group of rows). Such a box has no row to speak for it, so it takes a
+  // `label`: then it is a control of its own, a checkbox (`aria-checked`
+  // true, false or mixed) in the tab order, toggled with Space or Enter.
+  //
+  //   <SelectBox :chosen="all" :mixed="some" label="Select the disc" @pick="selectDisc()" />
+  //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
-  type Props = { chosen?: boolean | "" }
+  type Props = { chosen?: boolean | ""; mixed?: boolean | ""; label?: string }
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
 
@@ -26,9 +33,27 @@
     $emit("pick", event)
   }
   const stop = (event: Event) => event.stopPropagation()
+  const key = (event: KeyboardEvent) => {
+    if (!label || (event.key !== " " && event.key !== "Enter")) return
+    event.preventDefault()
+    event.stopPropagation()
+    $emit("pick", event)
+  }
+  const state = (): string => (flag(chosen) ? "true" : flag(mixed) ? "mixed" : "false")
 </script>
 
-<span class="box" :class.on="flag(chosen)" aria-hidden="true" @click="pick($event)" @dblclick="stop($event)"></span>
+<span class="box"
+      :class.on="flag(chosen)"
+      :class.mixed="!flag(chosen) && flag(mixed)"
+      :role="label ? 'checkbox' : null"
+      :aria-checked="label ? state() : null"
+      :aria-label="label || null"
+      :title="label || null"
+      :tabindex="label ? 0 : null"
+      :aria-hidden="label ? null : 'true'"
+      @click="pick($event)"
+      @keydown="key($event)"
+      @dblclick="stop($event)"></span>
 
 <style scoped>
   .box {
@@ -61,4 +86,7 @@
   .box:hover { border-color: var(--mm-accent); }
   .on { background: var(--mm-accent); border-color: var(--mm-accent-hover); box-shadow: none; }
   .on::after { opacity: 1; }
+  .mixed { background: var(--mm-accent); border-color: var(--mm-accent-hover); box-shadow: none; }
+  .mixed::after { width: .5rem; height: 0; border-width: 0 0 2px; transform: none; opacity: 1; }
+  .box:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
 </style>

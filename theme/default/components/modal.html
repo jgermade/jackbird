@@ -11,6 +11,13 @@
   // and the close key emit `close`; the dialog follows `:open`. `closeLabel`
   // is the close key's accessible name. The `nav` slot sits in the header,
   // under the title, edge to edge: `Tabs` (`plain`) that switch the body.
+  // With it the dialog keeps one height whichever tab is open (within the
+  // viewport; the body scrolls), so the tabs never move.
+  //
+  // It comes in rising a little and fading in over a fading backdrop, and
+  // goes out the same way back (`@starting-style`, and `display` and
+  // `overlay` moved discretely); where a browser has neither, it opens and
+  // closes at once. With reduced motion the durations are 0.
   //
   // At 720px and below it is a bottom sheet: the whole width, from the
   // bottom, rounded at the top, sliding in and out. Its header can be dragged
@@ -119,6 +126,7 @@
 
 <dialog class="modal"
         :class="`size-${size}`"
+        :class.with-nav="$slots.nav"
         :aria-labelledby="titleId"
         @cancel="cancel($event)"
         @click.self="$emit('close')">
@@ -141,6 +149,8 @@
 <style scoped>
   .modal {
     --width: 35rem;
+    --height: 30rem;
+    --away: translateY(.75rem) scale(.98);
     width: min(var(--width), calc(100vw - 2 * var(--mm-space-4)));
     max-height: calc(100vh - 2 * var(--mm-space-6));
     padding: 0;
@@ -150,11 +160,28 @@
     color: var(--mm-fg);
     box-shadow: var(--mm-shadow-lg);
     overflow: hidden;
+    opacity: 0;
+    transform: var(--away);
+    transition: opacity var(--mm-duration) var(--mm-ease),
+                transform var(--mm-duration) var(--mm-ease),
+                overlay var(--mm-duration) allow-discrete,
+                display var(--mm-duration) allow-discrete;
   }
-  .modal[open] { display: flex; flex-direction: column; }
-  .size-sm { --width: 25rem; }
-  .size-lg { --width: 47.5rem; }
-  .modal::backdrop { background: var(--mm-overlay); }
+  .modal[open] { display: flex; flex-direction: column; opacity: 1; transform: none; }
+  .modal.with-nav { height: min(var(--height), calc(100vh - 2 * var(--mm-space-6))); }
+  .size-sm { --width: 25rem; --height: 24rem; }
+  .size-lg { --width: 47.5rem; --height: 48rem; }
+  .modal::backdrop {
+    background-color: transparent;
+    transition: background-color var(--mm-duration) var(--mm-ease),
+                overlay var(--mm-duration) allow-discrete,
+                display var(--mm-duration) allow-discrete;
+  }
+  .modal[open]::backdrop { background-color: var(--mm-overlay); }
+  @starting-style {
+    .modal[open] { opacity: 0; transform: var(--away); }
+    .modal[open]::backdrop { background-color: transparent; }
+  }
 
   .head {
     display: grid;
@@ -192,9 +219,11 @@
     border-top: var(--mm-border-width) solid var(--mm-border);
   }
 
-  /* Phones: a bottom sheet. It slides up as it opens and down as it closes
-     (display and overlay transition as discrete steps); the theme's
-     durations are zero under reduced motion, so then it simply appears. */
+  /* Phones: a bottom sheet. Instead of the fade and rise above, it stays
+     opaque and slides up as it opens and down as it closes (display and
+     overlay transition as discrete steps); the backdrop keeps its fade. The
+     theme's durations are zero under reduced motion, so then it simply
+     appears. */
   @media (max-width: 720px) {
     .modal {
       width: 100%;
@@ -203,6 +232,7 @@
       margin: auto 0 0;
       border-bottom-width: 0;
       border-radius: var(--mm-radius-lg) var(--mm-radius-lg) 0 0;
+      opacity: 1;
       transform: translateY(100%);
       transition:
         transform var(--mm-duration-slow) var(--mm-ease),
@@ -211,18 +241,7 @@
     }
     .modal[open] { transform: translateY(0); }
     @starting-style {
-      .modal[open] { transform: translateY(100%); }
-    }
-    .modal::backdrop {
-      opacity: 0;
-      transition:
-        opacity var(--mm-duration-slow) var(--mm-ease),
-        overlay var(--mm-duration-slow) allow-discrete,
-        display var(--mm-duration-slow) allow-discrete;
-    }
-    .modal[open]::backdrop { opacity: 1; }
-    @starting-style {
-      .modal[open]::backdrop { opacity: 0; }
+      .modal[open] { opacity: 1; transform: translateY(100%); }
     }
     /* The header is where the sheet is dragged from: its handle says so. */
     .head { touch-action: none; padding-top: var(--mm-space-4); }

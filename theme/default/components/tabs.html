@@ -160,16 +160,15 @@
 </div>
 
 <style scoped>
-  /* The bottom line is drawn inside the bar, so the open tab covers it from
-     within: a tab hanging below the bar would make it scroll up and down
-     (with overflow-x set, overflow-y cannot stay visible). */
+  /* A recess in the chassis: darker at the top, where its inset line is,
+     and lighter towards the panel the open tab joins. */
   .tabs {
     display: flex;
     gap: var(--mm-space-2);
     min-width: 0;
     padding: var(--mm-space-2) var(--mm-space-3) 0;
-    box-shadow: inset 0 calc(-1 * var(--mm-border-width)) 0 var(--mm-border);
-    background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+    box-shadow: inset 0 var(--mm-border-width) 0 var(--mm-border);
+    background: linear-gradient(var(--mm-chassis), var(--mm-chassis-hi));
   }
   .tabs.plain { background: none; }
   .strip {

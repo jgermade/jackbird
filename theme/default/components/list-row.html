@@ -139,6 +139,8 @@
     inset: 0 calc(-1 * var(--mm-space-2)) 0 calc(-1 * (var(--mm-space-3) + var(--depth) * .875rem));
   }
   .folder .caret, .folder .icon { cursor: pointer; }
+  /* The ink, near black in Silver; black itself would vanish in Graphite. */
+  .folder .caret:hover { color: var(--mm-fg); }
   .folder .icon { align-self: stretch; }
   .caret svg { width: .5rem; height: .5rem; transition: transform var(--mm-duration) var(--mm-ease); }
   .row[aria-expanded="true"] .caret svg { transform: rotate(90deg); }

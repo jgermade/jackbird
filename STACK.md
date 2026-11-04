@@ -45,9 +45,11 @@ This document describes the technical stack and codebase architecture implemente
 
 ### Web APIs & Metadata
 - **File System Access API**: directory picking, permission checks, file reads and in-place
-  writes, through the VFS adapter.
+  writes, through the VFS adapter. The player plays a track from its file's own object URL
+  (`src/lib/media.ts`), not from its bytes, and reopens the file when it is rewritten.
 - **Web Audio API**: the player's audio element goes through an `AnalyserNode` on its way to the
-  speakers, for the display's spectrum analyser (above 900px wide).
+  speakers, for the display's spectrum analyser (above 900px wide), in an `AudioContext` at the
+  device's rate with `latencyHint: "playback"`; the bands span 40 Hz–16 kHz whatever the rate.
 - **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
   `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
   root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.
@@ -113,6 +115,7 @@ mp3-manager/
 │       ├── workspace.ts         # The active root: tree, scope, selection, and actions
 │       ├── editor.ts            # The metadata form; openEditor, saveEdits
 │       ├── player.ts            # The one Audio element; nowPlaying, playQueue, next, …
+│       ├── media.ts             # A track's file as a URL to play, without reading it
 │       ├── session.ts           # restoreSession, keepSessionSaved
 │       ├── rootSessionStore.ts  # IndexedDB persistence of open roots
 │       ├── verifier.ts          # Background checksum verification of stale tracks
