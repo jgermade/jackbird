@@ -68,6 +68,9 @@ This document describes the technical stack and codebase architecture implemente
   Vite/esbuild handles all transpilation). Templates are not type-checked, so setup scripts stay
   thin and the logic lives in helpers and `lib/`.
 - **Scripts Runtime**: Node.js, `"type": "module"`.
+- **Makefile**: `make up`, `make test` and `make build` run `npm run dev`, `npm test` and
+  `npm run build`, installing the dependencies first (`npm ci`) when they are missing or older
+  than `package-lock.json`.
 - **Tests**: `npm test`, with no test framework: the layer check (`scripts/check-layers.mjs`),
   a type check of the helpers and their tests (`tsconfig.test.json`), Node's own runner on
   `src/helpers/**/*.test.ts` with type stripping, and a per-file coverage floor of 90% of lines,

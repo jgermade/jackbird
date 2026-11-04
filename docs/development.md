@@ -4,16 +4,20 @@
 
 - Node.js 22.6 or later: the unit tests run TypeScript directly with `--experimental-strip-types`.
 - A Chromium-based browser to run the app.
+- `make`, for the shortcuts below (optional: the npm scripts do the same).
 
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | The dev server, on <http://localhost:8666>. |
-| `npm test` | Every check (below). Run it before every commit. |
-| `npm run build` | Type check, then the production build into `dist/`. Under `safeEval`, jq79 precompiles every component's functions into one script, which each page preloads. |
+| `npm run dev` (`make up`) | The dev server, on <http://localhost:8666>. |
+| `npm test` (`make test`) | Every check (below). Run it before every commit. |
+| `npm run build` (`make build`) | Type check, then the production build into `dist/`. Under `safeEval`, jq79 precompiles every component's functions into one script, which each page preloads. |
 | `npm run preview` | Serves `dist/` as it will be deployed. |
 | `npm run type-check` | The TypeScript check alone. |
+
+The `make` targets install the dependencies first (`npm ci`) when `node_modules` is missing or
+older than `package-lock.json`. A bare `make` lists them.
 
 ## What `npm test` runs
 
