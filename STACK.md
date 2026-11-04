@@ -158,7 +158,8 @@ mp3-manager/
 
 - Tabs for multiple open roots, each showing a loaded/total track count while metadata is
   still being read.
-- Selection in the tree and the album sheet (click, Shift-click for a range, arrows, Escape).
+- In the tree and the album sheet, a click (or Enter) on a track plays it, and a box at its left
+  selects it (Shift-click for a range, Space and Shift+Space, Escape to clear).
 - Metadata editor for one track or many: a field that varies across the selection keeps each
   track's value unless typed over; cover art by drag & drop or file choice.
 - Session restore on load: previously opened roots (with granted permission) reopen

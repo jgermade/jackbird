@@ -54,7 +54,10 @@
     content: "";
     width: .25rem;
     height: .5rem;
-    border: solid var(--mm-on-accent);
+    /* Longhands: jq79 scopes styles through the CSSOM, which drops a var()
+       shorthand that a later longhand overrides. */
+    border-style: solid;
+    border-color: var(--mm-on-accent);
     border-width: 0 2px 2px 0;
     transform: translateY(-1px) rotate(45deg);
     opacity: 0;

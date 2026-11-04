@@ -5,12 +5,14 @@
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
+import { collectFolderPaths } from "../helpers/tracks";
 import type { GroupingMode, Mp3Track, RootWorkspace, TrackMetadata } from "../types";
 import { t, tn } from "./i18n";
 import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
 import { readMetaSnapshot, writeMetaSnapshot } from "./meta";
 import { playback } from "./playback";
+import { nowPlaying } from "./player";
 
 /** Replaces the roots with `update(current)`, as a setState updater would. */
 export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[]): void {
@@ -399,25 +401,29 @@ export function closeRoot(rootId: string): void {
   }
 }
 
-/** Opens the root the queue plays from, with the queue's tracks selected. */
+/**
+ * Opens the root of the track playing at that track: its folders open in the
+ * tree and it becomes the current row, so the album sheet shows its folder.
+ * The selection stays as it is.
+ */
 export function showQueueInLibrary(): void {
-  const queue = $toRaw(playback).queue;
-  if (!queue) {
+  const playing = $toRaw(nowPlaying.value);
+  if (!playing) {
     return;
   }
 
-  library.activeRootId = queue.rootId;
+  library.activeRootId = playing.rootId;
   updateRoots((roots) =>
-    roots.map((root) =>
-      root.id === queue.rootId
-        ? {
-            ...root,
-            selectedTrackId: null,
-            selectedTrackIds: queue.trackIds,
-            selectionAnchorTrackId: null,
-            activeRowKey: null
-          }
-        : root
-    )
+    roots.map((root) => {
+      const track = root.id === playing.rootId ? root.tracks.find((item) => item.id === playing.trackId) : undefined;
+      if (!track) {
+        return root;
+      }
+      return {
+        ...root,
+        expandedAlbums: [...new Set([...root.expandedAlbums, ...collectFolderPaths([track])])],
+        activeRowKey: `track:${track.id}`
+      };
+    })
   );
 }

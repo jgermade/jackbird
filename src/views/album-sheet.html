@@ -6,6 +6,7 @@
 
   const EqBars = await import("../../theme/default/components/eq-bars.html")
   const Key = await import("../../theme/default/components/key.html")
+  const SelectBox = await import("../../theme/default/components/select-box.html")
   const Stripes = await import("../../theme/default/components/stripes.html")
 
   const { t, tn } = await import("../lib/i18n")
@@ -42,10 +43,24 @@
   }
 
   const titleOf = (track: Track): string => track.metadata.title || track.name
-  const isPausable = (track: Track): boolean => track.id === playingId() && playback.playing
-  const pick = (track: Track, event: MouseEvent | KeyboardEvent) => selectTrack(track.id, event.shiftKey ? "range" : "toggle")
+
+  // A click on a track plays the sheet from it (on the one playing, pauses
+  // or resumes); the second click of a double click is not another one. The
+  // box at its left, or the cell around it, selects it. Keys: Enter plays,
+  // Space selects, Shift+Space selects up to it.
+  const play = (track: Track, event: MouseEvent) => {
+    if (event.detail <= 1) playFromDetail(track.id)
+  }
+  const pick = (track: Track, event: MouseEvent | KeyboardEvent) => selectTrack(track.id, event?.shiftKey ? "range" : "toggle")
+  const pickCell = (track: Track, event: MouseEvent) => {
+    event.stopPropagation()
+    pick(track, event)
+  }
   const onKey = (track: Track, event: KeyboardEvent) => {
-    if (event.key === "Enter" || event.key === " ") {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      playFromDetail(track.id)
+    } else if (event.key === " ") {
       event.preventDefault()
       pick(track, event)
     }
@@ -116,21 +131,11 @@
                       tabindex="0"
                       :aria-selected="String(isChosen(track))"
                       :data-playing="String(track.id === playingId())"
-                      @click="pick(track, $event)"
+                      @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
+                    <td class="pick-cell" @click="pickCell(track, $event)"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></td>
                     <td class="mm-num">{{ track.metadata.trackNumber || "-" }}</td>
                     <td><span class="mm-title"><EqBars :if="track.id === playingId()" :active="playback.playing" />{{ titleOf(track) }}</span></td>
-                    <td class="mm-num mm-end">
-                      <span class="play" @click.stop="null">
-                        <Key square size="sm" variant="ghost"
-                             :label="t(isPausable(track) ? 'album.pause' : 'album.play', { title: titleOf(track) })"
-                             :title="isPausable(track) ? t('album.pauseShort') : t('album.playFromHere')"
-                             @click="playFromDetail(track.id)">
-                          <svg :if="isPausable(track)" class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" /><rect x="9.5" y="3" width="3" height="10" /></svg>
-                          <svg :else class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
-                        </Key>
-                      </span>
-                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -215,9 +220,9 @@
   .album-tag { padding: 1px var(--mm-space-2); border-radius: var(--mm-radius-full); background: var(--mm-sunken); color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); }
   .disc { display: grid; gap: var(--mm-space-1); margin-top: var(--mm-space-2); }
   .disc-head { display: flex; justify-content: space-between; gap: var(--mm-space-3); }
-  .mm-table tr { cursor: pointer; }
+  .mm-table tr { cursor: pointer; user-select: none; }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
-  .play { display: inline-flex; }
+  .mm-table .pick-cell { width: 1%; padding-right: 0; }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }

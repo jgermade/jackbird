@@ -1,0 +1,64 @@
+<script :setup="{ chosen = false }: Props" lang="ts">
+  // The box that selects a row, in a list whose row click does something
+  // else (plays the track): the box `Checkbox` draws, with no label and no
+  // `<input>`. Ticked, it fills with the signal colour.
+  //
+  //   <SelectBox :chosen="isChosen(track)" @pick="select(track, $event.detail)" />
+  //
+  // A click emits `pick`, with the native event as `$event.detail` (for its
+  // Shift key), and goes no further, so the row under it does not also hear
+  // it; nor does a double click. `chosen` is its state (not `checked`, which
+  // jq79 keeps for an `<input>`'s own and ignores on a component tag). The
+  // box is hidden from assistive technology and out of the tab order: the row
+  // says whether it is chosen (`aria-selected`), and the keyboard changes it
+  // there (Space). It takes clicks a little beyond its edges, so a finger
+  // finds it.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = { chosen?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+
+  const pick = (event: MouseEvent) => {
+    event.stopPropagation()
+    $emit("pick", event)
+  }
+  const stop = (event: Event) => event.stopPropagation()
+</script>
+
+<span class="box" :class.on="flag(chosen)" aria-hidden="true" @click="pick($event)" @dblclick="stop($event)"></span>
+
+<style scoped>
+  .box {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-content: center;
+    width: 1rem;
+    height: 1rem;
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: 2px;
+    background: var(--mm-field);
+    box-shadow: var(--mm-well-shadow);
+    cursor: pointer;
+  }
+  /* The hit area: the box and a margin around it. */
+  .box::before { content: ""; position: absolute; inset: -.375rem; }
+  .box::after {
+    content: "";
+    width: .25rem;
+    height: .5rem;
+    /* Longhands: jq79 scopes styles through the CSSOM, which drops a var()
+       shorthand that a later longhand overrides. */
+    border-style: solid;
+    border-color: var(--mm-on-accent);
+    border-width: 0 2px 2px 0;
+    transform: translateY(-1px) rotate(45deg);
+    opacity: 0;
+  }
+  .box:hover { border-color: var(--mm-accent); }
+  .on { background: var(--mm-accent); border-color: var(--mm-accent-hover); box-shadow: none; }
+  .on::after { opacity: 1; }
+</style>

@@ -62,38 +62,56 @@ export function buildWizardRows(tracks: Mp3Track[], expandedFolders: readonly st
   return rows;
 }
 
-/** What an arrow key does in the tree: select a row, or open or close a folder. */
-export type TreeKeyAction = { select: string } | { toggle: string } | null;
+/**
+ * What a key does in the tree: move to a row, open or close a folder, play a
+ * row, or pick a track (select or deselect it; with Shift, select up to it).
+ */
+export type TreeKeyAction =
+  | { move: string }
+  | { toggle: string }
+  | { play: string }
+  | { pick: string; range: boolean }
+  | null;
 
 const ARROWS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
 /**
- * The arrow keys over the visible rows. Up and down move. Right opens a closed
- * folder, else moves down. Left closes an open folder, else goes to the
- * parent. With no current row, any arrow selects the first. Anything else is
- * not the tree's.
+ * The tree's keys over the visible rows. Up and down move. Right opens a
+ * closed folder, else moves down. Left closes an open folder, else goes to
+ * the parent. With no current row, any arrow moves to the first. Enter plays
+ * the current row, and Space picks the current track (`range` with Shift).
+ * Anything else is not the tree's.
  */
-export function treeKeyAction(rows: readonly WizardTreeRow[], activeKey: string | null, key: string): TreeKeyAction {
-  if (rows.length === 0 || !ARROWS.has(key)) {
+export function treeKeyAction(rows: readonly WizardTreeRow[], activeKey: string | null, key: string, shiftKey = false): TreeKeyAction {
+  if (rows.length === 0) {
     return null;
   }
   const index = rows.findIndex((row) => row.key === activeKey);
-  if (index === -1) {
-    return { select: rows[0].key };
+  const row = index === -1 ? null : rows[index];
+  if (key === "Enter") {
+    return row ? { play: row.key } : null;
   }
-  const row = rows[index];
+  if (key === " ") {
+    return row?.kind === "track" && row.trackId ? { pick: row.trackId, range: shiftKey } : null;
+  }
+  if (!ARROWS.has(key)) {
+    return null;
+  }
+  if (!row) {
+    return { move: rows[0].key };
+  }
   const below = rows[Math.min(rows.length - 1, index + 1)].key;
   if (key === "ArrowUp") {
-    return { select: rows[Math.max(0, index - 1)].key };
+    return { move: rows[Math.max(0, index - 1)].key };
   }
   if (key === "ArrowDown") {
-    return { select: below };
+    return { move: below };
   }
   if (key === "ArrowRight") {
-    return row.kind === "album" && !row.expanded ? { toggle: row.album } : { select: below };
+    return row.kind === "album" && !row.expanded ? { toggle: row.album } : { move: below };
   }
   if (row.kind === "album" && row.expanded) {
     return { toggle: row.album };
   }
-  return row.parentKey ? { select: row.parentKey } : null;
+  return row.parentKey ? { move: row.parentKey } : null;
 }

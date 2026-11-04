@@ -29,9 +29,12 @@ The left panel lists the active root's folders and tracks. **Expand all** and **
 open and close every folder. Choosing a folder shows what it holds on the right, and choosing a
 track shows its folder. Until you choose one, the right panel shows the whole root.
 
-Each row has a ▶ key at its end (on a computer, it shows when the pointer is over the row): on a
-track it plays that track's folder from it, and on a folder it plays the folder from its first
-track. A double click on a track plays it too.
+A click on a track plays it (its folder, from that track). Each folder has a ▶ key at its end (on
+a computer, it shows when the pointer is over the row) that plays the folder from its first track.
+The box at the left of each track selects it (see [Selecting tracks](#selecting-tracks)).
+
+With the keyboard, the arrows move through the tree and open and close folders, **Enter** plays
+the row you are on, and **Space** selects or deselects the track you are on.
 
 On a phone, the two panels take turns: the **Library** and **Details** keys at the bottom switch
 between them.
@@ -45,22 +48,25 @@ track-number order. An album whose files sit in folders named like `CD1`, `CD 2`
 
 ## Playing
 
-The ▶ key on a track, in the library or on the right, starts playback; on the track that is
-playing it becomes ❚❚ and pauses. On the right, it plays the albums shown there, from that track.
+A click on a track, in the library or on the right, starts playback; a click on the track that is
+playing pauses it, and another resumes it. On the right, it plays the albums shown there, from
+that track. **Enter** does the same on the track you are on.
 
 At the top right, the transport keys go to the previous track, play or pause, and go to the next
-one. The list key (≡) beside them takes you back to the list that is playing, wherever you are
-in the library, with its tracks selected; its tooltip says which list and which track. The gear
-key opens the preferences.
+one. The list key (≡) beside them takes you back to the track that is playing, wherever you are
+in the library: its folders open in the tree and the right panel shows its folder; its tooltip
+says which list and which track. The gear key opens the preferences.
 
 The display shows the state (▶ playing, ❚❚ paused, ■ stopped), the title and artist, the time,
 and how far into the track it is.
 
 ## Selecting tracks
 
-Click a track to select it, and click it again to deselect it. Clicks add to the selection, and
-**Shift**-click selects every track between the first one you clicked and this one. **Escape**
-clears the selection.
+Click the box at the left of a track to select it, and click it again to deselect it. Clicks add
+to the selection, and a **Shift**-click selects every track between the first one you ticked and
+this one. With the keyboard, **Space** selects or deselects the track you are on, and
+**Shift+Space** selects up to it. Moving through the library, or playing, leaves the selection as
+it is, so tracks from several folders can be selected together. **Escape** clears it.
 
 While tracks are selected, a bar offers:
 

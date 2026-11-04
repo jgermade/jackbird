@@ -67,32 +67,46 @@ describe("treeKeyAction", () => {
   const rows = buildWizardRows(library, ["Jazz", "Jazz/Miles"]);
   // folder:Jazz, folder:Jazz/Bill, folder:Jazz/Miles, track:t1, track:t2, track:t4
 
-  it("ignores keys that are not arrows, and an empty tree", () => {
-    assert.equal(treeKeyAction(rows, "folder:Jazz", "Enter"), null);
+  it("ignores keys that are not the tree's, and an empty tree", () => {
+    assert.equal(treeKeyAction(rows, "folder:Jazz", "Tab"), null);
     assert.equal(treeKeyAction([], null, "ArrowDown"), null);
+    assert.equal(treeKeyAction([], null, "Enter"), null);
   });
 
-  it("selects the first row when there is no current one", () => {
-    assert.deepEqual(treeKeyAction(rows, null, "ArrowDown"), { select: "folder:Jazz" });
-    assert.deepEqual(treeKeyAction(rows, "track:gone", "ArrowLeft"), { select: "folder:Jazz" });
+  it("moves to the first row when there is no current one", () => {
+    assert.deepEqual(treeKeyAction(rows, null, "ArrowDown"), { move: "folder:Jazz" });
+    assert.deepEqual(treeKeyAction(rows, "track:gone", "ArrowLeft"), { move: "folder:Jazz" });
   });
 
   it("moves up and down, stopping at the ends", () => {
-    assert.deepEqual(treeKeyAction(rows, "track:t1", "ArrowUp"), { select: "folder:Jazz/Miles" });
-    assert.deepEqual(treeKeyAction(rows, "folder:Jazz", "ArrowUp"), { select: "folder:Jazz" });
-    assert.deepEqual(treeKeyAction(rows, "track:t1", "ArrowDown"), { select: "track:t2" });
-    assert.deepEqual(treeKeyAction(rows, "track:t4", "ArrowDown"), { select: "track:t4" });
+    assert.deepEqual(treeKeyAction(rows, "track:t1", "ArrowUp"), { move: "folder:Jazz/Miles" });
+    assert.deepEqual(treeKeyAction(rows, "folder:Jazz", "ArrowUp"), { move: "folder:Jazz" });
+    assert.deepEqual(treeKeyAction(rows, "track:t1", "ArrowDown"), { move: "track:t2" });
+    assert.deepEqual(treeKeyAction(rows, "track:t4", "ArrowDown"), { move: "track:t4" });
   });
 
   it("opens a closed folder on the right, else moves down", () => {
     assert.deepEqual(treeKeyAction(rows, "folder:Jazz/Bill", "ArrowRight"), { toggle: "Jazz/Bill" });
-    assert.deepEqual(treeKeyAction(rows, "folder:Jazz/Miles", "ArrowRight"), { select: "track:t1" });
+    assert.deepEqual(treeKeyAction(rows, "folder:Jazz/Miles", "ArrowRight"), { move: "track:t1" });
   });
 
   it("closes an open folder on the left, else goes to the parent, else does nothing", () => {
     assert.deepEqual(treeKeyAction(rows, "folder:Jazz/Miles", "ArrowLeft"), { toggle: "Jazz/Miles" });
-    assert.deepEqual(treeKeyAction(rows, "track:t2", "ArrowLeft"), { select: "folder:Jazz/Miles" });
-    assert.deepEqual(treeKeyAction(rows, "folder:Jazz/Bill", "ArrowLeft"), { select: "folder:Jazz" });
+    assert.deepEqual(treeKeyAction(rows, "track:t2", "ArrowLeft"), { move: "folder:Jazz/Miles" });
+    assert.deepEqual(treeKeyAction(rows, "folder:Jazz/Bill", "ArrowLeft"), { move: "folder:Jazz" });
     assert.equal(treeKeyAction(rows, "track:t4", "ArrowLeft"), null);
+  });
+
+  it("plays the current row on Enter, track or folder", () => {
+    assert.deepEqual(treeKeyAction(rows, "track:t2", "Enter"), { play: "track:t2" });
+    assert.deepEqual(treeKeyAction(rows, "folder:Jazz/Bill", "Enter"), { play: "folder:Jazz/Bill" });
+    assert.equal(treeKeyAction(rows, null, "Enter"), null);
+  });
+
+  it("picks the current track on Space, as a range with Shift", () => {
+    assert.deepEqual(treeKeyAction(rows, "track:t1", " "), { pick: "t1", range: false });
+    assert.deepEqual(treeKeyAction(rows, "track:t1", " ", true), { pick: "t1", range: true });
+    assert.equal(treeKeyAction(rows, "folder:Jazz", " "), null);
+    assert.equal(treeKeyAction(rows, null, " "), null);
   });
 });
