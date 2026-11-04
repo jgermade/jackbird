@@ -102,7 +102,7 @@ mp3-manager/
 │   │   └── preferences-dialog.html # Tone and language
 │   └── lib/
 │       ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
-│       ├── meta.ts              # Reads and writes .meta/mp3-manager.json in a root
+│       ├── meta.ts              # Reads and writes .meta/mp3-manager.json; flushMeta queues writes
 │       ├── roots.ts             # hydrateRoot, openFolder, selectRoot, closeRoot, …
 │       ├── workspace.ts         # The active root: tree, scope, selection, and actions
 │       ├── editor.ts            # The metadata form; openEditor, saveEdits
@@ -142,7 +142,9 @@ mp3-manager/
 - A full checksum and an audio-only checksum (without the ID3 tag) are computed per track for
   change detection and cached in a per-root `.meta/mp3-manager.json` snapshot
   (`MetaSnapshot` / `MetaRecord`). A background verifier re-checks tracks whose checksums are
-  missing or more than a day old.
+  missing or more than a day old, re-reading the tags of a file changed outside the app. It
+  holds off while a save is under way and never records over what a save recorded; `.meta/` is
+  written through one queue per root (`flushMeta`), always from the library's latest state.
 - Edits are written back as ID3 tags with `browser-id3-writer`, serialized to bytes, and
   written in place through the VFS; `.meta/` is updated with the new checksums.
 

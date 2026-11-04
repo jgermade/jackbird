@@ -1,15 +1,18 @@
 // The metadata editor: the form being typed into, opening it on the
-// selection, and saving it to the files, `.meta/` and the library. The save
-// is the former React view's `handleSave` as it was. See
-// RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
+// selection, and saving it to the files, the library and `.meta/`. The save
+// is the former React view's `handleSave`, except that it records into the
+// root as it is when the save ends, not as it was when it began (the
+// verifier may have recorded other tracks meanwhile). See
+// RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7, and the
+// verifier fix).
 
 import { $reactive, $toRaw } from "jq79";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "../helpers/metadata";
-import type { EditableMetadata, MetaSnapshot, Mp3Track } from "../types";
+import type { EditableMetadata, MetaRecord, Mp3Track } from "../types";
 import { t, tn } from "./i18n";
 import { calculateDualChecksums, writeTrackMetadataToBytes } from "./id3";
 import { library } from "./library";
-import { writeMetaSnapshot } from "./meta";
+import { flushMeta } from "./meta";
 import { updateRoots } from "./roots";
 import { ui } from "./ui";
 import { activeRoot, selectedTracks } from "./workspace";
@@ -40,9 +43,11 @@ export function closeEditor(): void {
 /**
  * Writes the form to every selected track: a field the selection varied in
  * and the form left empty keeps each track's own value (see mergeDraft). Each
- * file gets its new tags and checksums, `.meta/` is written once at the end,
- * and the library takes the new tracks. Says what was saved, or why not, and
- * closes the editor when it worked.
+ * file gets its new tags and checksums; then the library takes the new
+ * tracks and records, merged into the root as it is now, and `.meta/` is
+ * written from it (flushMeta). `library.saving` is set throughout, which
+ * holds the verifier off. Says what was saved, or why not, and closes the
+ * editor when it all worked.
  */
 export async function saveEdits(): Promise<void> {
   const root = activeRoot.value.data;
@@ -58,7 +63,7 @@ export async function saveEdits(): Promise<void> {
 
   try {
     const varied = getVariedFields(tracks);
-    const nextRecords = { ...root.metaSnapshot.tracks };
+    const records: Record<string, MetaRecord> = {};
     const saved = new Map<string, Mp3Track>();
 
     for (const track of tracks) {
@@ -70,18 +75,23 @@ export async function saveEdits(): Promise<void> {
       const lastModified = Date.now();
       const checked = { checksum: fullChecksum, fullChecksum, audioChecksum, size: bytes.byteLength, lastModified, lastVerifiedAt: nowIso, metadata };
 
-      nextRecords[track.relativePath] = { ...checked, updatedAt: nowIso };
+      records[track.relativePath] = { ...checked, updatedAt: nowIso };
       saved.set(track.id, { ...track, ...checked });
     }
 
-    const snapshot: MetaSnapshot = { ...root.metaSnapshot, tracks: nextRecords };
-    await writeMetaSnapshot(root.vfs, snapshot);
-
+    // The files are written: the library shows them even if `.meta/` fails.
     updateRoots((roots) =>
       roots.map((item) =>
-        item.id === root.id ? { ...item, metaSnapshot: snapshot, tracks: item.tracks.map((one) => saved.get(one.id) ?? one) } : item
+        item.id === root.id
+          ? {
+              ...item,
+              tracks: item.tracks.map((one) => saved.get(one.id) ?? one),
+              metaSnapshot: { ...item.metaSnapshot, tracks: { ...item.metaSnapshot.tracks, ...records } }
+            }
+          : item
       )
     );
+    await flushMeta(root.id);
 
     const target = tracks.length === 1 ? tracks[0].name : tn("tracks.count", tracks.length);
     library.infoMessage = t("message.saved", { target });
