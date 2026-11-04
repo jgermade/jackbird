@@ -72,7 +72,9 @@ export async function saveEdits(): Promise<void> {
       await root.vfs.write(track.relativePath, bytes);
       const { fullChecksum, audioChecksum } = await calculateDualChecksums(bytes);
       const nowIso = new Date().toISOString();
-      const lastModified = Date.now();
+      // The date the disk gave the file, which the next load compares with:
+      // one of our own would make it read every edited file again.
+      const lastModified = (await root.vfs.stat(track.relativePath).catch(() => null))?.mtime ?? Date.now();
       const checked = { checksum: fullChecksum, fullChecksum, audioChecksum, size: bytes.byteLength, lastModified, lastVerifiedAt: nowIso, metadata };
 
       records[track.relativePath] = { ...checked, updatedAt: nowIso };
