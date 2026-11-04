@@ -1,6 +1,7 @@
 <script :setup lang="ts">
   // The app's top bar as a Deck faceplate: the brand, the display, the keys
-  // (transport, back to the list playing, preferences), and the open roots as
+  // (DeckKeys: transport, back to the list playing, preferences; on phones
+  // they go to the footer and the panel selector takes their place), and the open roots as
   // tabs (a dropdown on phones) with the folder key and, while tracks are
   // selected, the selection's key: it opens the selection's dialog on Edit. A view: it reads the
   // lib/ stores and calls lib/ actions, and draws with theme components. See
@@ -9,18 +10,19 @@
   const Counter = await import("../../theme/default/components/counter.html")
   const Display = await import("../../theme/default/components/display.html")
   const Key = await import("../../theme/default/components/key.html")
-  const KeyBank = await import("../../theme/default/components/key-bank.html")
+  const KeySelect = await import("../../theme/default/components/key-select.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
   const Spectrum = await import("../../theme/default/components/spectrum.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
+  const DeckKeys = await import("./deck-keys.html")
 
   const { formatTime } = await import("../helpers/format")
   const { t, tn } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
-  const { nowPlaying, next, previous, readSpectrum, togglePlay } = await import("../lib/player")
-  const { closeRoot, openFolder, selectRoot, showQueueInLibrary } = await import("../lib/roots")
+  const { nowPlaying, readSpectrum } = await import("../lib/player")
+  const { closeRoot, openFolder, selectRoot } = await import("../lib/roots")
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
   const { ui } = await import("../lib/ui")
@@ -53,7 +55,6 @@
   $: stateGlyph = playback.error ? "■" : playback.playing || playback.loading ? "▶" : current ? "❚❚" : "■"
   $: titleLine = playback.error || (current ? (current.artist ? `${current.title} — ${current.artist}` : current.title) : t("faceplate.idle"))
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
-  $: returnLabel = current ? t("playback.returnTo", { source: current.sourceLabel, position: current.position, total: current.total }) : t("playback.label")
 
   $: tabs = library.roots.map((root) => ({
     id: root.id,
@@ -89,31 +90,16 @@
       </Display>
     </div>
 
-    <div class="controls">
-      <div class="transport">
-        <KeyBank :label="t('faceplate.transport')">
-          <Key square :label="t('playback.previous')" :title="t('playback.previous')" :disabled="!current || current.position === 1" @click="previous()">
-            <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="2" y="3" width="2" height="10" /><path d="M14 3v10L5 8z" /></svg>
-          </Key>
-          <Key square :label="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :title="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :pressed="playback.playing" :disabled="!current" @click="togglePlay()">
-            <svg :if="playback.playing" class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" /><rect x="9.5" y="3" width="3" height="10" /></svg>
-            <svg :else class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
-          </Key>
-          <Key square :label="t('playback.next')" :title="t('playback.next')" :disabled="!current || current.position >= current.total" @click="next()">
-            <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="12" y="3" width="2" height="10" /><path d="M2 3v10l9-5z" /></svg>
-          </Key>
-        </KeyBank>
-      </div>
-      <Key square :label="returnLabel" :title="returnLabel" :disabled="!current" @click="showQueueInLibrary()">
-        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
-      </Key>
-      <Key square :label="t('preferences.open')" :title="t('preferences.title')" @click="ui.preferencesOpen = true">
-        <svg class="icon" viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M6.40 2.84L6.56 0.89L9.44 0.89L9.60 2.84A5.4 5.4 0 0 1 10.52 3.22L12.01 1.96L14.04 3.99L12.78 5.48A5.4 5.4 0 0 1 13.16 6.40L15.11 6.56L15.11 9.44L13.16 9.60A5.4 5.4 0 0 1 12.78 10.52L14.04 12.01L12.01 14.04L10.52 12.78A5.4 5.4 0 0 1 9.60 13.16L9.44 15.11L6.56 15.11L6.40 13.16A5.4 5.4 0 0 1 5.48 12.78L3.99 14.04L1.96 12.01L3.22 10.52A5.4 5.4 0 0 1 2.84 9.60L0.89 9.44L0.89 6.56L2.84 6.40A5.4 5.4 0 0 1 3.22 5.48L1.96 3.99L3.99 1.96L5.48 3.22A5.4 5.4 0 0 1 6.40 2.84ZM10.4 8A2.4 2.4 0 1 0 5.6 8A2.4 2.4 0 1 0 10.4 8Z" /></svg>
-      </Key>
+    <div class="controls"><DeckKeys place="header" /></div>
+    <div class="pane-pick">
+      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="ui.pane = $event.detail"
+                 :options="[{ value: 'library', label: t('library.title') }, { value: 'details', label: t('panels.details') }]" />
     </div>
   </div>
 
-  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
+  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
+        :add-label="folderLabel" :add-disabled="library.loading" @add="openFolder()"
+        @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
       <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
       <span class="open-folder" :class.has-roots="hasRoots">
@@ -159,8 +145,9 @@
   }
   .brand-mark { grid-area: brand; display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
   .screen { grid-area: screen; min-width: 0; }
-  .controls { grid-area: controls; display: flex; align-items: center; gap: var(--mm-space-3); }
-  .transport { width: max-content; }
+  .controls { grid-area: controls; display: flex; align-items: center; }
+  /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
+  .pane-pick { grid-area: controls; display: none; justify-self: end; }
 
   /* The display's one text row: the state glyph, then the title, which ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
@@ -229,13 +216,16 @@
       gap: var(--mm-space-2) var(--mm-space-3);
       padding: var(--mm-space-2) var(--mm-space-3);
     }
-    .controls { gap: var(--mm-space-2); }
     .wordmark { display: none; }
     .logo { height: 2.25rem; }
   }
-  /* Phones: the folder key is its + alone, and the selection's key its count. */
+  /* Phones: the keys go to the footer and the panel selector takes their place;
+     once a root is open, adding another is an option of the root picker, and
+     the selection's key is its count. */
   @media (max-width: 720px) {
-    .has-roots .folder-text { display: none; }
+    .controls { display: none; }
+    .pane-pick { display: flex; }
+    .open-folder.has-roots { display: none; }
     .count-wide { display: none; }
     .count-narrow { display: inline; }
   }

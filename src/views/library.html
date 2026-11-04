@@ -12,6 +12,7 @@
   const { t } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
+  const { ui } = await import("../lib/ui")
   const { nowPlaying } = await import("../lib/player")
   const {
     activeRoot,
@@ -53,8 +54,8 @@
   // or resumes); a click on a folder shows it in the album sheet. Either
   // becomes the current row. The second click of a double click is not
   // another one, or a double click would play and then pause. A track's box
-  // selects it. A folder's ❯ key shows it in the album sheet and emits
-  // `details`, so the workspace can bring that panel into view on a phone.
+  // selects it. A folder's ❯ key shows it in the album sheet and brings that
+  // panel into view on a phone (`ui.pane`).
   const open = (row: Row, event: MouseEvent) => {
     if (event?.detail > 1) return
     setCurrentRow(row.key)
@@ -67,7 +68,7 @@
   }
   const openFolder = (row: Row) => {
     setCurrentRow(row.key)
-    $emit("details")
+    ui.pane = "details"
   }
 
   const onKey = (event: KeyboardEvent) => {
