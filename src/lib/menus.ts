@@ -1,13 +1,12 @@
 // The rows' menus (the ⋮ key): what a track's or a folder's menu offers, and
-// doing it. The library's tree and the album sheet use the same ones. "Go to
-// album" and "Go to artist" join with W6's views.
+// doing it. The library's tree and the album sheet use the same ones.
 // See RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:32, W4).
 
 import { openSelectionFor } from "./editor";
 import { t, tn } from "./i18n";
 import { showInLibrary } from "./roots";
 import { ui } from "./ui";
-import { activeRoot, menuTargetCount, menuTargets, playFromTree, queueFolder, queueTracks, setCurrentRow } from "./workspace";
+import { activeRoot, goToGroup, menuTargetCount, menuTargets, playFromTree, queueFolder, queueTracks, setCurrentRow } from "./workspace";
 
 /** An item of a menu, as the theme's `Menu` takes it. */
 export type MenuItem = { id: string; label: string; danger?: boolean; rule?: boolean };
@@ -20,10 +19,12 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
   const count = menuTargetCount(trackId);
   const items: MenuItem[] = [
     { id: "next", label: tn("menu.playNext", count) },
-    { id: "queue", label: tn("menu.addToQueue", count) }
+    { id: "queue", label: tn("menu.addToQueue", count) },
+    { id: "album", label: t("menu.goToAlbum"), rule: true },
+    { id: "artist", label: t("menu.goToArtist") }
   ];
   if (place === "sheet") {
-    items.push({ id: "show", label: t("menu.showInLibrary"), rule: true });
+    items.push({ id: "show", label: t("menu.showInLibrary") });
   }
   items.push(
     { id: "edit", label: t("menu.edit"), rule: true },
@@ -40,6 +41,11 @@ export function onTrackMenu(trackId: string, choice: string): void {
     case "next":
     case "queue":
       queueTracks(menuTargets(trackId), choice === "next" ? "next" : "end");
+      break;
+    case "album":
+    case "artist":
+      goToGroup(trackId, choice);
+      ui.pane = "details";
       break;
     case "show": {
       const root = activeRoot.value.data;

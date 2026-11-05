@@ -9,6 +9,7 @@
   selectable = false,
   playable = false,
   current = false,
+  muted = false,
   rowId = '',
   lead = '',
   label = '',
@@ -35,8 +36,8 @@
   // is its selection (not `selected`, which jq79 keeps for an `<option>`'s
   // own state and ignores on a component tag). `current` marks the row the
   // keyboard is on, apart from the selection, and `rowId` is its id for the
-  // tree's `aria-activedescendant`. `lead` is a small mono prefix (a track
-  // number). The `action` slot is a key at the row's end (before the cue),
+  // tree's `aria-activedescendant`. `muted` dims a row that stands for
+  // something missing. `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (before the cue),
   // shown on hover, on the current, chosen and playing rows, and always where
   // there is no hover (a touch screen); give it `@click.stop` so it does not
   // also select the row.
@@ -55,6 +56,7 @@
     selectable?: boolean | ""
     playable?: boolean | ""
     current?: boolean | ""
+    muted?: boolean | ""
     rowId?: string
     lead?: string | number
     label?: string
@@ -81,6 +83,7 @@
      :class.folder="isFolder"
      :class.playing="flag(playing)"
      :class.current="flag(current)"
+     :class.muted="flag(muted)"
      :id="rowId || null"
      role="treeitem"
      :aria-level="level + 1"
@@ -128,6 +131,8 @@
   @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
   .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  /* Something the row stands for that is not there (a playlist's entry missing from the library). */
+  .row.muted .label, .row.muted .meta { color: var(--mm-fg-subtle); font-style: italic; }
   .row.current:not([aria-selected="true"]) { background: var(--mm-hover); box-shadow: inset 0 0 0 1px var(--mm-border-strong); }
 
   .caret { position: relative; display: grid; place-items: center; align-self: stretch; color: var(--mm-fg-subtle); }

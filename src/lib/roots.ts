@@ -7,7 +7,7 @@ import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
-import type { GroupingMode, Mp3Track, RootWorkspace } from "../types";
+import type { GroupingMode, LibraryView, Mp3Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
@@ -35,6 +35,7 @@ export async function hydrateRoot(
     /** Where a reopened root was: its open folders and its current row. */
     expandedAlbums?: string[];
     activeRowKey?: string | null;
+    view?: LibraryView;
   }
 ): Promise<void> {
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -75,7 +76,9 @@ export async function hydrateRoot(
       metaSnapshot: snapshot,
       expandedAlbums: options.expandedAlbums ?? [],
       expandedDiscs: [],
-      activeRowKey: options.activeRowKey ?? null
+      activeRowKey: options.activeRowKey ?? null,
+      view: options.view ?? "files",
+      playlists: []
     };
 
     if (existingIndex === -1) {
@@ -87,7 +90,9 @@ export async function hydrateRoot(
       ...nextRoot,
       expandedAlbums: currentRoots[existingIndex].expandedAlbums,
       expandedDiscs: currentRoots[existingIndex].expandedDiscs,
-      activeRowKey: currentRoots[existingIndex].activeRowKey
+      activeRowKey: currentRoots[existingIndex].activeRowKey,
+      view: currentRoots[existingIndex].view,
+      playlists: currentRoots[existingIndex].playlists
     };
     return copy;
   });

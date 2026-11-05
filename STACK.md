@@ -103,7 +103,7 @@ mp3-manager/
 │   ├── html-modules.d.ts        # *.html imports are jq79 components
 │   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
 │   │                            # metadata, tracks, tree, snapshot, format, i18n,
-│   │                            # selection, scope, albums, session, queue, rename, spectrum, id3v2
+│   │                            # selection, scope, albums, session, queue, rename, views, spectrum, id3v2
 │   ├── assets/brand/            # jackbird-metal.svg: the logo (faceplate, landing, favicon)
 │   ├── components/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove

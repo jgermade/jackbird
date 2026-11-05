@@ -50,6 +50,27 @@ track you are on.
 On a phone, the two panels take turns: swipe between them, or use the **Library** and **Details**
 keys at the top right.
 
+### Views
+
+The keys under the library's title list the root in other ways; the one down is the view open, and
+each folder keeps its own across visits:
+
+- **Files**: its folders, as above.
+- **Playlists**: its playlist files (see [Playlists](#playlists)).
+- **Artists**: each artist, opening into their tracks, by album.
+- **Albums by artist**: each artist, their albums, then the tracks.
+- **Albums**: each album with its artist beside it ("Various artists" when it has several). An album
+  is the tracks that share the album tag in one folder, a "Disc 1" or "CD 2" folder counting as
+  its album's, so a two-disc album is one.
+- **Compilations**: the albums with more than one artist.
+- **Songs**: every track by title, its artist beside it.
+
+Tracks without an artist or album go under "Unknown artist" or "No album". In every view the
+keyboard, the selection, ▶ and ⋮ work as in Files; choosing an artist or an album shows it on the
+right, and a track plays its group (or, in Songs, the list) from it, in the order shown. A track's
+⋮ also has **Go to album** and **Go to artist**, which switch to that view with the album or the
+artist shown on the right.
+
 ## Albums
 
 The right panel groups the chosen folder's tracks into albums, by their artist and album tags.

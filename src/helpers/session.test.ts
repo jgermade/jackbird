@@ -5,16 +5,16 @@ import { parsePlaybackState, parseViewState, sameSession, sessionOf } from "./se
 const music = { name: "Music" };
 const podcasts = { name: "Podcasts" };
 const open = [
-  { id: "1", label: "Music", rootHandle: music, groupingMode: "wizard" as const, tracks: [], expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles" },
-  { id: "2", label: "Podcasts", rootHandle: podcasts, groupingMode: "flat" as const, tracks: [], expandedAlbums: [], activeRowKey: null }
+  { id: "1", label: "Music", rootHandle: music, groupingMode: "wizard" as const, tracks: [], expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles", view: "files" as const },
+  { id: "2", label: "Podcasts", rootHandle: podcasts, groupingMode: "flat" as const, tracks: [], expandedAlbums: [], activeRowKey: null, view: "artists" as const }
 ];
 
 describe("sessionOf", () => {
   it("keeps each root's id, label, handle, grouping, open folders and current row, in order, and the active id", () => {
     assert.deepEqual(sessionOf(open, "2"), {
       roots: [
-        { id: "1", label: "Music", handle: music, groupingMode: "wizard", expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles" },
-        { id: "2", label: "Podcasts", handle: podcasts, groupingMode: "flat", expandedAlbums: [], activeRowKey: null }
+        { id: "1", label: "Music", handle: music, groupingMode: "wizard", expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles", view: "files" },
+        { id: "2", label: "Podcasts", handle: podcasts, groupingMode: "flat", expandedAlbums: [], activeRowKey: null, view: "artists" }
       ],
       activeRootId: "2"
     });
@@ -34,6 +34,12 @@ describe("sameSession", () => {
 
   it("is the same for the same roots, whatever else changed in them", () => {
     assert.equal(sameSession(saved, sessionOf(open.map((root) => ({ ...root, tracks: [] })), "1")), true);
+  });
+
+  it("differs when a root's view changes, and reads a session saved before views as Files", () => {
+    assert.equal(sameSession(saved, sessionOf(open.map((root) => (root.id === "1" ? { ...root, view: "songs" as const } : root)), "1")), false);
+    const before = { ...saved, roots: saved.roots.map(({ view: _view, ...root }) => root) };
+    assert.equal(sameSession(before, sessionOf(open.map((root) => ({ ...root, view: "files" as const })), "1")), true);
   });
 
   it("differs when the active root changes", () => {
@@ -59,7 +65,7 @@ describe("sameSession", () => {
 
   it("reads a session saved before folders and rows were kept as having none", () => {
     const old = { roots: [{ id: "2", label: "Podcasts", handle: podcasts, groupingMode: "flat" as const }], activeRootId: "2" };
-    assert.equal(sameSession(old, sessionOf([open[1]], "2")), true);
+    assert.equal(sameSession(old, sessionOf([{ ...open[1], view: "files" as const }], "2")), true);
   });
 });
 
