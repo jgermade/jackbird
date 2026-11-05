@@ -102,7 +102,8 @@ The display shows the state (▶ playing, ❚❚ paused, ■ stopped), the title
 and how far into the track it is.
 
 On a screen wider than 640px, the display also has a spectrum analyser at its left: its columns move
-with the music, from 40 Hz to 16 kHz, and fall still when it pauses.
+with the music, from 40 Hz to 16 kHz, and fall still when it pauses. On a phone, three columns of it
+(lows, mids, highs) take the state's place while the music plays.
 
 A track plays straight from its file, without being loaded into memory first. Saving its tags
 while it plays, or another program changing the file, does not stop it: it carries on from the
