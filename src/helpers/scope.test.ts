@@ -33,3 +33,26 @@ describe("detailScope", () => {
     assert.equal(detailScope(root("track:t4"), rows).label, "Music");
   });
 });
+
+describe("detailScope in the views", () => {
+  const a = track("A/1.mp3", { title: "One" });
+  const b = track("B/2.mp3", { title: "Two" });
+  const root = (activeRowKey: string | null) => ({ label: "Music", tracks: [a, b], activeRowKey });
+  const rows = [
+    { key: "@artist:x", kind: "album" as const, album: "@artist:x", label: "X", parentKey: null, depth: 0, trackIds: [b.id, a.id], inView: "artists" as const },
+    { key: "track:B/2.mp3", kind: "track" as const, album: "", label: "Two", parentKey: "@artist:x", depth: 1, trackId: b.id, inView: "artists" as const },
+    { key: "track:A/1.mp3", kind: "track" as const, album: "", label: "One", parentKey: null, depth: 0, trackId: a.id, inView: "songs" as const }
+  ];
+
+  it("shows a group's tracks in its order", () => {
+    assert.deepEqual(detailScope(root("@artist:x"), rows), { label: "X", tracks: [b, a], ordered: true });
+  });
+
+  it("shows a track's group", () => {
+    assert.deepEqual(detailScope(root("track:B/2.mp3"), rows), { label: "X", tracks: [b, a], ordered: true });
+  });
+
+  it("shows the view's tracks for a track without a group", () => {
+    assert.deepEqual(detailScope(root("track:A/1.mp3"), rows), { label: "Music", tracks: [b, a], ordered: true });
+  });
+});

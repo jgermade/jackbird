@@ -9,6 +9,7 @@
   selectable = false,
   playable = false,
   current = false,
+  muted = false,
   rowId = '',
   lead = '',
   label = '',
@@ -35,8 +36,8 @@
   // is its selection (not `selected`, which jq79 keeps for an `<option>`'s
   // own state and ignores on a component tag). `current` marks the row the
   // keyboard is on, apart from the selection, and `rowId` is its id for the
-  // tree's `aria-activedescendant`. `lead` is a small mono prefix (a track
-  // number). The `action` slot is a key at the row's end (before the cue),
+  // tree's `aria-activedescendant`. `muted` dims a row that stands for
+  // something missing. `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (before the cue),
   // shown on hover, on the current, chosen and playing rows, and always where
   // there is no hover (a touch screen); give it `@click.stop` so it does not
   // also select the row.
@@ -55,6 +56,7 @@
     selectable?: boolean | ""
     playable?: boolean | ""
     current?: boolean | ""
+    muted?: boolean | ""
     rowId?: string
     lead?: string | number
     label?: string
@@ -81,6 +83,7 @@
      :class.folder="isFolder"
      :class.playing="flag(playing)"
      :class.current="flag(current)"
+     :class.muted="flag(muted)"
      :id="rowId || null"
      role="treeitem"
      :aria-level="level + 1"
@@ -112,8 +115,8 @@
   .row {
     display: grid;
     grid-template-columns: .875rem 1.125rem minmax(0, 1fr) auto;
-    /* The action slot and the cue, when there are, in the same row. */
-    grid-auto-columns: 1.5rem;
+    /* The action slot (as wide as its keys) and the cue, when there are, in the same row. */
+    grid-auto-columns: auto;
     grid-auto-flow: column;
     align-items: center;
     gap: var(--mm-space-2);
@@ -125,9 +128,11 @@
     cursor: pointer;
     user-select: none;
   }
-  .row:hover { background: var(--mm-hover); }
+  @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
   .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  /* Something the row stands for that is not there (a playlist's entry missing from the library). */
+  .row.muted .label, .row.muted .meta { color: var(--mm-fg-subtle); font-style: italic; }
   .row.current:not([aria-selected="true"]) { background: var(--mm-hover); box-shadow: inset 0 0 0 1px var(--mm-border-strong); }
 
   .caret { position: relative; display: grid; place-items: center; align-self: stretch; color: var(--mm-fg-subtle); }
@@ -140,7 +145,7 @@
   }
   .folder .caret, .folder .icon { cursor: pointer; }
   /* The ink, near black in Silver; black itself would vanish in Graphite. */
-  .folder .caret:hover { color: var(--mm-fg); }
+  @media (hover: hover) { .folder .caret:hover { color: var(--mm-fg); } }
   .folder .icon { align-self: stretch; }
   .caret svg { width: .5rem; height: .5rem; transition: transform var(--mm-duration) var(--mm-ease); }
   .row[aria-expanded="true"] .caret svg { transform: rotate(90deg); }
@@ -148,15 +153,18 @@
   .icon svg { width: 1rem; height: 1rem; }
   .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lead { display: inline-block; min-width: 1.5em; margin-right: var(--mm-space-2); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
-  .action { display: grid; place-items: center; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .row:hover .action, .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
-  /* A key revealed on hover cannot be found without one. */
-  @media (hover: none) { .action { opacity: 1; } }
+  .action { display: flex; align-items: center; min-width: 1.5rem; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
+  @media (hover: hover) { .row:hover .action { opacity: 1; } }
   .folder .label { font-weight: var(--mm-weight-bold); }
   .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; }
-  .cue { display: grid; place-items: center; }
+  .cue { display: grid; place-items: center; width: 1.5rem; }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .row:hover .cue-play { opacity: 1; }
+  @media (hover: hover) { .row:hover .cue-play { opacity: 1; } }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
+  /* A key revealed on hover cannot be found without one: on a touch screen the
+     keys and the ▶ are always there, and nothing has a hover state (W2).
+     Last, so it wins over the rules that hide them. */
+  @media (hover: none) { .action, .cue-play { opacity: 1; } }
 </style>

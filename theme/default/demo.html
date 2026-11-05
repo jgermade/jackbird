@@ -14,8 +14,10 @@
   const KeySelect = await import("./components/key-select.html")
   const Lamp = await import("./components/lamp.html")
   const ListRow = await import("./components/list-row.html")
+  const Menu = await import("./components/menu.html")
   const Meter = await import("./components/meter.html")
   const Modal = await import("./components/modal.html")
+  const SubModal = await import("./components/sub-modal.html")
   const Panel = await import("./components/panel.html")
   const Reel = await import("./components/reel.html")
   const Select = await import("./components/select.html")
@@ -128,6 +130,7 @@
   // ---- specimens ---------------------------------------------------------------
 
   let latched: boolean = false
+  let chosen: string = "none"
   let groupBy: string = "album"
   let hold: boolean = true
 
@@ -200,6 +203,7 @@
   const playSelection = () => { if (selected.length > 0) playTrack(Math.min(...selected)) }
 
   let infoOpen: boolean = false
+  let noteOpen: boolean = false
 
   // ---- swatches, read back once the islands are on the page ------------------
 
@@ -412,6 +416,15 @@
             <div class="items">
               <Key led :pressed="latched" @click="latched = !latched">Loop</Key>
               <span class="state">pressed: {{ latched }}</span>
+            </div>
+          </div>
+          <div class="spec-row">
+            <span class="mm-legend">Menu · a key that opens a list</span>
+            <div class="items">
+              <Menu label="More for So What"
+                    :items="[{ id: 'next', label: 'Play next' }, { id: 'queue', label: 'Add to queue' }, { id: 'edit', label: 'Edit tags…', rule: true }, { id: 'remove', label: 'Remove from library…', danger: true, rule: true }]"
+                    @select="chosen = $event.detail" />
+              <span class="state">chosen: {{ chosen }}</span>
             </div>
           </div>
         </div>
@@ -641,7 +654,7 @@
   <section class="section" aria-labelledby="h-modal">
     <div class="head">
       <h2 id="h-modal">Modal</h2>
-      <p>On the native dialog: Escape, the close key and a click outside all ask the owner to close it.</p>
+      <p>On the native dialog: Escape, the close key and a click outside all ask the owner to close it. A SubModal comes down out of its head, over its body alone.</p>
     </div>
     <div class="items">
       <Key @click="infoOpen = true">Open track info</Key>
@@ -653,7 +666,15 @@
         <div class="row"><span class="mm-legend">Audio checksum</span><span class="mono">3f9a…c21e</span></div>
         <div class="row"><span class="mm-legend">State</span><Lamp tone="ok">Saved</Lamp></div>
       </div>
+      <SubModal :open="noteOpen" title="Add a note" close-label="Close" @close="noteOpen = false">
+        <TextInput label="Note" placeholder="Best take of the session" />
+        <template :slot.foot>
+          <Key variant="ghost" @click="noteOpen = false">Cancel</Key>
+          <Key variant="primary" @click="noteOpen = false">Add</Key>
+        </template>
+      </SubModal>
       <template :slot.foot>
+        <Key variant="ghost" @click="noteOpen = true">Add a note…</Key>
         <Key variant="primary" @click="infoOpen = false">Done</Key>
       </template>
     </Modal>
@@ -888,7 +909,8 @@
   .tracks .pick { width: 1%; padding-right: 0; }
   .tracks .cue { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
   .tracks .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; }
-  .tracks tr:hover .cue-play { opacity: 1; }
+  @media (hover: hover) { .tracks tr:hover .cue-play { opacity: 1; } }
+  @media (hover: none) { .tracks .cue-play { opacity: 1; } }
 
   .foot { padding-block: var(--mm-space-7) var(--mm-space-8); border-top: var(--mm-border-width) solid var(--mm-border); color: var(--mm-fg-muted); }
 

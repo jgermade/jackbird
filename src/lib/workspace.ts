@@ -6,26 +6,22 @@
 
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
+import { queueOf } from "../helpers/queue";
 import { detailScope, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
-import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
+import { orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
-import type { Mp3Track, RootWorkspace, WizardTreeRow } from "../types";
+import { albumKey, artistKey, buildViewRows, type ViewLabels } from "../helpers/views";
+import type { LibraryView, Mp3Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
-import { nowPlaying, playQueue, togglePlay } from "./player";
+import { addToQueue, dropFromQueue, nowPlaying, playNext, playQueue, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
 
-/**
- * A derived value handed to views whole. jq79 passes class instances through
- * untouched, so the store that holds one never wraps it or compares it field
- * by field; a new box is simply a new value. Views read `.value.data` in their
- * bindings and never copy it into a store variable.
- */
-export class Opaque<T> {
-  constructor(readonly data: T) {}
-}
+import { Opaque } from "./opaque";
+
+export { Opaque };
 
 type Derived = {
   root: RootWorkspace | null;
@@ -33,9 +29,29 @@ type Derived = {
   scope: Scope;
 };
 
-// The last derivation, keyed on the roots array and the active id: every
-// write replaces the array (updateRoots), so identity is enough.
-let cache: { roots: RootWorkspace[]; id: string | null; derived: Derived } | null = null;
+// The last derivation, keyed on the roots array, the active id and the
+// language (the views' labels): every write replaces the array (updateRoots),
+// so identity is enough.
+let cache: { roots: RootWorkspace[]; id: string | null; language: string; derived: Derived } | null = null;
+
+/** The words the views need, in the interface's language. */
+function viewLabels(): ViewLabels {
+  return {
+    unknownArtist: t("album.unknownArtist"),
+    unknownAlbum: t("album.untitled"),
+    variousArtists: t("views.variousArtists"),
+    missing: t("playlist.missing"),
+    locale: preferences.language
+  };
+}
+
+/** A root's rows in its view: its folders (Files), or the view's groups. */
+function rowsOf(root: RootWorkspace): WizardTreeRow[] {
+  const view = root.view ?? "files";
+  return view === "files"
+    ? buildWizardRows(root.tracks, root.expandedAlbums)
+    : buildViewRows(view, root.tracks, root.expandedAlbums, viewLabels(), root.playlists ?? []);
+}
 
 /**
  * The active root, its tree rows and the sheet's scope, worked out once per
@@ -48,13 +64,14 @@ let cache: { roots: RootWorkspace[]; id: string | null; derived: Derived } | nul
 function derive(): Derived {
   const roots = $toRaw(library.roots);
   const id = library.activeRootId;
-  if (cache && cache.roots === roots && cache.id === id) {
+  const language = preferences.language;
+  if (cache && cache.roots === roots && cache.id === id && cache.language === language) {
     return cache.derived;
   }
   const root = roots.find((item) => item.id === id) ?? null;
-  const rows = root ? buildWizardRows(root.tracks, root.expandedAlbums) : [];
+  const rows = root ? rowsOf(root) : [];
   const derived = { root, rows, scope: detailScope(root, rows) };
-  cache = { roots, id, derived };
+  cache = { roots, id, language, derived };
   return derived;
 }
 
@@ -83,6 +100,11 @@ export const selectedTracks = $computed((): Opaque<Mp3Track[]> => {
 /** The active root as a plain object. */
 function current(): RootWorkspace | null {
   return derive().root;
+}
+
+/** A scope's tracks in the order they play: a view's own, else by folder, disc and number. */
+function playOrder(scope: Scope): Mp3Track[] {
+  return scope.ordered ? scope.tracks : orderDetailPlaylist(scope.tracks);
 }
 
 function updateActive(update: (root: RootWorkspace) => RootWorkspace): void {
@@ -183,12 +205,23 @@ export function toggleFolder(folder: string): void {
   }));
 }
 
-export function expandAllFolders(): void {
-  updateActive((root) => ({ ...root, expandedAlbums: collectFolderPaths(root.tracks) }));
+/** Lists the active root by `view`; the current row stays if the view has it. */
+export function setView(view: LibraryView): void {
+  updateActive((root) => (root.view === view ? root : { ...root, view }));
 }
 
-export function collapseAllFolders(): void {
-  updateActive((root) => ({ ...root, expandedAlbums: [], expandedDiscs: [] }));
+/**
+ * Goes to a track's album or artist: the library switches to Albums or
+ * Artists, with that group as its current row (so Details shows it).
+ */
+export function goToGroup(trackId: string, group: "album" | "artist"): void {
+  const track = current()?.tracks.find((item) => item.id === trackId);
+  if (!track) {
+    return;
+  }
+  const view: LibraryView = group === "album" ? "albums" : "artists";
+  const key = group === "album" ? albumKey(track) : artistKey(track);
+  updateActive((root) => ({ ...root, view, activeRowKey: key }));
 }
 
 /** Drops the selected tracks from the library (not from disk): they come back when the folder is opened again. */
@@ -198,6 +231,8 @@ export function removeSelectedTracks(): void {
     return;
   }
   const gone = new Set(root.selectedTrackIds);
+  // They leave the queue first (if the one playing goes, the next one plays), then the library.
+  dropFromQueue((item) => item.rootId === root.id && gone.has(item.trackId));
   updateActive((item) => ({ ...clearedSelection(item), tracks: item.tracks.filter((track) => !gone.has(track.id)) }));
   library.infoMessage = tn("message.removed", gone.size);
 }
@@ -214,10 +249,10 @@ export function playFromDetail(trackId: string): void {
     togglePlay();
     return;
   }
-  const trackIds = orderDetailPlaylist(scope.tracks).map((track) => track.id);
+  const trackIds = playOrder(scope).map((track) => track.id);
   const index = trackIds.indexOf(trackId);
   if (index !== -1) {
-    playQueue({ rootId: root.id, trackIds, sourceLabel: scope.label }, index);
+    playQueue(queueOf(root.id, trackIds, scope.label), index);
   }
 }
 
@@ -238,14 +273,98 @@ export function playFromTree(rowKey: string): void {
     return;
   }
   const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
-  const trackIds = orderDetailPlaylist(scope.tracks).map((track) => track.id);
-  const index = row.kind === "track" && row.trackId ? trackIds.indexOf(row.trackId) : 0;
+  const trackIds = playOrder(scope).map((track) => track.id);
+  const index = row.kind === "track" && row.trackId ? placeOf(row, rows, trackIds) : 0;
   if (trackIds.length > 0 && index !== -1) {
-    playQueue({ rootId: root.id, trackIds, sourceLabel: scope.label }, index);
+    playQueue(queueOf(root.id, trackIds, scope.label), index);
   }
 }
 
-/** The per-track rename key: a placeholder until the naming pattern exists. */
-export function consolidateTrack(): void {
-  library.infoMessage = t("message.consolidatePending");
+/**
+ * Where a track row is in the tracks it plays with: a playlist's entry by its
+ * place (a track can be in a playlist twice; the missing entries before it
+ * do not count), any other track by its id.
+ */
+function placeOf(row: WizardTreeRow, rows: readonly WizardTreeRow[], trackIds: readonly string[]): number {
+  if (row.playlistIndex === undefined) {
+    return trackIds.indexOf(row.trackId ?? "");
+  }
+  return rows.filter((other) => other.parentKey === row.parentKey && other.trackId && (other.playlistIndex ?? 0) < (row.playlistIndex ?? 0)).length;
+}
+
+/**
+ * What a track's menu acts on: the selection, in the order it plays, when
+ * the track is in it; else the track alone.
+ */
+export function menuTargets(trackId: string): string[] {
+  const root = current();
+  if (!root || !root.selectedTrackIds.includes(trackId)) {
+    return [trackId];
+  }
+  const chosen = new Set(root.selectedTrackIds);
+  return orderDetailPlaylist(root.tracks.filter((track) => chosen.has(track.id))).map((track) => track.id);
+}
+
+/** How many tracks a track's menu acts on (see menuTargets). */
+export function menuTargetCount(trackId: string): number {
+  const root = current();
+  return root?.selectedTrackIds.includes(trackId) ? root.selectedTrackIds.length : 1;
+}
+
+function queue(tracks: Mp3Track[], label: string, where: "next" | "end"): void {
+  const root = current();
+  if (!root || tracks.length === 0) {
+    return;
+  }
+  const items = tracks.map((track) => ({ rootId: root.id, trackId: track.id }));
+  if (where === "next") {
+    playNext(items, label);
+    library.infoMessage = tn("message.playNext", items.length, { title: label });
+  } else {
+    addToQueue(items, label);
+    library.infoMessage = tn("message.queued", items.length, { title: label });
+  }
+}
+
+/** Queues tracks of the active root (in the order they play), next or at the end. */
+export function queueTracks(trackIds: readonly string[], where: "next" | "end"): void {
+  const root = current();
+  if (!root) {
+    return;
+  }
+  const wanted = new Set(trackIds);
+  const tracks = orderDetailPlaylist(root.tracks.filter((track) => wanted.has(track.id)));
+  const label = tracks.length === 1 ? tracks[0].metadata.title || tracks[0].name : tn("tracks.count", tracks.length);
+  queue(tracks, label, where);
+}
+
+/** A folder row's (or a view's group's) tracks, in the order they play, and its name. */
+export function folderTracks(rowKey: string): { label: string; trackIds: string[] } | null {
+  const { root, rows } = derive();
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row || row.kind !== "album") {
+    return null;
+  }
+  const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
+  return { label: scope.label, trackIds: playOrder(scope).map((track) => track.id) };
+}
+
+/** Queues a folder row's tracks, in the order the folder plays them, next or at the end. */
+export function queueFolder(rowKey: string, where: "next" | "end"): void {
+  const { root, rows } = derive();
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row || row.kind !== "album") {
+    return;
+  }
+  const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
+  queue(playOrder(scope), scope.label, where);
+}
+
+/** Makes a track the selection, unless it is in it already. */
+export function selectUnlessChosen(trackId: string): void {
+  const root = current();
+  if (!root || root.selectedTrackIds.includes(trackId)) {
+    return;
+  }
+  updateActive((item) => ({ ...item, selectedTrackId: trackId, selectedTrackIds: [trackId], selectionAnchorTrackId: trackId }));
 }

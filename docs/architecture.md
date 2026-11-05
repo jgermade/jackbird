@@ -24,7 +24,8 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
 1. **Pick.** `openFolder()` (`src/lib/roots.ts`) asks for a folder with `FSAAdapter.pick()`.
 2. **Render what is known.** `hydrateRoot()` reads `.meta/mp3-manager.json` (`src/lib/meta.ts`)
    and shows its tracks at once.
-3. **Walk.** In the background, `walk()` lists the folder's `.mp3` files.
+3. **Walk.** In the background, `walk()` lists the folder's `.mp3` files, and its `.m3u8` and
+   `.m3u` playlists, which `src/lib/playlists.ts` reads beside the tracks (see below).
 4. **Read.** New and changed files are read as bytes; `readTrackMetadataFromBytes()` parses their
    tags (with `jsmediatags`) and `calculateDualChecksums()` hashes the whole file and its audio
    alone (without the ID3 tag). The snapshot in `.meta/` is written again.
@@ -35,6 +36,16 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
 7. **Write.** The bytes go back through the root's VFS, and the library and `.meta/` record the
    new tags and checksums.
 
+## Playlists
+
+`src/lib/playlists.ts` is what the library does with a root's playlists (make one, add to it, move
+and take out its entries, delete it, save the queue as one), over one interface, `PlaylistStore`
+(list, exists, save, delete), so the views do not know where a playlist lives. In a folder, local
+or in the cloud, it is an M3U file over the root's `VFSAdapter` (`m3uPlaylists`): read and written
+by `src/helpers/m3u.ts`, its entries' paths relative to its own folder. On the family instance it
+will be rows of its database, behind the same interface. A playlist's change shows at once and its
+file is written after the writes before it, so the last one written is what the library shows.
+
 Beside that flow, `src/main.ts` starts three things:
 
 - **The session** (`src/lib/session.ts`): the open roots and the active one are kept in IndexedDB
@@ -42,6 +53,24 @@ Beside that flow, `src/main.ts` starts three things:
 - **The verifier** (`src/lib/verifier.ts`): re-reads, one at a time, the tracks whose checksums are
   missing or more than a day old.
 - **The root view** (`src/views/app.html`).
+
+## The tag engine
+
+`src/lib/id3.ts` still reads and writes tags (MP3 only) with `jsmediatags` and
+`browser-id3-writer`. Its replacement is built and not yet wired in: three Rust crates in
+`crates/`, which E2 brings into the web app as WebAssembly and E4 into the desktop app natively.
+
+- **`jackbird-id3`** reads an ID3v2 tag (v2.2 to v2.4) into its frames as they are stored, and
+  writes frames back; only the frames jackbird edits are decoded (text, pictures). A frame nobody
+  edits goes back byte for byte, in its place.
+- **`jackbird-flac`** does the same for FLAC's metadata blocks, and keeps Vorbis comments entry by
+  entry, whatever bytes each holds.
+- **`jackbird-tags`** is jackbird's layer: the six fields and the cover over both formats, the
+  audio region the checksums hash (for MP3 exactly `getAudioFrameSlice`'s, so existing `.meta/`
+  checksums stay valid), and writes that keep the audio where it was when the tag fits. Every
+  write is checked before its bytes are given back: the result must read back as asked, its audio
+  must be byte-identical, and every frame, block and comment it did not touch must be there, byte
+  for byte and in order; otherwise it is refused, with a code for the interface.
 
 ## Layers
 

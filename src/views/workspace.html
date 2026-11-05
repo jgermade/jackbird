@@ -4,8 +4,10 @@
   // fills the screen below the faceplate and they sit in a row that snaps:
   // a horizontal swipe moves from one to the other, and the selector in the
   // faceplate (`ui.pane`) shows which one is in view and jumps to the other.
-  // A footer, always at the bottom, holds the deck's keys (DeckKeys). Escape
-  // clears the selection when no dialog is open. The panel
+  // A footer, always at the bottom, holds the deck's keys (DeckKeys); on
+  // phones the queue opens as a panel over the panes (QueuePanel), above it.
+  // Escape closes that panel, or else clears the selection when no dialog is
+  // open. The panel
   // in view and both panes' scroll positions are kept for this tab when the
   // page goes away, and come back once a reload has reopened the roots. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
@@ -13,16 +15,25 @@
   const Library = await import("./library.html")
   const AlbumSheet = await import("./album-sheet.html")
   const DeckKeys = await import("./deck-keys.html")
+  const QueuePanel = await import("./queue-panel.html")
   const { parseViewState } = await import("../helpers/session")
   const { library } = await import("../lib/library")
   const { SESSION_KEYS, readSession, writeSession } = await import("../lib/storage")
   const { ui } = await import("../lib/ui")
   const { clearSelection } = await import("../lib/workspace")
 
+  const NARROW = matchMedia("(max-width: 720px)")
+  let narrow: boolean = NARROW.matches
+  const onWidth = (event: MediaQueryListEvent) => {
+    narrow = event.matches
+  }
+  NARROW.addEventListener("change", onWidth)
+  $destroyed(() => NARROW.removeEventListener("change", onWidth))
+
   const escape = (event: KeyboardEvent) => {
-    if (event.key === "Escape" && !document.querySelector("dialog[open]")) {
-      clearSelection()
-    }
+    if (event.key !== "Escape" || document.querySelector("dialog[open], :popover-open")) return
+    if (narrow && ui.queueOpen) ui.queueOpen = false
+    else clearSelection()
   }
   window.addEventListener("keydown", escape)
   $destroyed(() => window.removeEventListener("keydown", escape))
@@ -83,9 +94,12 @@
 </script>
 
 <div class="workspace">
-  <div class="panes" @scrollend="settle($event)">
-    <div class="pane tree-pane"><Library /></div>
-    <div class="pane sheet-pane"><AlbumSheet /></div>
+  <div class="stage">
+    <div class="panes" @scrollend="settle($event)">
+      <div class="pane tree-pane"><Library /></div>
+      <div class="pane sheet-pane"><AlbumSheet /></div>
+    </div>
+    <QueuePanel :if="narrow && ui.queueOpen" />
   </div>
   <div class="footbar"><DeckKeys place="footer" /></div>
 </div>
@@ -102,6 +116,7 @@
     font-size: var(--mm-text-md);
   }
   .footbar { display: none; }
+  .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   .panes {
     display: grid;
     flex: 1 1 auto;

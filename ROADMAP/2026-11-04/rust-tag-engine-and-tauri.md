@@ -1,4 +1,4 @@
-# Rust tag engine (lofty) and Tauri v2
+# Rust tag engine and Tauri v2
 
 What is planned, in order. The reasoning lives in
 [RECORD/2026-08-11.musikmatch-rust-migration.WIP.md](../../RECORD/2026-08-11.musikmatch-rust-migration.WIP.md)
@@ -7,7 +7,10 @@ first, then the desktop app, with the daemon, the SQLite index and the sync mesh
 
 Dates are estimates from the day each step starts; each step ends with its "done when" met and a
 walkthrough in the record. E0, the spike, is done: the rest goes ahead with the changes the record
-lists (2026-11-04, 18:30 for E1 and E2, 19:41 for E4's media URLs, the latter awaiting approval).
+lists (2026-11-04, 18:30 for E2, 21:45 to 22:20 for E1, 19:41 for E4's media URLs, the latter awaiting approval).
+E1 is done too (2026-11-04): jackbird's own tag crates replaced `lofty`. The web plan that ran
+after it ([web-queue-views-renaming.md](web-queue-views-renaming.md)) is done as well, so E2 is next,
+awaiting the owner's go.
 After E4 comes the family instance ([family-instance.md](family-instance.md)).
 
 ```mermaid
@@ -18,7 +21,7 @@ gantt
   section Decide
     E0 Spike: lofty in wasm, Tauri shell      :done, e0, 2026-11-04, 1d
   section Tag engine
-    E1 crates/tags (lofty, safeguards)         :e1, after e0, 5d
+    E1 Own tag crates (id3, flac, tags)       :done, e1, after e0, 5d
     E2 The engine in the web app (wasm)        :e2, after e1, 5d
     E3 FLAC                                    :e3, after e2, 4d
   section Desktop
@@ -31,7 +34,7 @@ gantt
 | Step | Scope | Done when |
 | --- | --- | --- |
 | E0 Spike (**done**, 2026-11-04) | `lofty` built for `wasm32-unknown-unknown`; size and speed against today's engine on the 13 MB benchmark file; whether `lofty` keeps unedited ID3 frames, Vorbis comments and FLAC blocks; a Tauri v2 shell loading today's `dist/` on macOS, Windows and Linux (jq79, `<audio>`, the analyser) | go, with a merge layer in E1 (record, 18:30–19:41); the owner's run by hand of the CI bundles is pending |
-| E1 Tag engine | `crates/tags`: read and write tags over bytes, the audio region of each format, and the write safeguards (parse again, audio bytes unchanged, else refuse), with `cargo test` on shared fixtures | the fixtures pass, including every case the TypeScript `id3v2` tests cover |
+| E1 Tag engine (**done**, 2026-11-04) | jackbird's own crates, with no tag dependency (record, 21:45 to 22:20): `crates/id3` (ID3v2 frames kept as raw bytes, text and picture codecs), `crates/flac` (blocks, Vorbis comment entries, pictures), `crates/tags` (the six fields and the cover over both, the audio region, the year rule, the refusals and three safeguards: fields read back, audio byte-identical, every unedited frame, block and comment kept byte for byte), with `cargo test` on shared fixtures | the fixtures pass, including every case the TypeScript `id3v2` tests cover |
 | E2 Engine in the web | `crates/tags-wasm` (wasm-bindgen), `src/lib/tags/` with one interface and its wasm implementation, loaded lazily; `jsmediatags`, `browser-id3-writer` and `src/helpers/id3v2.ts` retired; checksums keep their definitions | `npm test` runs the fixtures against the wasm build; an existing `.meta/` reopens without re-reading any file; the first load is no slower |
 | E3 FLAC | the walk takes `.flac`; MIME types by extension; `Mp3Track` becomes `Track`; texts no longer say MP3 only | a FLAC library opens, plays, edits and saves, and every saved file decodes with `ffmpeg` and keeps its unedited comments and blocks |
 | E4 Tauri desktop | `src-tauri/`: the same UI in the webview; a native `VFSAdapter` over Tauri commands and the folder dialog; tags and checksums run natively, on paths (no whole files over the IPC); the session keeps paths; playback streams from disk; release builds for macOS, Windows and Linux in GitHub Actions | the desktop app opens a folder, plays, edits and reopens it after a restart on all three systems |

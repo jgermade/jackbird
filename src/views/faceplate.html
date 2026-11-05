@@ -31,6 +31,7 @@
   $: current = nowPlaying.value
   // Above 640px the display shows the spectrum, moving while the music plays
   // (from 901 to 1024px it takes the wordmark's room; to 900px the display has a row of its own).
+  // At 640px and below, three bands of it take the state glyph's place while the music plays.
   const WIDE = matchMedia("(min-width: 641px)")
   let wide: boolean = WIDE.matches
   const onWidth = (event: MediaQueryListEvent) => {
@@ -42,6 +43,12 @@
   $: folderLabel = library.loading ? t("picker.scanning") : hasRoots ? t("picker.addRoot") : t("picker.openLibrary")
   // On a computer the key reads "+ Folder" once a root is open; on a phone, the + alone.
   $: folderText = library.loading ? t("picker.scanning") : hasRoots ? t("picker.folder") : t("picker.openLibrary")
+  // Choosing a pane on a phone closes the queue's panel over it.
+  const pickPane = (pane: "library" | "details") => {
+    ui.pane = pane
+    ui.queueOpen = false
+  }
+
   // Read through a function: the active root is boxed (see Opaque in lib/workspace.ts).
   const selectedCount = (): number => activeRoot.value.data?.selectedTrackIds.length ?? 0
 
@@ -78,7 +85,8 @@
           <div class="lcd-main">
             <div class="mm-display-row">
               <span class="now">
-                <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
+                <span :if="!wide && playback.playing" class="mini-spectrum" aria-hidden="true"><Spectrum :source="readSpectrum" :bands="3" :active="!wide && playback.playing" /></span>
+                <span :else class="state" aria-hidden="true">{{ stateGlyph }}</span>
                 <span class="visually-hidden">{{ stateLabel }}</span>
                 <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
               </span>
@@ -92,7 +100,7 @@
 
     <div class="controls"><DeckKeys place="header" /></div>
     <div class="pane-pick">
-      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="ui.pane = $event.detail"
+      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="pickPane($event.detail)"
                  :options="[{ value: 'library', label: t('library.title') }, { value: 'details', label: t('panels.details') }]" />
     </div>
   </div>
@@ -159,6 +167,8 @@
     letter-spacing: -.1em;
     text-align: center;
   }
+  /* Three bands of the spectrum, in the glyph's place, on phones while the music plays. */
+  .mini-spectrum { display: inline-block; flex: none; align-self: center; width: 1.1em; height: .95em; }
   .visually-hidden {
     position: absolute;
     width: 1px;

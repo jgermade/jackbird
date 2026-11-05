@@ -2,18 +2,24 @@
 # Each target installs the dependencies first when they are missing or out of date.
 
 .DEFAULT_GOAL := help
-.PHONY: help up test build
+.PHONY: help up test test-crates build
 
 help:
 	@echo "make up     The app in development mode, on http://localhost:8666"
 	@echo "make test   Every check (npm test)"
 	@echo "make build  The production build, into dist/"
+	@echo "make test-crates  The Rust tag crates: format, lints and tests (needs Rust)"
 
 up: node_modules/.package-lock.json
 	npm run dev
 
 test: node_modules/.package-lock.json
 	npm test
+
+test-crates:
+	cargo fmt --all --check
+	cargo clippy --workspace --all-targets --locked -- -D warnings
+	cargo test --workspace --locked
 
 build: node_modules/.package-lock.json
 	npm run build

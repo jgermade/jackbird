@@ -1,0 +1,124 @@
+<script :setup lang="ts">
+  // What the playlist dialog asks (`ui.playlist`), in a `Modal` or in the
+  // queue's `SubModal`: **adding** tracks to a playlist (the root's playlists
+  // to choose from, or a new one by name, written as
+  // `Playlists/<name>.m3u8`), **saving the queue** as a playlist (a name and,
+  // with several folders open, the folder; the queue's tracks of other
+  // folders cannot be in it, and it says how many are left out), or asking
+  // before **deleting** one. Its keys are PlaylistKeys. A view over
+  // lib/playlists.ts. See RECORD/2026-11-04.github-actions-workflows.WIP.md
+  // (22:12, W8's plan, and the sub-modal).
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Select = await import("../../theme/default/components/select.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+
+  const { newPlaylistPath } = await import("../helpers/playlists")
+  const { t, tn } = await import("../lib/i18n")
+  const { library } = await import("../lib/library")
+  const { preferences } = await import("../lib/preferences")
+  const { ui } = await import("../lib/ui")
+  const { addToChosenPlaylist, playlistForm, playlistProblem, queueSplit, submitPlaylistDialog } = await import("../lib/playlists")
+
+  type Choice = { path: string; name: string; entries: unknown[] }
+
+  const mode = (): string => ui.playlist?.mode ?? ""
+  const root = () => library.roots.find((item) => item.id === playlistForm.rootId)
+  const folderName = (): string => root()?.label ?? ""
+
+  const existing = (): Choice[] =>
+    [...(root()?.playlists ?? [])].sort((left: Choice, right: Choice) => left.name.localeCompare(right.name, preferences.language))
+
+  // The name: where it will be written, or why it cannot be (once typed); a
+  // failure on saving in place of either.
+  const nameError = (): string => playlistProblem() || playlistForm.error
+  const nameHint = (): string => {
+    const path = newPlaylistPath(playlistForm.name)
+    return path ? t("playlist.where", { path }) : ""
+  }
+
+  const folderOptions = () => library.roots.map((item: { id: string; label: string }) => ({ value: item.id, label: item.label }))
+  const split = () => queueSplit(playlistForm.rootId)
+  const deletePath = (): string => (ui.playlist?.mode === "delete" ? ui.playlist.path : "")
+
+  const typed = (value: string) => {
+    playlistForm.name = value
+    playlistForm.error = ""
+  }
+  const submit = (event: Event) => {
+    event.preventDefault()
+    void submitPlaylistDialog()
+  }
+</script>
+
+<form :if="mode() === 'add' || mode() === 'queue'" class="body" @submit="submit($event)">
+  <section :if="mode() === 'add'" class="choices">
+    <h3 class="mm-legend">{{ t("playlist.existing", { folder: folderName() }) }}</h3>
+    <p :if="existing().length === 0" class="hint">{{ t("playlist.none", { folder: folderName() }) }}</p>
+    <ul :else class="list">
+      <li :each="playlist in existing()" :key="playlist.path">
+        <button type="button" class="choice" :disabled="playlistForm.busy" @click="addToChosenPlaylist(playlist.path)">
+          <span class="name">{{ playlist.name }}</span>
+          <span class="meta">{{ tn("tracks.count", playlist.entries.length) }}</span>
+        </button>
+      </li>
+    </ul>
+  </section>
+  <Field :label="mode() === 'add' ? t('playlist.newName') : t('playlist.name')" control="playlist-name" :hint="nameHint()" :error="nameError()">
+    <TextInput id="playlist-name" :model="playlistForm.name" :placeholder="t('playlist.namePlaceholder')" describedby="playlist-name-note" :invalid="!!nameError()" @input="typed($event.detail)" />
+  </Field>
+  <Field :if="mode() === 'queue' && library.roots.length > 1" :label="t('playlist.folder')" control="playlist-folder">
+    <Select id="playlist-folder" :model="playlistForm.rootId" :options="folderOptions()" @change="playlistForm.rootId = $event.detail" />
+  </Field>
+  <div :if="mode() === 'queue'" class="notes">
+    <p class="hint">{{ tn("playlist.queueCount", split().inRoot) }}</p>
+    <p :if="split().elsewhere > 0" class="warning" role="status">{{ tn("playlist.leftOut", split().elsewhere) }}</p>
+  </div>
+</form>
+<div :elseif="mode() === 'delete'" class="body">
+  <p class="text">{{ t("playlist.deleteText", { path: deletePath() }) }}</p>
+  <p :if="playlistForm.error" class="failure" role="alert">{{ playlistForm.error }}</p>
+</div>
+
+<style scoped>
+  .body { display: grid; gap: var(--mm-space-4); }
+  .choices { display: grid; gap: var(--mm-space-2); }
+  .choices h3 { margin: 0; }
+  .list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    max-height: 13rem;
+    overflow-y: auto;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    list-style: none;
+  }
+  .list li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .choice {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mm-space-3);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    font: inherit;
+    font-size: var(--mm-text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  @media (hover: hover) { .choice:hover:not(:disabled) { background: var(--mm-hover); } }
+  .choice:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .choice:disabled { opacity: .45; cursor: default; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { flex: none; font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); color: var(--mm-fg-subtle); }
+  .notes { display: grid; gap: var(--mm-space-1); }
+  .hint, .text { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .text { color: var(--mm-fg); overflow-wrap: anywhere; }
+  .warning, .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-accent); border-radius: var(--mm-radius-key); background: var(--mm-sunken); color: var(--mm-fg); font-size: var(--mm-text-sm); }
+  .failure { border-left-color: var(--mm-bad-led); background: var(--mm-bad-soft); color: var(--mm-bad); }
+</style>

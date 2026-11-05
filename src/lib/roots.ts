@@ -5,15 +5,16 @@
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
+import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
-import type { GroupingMode, Mp3Track, RootWorkspace } from "../types";
+import type { GroupingMode, LibraryView, Mp3Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
-import { playback } from "./playback";
-import { nowPlaying } from "./player";
+import { dropFromQueue } from "./player";
+import { loadPlaylists } from "./playlists";
 
 /** Replaces the roots with `update(current)`, as a setState updater would. */
 export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[]): void {
@@ -36,6 +37,7 @@ export async function hydrateRoot(
     /** Where a reopened root was: its open folders and its current row. */
     expandedAlbums?: string[];
     activeRowKey?: string | null;
+    view?: LibraryView;
   }
 ): Promise<void> {
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -76,7 +78,9 @@ export async function hydrateRoot(
       metaSnapshot: snapshot,
       expandedAlbums: options.expandedAlbums ?? [],
       expandedDiscs: [],
-      activeRowKey: options.activeRowKey ?? null
+      activeRowKey: options.activeRowKey ?? null,
+      view: options.view ?? "files",
+      playlists: []
     };
 
     if (existingIndex === -1) {
@@ -88,7 +92,9 @@ export async function hydrateRoot(
       ...nextRoot,
       expandedAlbums: currentRoots[existingIndex].expandedAlbums,
       expandedDiscs: currentRoots[existingIndex].expandedDiscs,
-      activeRowKey: currentRoots[existingIndex].activeRowKey
+      activeRowKey: currentRoots[existingIndex].activeRowKey,
+      view: currentRoots[existingIndex].view,
+      playlists: currentRoots[existingIndex].playlists
     };
     return copy;
   });
@@ -100,7 +106,12 @@ export async function hydrateRoot(
   // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
   void (async () => {
     try {
-      const mp3Files = (await walk(vfs))
+      const walked = await walk(vfs);
+      // The playlists are read beside the tracks, and do not hold them up.
+      void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
+        console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
+      );
+      const mp3Files = walked
         .filter((entry) => entry.path.toLowerCase().endsWith(".mp3"))
         .map((entry) => ({
           name: entry.path.split("/").at(-1) ?? entry.path,
@@ -323,7 +334,14 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
     return;
   }
 
-  const currentFiles = (await walk(root.vfs)).filter((entry) => entry.path.toLowerCase().endsWith(".mp3"));
+  const walked = await walk(root.vfs);
+  // Playlists made or deleted elsewhere since: read them again.
+  const playlistPaths = walked.map((entry) => entry.path).filter(isPlaylistFile);
+  const knownPlaylists = new Set((root.playlists ?? []).map((playlist) => playlist.path));
+  if (playlistPaths.length !== knownPlaylists.size || playlistPaths.some((path) => !knownPlaylists.has(path))) {
+    void loadPlaylists(root.id, walked.map((entry) => entry.path));
+  }
+  const currentFiles = walked.filter((entry) => entry.path.toLowerCase().endsWith(".mp3"));
   const currentPaths = new Set(currentFiles.map((file) => file.path));
   const knownPaths = new Set(root.tracks.map((track) => track.relativePath));
   if (currentFiles.length === root.tracks.length && [...currentPaths].every((path) => knownPaths.has(path))) {
@@ -340,7 +358,10 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
   });
 }
 
-/** Closes a root; playback from it stops, and its neighbour becomes active. */
+/**
+ * Closes a root, and its neighbour becomes active. Its tracks leave the
+ * queue; if the one playing was one of them, the next one left plays.
+ */
 export function closeRoot(rootId: string): void {
   const { roots, activeRootId } = $toRaw(library);
   const index = roots.findIndex((root) => root.id === rootId);
@@ -348,10 +369,7 @@ export function closeRoot(rootId: string): void {
     return;
   }
 
-  if ($toRaw(playback).queue?.rootId === rootId) {
-    playback.queue = null;
-    playback.index = 0;
-  }
+  dropFromQueue((item) => item.rootId === rootId);
 
   const nextRoots = roots.filter((root) => root.id !== rootId);
   library.roots = nextRoots;
@@ -361,20 +379,15 @@ export function closeRoot(rootId: string): void {
 }
 
 /**
- * Opens the root of the track playing at that track: its folders open in the
- * tree and it becomes the current row, so the album sheet shows its folder.
- * The selection stays as it is.
+ * Opens a track's root at that track: its folders open in the tree and it
+ * becomes the current row, so the album sheet shows its folder. The
+ * selection stays as it is.
  */
-export function showQueueInLibrary(): void {
-  const playing = $toRaw(nowPlaying.value);
-  if (!playing) {
-    return;
-  }
-
-  library.activeRootId = playing.rootId;
+export function showInLibrary(rootId: string, trackId: string): void {
+  library.activeRootId = rootId;
   updateRoots((roots) =>
     roots.map((root) => {
-      const track = root.id === playing.rootId ? root.tracks.find((item) => item.id === playing.trackId) : undefined;
+      const track = root.id === rootId ? root.tracks.find((item) => item.id === trackId) : undefined;
       if (!track) {
         return root;
       }
@@ -386,3 +399,4 @@ export function showQueueInLibrary(): void {
     })
   );
 }
+

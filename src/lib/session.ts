@@ -35,7 +35,8 @@ export async function restoreSession(): Promise<void> {
         groupingMode: saved.groupingMode,
         setActive: false,
         expandedAlbums: saved.expandedAlbums ?? [],
-        activeRowKey: saved.activeRowKey ?? null
+        activeRowKey: saved.activeRowKey ?? null,
+        view: saved.view ?? "files"
       });
       reopened.push(saved.id);
     }

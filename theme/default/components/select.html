@@ -71,7 +71,7 @@
     font: var(--mm-text-md) / 1 var(--mm-font-sans);
     cursor: pointer;
   }
-  .control:hover:not(:disabled) { border-color: var(--mm-border-strong); }
+  @media (hover: hover) { .control:hover:not(:disabled) { border-color: var(--mm-border-strong); } }
   .control:focus-visible {
     outline: none;
     border-color: var(--mm-accent);

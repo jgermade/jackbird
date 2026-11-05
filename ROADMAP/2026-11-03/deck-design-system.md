@@ -34,3 +34,9 @@ gantt
 | Library | library tree, album sheet, action bar, scan progress | same |
 | Modals and forms | metadata editor, track info, preferences | same |
 | Clean-up | React, `src/styles.css` | no React dependency, no old colour variables, no hard-coded colours |
+
+Added to the theme since, with the web plan ([../2026-11-04/web-queue-views-renaming.md](../2026-11-04/web-queue-views-renaming.md)),
+each in the demo at `/theme/default/`: `Menu`, the ⋮ key and its list (W4); `SubModal`, a sheet
+out of a `Modal`'s head, after luu's; and `KeyBank`'s recess drawn in SVG, shaped to its keys (both
+W8). Their reasoning is in
+[RECORD/2026-11-04.github-actions-workflows.WIP.md](../../RECORD/2026-11-04.github-actions-workflows.WIP.md).

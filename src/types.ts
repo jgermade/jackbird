@@ -29,6 +29,7 @@ export type EditableMetadata = TrackMetadata;
 export type WizardTreeRow = {
   key: string;
   kind: "album" | "disc" | "track";
+  /** A folder's path (Files), or a group's key (the other views): what opens and closes it. */
   album: string;
   label: string;
   parentKey: string | null;
@@ -39,6 +40,40 @@ export type WizardTreeRow = {
   trackNumber?: string;
   artist?: string;
   relativePath?: string;
+  /** Small text at the row's end; else a track's artist. */
+  meta?: string;
+  /** A view's group: its tracks' ids, in the order they play. */
+  trackIds?: string[];
+  /** The view a row belongs to, when it is not Files. */
+  inView?: LibraryView;
+  /** A playlist's path (its group and entries), and an entry's place in it. */
+  playlist?: string;
+  playlistIndex?: number;
+  /** A playlist entry that is not in the library. */
+  missing?: boolean;
+};
+
+/** How the library lists a root: its folders, or grouped by tags, or its playlists. */
+export type LibraryView = "files" | "playlists" | "artists" | "albumsByArtist" | "albums" | "compilations" | "songs";
+
+/** One entry of a playlist: its path in the root when it resolves, and what the file said of it. */
+export type PlaylistEntry = {
+  /** The track's path in the root; null when it cannot be resolved (absolute, a URL, outside the root). */
+  path: string | null;
+  /** The line as the file had it. */
+  raw: string;
+  /** From `#EXTINF`, when there was one. */
+  title?: string;
+  duration?: number;
+};
+
+/** A playlist file of a root (`.m3u8`, `.m3u`). */
+export type Playlist = {
+  /** Its path in the root. */
+  path: string;
+  /** Its file name without the extension. */
+  name: string;
+  entries: PlaylistEntry[];
 };
 
 /** What `.meta/mp3-manager.json` keeps about one track, by relative path. */
@@ -85,11 +120,20 @@ export type RootWorkspace = {
   expandedAlbums: string[];
   expandedDiscs: string[];
   activeRowKey: string | null;
+  /** How the library lists it (Files by default). */
+  view: LibraryView;
+  /** Its playlist files, as the walk found them. */
+  playlists: Playlist[];
 };
 
-/** What is playing: tracks of one root, in order, and where they came from. */
-export type PlaybackQueue = {
+/** One track of the queue: which open root it is in, and its id there. */
+export type QueueItem = {
   rootId: string;
-  trackIds: string[];
+  trackId: string;
+};
+
+/** What is playing: tracks of any open roots, in order, and where they came from. */
+export type PlaybackQueue = {
+  items: QueueItem[];
   sourceLabel: string;
 };

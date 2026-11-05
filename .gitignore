@@ -7,5 +7,4 @@ dist/
 .DS_Store
 
 .tmp/
-# The E0 spike built without CARGO_TARGET_DIR (see spikes/e0-lofty/README.md).
-spikes/**/target/
+/target/

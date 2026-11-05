@@ -25,6 +25,18 @@ assets such as styles, fonts and images):
 
 `src/types.ts` holds types only and may be imported from anywhere.
 
+### Rust crates
+
+`crates/` holds jackbird's own Rust crates (the tag engine), one Cargo workspace whose
+`Cargo.toml` is at the root (`src-tauri/` stays its own project until E4). They do no I/O (bytes
+in, bytes out) and depend on nothing but each other; a dependency in `[dev-dependencies]` is for
+tests only. They are written from the formats' specifications; other libraries are references for
+behaviour and edge cases, and no code is copied from GPL or LGPL ones. Tests run on the shared
+fixtures in `fixtures/tags/` (made by `fixtures/tags/make.mjs`, whose expectations come from how
+each file is built). Run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --
+-D warnings` and `cargo test --workspace` (or `make test-crates`) before committing a change to
+them.
+
 jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.md`):
 
 - A prop can't be called `value`, `checked`, `selected`, `text`, `html` or `class`: those are
@@ -40,6 +52,10 @@ jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.m
   the bundle.)
 
 ### Sizes
+
+Hover states live only inside `@media (hover: hover)`: a touch screen has none, so whatever a
+hover reveals (a row's keys, its ▶) is always shown under `(hover: none)`. `npm test` fails on a
+`:hover` rule outside that media query.
 
 Sizes are in `rem`, never in `px`, so the interface scales with the root font size: 16px on a
 desktop and `4vw` on a phone (`theme/default/tokens.css`), which scales every component

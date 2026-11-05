@@ -1,6 +1,8 @@
 <script :setup="{ place = 'header' }: Props" lang="ts">
-  // The deck's keys: the transport bank, the key back to the list playing,
-  // and the preferences key. In the faceplate's header (`place="header"`):
+  // The deck's keys: the transport bank, the list key (it opens and closes
+  // the queue, and stays down while it is open), and the preferences key. In
+  // the phones' footer, while the queue is open, the preferences key gives
+  // way to Clear upcoming. In the faceplate's header (`place="header"`):
   // transport, list, preferences. In the phones' footer (`place="footer"`):
   // preferences, transport, list, spread across the bar. The markup follows
   // the order, so the keyboard does too. A view over lib/player.ts. See
@@ -13,16 +15,24 @@
 
   const { t } = await import("../lib/i18n")
   const { playback } = await import("../lib/playback")
-  const { nowPlaying, next, previous, togglePlay } = await import("../lib/player")
-  const { showQueueInLibrary } = await import("../lib/roots")
+  const { clearUpcoming, nowPlaying, next, previous, queueEntries, togglePlay } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
 
   $: current = nowPlaying.value
-  $: returnLabel = current ? t("playback.returnTo", { source: current.sourceLabel, position: current.position, total: current.total }) : t("playback.label")
+  // Read through a function: the entries are boxed (see Opaque).
+  const nothingAfter = (): boolean => {
+    const entries = queueEntries.value.data
+    const current = entries.findIndex((entry) => entry.state === "current")
+    return current < 0 || current >= entries.length - 1
+  }
+  $: queueLabel = current ? t("queue.open", { source: current.sourceLabel || t("queue.title"), position: current.position, total: current.total }) : t("queue.title")
 </script>
 
 <div class="deck-keys" :class.footer="place === 'footer'">
-  <Key :if="place === 'footer'" square :label="t('preferences.open')" :title="t('preferences.title')" @click="ui.preferencesOpen = true">
+  <Key :if="place === 'footer' && ui.queueOpen" square :label="t('queue.clearUpcoming')" :title="t('queue.clearUpcoming')" :disabled="nothingAfter()" @click="clearUpcoming()">
+    <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h6M2.5 12h4.5M10 10.5l3.5 3.5M13.5 10.5 10 14" /></svg>
+  </Key>
+  <Key :elseif="place === 'footer'" square :label="t('preferences.open')" :title="t('preferences.title')" @click="ui.preferencesOpen = true">
     <svg class="icon" viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M6.40 2.84L6.56 0.89L9.44 0.89L9.60 2.84A5.4 5.4 0 0 1 10.52 3.22L12.01 1.96L14.04 3.99L12.78 5.48A5.4 5.4 0 0 1 13.16 6.40L15.11 6.56L15.11 9.44L13.16 9.60A5.4 5.4 0 0 1 12.78 10.52L14.04 12.01L12.01 14.04L10.52 12.78A5.4 5.4 0 0 1 9.60 13.16L9.44 15.11L6.56 15.11L6.40 13.16A5.4 5.4 0 0 1 5.48 12.78L3.99 14.04L1.96 12.01L3.22 10.52A5.4 5.4 0 0 1 2.84 9.60L0.89 9.44L0.89 6.56L2.84 6.40A5.4 5.4 0 0 1 3.22 5.48L1.96 3.99L3.99 1.96L5.48 3.22A5.4 5.4 0 0 1 6.40 2.84ZM10.4 8A2.4 2.4 0 1 0 5.6 8A2.4 2.4 0 1 0 10.4 8Z" /></svg>
   </Key>
   <div class="transport">
@@ -39,7 +49,7 @@
       </Key>
     </KeyBank>
   </div>
-  <Key square :label="returnLabel" :title="returnLabel" :disabled="!current" @click="showQueueInLibrary()">
+  <Key square :label="queueLabel" :title="queueLabel" :pressed="ui.queueOpen" :disabled="!playback.queue && !ui.queueOpen" @click="ui.queueOpen = !ui.queueOpen">
     <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
   </Key>
   <Key :if="place !== 'footer'" square :label="t('preferences.open')" :title="t('preferences.title')" @click="ui.preferencesOpen = true">

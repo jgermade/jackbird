@@ -86,10 +86,12 @@
   /* The hairline around the display window. Same in both tones. */
   --mm-display-rim: #777777;
 
-  /* The J-card stripes: the brand mark, the active tab. Same in both tones. */
-  --mm-stripe-1: #f05a1a;
+  /* The J-card stripes, in the order green, orange, red: the brand mark, the
+     active tab, the splash; and one each on the tabs that carry a tone (go,
+     edit, danger). Same in both tones. */
+  --mm-stripe-1: #2bb39f;
   --mm-stripe-2: #f2a900;
-  --mm-stripe-3: #2bb39f;
+  --mm-stripe-3: #f05a1a;
 
   /* What a modal lays over the page. */
   --mm-overlay: rgba(27, 29, 29, .42);
@@ -98,7 +100,9 @@
 
   --mm-key-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 0 var(--mm-chassis-lo), 0 2px 4px rgba(20, 24, 24, .14);
   --mm-key-pressed: inset 0 2px 4px rgba(20, 24, 24, .22);
-  --mm-well-shadow: inset 0 1px 3px rgba(20, 24, 24, .18);
+  /* A recess's inner shadow; its colour alone too, for one drawn in SVG (KeyBank). */
+  --mm-well-shade: rgba(20, 24, 24, .18);
+  --mm-well-shadow: inset 0 1px 3px var(--mm-well-shade);
   --mm-shadow-md: 0 6px 18px rgba(20, 24, 24, .10), 0 1px 3px rgba(20, 24, 24, .08);
   --mm-shadow-lg: 0 24px 60px rgba(20, 24, 24, .22), 0 4px 12px rgba(20, 24, 24, .10);
   /* A key in the signal colour (primary, danger), up and down. */
@@ -225,7 +229,8 @@
 
   --mm-key-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 #000000, 0 2px 5px rgba(0, 0, 0, .5);
   --mm-key-pressed: inset 0 2px 5px rgba(0, 0, 0, .6);
-  --mm-well-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+  --mm-well-shade: rgba(0, 0, 0, .6);
+  --mm-well-shadow: inset 0 1px 3px var(--mm-well-shade);
   --mm-shadow-md: 0 8px 24px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4);
   --mm-shadow-lg: 0 24px 60px rgba(0, 0, 0, .65), 0 4px 12px rgba(0, 0, 0, .4);
   --mm-key-shadow-signal: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 0 #000000, 0 2px 5px rgba(0, 0, 0, .5);

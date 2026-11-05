@@ -1,4 +1,4 @@
-import type { GroupingMode, PlaybackQueue } from "../types.ts";
+import type { GroupingMode, LibraryView, PlaybackQueue } from "../types.ts";
 
 /**
  * What the session keeps of one open root: enough to reopen it after a
@@ -12,6 +12,8 @@ export type SessionRoot<Handle> = {
   groupingMode: GroupingMode;
   expandedAlbums?: string[];
   activeRowKey?: string | null;
+  /** How the library listed it; a session saved before views has none (Files). */
+  view?: LibraryView;
 };
 
 /** The open roots, in tab order, and the active one. */
@@ -27,6 +29,7 @@ type OpenRoot<Handle> = {
   groupingMode: GroupingMode;
   expandedAlbums: readonly string[];
   activeRowKey: string | null;
+  view: LibraryView;
 };
 
 /** The session to save for these open roots. */
@@ -38,7 +41,8 @@ export function sessionOf<Handle>(roots: readonly OpenRoot<Handle>[], activeRoot
       handle: root.rootHandle,
       groupingMode: root.groupingMode,
       expandedAlbums: [...root.expandedAlbums],
-      activeRowKey: root.activeRowKey
+      activeRowKey: root.activeRowKey,
+      view: root.view
     })),
     activeRootId
   };
@@ -64,6 +68,7 @@ export function sameSession<Handle>(last: Session<Handle> | null, next: Session<
       root.handle === other.handle &&
       root.groupingMode === other.groupingMode &&
       (root.activeRowKey ?? null) === (other.activeRowKey ?? null) &&
+      (root.view ?? "files") === (other.view ?? "files") &&
       open.length === otherOpen.length &&
       open.every((folder, at) => folder === otherOpen[at])
     );
@@ -81,10 +86,28 @@ export type SavedPlayback = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
+/** A queue as saved: `{ items, sourceLabel }`, or, before queues spanned roots, `{ rootId, trackIds, sourceLabel }`. */
+function queueFrom(value: unknown): PlaybackQueue | null {
+  if (!isRecord(value) || typeof value.sourceLabel !== "string") {
+    return null;
+  }
+  const { sourceLabel } = value;
+  if (Array.isArray(value.items)) {
+    const items = value.items;
+    const valid = items.length > 0 && items.every((item) => isRecord(item) && typeof item.rootId === "string" && typeof item.trackId === "string");
+    return valid ? { items: items.map((item) => ({ rootId: item.rootId as string, trackId: item.trackId as string })), sourceLabel } : null;
+  }
+  const { rootId, trackIds } = value;
+  if (typeof rootId !== "string" || !Array.isArray(trackIds) || trackIds.length === 0 || !trackIds.every((id) => typeof id === "string")) {
+    return null;
+  }
+  return { items: trackIds.map((trackId: string) => ({ rootId, trackId })), sourceLabel };
+}
+
 /**
  * The music saved before a reload, from its text; `null` when there is none
- * or it is not one: a queue of track ids, an index inside it, a position of
- * zero or more seconds, and whether it played.
+ * or it is not one: a queue of tracks (in either shape `queueFrom` reads), an
+ * index inside it, a position of zero or more seconds, and whether it played.
  */
 export function parsePlaybackState(raw: string | null): SavedPlayback | null {
   if (!raw) {
@@ -92,25 +115,21 @@ export function parsePlaybackState(raw: string | null): SavedPlayback | null {
   }
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed) || !isRecord(parsed.queue)) {
+    if (!isRecord(parsed)) {
       return null;
     }
-    const { queue, index, position, playing } = parsed;
-    const { rootId, trackIds, sourceLabel } = queue;
+    const queue = queueFrom(parsed.queue);
+    const { index, position, playing } = parsed;
     const valid =
-      typeof rootId === "string" &&
-      typeof sourceLabel === "string" &&
-      Array.isArray(trackIds) &&
-      trackIds.length > 0 &&
-      trackIds.every((id) => typeof id === "string") &&
+      queue !== null &&
       Number.isInteger(index) &&
       (index as number) >= 0 &&
-      (index as number) < trackIds.length &&
+      (index as number) < queue.items.length &&
       typeof position === "number" &&
       Number.isFinite(position) &&
       position >= 0 &&
       typeof playing === "boolean";
-    return valid ? { queue: { rootId, trackIds: [...trackIds], sourceLabel }, index: index as number, position, playing } : null;
+    return valid ? { queue, index: index as number, position, playing } : null;
   } catch {
     return null;
   }

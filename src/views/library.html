@@ -1,33 +1,37 @@
 <script :setup lang="ts">
-  // The library pane: the active root's folders and tracks as a tree, with
-  // its head, its messages and the scan meter. A view over lib/workspace.ts.
-  // See RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
+  // The library pane: the active root's folders and tracks as a tree (or as
+  // one of its views), with its head (the view keys and the track count),
+  // its messages and the scan meter. Each row's ⋮ is its menu (lib/menus.ts).
+  // A view over lib/workspace.ts. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (step 5) and
+  // RECORD/2026-11-04.github-actions-workflows.WIP.md (W6, W8, and the head
+  // at 00:54).
 
   const Key = await import("../../theme/default/components/key.html")
   const ListRow = await import("../../theme/default/components/list-row.html")
+  const Menu = await import("../../theme/default/components/menu.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
 
   const { formatTrackNumber } = await import("../helpers/format")
-  const { t } = await import("../lib/i18n")
+  const { t, tn } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { ui } = await import("../lib/ui")
   const { nowPlaying } = await import("../lib/player")
+  const { onRowMenu, rowMenu } = await import("../lib/menus")
   const {
     activeRoot,
-    collapseAllFolders,
-    consolidateTrack,
-    expandAllFolders,
     navigateTree,
     playFromTree,
     selectTrack,
     setCurrentRow,
+    setView,
     toggleFolder,
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; trackId?: string; trackNumber?: string; artist?: string }
+  type Row = { key: string; kind: string; album: string; label: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; inView?: string; missing?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
@@ -45,6 +49,16 @@
     return key ? rowDomId(key) : null
   }
 
+  // The views, as keys in the head: the open one is down.
+  const view = (): string => root()?.view ?? "files"
+  const rowMeta = (row: Row): string => (row.meta ?? (row.kind === "track" ? row.artist : "") ?? "")
+  const emptyText = (): string => {
+    if (isLoading()) return t("tree.loadingLibrary")
+    if (view() === "playlists") return t("views.empty.playlists")
+    if (view() === "compilations") return t("views.empty.compilations")
+    return t("tree.empty")
+  }
+
   const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
   const rowLead = (row: Row): string => (row.kind === "track" ? formatTrackNumber(row.trackNumber) || (isLoading() ? "…" : "—") : "")
   const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
@@ -59,7 +73,7 @@
   const open = (row: Row, event: MouseEvent) => {
     if (event?.detail > 1) return
     setCurrentRow(row.key)
-    if (row.kind === "track") playFromTree(row.key)
+    if (row.kind === "track" && row.trackId) playFromTree(row.key)
   }
   const pick = (row: Row, event: MouseEvent) => {
     if (!row.trackId) return
@@ -82,17 +96,31 @@
 </script>
 
 <section class="library" :aria-label="t('library.title')">
-  <header class="head">
-    <h2 class="mm-legend is-ink title">{{ t("library.title") }}</h2>
-    <span class="count">{{ root() ? root().tracks.length : 0 }}</span>
-    <span class="tools">
-      <Key square size="sm" variant="ghost" :label="t('library.expandAll')" :title="t('library.expandAll')" :disabled="!root() || root().tracks.length === 0" @click="expandAllFolders()">
-        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M3 5.5h10M3 10.5h10M8 3v5M8 8v5" /></svg>
+  <header :if="root()" class="head">
+    <div class="views" role="group" :aria-label="t('views.label')">
+      <Key square size="sm" variant="ghost" :label="t('views.files')" :title="t('views.files')" :pressed="view() === 'files'" @click="setView('files')">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z" /></svg>
       </Key>
-      <Key square size="sm" variant="ghost" :label="t('library.collapseAll')" :title="t('library.collapseAll')" :disabled="!root() || root().expandedAlbums.length === 0" @click="collapseAllFolders()">
-        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M3 5.5h10M3 10.5h10" /></svg>
+      <Key square size="sm" variant="ghost" :label="t('views.playlists')" :title="t('views.playlists')" :pressed="view() === 'playlists'" @click="setView('playlists')">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4h8M2 7.5h8M2 11h5M12.25 12.5V5.5l2-.75" /><circle cx="11" cy="12.5" r="1.3" fill="currentColor" stroke="none" /></svg>
       </Key>
-    </span>
+      <Key square size="sm" variant="ghost" :label="t('views.artists')" :title="t('views.artists')" :pressed="view() === 'artists'" @click="setView('artists')">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.75c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" /></svg>
+      </Key>
+      <Key square size="sm" variant="ghost" :label="t('views.albumsByArtist')" :title="t('views.albumsByArtist')" :pressed="view() === 'albumsByArtist'" @click="setView('albumsByArtist')">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="4.5" r="2" /><path d="M1.5 11.5c.4-2 1.8-3.25 3.5-3.25" /><circle cx="11" cy="10.5" r="3.75" /><circle cx="11" cy="10.5" r=".8" fill="currentColor" stroke="none" /></svg>
+      </Key>
+      <Key square size="sm" variant="ghost" :label="t('views.albums')" :title="t('views.albums')" :pressed="view() === 'albums'" @click="setView('albums')">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none" /></svg>
+      </Key>
+      <Key square size="sm" variant="ghost" :label="t('views.compilations')" :title="t('views.compilations')" :pressed="view() === 'compilations'" @click="setView('compilations')">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="8" r="4.75" /><circle cx="6" cy="8" r=".8" fill="currentColor" stroke="none" /><path d="M10 3.6a4.75 4.75 0 0 1 0 8.8M12.75 3.6a4.75 4.75 0 0 1 0 8.8" /></svg>
+      </Key>
+      <Key square size="sm" variant="ghost" :label="t('views.songs')" :title="t('views.songs')" :pressed="view() === 'songs'" @click="setView('songs')">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" stroke="none" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" stroke="none" /></svg>
+      </Key>
+    </div>
+    <span class="count" :title="tn('tracks.count', root().tracks.length)">{{ root().tracks.length }}</span>
   </header>
 
   <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
@@ -106,7 +134,7 @@
     <span class="mm-legend">{{ t("library.loadingMetadata", { loaded: root().loadedCount, total: root().tracks.length }) }}</span>
   </div>
 
-  <p :if="rows().length === 0" class="no-tracks">{{ isLoading() ? t("tree.loadingLibrary") : t("tree.empty") }}</p>
+  <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
     <ListRow :each="row in rows()"
              :key="row.key"
@@ -114,15 +142,16 @@
              :depth="row.depth"
              :label="rowLabel(row)"
              :lead="rowLead(row)"
-             :meta="row.kind === 'track' ? row.artist || '' : ''"
+             :meta="rowMeta(row)"
              :expanded="!!row.expanded"
              :chosen="isChosen(row)"
              :current="isCurrent(row)"
              :playing="row.kind === 'track' && row.trackId === playingId()"
              :playing-active="playback.playing"
              :row-id="rowDomId(row.key)"
-             :selectable="row.kind === 'track'"
-             :playable="row.kind === 'track'"
+             :selectable="row.kind === 'track' && !!row.trackId"
+             :playable="row.kind === 'track' && !!row.trackId"
+             :muted="!!row.missing"
              @select="open(row, $event.detail)"
              @pick="pick(row, $event.detail)"
              @toggle="toggleFolder(row.album)">
@@ -131,9 +160,7 @@
           <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
-          <Key :if="row.kind === 'track' && (isChosen(row) || isCurrent(row))" square size="sm" variant="ghost" :label="t('tree.rename')" :title="t('tree.renameTitle')" @click="consolidateTrack()">
-            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9z" /><path d="M8.35 4.15 11.85 7.65" stroke-linecap="round" /></svg>
-          </Key>
+          <Menu :if="row.kind === 'album' || row.trackId || row.playlist" :label="t(row.kind === 'album' ? 'menu.folder' : 'menu.track', { title: rowLabel(row) })" :items="rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
         </span>
       </template>
     </ListRow>
@@ -142,21 +169,21 @@
 
 <style scoped>
   .library { display: flex; flex-direction: column; color: var(--mm-fg); }
+  /* The view keys from the left, flat on the head, the open one down; the track count after them. */
   .head {
     position: sticky;
     top: 0;
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: var(--mm-space-2);
+    gap: var(--mm-space-3);
     min-height: 2.75rem;
-    padding: var(--mm-space-1) var(--mm-space-2) var(--mm-space-1) var(--mm-space-4);
+    padding: var(--mm-space-1) var(--mm-space-4) var(--mm-space-1) var(--mm-space-2);
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     background: var(--mm-surface);
   }
-  .title { margin: 0; }
+  .views { display: flex; flex-wrap: wrap; align-items: center; gap: .125rem; }
   .count { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
-  .tools { display: flex; gap: var(--mm-space-1); margin-left: auto; }
   .icon { width: .875rem; height: .875rem; }
 
   .messages { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-3) var(--mm-space-4) 0; }

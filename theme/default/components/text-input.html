@@ -82,7 +82,7 @@
     transition: border-color var(--mm-duration) var(--mm-ease), box-shadow var(--mm-duration) var(--mm-ease);
   }
   .input::placeholder { color: var(--mm-fg-subtle); font-style: italic; opacity: 1; }
-  .input:hover:not(:disabled) { border-color: var(--mm-border-strong); }
+  @media (hover: hover) { .input:hover:not(:disabled) { border-color: var(--mm-border-strong); } }
   .input:focus-visible {
     outline: none;
     border-color: var(--mm-accent);
@@ -106,7 +106,7 @@
     box-shadow: var(--mm-well-shadow);
     transition: border-color var(--mm-duration) var(--mm-ease), box-shadow var(--mm-duration) var(--mm-ease);
   }
-  .wrap.has-end:hover { border-color: var(--mm-border-strong); }
+  @media (hover: hover) { .wrap.has-end:hover { border-color: var(--mm-border-strong); } }
   .wrap.has-end:focus-within { border-color: var(--mm-accent); box-shadow: var(--mm-well-shadow), 0 0 0 1px var(--mm-accent); }
   .has-end .input { flex: 1 1 auto; min-width: 0; height: 100%; border: 0; background: transparent; box-shadow: none; }
   .has-end .input:focus-visible { box-shadow: none; }

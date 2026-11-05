@@ -20,12 +20,14 @@
   // through `<selectedcontent>`, and where the browser has no base-select it
   // is a plain native select that still works.
   // `plain` drops the bar's own chassis, for a bar inside another one (a
-  // modal's header).
+  // modal's header). An item's `tone` (`go`, `edit` or `danger`) gives its
+  // tab one stripe colour on top, green, orange or red, instead of the three
+  // stripes: a hairline while closed, the stripes' height while open.
   //
   // **Part of the default theme**: imports `Led`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
-  type Item = { id: string; label: string; meta?: string | number; closeLabel?: string }
+  type Item = { id: string; label: string; meta?: string | number; closeLabel?: string; tone?: "go" | "edit" | "danger" }
   type Props = {
     items?: Item[]
     model?: string | null
@@ -110,7 +112,8 @@
 
 <div class="tabs" :class.compact="flag(compact)" :class.plain="flag(plain)">
   <div class="strip" role="tablist" :aria-label="label || null">
-  <div :each="item in items" :key="item.id" class="tab" :class.on="item.id === model">
+  <div :each="item in items" :key="item.id" class="tab" :class.on="item.id === model" :class.toned="!!item.tone"
+       :class.tone-go="item.tone === 'go'" :class.tone-edit="item.tone === 'edit'" :class.tone-danger="item.tone === 'danger'">
     <button type="button"
             role="tab"
             class="main"
@@ -247,7 +250,8 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .pick-option:hover, .pick-option:focus-visible { outline: none; background: var(--mm-hover); color: var(--mm-fg); }
+  .pick-option:focus-visible { outline: none; background: var(--mm-hover); color: var(--mm-fg); }
+  @media (hover: hover) { .pick-option:hover { outline: none; background: var(--mm-hover); color: var(--mm-fg); } }
   .pick-option:checked { color: var(--mm-fg); }
   .pick-option::checkmark { display: none; }
   /* The chosen item's × sits at its row's end, in the drop-down only. */
@@ -260,7 +264,7 @@
     border-radius: var(--mm-radius-key);
     color: var(--mm-fg-subtle);
   }
-  .pick-close:hover { background: var(--mm-sunken); color: var(--mm-fg); }
+  @media (hover: hover) { .pick-close:hover { background: var(--mm-sunken); color: var(--mm-fg); } }
   .pick-close svg { width: .625rem; height: .625rem; }
   .pick-button selectedcontent .pick-close { display: none; }
   .pick-rule { margin: var(--mm-space-1) 0; border: 0; border-top: var(--mm-border-width) solid var(--mm-border); }
@@ -297,6 +301,21 @@
     border-radius: .3125rem .3125rem 0 0;
     background: linear-gradient(90deg, var(--mm-stripe-1) 0 33.33%, var(--mm-stripe-2) 0 66.66%, var(--mm-stripe-3) 0);
   }
+  /* A toned tab: its one colour on top, a hairline while closed. */
+  .tab.tone-go { --tab-tone: var(--mm-stripe-1); }
+  .tab.tone-edit { --tab-tone: var(--mm-stripe-2); }
+  .tab.tone-danger { --tab-tone: var(--mm-stripe-3); }
+  .tab.toned::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    left: -1px;
+    height: 2px;
+    border-radius: .3125rem .3125rem 0 0;
+    background: var(--tab-tone);
+  }
+  .tab.toned.on::before { height: .25rem; }
   .main {
     display: inline-flex;
     align-items: center;
@@ -310,7 +329,8 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .main:hover, .on .main { color: var(--mm-fg); }
+  .on .main { color: var(--mm-fg); }
+  @media (hover: hover) { .main:hover { color: var(--mm-fg); } }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .close {
     display: inline-grid;
@@ -325,7 +345,7 @@
     color: var(--mm-fg-subtle);
     cursor: pointer;
   }
-  .close:hover { background: var(--mm-hover); color: var(--mm-fg); }
+  @media (hover: hover) { .close:hover { background: var(--mm-hover); color: var(--mm-fg); } }
   .close svg { width: .625rem; height: .625rem; }
   .main:focus-visible, .close:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; border-radius: var(--mm-radius-key); }
 </style>

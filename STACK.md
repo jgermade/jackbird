@@ -52,12 +52,14 @@ This document describes the technical stack and codebase architecture implemente
   device's rate with `latencyHint: "playback"`; the bands span 40 Hz–16 kHz whatever the rate.
 - **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
   `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
-  root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back.
+  root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back. Their
+  replacement is built (E1) and not yet wired in (E2): jackbird's own tag crates in `crates/`
+  (below), with no tag dependency.
 - **Session persistence**: `src/lib/session.ts` restores the open roots on load and saves them
   whenever they change; `src/lib/rootSessionStore.ts` keeps their handles and grouping mode in
   IndexedDB (`mp3-manager` database).
 - **State**: jq79 `$reactive` stores in `src/lib/`: `library` (roots, active root, loading and
-  saving flags, messages), `playback` (queue, position, playing), `ui` (open dialogs),
+  saving flags, messages), `playback` (the queue, of tracks of any open roots, position, playing), `ui` (open dialogs),
   `editor` (the metadata form) and `preferences` (theme and language, saved under the keys in
   `src/lib/storage.ts`). Derived values (`src/lib/workspace.ts`) are `$computed`.
 - **Languages**: English (source and fallback) and Spanish. `src/lib/i18n.ts` gives `t` and
@@ -75,6 +77,13 @@ This document describes the technical stack and codebase architecture implemente
 - **Makefile**: `make up`, `make test` and `make build` run `npm run dev`, `npm test` and
   `npm run build`, installing the dependencies first (`npm ci`) when they are missing or older
   than `package-lock.json`.
+- **Rust** (stable; only to work on `crates/` until E2 builds them into the app): a Cargo
+  workspace at the root with jackbird's tag crates, `jackbird-id3` (ID3v2 tags as frames kept byte
+  for byte, text and picture codecs), `jackbird-flac` (FLAC metadata blocks, Vorbis comment
+  entries, pictures) and `jackbird-tags` (the six fields and the cover over both, the audio region,
+  safe writes). No I/O and no dependencies but each other; `cargo test` runs them on the shared
+  fixtures in `fixtures/tags/`, and CI (`tags.yml`) adds `rustfmt` and `clippy`. `src-tauri/` is
+  its own Cargo project until E4.
 - **Tests**: `npm test`, with no test framework: the layer check (`scripts/check-layers.mjs`),
   a type check of the helpers and their tests (`tsconfig.test.json`), Node's own runner on
   `src/helpers/**/*.test.ts` with type stripping, and a per-file coverage floor of 90% of lines,
@@ -94,19 +103,25 @@ mp3-manager/
 │   ├── html-modules.d.ts        # *.html imports are jq79 components
 │   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
 │   │                            # metadata, tracks, tree, snapshot, format, i18n,
-│   │                            # selection, scope, albums, session
+│   │                            # selection, scope, albums, session, queue, rename, views, m3u,
+│   │                            # playlists, spectrum, id3v2
 │   ├── assets/brand/            # jackbird-metal.svg: the logo (faceplate, landing, favicon)
 │   ├── components/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove
 │   ├── views/
-│   │   ├── app.html             # Root: faceplate, workspace, the two dialogs
+│   │   ├── app.html             # Root: faceplate, workspace, the dialogs
 │   │   ├── faceplate.html       # Brand, the deck's keys (the panel selector on phones), display,
 │   │   │                        # root tabs (one tab with a picker on phones), folder key, selection
 │   │   ├── deck-keys.html       # Transport, list and preferences keys (header, or phones' footer)
 │   │   ├── workspace.html       # The two panes (swipeable on phones, the keys in a footer), Escape
-│   │   ├── library.html         # The tree, its head, messages and scan meter
+│   │   ├── library.html         # The tree (or a view), its head (view keys, count), messages, scan meter
 │   │   ├── album-sheet.html     # Landing, albums and discs
-│   │   ├── selection-dialog.html # The selection: Edit, Info and Danger tabs
+│   │   ├── selection-dialog.html # The selection: Info, Edit, Rename and Delete tabs
+│   │   ├── queue-dialog.html    # The queue on a computer: its list, Save as playlist, Clear upcoming
+│   │   ├── playlist-dialog.html # The playlist dialog as a Modal: add to one, delete one, save the queue
+│   │   ├── playlist-form.html   # Its form (also the queue dialog's SubModal); playlist-keys.html its keys
+│   │   ├── queue-panel.html     # The queue on a phone: a panel above the footer
+│   │   ├── queue-list.html      # The queue's tracks: covers, drag, play, remove
 │   │   └── preferences-dialog.html # Tone and language
 │   └── lib/
 │       ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
@@ -114,7 +129,11 @@ mp3-manager/
 │       ├── roots.ts             # hydrateRoot, openFolder, selectRoot, closeRoot, …
 │       ├── workspace.ts         # The active root: tree, scope, selection, and actions
 │       ├── editor.ts            # The metadata form; openEditor, saveEdits
-│       ├── player.ts            # The one Audio element; nowPlaying, playQueue, next, …
+│       ├── player.ts            # The one Audio element; nowPlaying, the queue's actions and entries
+│       ├── opaque.ts            # Opaque: derived values handed to views boxed
+│       ├── menus.ts             # The rows' ⋮ menus: track, folder, playlist, entry; and doing it
+│       ├── playlists.ts         # Playlists over PlaylistStore (.m3u8 files now): make, add, move, delete
+│       ├── rename.ts            # Renaming the selection by a %field% pattern; the library follows
 │       ├── media.ts             # A track's file as a URL to play, without reading it
 │       ├── session.ts           # restoreSession, keepSessionSaved
 │       ├── rootSessionStore.ts  # IndexedDB persistence of open roots
@@ -128,8 +147,15 @@ mp3-manager/
 │   ├── fonts.css, fonts/        # Self-hosted woff2 + OFL licences
 │   ├── content.css              # Classes for plain markup (legend, table, display rows)
 │   ├── base.css                 # Box sizing; the body's ground, ink and type
-│   ├── components/*.html        # jq79: key, key-bank, display, meter, lamp, tabs, modal, …
+│   ├── components/*.html        # jq79: key, key-bank (its recess shaped to the keys), display, meter,
+│   │                            # lamp, tabs, modal, sub-modal, menu, …
 │   └── index.html, demo.ts/.html # The demo page
+├── crates/                      # Rust: jackbird's tag engine (Cargo.toml at the root is its workspace)
+│   ├── id3/                     # jackbird-id3: ID3v2 frames, text and picture codecs
+│   ├── flac/                    # jackbird-flac: FLAC blocks, Vorbis comments, pictures
+│   └── tags/                    # jackbird-tags: fields, cover, audio region, safe writes
+├── fixtures/tags/               # Shared tag fixtures, cases.json, and make.mjs that makes them
+├── src-tauri/                   # The Tauri v2 shell (E0), its own Cargo project
 ├── scripts/                     # check-layers.mjs, check-coverage.mjs (run by npm test)
 ├── RECORD/                      # Specs, plans, walkthroughs & audit trail (see AGENTS.md)
 └── ROADMAP/                     # Dated roadmaps with Mermaid Gantt charts (see AGENTS.md)
@@ -169,10 +195,10 @@ mp3-manager/
   still being read.
 - In the tree and the album sheet, a click (or Enter) on a track plays it, and a box at its left
   selects it (Shift-click for a range, Space and Shift+Space, Escape to clear).
-- The selection's key in the tab bar opens one dialog with Edit, Info and Danger tabs. The editor
+- The selection's key in the tab bar opens one dialog with Info, Edit, Rename and Delete tabs (green, orange, orange, red on top). The editor
   works on one track or many: a field that varies across the selection keeps each track's value
   unless typed over or its "Override" box is ticked (then even an empty value is written); cover art by
-  drag & drop or file choice. Danger removes the tracks from the library (not from disk).
+  drag & drop or file choice. Delete removes the tracks from the library (not from disk).
 - Session restore on load: previously opened roots (with granted permission) reopen
   automatically, keeping the last active tab, each root's open folders and current row, and (for
   the tab, in `sessionStorage`) the phone's panel, the panes' scroll and the music: the same track

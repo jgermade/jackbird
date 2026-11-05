@@ -1,0 +1,31 @@
+<script :setup lang="ts">
+  // The playlist dialog as a `Modal` of its own: adding tracks to a playlist
+  // and deleting one (from the rows' menus), and saving the queue from the
+  // phone's queue panel. On a computer the queue is a `Modal` already, and
+  // saving it is a `SubModal` of it instead (QueueDialog). Its body is
+  // PlaylistForm, its keys PlaylistKeys. See
+  // RECORD/2026-11-04.github-actions-workflows.WIP.md (W8's plan and the
+  // sub-modal).
+
+  const Modal = await import("../../theme/default/components/modal.html")
+  const PlaylistForm = await import("./playlist-form.html")
+  const PlaylistKeys = await import("./playlist-keys.html")
+
+  const { t } = await import("../lib/i18n")
+  const { ui } = await import("../lib/ui")
+  const { closePlaylistDialog, playlistTitle } = await import("../lib/playlists")
+
+  const isOpen = (): boolean => !!ui.playlist && !(ui.playlist.mode === "queue" && ui.playlist.sub)
+  const eyebrow = (): string => (ui.playlist?.mode === "add" ? ui.playlist.label : ui.playlist?.mode === "queue" ? t("queue.title") : t("playlist.eyebrow"))
+</script>
+
+<div class="playlist-dialog">
+  <Modal :open="isOpen()" :eyebrow="eyebrow()" :title="playlistTitle()" size="sm" :close-label="t('playlist.close')" @close="closePlaylistDialog()">
+    <PlaylistForm :if="isOpen()" />
+    <template :slot.foot><PlaylistKeys /></template>
+  </Modal>
+</div>
+
+<style scoped>
+  .playlist-dialog { display: contents; }
+</style>

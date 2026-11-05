@@ -1,0 +1,625 @@
+{
+  "about": "Made by fixtures/tags/make.mjs. Each case: the file, what reading it gives, its audio region (start, end, SHA-1), and what a save of a new title gives: ok, or the error's code.",
+  "cases": [
+    {
+      "name": "mp3-v23-padded",
+      "file": "mp3-v23-padded.mp3",
+      "format": "mp3",
+      "about": "E0's eighteen frames in v2.3, with padding",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 1815,
+        "end": 4114,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 4114
+    },
+    {
+      "name": "mp3-v24-padded",
+      "file": "mp3-v24-padded.mp3",
+      "format": "mp3",
+      "about": "E0's eighteen frames in v2.4 (UTF-8, TDRC), with padding",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 1815,
+        "end": 4114,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 4114
+    },
+    {
+      "name": "mp3-v23-unsync",
+      "file": "mp3-v23-unsync.mp3",
+      "format": "mp3",
+      "about": "v2.3 with the whole tag unsynchronised, no padding",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 1565,
+        "end": 3864,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 3864
+    },
+    {
+      "name": "mp3-v24-plain-sizes",
+      "file": "mp3-v24-plain-sizes.mp3",
+      "format": "mp3",
+      "about": "v2.4 with plain frame sizes, as old iTunes wrote them",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 1559,
+        "end": 3858,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 3858
+    },
+    {
+      "name": "mp3-v23-ext-header",
+      "file": "mp3-v23-ext-header.mp3",
+      "format": "mp3",
+      "about": "v2.3 with an extended header",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 179,
+        "end": 2478,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2478
+    },
+    {
+      "name": "mp3-v24-ext-header",
+      "file": "mp3-v24-ext-header.mp3",
+      "format": "mp3",
+      "about": "v2.4 with an extended header",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 175,
+        "end": 2474,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2474
+    },
+    {
+      "name": "mp3-v24-footer",
+      "file": "mp3-v24-footer.mp3",
+      "format": "mp3",
+      "about": "v2.4 with a footer, which the audio region starts after",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 115,
+        "end": 2414,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2414
+    },
+    {
+      "name": "mp3-v23-id3v1",
+      "file": "mp3-v23-id3v1.mp3",
+      "format": "mp3",
+      "about": "v2.3 and an ID3v1 tag at the end",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 1687,
+        "end": 3986,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 4114
+    },
+    {
+      "name": "mp3-v24-ape",
+      "file": "mp3-v24-ape.mp3",
+      "format": "mp3",
+      "about": "v2.4 and an APEv2 tag at the end",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 137,
+        "end": 2486,
+        "sha1": "f8beae1d44e914f22f5b04f4db8012e6df98f4b0"
+      },
+      "size": 2518
+    },
+    {
+      "name": "mp3-no-tag",
+      "file": "mp3-no-tag.mp3",
+      "format": "mp3",
+      "about": "no tag at all",
+      "fields": {
+        "title": "",
+        "artist": "",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 0,
+        "end": 2299,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2299
+    },
+    {
+      "name": "mp3-v24-frame-flags",
+      "file": "mp3-v24-frame-flags.mp3",
+      "format": "mp3",
+      "about": "v2.4 frames with their own unsynchronisation, group and data length indicator",
+      "fields": {
+        "title": "Flaggedÿà",
+        "artist": "Artist",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 138,
+        "end": 2437,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2437
+    },
+    {
+      "name": "mp3-duplicates",
+      "file": "mp3-duplicates.mp3",
+      "format": "mp3",
+      "about": "two TIT2 and two TXXX with one description (invalid, but found in files)",
+      "fields": {
+        "title": "First",
+        "artist": "Artist",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 156,
+        "end": 2455,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2455
+    },
+    {
+      "name": "mp3-odd-years",
+      "file": "mp3-odd-years.mp3",
+      "format": "mp3",
+      "about": "a year that is not a date, and a genre by its ID3v1 number",
+      "fields": {
+        "title": "Odd",
+        "artist": "",
+        "album": "",
+        "year": "c. 1959",
+        "genre": "(17)",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 121,
+        "end": 2420,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2420
+    },
+    {
+      "name": "mp3-empty-frames",
+      "file": "mp3-empty-frames.mp3",
+      "format": "mp3",
+      "about": "a text frame with only its encoding, one of size 0, one with only a terminator",
+      "fields": {
+        "title": "",
+        "artist": "",
+        "album": "x",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 119,
+        "end": 2418,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2418
+    },
+    {
+      "name": "mp3-v23-utf16",
+      "file": "mp3-v23-utf16.mp3",
+      "format": "mp3",
+      "about": "UTF-16 with little- and big-endian byte order marks",
+      "fields": {
+        "title": "Ñandú — 東京",
+        "artist": "Ölgaard",
+        "album": "Ålbum",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 157,
+        "end": 2456,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2456
+    },
+    {
+      "name": "mp3-v24-unicode",
+      "file": "mp3-v24-unicode.mp3",
+      "format": "mp3",
+      "about": "UTF-16BE, and several values in UTF-8 and in UTF-16",
+      "fields": {
+        "title": "東京",
+        "artist": "One/Two",
+        "album": "A/B",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 128,
+        "end": 2427,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2427
+    },
+    {
+      "name": "mp3-v22",
+      "file": "mp3-v22.mp3",
+      "format": "mp3",
+      "about": "ID3v2.2 (read; a save is refused)",
+      "fields": {
+        "title": "Old",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1990",
+        "genre": "Rock",
+        "track": "1/9"
+      },
+      "cover": {
+        "file": "covers/cover2.jpg",
+        "mime": "image/jpeg",
+        "sha1": "c1bee5f6b1d21f45695a77aeb5d9ef74c0df1bff"
+      },
+      "write": "id3v22",
+      "region": {
+        "start": 693,
+        "end": 2992,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2992
+    },
+    {
+      "name": "mp3-junk",
+      "file": "mp3-junk.mp3",
+      "format": "mp3",
+      "about": "bytes after the frames that are neither a frame nor padding (read; a save is refused)",
+      "fields": {
+        "title": "Junk",
+        "artist": "Artist",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "unreadable",
+      "region": {
+        "start": 62,
+        "end": 2361,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 2361
+    },
+    {
+      "name": "mp3-saved-by-jackbird",
+      "file": "mp3-saved-by-jackbird.mp3",
+      "format": "mp3",
+      "about": "mp3-v23-padded retitled by today's app (browser-id3-writer, then keepUneditedFrames)",
+      "fields": {
+        "title": "After",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 1566,
+        "end": 3865,
+        "sha1": "8464450d6982b39cc9f618025485798177869d08"
+      },
+      "size": 3865
+    },
+    {
+      "name": "flac-full",
+      "file": "flac-full.flac",
+      "format": "flac",
+      "about": "STREAMINFO, SEEKTABLE, APPLICATION, 14 comments (two ARTIST, a lower-case key), CUESHEET, two pictures, padding last",
+      "fields": {
+        "title": "Before",
+        "artist": "One",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 2641,
+        "end": 4595,
+        "sha1": "fb77bf09844b0849b976ac0dbdd07a32a2d569d3"
+      },
+      "size": 4595
+    },
+    {
+      "name": "flac-padding-first",
+      "file": "flac-padding-first.flac",
+      "format": "flac",
+      "about": "flac-full with the padding second",
+      "fields": {
+        "title": "Before",
+        "artist": "One",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 2641,
+        "end": 4595,
+        "sha1": "fb77bf09844b0849b976ac0dbdd07a32a2d569d3"
+      },
+      "size": 4595
+    },
+    {
+      "name": "flac-no-padding",
+      "file": "flac-no-padding.flac",
+      "format": "flac",
+      "about": "flac-full without padding",
+      "fields": {
+        "title": "Before",
+        "artist": "One",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 2125,
+        "end": 4079,
+        "sha1": "fb77bf09844b0849b976ac0dbdd07a32a2d569d3"
+      },
+      "size": 4079
+    },
+    {
+      "name": "flac-id3-prefix",
+      "file": "flac-id3-prefix.flac",
+      "format": "flac",
+      "about": "flac-full after an ID3v2 tag, which FLAC readers skip",
+      "fields": {
+        "title": "Before",
+        "artist": "One",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 2677,
+        "end": 4631,
+        "sha1": "fb77bf09844b0849b976ac0dbdd07a32a2d569d3"
+      },
+      "size": 4631
+    },
+    {
+      "name": "flac-no-comments",
+      "file": "flac-no-comments.flac",
+      "format": "flac",
+      "about": "STREAMINFO and padding only",
+      "fields": {
+        "title": "",
+        "artist": "",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 110,
+        "end": 2064,
+        "sha1": "fb77bf09844b0849b976ac0dbdd07a32a2d569d3"
+      },
+      "size": 2064
+    },
+    {
+      "name": "flac-odd-comments",
+      "file": "flac-odd-comments.flac",
+      "format": "flac",
+      "about": "an entry without =, one with invalid UTF-8, a key with a non-ASCII letter, a second title in lower case",
+      "fields": {
+        "title": "Odd",
+        "artist": "",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 189,
+        "end": 2143,
+        "sha1": "fb77bf09844b0849b976ac0dbdd07a32a2d569d3"
+      },
+      "size": 2143
+    },
+    {
+      "name": "flac-track-total",
+      "file": "flac-track-total.flac",
+      "format": "flac",
+      "about": "TRACKNUMBER with TOTALTRACKS, YEAR without DATE, a PNG cover",
+      "fields": {
+        "title": "Totals",
+        "artist": "",
+        "album": "",
+        "year": "2001",
+        "genre": "",
+        "track": "3/12"
+      },
+      "cover": {
+        "file": "covers/cover3.png",
+        "mime": "image/png",
+        "sha1": "6110c588ea1aee5a8e538215fbaafa3de7de85c9"
+      },
+      "write": "ok",
+      "region": {
+        "start": 388,
+        "end": 2342,
+        "sha1": "fb77bf09844b0849b976ac0dbdd07a32a2d569d3"
+      },
+      "size": 2342
+    }
+  ]
+}

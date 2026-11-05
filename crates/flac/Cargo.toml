@@ -1,0 +1,10 @@
+[package]
+name = "jackbird-flac"
+description = "FLAC metadata blocks, Vorbis comments kept entry by entry, and pictures"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

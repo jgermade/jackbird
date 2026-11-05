@@ -5,16 +5,16 @@ import { parsePlaybackState, parseViewState, sameSession, sessionOf } from "./se
 const music = { name: "Music" };
 const podcasts = { name: "Podcasts" };
 const open = [
-  { id: "1", label: "Music", rootHandle: music, groupingMode: "wizard" as const, tracks: [], expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles" },
-  { id: "2", label: "Podcasts", rootHandle: podcasts, groupingMode: "flat" as const, tracks: [], expandedAlbums: [], activeRowKey: null }
+  { id: "1", label: "Music", rootHandle: music, groupingMode: "wizard" as const, tracks: [], expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles", view: "files" as const },
+  { id: "2", label: "Podcasts", rootHandle: podcasts, groupingMode: "flat" as const, tracks: [], expandedAlbums: [], activeRowKey: null, view: "artists" as const }
 ];
 
 describe("sessionOf", () => {
   it("keeps each root's id, label, handle, grouping, open folders and current row, in order, and the active id", () => {
     assert.deepEqual(sessionOf(open, "2"), {
       roots: [
-        { id: "1", label: "Music", handle: music, groupingMode: "wizard", expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles" },
-        { id: "2", label: "Podcasts", handle: podcasts, groupingMode: "flat", expandedAlbums: [], activeRowKey: null }
+        { id: "1", label: "Music", handle: music, groupingMode: "wizard", expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles", view: "files" },
+        { id: "2", label: "Podcasts", handle: podcasts, groupingMode: "flat", expandedAlbums: [], activeRowKey: null, view: "artists" }
       ],
       activeRootId: "2"
     });
@@ -34,6 +34,12 @@ describe("sameSession", () => {
 
   it("is the same for the same roots, whatever else changed in them", () => {
     assert.equal(sameSession(saved, sessionOf(open.map((root) => ({ ...root, tracks: [] })), "1")), true);
+  });
+
+  it("differs when a root's view changes, and reads a session saved before views as Files", () => {
+    assert.equal(sameSession(saved, sessionOf(open.map((root) => (root.id === "1" ? { ...root, view: "songs" as const } : root)), "1")), false);
+    const before = { ...saved, roots: saved.roots.map(({ view: _view, ...root }) => root) };
+    assert.equal(sameSession(before, sessionOf(open.map((root) => ({ ...root, view: "files" as const })), "1")), true);
   });
 
   it("differs when the active root changes", () => {
@@ -59,26 +65,43 @@ describe("sameSession", () => {
 
   it("reads a session saved before folders and rows were kept as having none", () => {
     const old = { roots: [{ id: "2", label: "Podcasts", handle: podcasts, groupingMode: "flat" as const }], activeRootId: "2" };
-    assert.equal(sameSession(old, sessionOf([open[1]], "2")), true);
+    assert.equal(sameSession(old, sessionOf([{ ...open[1], view: "files" as const }], "2")), true);
   });
 });
 
 describe("parsePlaybackState", () => {
-  const saved = { queue: { rootId: "1", trackIds: ["a.mp3", "b.mp3"], sourceLabel: "Jazz" }, index: 1, position: 12.5, playing: true };
+  const queue = { items: [{ rootId: "1", trackId: "a.mp3" }, { rootId: "2", trackId: "b.mp3" }], sourceLabel: "Jazz" };
+  const saved = { queue, index: 1, position: 12.5, playing: true };
 
   it("reads what was saved", () => {
     assert.deepEqual(parsePlaybackState(JSON.stringify(saved)), saved);
   });
 
+  it("reads a queue saved before queues spanned roots, as that root's tracks", () => {
+    const old = { queue: { rootId: "1", trackIds: ["a.mp3", "b.mp3"], sourceLabel: "Jazz" }, index: 1, position: 3, playing: false };
+    assert.deepEqual(parsePlaybackState(JSON.stringify(old)), {
+      queue: { items: [{ rootId: "1", trackId: "a.mp3" }, { rootId: "1", trackId: "b.mp3" }], sourceLabel: "Jazz" },
+      index: 1,
+      position: 3,
+      playing: false
+    });
+  });
+
   it("is null for nothing, broken JSON, or something that is not a saved playback", () => {
+    const old = { rootId: "1", trackIds: ["a.mp3"], sourceLabel: "Jazz" };
     assert.equal(parsePlaybackState(null), null);
     assert.equal(parsePlaybackState(""), null);
     assert.equal(parsePlaybackState("{"), null);
     assert.equal(parsePlaybackState("[]"), null);
+    assert.equal(parsePlaybackState("3"), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: null })), null);
-    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...saved.queue, trackIds: [] } })), null);
-    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...saved.queue, trackIds: [1] } })), null);
-    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...saved.queue, rootId: 1 } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, sourceLabel: 1 } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, items: [] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, items: [{ rootId: "1" }, { rootId: "2", trackId: "b" }] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...queue, items: ["a"] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...old, trackIds: [] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...old, trackIds: [1] } })), null);
+    assert.equal(parsePlaybackState(JSON.stringify({ ...saved, queue: { ...old, rootId: 1 } })), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, index: 2 })), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, index: -1 })), null);
     assert.equal(parsePlaybackState(JSON.stringify({ ...saved, index: 0.5 })), null);

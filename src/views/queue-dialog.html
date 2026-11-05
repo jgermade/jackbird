@@ -1,0 +1,63 @@
+<script :setup lang="ts">
+  // The queue on a computer (wider than 720px): a dialog, opened from the
+  // deck's list key, with the queue's list (QueueList) and, in its foot, the
+  // actions on the whole queue: Save as playlist… (W8; a SubModal of this
+  // dialog, its form PlaylistForm) and Clear upcoming.
+  // On phones the queue is a
+  // panel above the deck's footer instead (QueuePanel). See
+  // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3;
+  // the footers after W4).
+
+  const Key = await import("../../theme/default/components/key.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const QueueList = await import("./queue-list.html")
+  const SubModal = await import("../../theme/default/components/sub-modal.html")
+  const PlaylistForm = await import("./playlist-form.html")
+  const PlaylistKeys = await import("./playlist-keys.html")
+
+  const { t } = await import("../lib/i18n")
+  const { clearUpcoming, queueEntries, queueEyebrow, queueTitle } = await import("../lib/player")
+  const { closePlaylistDialog, openPlaylistDialog } = await import("../lib/playlists")
+  const { ui } = await import("../lib/ui")
+
+  const WIDE = matchMedia("(min-width: 721px)")
+  let wide: boolean = WIDE.matches
+  const onWidth = (event: MediaQueryListEvent) => {
+    wide = event.matches
+  }
+  WIDE.addEventListener("change", onWidth)
+  $destroyed(() => WIDE.removeEventListener("change", onWidth))
+
+  // Read through a function: the entries are boxed (see Opaque).
+  const nothingAfter = (): boolean => {
+    const entries = queueEntries.value.data
+    const current = entries.findIndex((entry) => entry.state === "current")
+    return current < 0 || current >= entries.length - 1
+  }
+  const close = () => {
+    ui.queueOpen = false
+  }
+  // Saving the queue as a playlist: a sheet of this dialog (SubModal).
+  const saving = (): boolean => ui.playlist?.mode === "queue" && !!ui.playlist.sub
+</script>
+
+<div class="queue-dialog">
+  <Modal :if="wide" :open="ui.queueOpen" :eyebrow="queueEyebrow()" :title="queueTitle()" :close-label="t('queue.close')" @close="close()">
+    <QueueList />
+    <SubModal :open="saving()" :title="t('playlist.queueTitle')" :close-label="t('playlist.close')" @close="closePlaylistDialog()">
+      <PlaylistForm :if="saving()" />
+      <template :slot.foot><PlaylistKeys /></template>
+    </SubModal>
+    <template :slot.foot>
+      <span class="foot">
+        <Key variant="ghost" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue', sub: true })">{{ t("queue.saveAsPlaylist") }}</Key>
+        <Key variant="ghost" :disabled="nothingAfter()" @click="clearUpcoming()">{{ t("queue.clearUpcoming") }}</Key>
+      </span>
+    </template>
+  </Modal>
+</div>
+
+<style scoped>
+  .queue-dialog { display: contents; }
+  .foot { display: flex; justify-content: space-between; gap: var(--mm-space-2); width: 100%; }
+</style>
