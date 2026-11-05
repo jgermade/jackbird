@@ -3,16 +3,150 @@
   //
   //   <KeyBank label="Transport"><Key square label="Play">…</Key>…</KeyBank>
   //
+  // **The recess takes the keys' shape**, as a cut in a real panel does: in
+  // one row, it rises around a taller key and drops around the shorter ones
+  // beside it, its corners rounded inside and out. It is drawn as an SVG path
+  // behind the keys, worked out from where they are (their layout, not a
+  // pressed key's 1px of travel) whenever the bank or a key changes size or
+  // keys come and go; its inner shadow is the well's (`--mm-well-shade`).
+  // Until it is measured, and when the keys wrap onto more than one row, it
+  // is the plain rounded recess, drawn with CSS.
+  //
   // **Part of the default theme**: imports nothing, and draws only with
-  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md` and
+  // `RECORD/2026-11-04.github-actions-workflows.WIP.md` (the shaped recess).
 
   type Props = { label?: string }
+  type Box = { left: number; top: number; right: number; bottom: number }
+
+  const uid = `mm-bank-${Math.random().toString(36).slice(2, 9)}`
+  let outline = ""
+
+  const bank = (): HTMLElement | null => $self(".bank") as HTMLElement | null
+
+  // The boxes of the bank's items, in its own pixels: a component's host has
+  // no box of its own (`display: contents`), so its children stand for it.
+  const boxesIn = (element: Element, root: HTMLElement): Box[] =>
+    Array.from(element.children).flatMap((child): Box[] => {
+      if (child instanceof SVGElement) return []
+      if (getComputedStyle(child).display === "contents") return boxesIn(child, root)
+      const item = child as HTMLElement
+      if (!item.offsetWidth && !item.offsetHeight) return []
+      if (item.offsetParent !== root) {
+        const outer = root.getBoundingClientRect()
+        const inner = item.getBoundingClientRect()
+        return [{ left: inner.left - outer.left, top: inner.top - outer.top, right: inner.right - outer.left, bottom: inner.bottom - outer.top }]
+      }
+      return [{ left: item.offsetLeft, top: item.offsetTop, right: item.offsetLeft + item.offsetWidth, bottom: item.offsetTop + item.offsetHeight }]
+    })
+
+  // A closed path through `points` with each corner rounded to `radius` (less
+  // where a side is too short for it), convex or concave alike.
+  const rounded = (points: [number, number][], radius: number): string => {
+    const KAPPA = 0.5523
+    const n = points.length
+    let d = ""
+    for (let i = 0; i < n; i += 1) {
+      const [x, y] = points[i]
+      const [ax, ay] = points[(i - 1 + n) % n]
+      const [bx, by] = points[(i + 1) % n]
+      const toA = Math.hypot(ax - x, ay - y)
+      const toB = Math.hypot(bx - x, by - y)
+      const r = Math.min(radius, toA / 2, toB / 2)
+      const p1 = [x + ((ax - x) / toA) * r, y + ((ay - y) / toA) * r]
+      const p2 = [x + ((bx - x) / toB) * r, y + ((by - y) / toB) * r]
+      const c1 = [p1[0] + (x - p1[0]) * KAPPA, p1[1] + (y - p1[1]) * KAPPA]
+      const c2 = [p2[0] + (x - p2[0]) * KAPPA, p2[1] + (y - p2[1]) * KAPPA]
+      const f = (v: number) => Math.round(v * 100) / 100
+      d += `${i === 0 ? "M" : "L"}${f(p1[0])} ${f(p1[1])}C${f(c1[0])} ${f(c1[1])} ${f(c2[0])} ${f(c2[1])} ${f(p2[0])} ${f(p2[1])}`
+    }
+    return `${d}Z`
+  }
+
+  // The recess around one row of keys: each key grown by the bank's padding,
+  // and their union's outline, stepped where a key is taller than the next.
+  const shape = (boxes: Box[], pad: number, radius: number): string => {
+    if (boxes.length === 0) return ""
+    const sorted = [...boxes].sort((a, b) => a.left - b.left)
+    // More than one row (a key under another): the plain recess (CSS) is drawn instead.
+    if (sorted.some((a) => sorted.some((b) => a.top >= b.bottom))) return ""
+    const rowTop = Math.min(...sorted.map((box) => box.top))
+    const rowBottom = Math.max(...sorted.map((box) => box.bottom))
+    const grown = sorted.map((box) => ({ left: box.left - pad, right: box.right + pad, top: box.top - pad, bottom: box.bottom + pad }))
+    // Spans between the grown keys' edges, each as high as the keys over it
+    // (a gap wider than the padding is bridged at the lower of its sides).
+    const edges = [...new Set(grown.flatMap((box) => [box.left, box.right]))].sort((a, b) => a - b)
+    const spans: { from: number; to: number; top: number; bottom: number }[] = []
+    for (let i = 0; i < edges.length - 1; i += 1) {
+      const middle = (edges[i] + edges[i + 1]) / 2
+      const over = grown.filter((box) => box.left <= middle && box.right >= middle)
+      const before = grown.filter((box) => box.right <= middle).at(-1)
+      const after = grown.find((box) => box.left >= middle)
+      const top = over.length ? Math.min(...over.map((box) => box.top)) : Math.max(before?.top ?? rowTop, after?.top ?? rowTop)
+      const bottom = over.length ? Math.max(...over.map((box) => box.bottom)) : Math.min(before?.bottom ?? rowBottom, after?.bottom ?? rowBottom)
+      const last = spans.at(-1)
+      if (last && last.top === top && last.bottom === bottom) last.to = edges[i + 1]
+      else spans.push({ from: edges[i], to: edges[i + 1], top, bottom })
+    }
+    const points: [number, number][] = [
+      ...spans.flatMap((span): [number, number][] => [[span.from, span.top], [span.to, span.top]]),
+      ...[...spans].reverse().flatMap((span): [number, number][] => [[span.to, span.bottom], [span.from, span.bottom]])
+    ]
+    return rounded(points, radius)
+  }
+
+  const measure = () => {
+    const root = bank()
+    if (!root) return
+    const style = getComputedStyle(root)
+    const next = shape(boxesIn(root, root), parseFloat(style.paddingTop) || 0, parseFloat(style.borderTopLeftRadius) || 0)
+    if (next !== outline) outline = next
+  }
+
+  await $mounted()
+  const root = bank()
+  if (root) {
+    const sizes = new ResizeObserver(() => measure())
+    const watch = () => {
+      sizes.disconnect()
+      sizes.observe(root)
+      root.querySelectorAll(".bank > *, .bank > * > *").forEach((element) => sizes.observe(element))
+    }
+    const changes = new MutationObserver(() => {
+      watch()
+      measure()
+    })
+    changes.observe(root, { childList: true, subtree: true })
+    watch()
+    measure()
+    $destroyed(() => {
+      sizes.disconnect()
+      changes.disconnect()
+    })
+  }
 </script>
 
-<div class="bank" role="group" :aria-label="label || null"><slot /></div>
+<div class="bank" :class.shaped="!!outline" role="group" :aria-label="label || null">
+  <svg :if="outline" class="frame" aria-hidden="true" focusable="false">
+    <defs>
+      <filter :id="uid" x="-10%" y="-20%" width="120%" height="140%">
+        <feFlood style="flood-color: var(--mm-well-shade)" result="shade" />
+        <feComposite in="shade" in2="SourceAlpha" operator="out" result="outside" />
+        <feOffset in="outside" dy="1" result="moved" />
+        <feGaussianBlur in="moved" stdDeviation="1.5" result="soft" />
+        <feComposite in="soft" in2="SourceAlpha" operator="in" result="inner" />
+        <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="inner" /></feMerge>
+      </filter>
+    </defs>
+    <path class="well" :d="outline" :filter="`url(#${uid})`" />
+  </svg>
+  <slot />
+</div>
 
 <style scoped>
   .bank {
+    position: relative;
+    isolation: isolate;
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
@@ -22,4 +156,16 @@
     background: var(--mm-sunken);
     box-shadow: var(--mm-well-shadow);
   }
+  /* Shaped: the SVG draws the recess, under the keys. */
+  .bank.shaped { background: transparent; box-shadow: none; }
+  .frame {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .well { fill: var(--mm-sunken); }
 </style>
