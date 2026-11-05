@@ -1,11 +1,11 @@
 // Which dialogs are open: the preferences, the queue's, and the selection's
-// dialog with the tab it shows (edit the tags, see the files' info, or remove
-// them from the library); and on phones, which panel is in view (the
+// dialog with the tab it shows (see the files' info, edit their tags, rename
+// them, or remove them from the library); and on phones, which panel is in view (the
 // workspace scrolls to it, and sets it when a swipe ends).
 
 import { $reactive } from "jq79";
 
-export type SelectionTab = "edit" | "info" | "danger";
+export type SelectionTab = "info" | "edit" | "rename" | "danger";
 export type Pane = "library" | "details";
 
 export const ui = $reactive({

@@ -115,8 +115,8 @@ Every track and every folder has a menu behind its ⋮ key, at the end of its ro
 when the pointer is over the row (always on a touch screen, and on the current, selected and
 playing rows), and on each track on the right.
 
-- **A track**: **Play next**, **Add to queue**, **Edit tags…**, **Info…** and **Remove from
-  library…** (the selection's dialog on that tab). On the right, also **Show in library**, which
+- **A track**: **Play next**, **Add to queue**, **Edit tags…**, **Info…**, **Rename…** and
+  **Remove from library…** (the selection's dialog on that tab). On the right, also **Show in library**, which
   opens the track in the tree. When the track is selected, the menu acts on the whole selection
   and says how many tracks ("Add 3 tracks to queue"); when it is not, the dialog's items make it
   the selection first.
@@ -167,6 +167,27 @@ For the cover, drop an image on it or use **Choose image**; **Remove** takes it 
 **Save changes** writes the tags and the cover into the MP3 files themselves. Every other tag the
 files carry (album artist, disc number, comments, lyrics, ReplayGain and the like) is kept as it
 was.
+
+## Renaming files
+
+The selection's dialog has a **Rename** tab (also **Rename…** in a track's ⋮ menu): it names each
+selected file from its tags by a pattern, in the syntax of mp3tag, foobar2000 and MusicBrainz
+Picard. The fields are `%title%`, `%artist%`, `%album%`, `%year%`, `%genre%`, `%track%`, `%disc%`
+and `%filename%` (the current name); `%track%` is padded with zeros to the album's width ("07" of
+12), so names sort as the tracks play. The select beside the pattern holds ready-made ones
+(`%track% - %title%`, the first, `%artist% - %title%` and others); the last pattern used is kept for
+the next time.
+
+The preview shows each file's name now and after. Characters a file name cannot hold
+(`\ / : * ? " < > |`) become `_`. A name another file already has (in the selection or in the
+library, whatever its case), or a pattern that leaves a name empty, is marked, and the files are not
+renamed until it is fixed; names that would not change are dimmed. Only the name changes: the file
+stays in its folder and keeps its extension.
+
+The library, `.meta/`, the selection, the queue and the track playing (which carries on) follow the
+new names, so the folder reopens without reading the files again. If a file cannot be renamed (its
+new name is taken on disk by a file the library does not list, say), the renaming stops there and
+says which file and why; the files renamed before it stay renamed.
 
 ## Checking files in the background
 

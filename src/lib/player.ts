@@ -226,9 +226,10 @@ let refreshing = false;
  * Opens the loaded track's file again, at the same second and playing if it
  * was, when it changed since it was opened: the browser stops reading a file
  * once it is rewritten (a save, another program), and the element then waits
- * for ever, without an error. Nothing when it did not change.
+ * for ever, without an error. Nothing when it did not change, unless `force`
+ * (the file was renamed: the old one is gone).
  */
-async function refresh(): Promise<void> {
+async function refresh(force = false): Promise<void> {
   const key = loadedKey;
   const target = loaded;
   const opened = media;
@@ -241,7 +242,7 @@ async function refresh(): Promise<void> {
   }
   refreshing = true;
   try {
-    if (!(await opened.changed(root))) {
+    if (!force && !(await opened.changed(root))) {
       return;
     }
     const next = await openMedia(root, target.relativePath);
@@ -464,6 +465,32 @@ export function moveInQueue(from: number, to: number): void {
 /** Removes every track after the current one. */
 export function clearUpcoming(): void {
   apply(clearAfterCurrent(position()));
+}
+
+/**
+ * Follows tracks of `rootId` renamed (`renames`: old id to new id): the
+ * queue keeps them, and the one loaded carries on from its new path, at the
+ * same second. Call it in the same moment the library takes the new ids, so
+ * the player never sees the track missing.
+ */
+export function followRename(rootId: string, renames: ReadonlyMap<string, string>): void {
+  const queue = $toRaw(playback).queue;
+  if (queue && queue.items.some((item) => item.rootId === rootId && renames.has(item.trackId))) {
+    playback.queue = {
+      ...queue,
+      items: queue.items.map((item) => (item.rootId === rootId && renames.has(item.trackId) ? { rootId, trackId: renames.get(item.trackId) as string } : item))
+    };
+  }
+  const trackId = loaded?.rootId === rootId && loadedKey ? loadedKey.slice(rootId.length + 1) : null;
+  const renamed = trackId ? renames.get(trackId) : undefined;
+  if (loaded && renamed) {
+    loadedKey = keyOf({ rootId, trackId: renamed });
+    loaded.relativePath = renamed;
+    if (startPaused === keyOf({ rootId, trackId: trackId as string })) {
+      startPaused = loadedKey;
+    }
+    void refresh(true);
+  }
 }
 
 /** Plays the queue's `at`-th track; the current one pauses or resumes. */

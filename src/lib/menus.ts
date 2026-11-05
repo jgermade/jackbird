@@ -1,6 +1,6 @@
 // The rows' menus (the ⋮ key): what a track's or a folder's menu offers, and
 // doing it. The library's tree and the album sheet use the same ones. "Go to
-// album", "Go to artist" (W6) and "Rename…" (W5) join when their steps do.
+// album" and "Go to artist" join with W6's views.
 // See RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:32, W4).
 
 import { openSelectionFor } from "./editor";
@@ -28,6 +28,7 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
   items.push(
     { id: "edit", label: t("menu.edit"), rule: true },
     { id: "info", label: t("menu.info") },
+    { id: "rename", label: tn("menu.rename", count) },
     { id: "remove", label: tn("menu.remove", count), danger: true, rule: true }
   );
   return items;
@@ -53,6 +54,9 @@ export function onTrackMenu(trackId: string, choice: string): void {
       break;
     case "info":
       openSelectionFor(trackId, "info");
+      break;
+    case "rename":
+      openSelectionFor(trackId, "rename");
       break;
     case "remove":
       openSelectionFor(trackId, "danger");

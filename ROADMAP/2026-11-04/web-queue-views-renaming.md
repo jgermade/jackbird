@@ -7,6 +7,8 @@ What is planned for the web app, in order. The reasoning and each step's detail 
 instance's database come with its F3 ([family-instance.md](family-instance.md)).
 
 Dates are estimates; each step ends with its "done when" met and a walkthrough in the record.
+W1–W5 and W7 are done (2026-11-04 and 05); the queue's dialog changed after W4 at the owner's
+request (drag, covers, a panel above the footer on phones).
 
 ```mermaid
 gantt
@@ -14,14 +16,14 @@ gantt
   dateFormat YYYY-MM-DD
   axisFormat %d %b
   section Small
-    W1 Colours, the selection dialog's tabs     :w1, 2026-11-05, 1d
-    W2 No hover on touch screens                :w2, after w1, 1d
+    W1 Colours, the selection dialog's tabs     :done, w1, 2026-11-05, 1d
+    W2 No hover on touch screens                :done, w2, after w1, 1d
   section Playing
-    W3 The queue across roots, its dialog       :w3, after w2, 3d
-    W4 The menu on each row                     :w4, after w3, 3d
-    W7 The 3-column spectrum on phones          :w7, after w4, 1d
+    W3 The queue across roots, its dialog       :done, w3, after w2, 3d
+    W4 The menu on each row                     :done, w4, after w3, 3d
+    W7 The 3-column spectrum on phones          :done, w7, after w4, 1d
   section Library
-    W5 Renaming the selected tracks             :w5, after w7, 3d
+    W5 Renaming the selected tracks             :done, w5, after w7, 3d
     W6 Library views                            :w6, after w5, 5d
     W8 Playlists (.m3u8 in folders)             :w8, after w6, 5d
 ```

@@ -103,7 +103,7 @@ mp3-manager/
 │   ├── html-modules.d.ts        # *.html imports are jq79 components
 │   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
 │   │                            # metadata, tracks, tree, snapshot, format, i18n,
-│   │                            # selection, scope, albums, session, queue, spectrum, id3v2
+│   │                            # selection, scope, albums, session, queue, rename, spectrum, id3v2
 │   ├── assets/brand/            # jackbird-metal.svg: the logo (faceplate, landing, favicon)
 │   ├── components/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove
@@ -115,8 +115,10 @@ mp3-manager/
 │   │   ├── workspace.html       # The two panes (swipeable on phones, the keys in a footer), Escape
 │   │   ├── library.html         # The tree, its head, messages and scan meter
 │   │   ├── album-sheet.html     # Landing, albums and discs
-│   │   ├── selection-dialog.html # The selection: Info, Edit and Delete tabs
-│   │   ├── queue-dialog.html    # The queue: play, move, remove, clear upcoming, show in library
+│   │   ├── selection-dialog.html # The selection: Info, Edit, Rename and Delete tabs
+│   │   ├── queue-dialog.html    # The queue on a computer: its list, and Clear upcoming
+│   │   ├── queue-panel.html     # The queue on a phone: a panel above the footer
+│   │   ├── queue-list.html      # The queue's tracks: covers, drag, play, remove
 │   │   └── preferences-dialog.html # Tone and language
 │   └── lib/
 │       ├── id3.ts               # readTrackMetadataFromBytes / writeTrackMetadataToBytes
@@ -127,6 +129,7 @@ mp3-manager/
 │       ├── player.ts            # The one Audio element; nowPlaying, the queue's actions and entries
 │       ├── opaque.ts            # Opaque: derived values handed to views boxed
 │       ├── menus.ts             # The rows' ⋮ menus: what a track's or folder's offers, and doing it
+│       ├── rename.ts            # Renaming the selection by a %field% pattern; the library follows
 │       ├── media.ts             # A track's file as a URL to play, without reading it
 │       ├── session.ts           # restoreSession, keepSessionSaved
 │       ├── rootSessionStore.ts  # IndexedDB persistence of open roots
@@ -187,7 +190,7 @@ mp3-manager/
   still being read.
 - In the tree and the album sheet, a click (or Enter) on a track plays it, and a box at its left
   selects it (Shift-click for a range, Space and Shift+Space, Escape to clear).
-- The selection's key in the tab bar opens one dialog with Info, Edit and Delete tabs (green, orange, red on top). The editor
+- The selection's key in the tab bar opens one dialog with Info, Edit, Rename and Delete tabs (green, orange, orange, red on top). The editor
   works on one track or many: a field that varies across the selection keeps each track's value
   unless typed over or its "Override" box is ticked (then even an empty value is written); cover art by
   drag & drop or file choice. Delete removes the tracks from the library (not from disk).

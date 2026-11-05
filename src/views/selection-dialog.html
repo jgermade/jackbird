@@ -14,6 +14,7 @@
   const Field = await import("../../theme/default/components/field.html")
   const Key = await import("../../theme/default/components/key.html")
   const Modal = await import("../../theme/default/components/modal.html")
+  const Select = await import("../../theme/default/components/select.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
   const CoverDrop = await import("../components/cover-drop.html")
@@ -25,7 +26,9 @@
   const { library } = await import("../lib/library")
   const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
-  const { removeSelectedTracks, selectedTracks } = await import("../lib/workspace")
+  const { activeRoot, removeSelectedTracks, selectedTracks } = await import("../lib/workspace")
+  const { canRename, renamePlan, renameSelected, renamer, setRenamePattern } = await import("../lib/rename")
+  const { RENAME_FIELDS, RENAME_PRESETS } = await import("../helpers/rename")
 
   type Track = {
     id: string
@@ -56,10 +59,11 @@
   const single = (): Track | null => (tracks().length === 1 ? tracks()[0] : null)
   const varied = () => getVariedFields(selectedTracks.value.data)
 
-  // In the order Info, Edit, Delete, each with its stripe colour: green, orange, red.
+  // In the order Info, Edit, Rename, Delete, each with its stripe colour: green, orange, orange, red.
   const tabs = () => [
     { id: "info", label: t("selection.tab.info"), tone: "go" },
     { id: "edit", label: t("actions.edit"), tone: "edit" },
+    { id: "rename", label: t("selection.tab.rename"), tone: "edit" },
     { id: "danger", label: t("selection.tab.danger"), tone: "danger" }
   ]
   const heading = (): string => {
@@ -102,6 +106,24 @@
       { label: t("info.audioChecksum"), text: track.audioChecksum || none, mono: true },
       { label: t("info.lastVerified"), text: track.lastVerifiedAt ? new Date(track.lastVerifiedAt).toLocaleString(preferences.language) : none }
     ]
+  }
+
+  // Rename: the pattern (typed, or a preset), its fields, the preview, and its key.
+  type Plan = { trackId: string; from: string; name: string; status: "ok" | "same" | "empty" | "clash" }
+  const plans = (): Plan[] => renamePlan.value.data
+  const presetOptions = () => [{ value: "", label: t("rename.custom") }, ...RENAME_PRESETS.map((preset: string) => ({ value: preset, label: preset }))]
+  const presetValue = (): string => ((RENAME_PRESETS as readonly string[]).includes(renamer.pattern) ? renamer.pattern : "")
+  const pickPreset = (value: string) => {
+    if (value) setRenamePattern(value)
+  }
+  const fieldList = (): string => RENAME_FIELDS.map((field: string) => `%${field}%`).join(" ")
+  const fileName = (path: string): string => path.split("/").pop() ?? path
+  const statusLabel = (plan: Plan): string =>
+    plan.status === "same" ? t("rename.same") : plan.status === "clash" ? t("rename.clash") : plan.status === "empty" ? t("rename.empty") : ""
+  const reading = (): boolean => !!activeRoot.value.data?.loadingMetadata
+  const renameCount = (): number => plans().filter((plan) => plan.status === "ok").length
+  const rename = async () => {
+    if (await renameSelected()) closeSelection()
   }
 
   // Delete: the tab is the confirmation, so its key removes at once.
@@ -204,6 +226,32 @@
       </div>
     </div>
 
+    <div :elseif="ui.selectionTab === 'rename'" class="rename">
+      <div class="rename-head">
+        <Field :label="t('rename.pattern')" control="rename-pattern">
+          <TextInput id="rename-pattern" :model="renamer.pattern" @input="setRenamePattern($event.detail)" />
+        </Field>
+        <Field :label="t('rename.presets')" control="rename-preset">
+          <Select id="rename-preset" :model="presetValue()" :options="presetOptions()" @change="pickPreset($event.detail)" />
+        </Field>
+      </div>
+      <p class="hint mono">{{ t("rename.fields", { fields: fieldList() }) }}</p>
+      <p :if="reading()" class="failure" role="status">{{ t("rename.loading") }}</p>
+      <p :if="library.errorMessage" class="failure" role="alert">{{ library.errorMessage }}</p>
+      <div class="mm-table-wrap">
+        <table class="mm-table preview">
+          <thead><tr><th>{{ t("rename.from") }}</th><th>{{ t("rename.to") }}</th><th></th></tr></thead>
+          <tbody>
+            <tr :each="plan in plans()" :key="plan.trackId" :class.unchanged="plan.status === 'same'" :class.wrong="plan.status === 'clash' || plan.status === 'empty'">
+              <td class="mono">{{ fileName(plan.from) }}</td>
+              <td class="mono">{{ plan.name || "—" }}</td>
+              <td class="state"><span :if="plan.status !== 'ok'" class="flag">{{ statusLabel(plan) }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div :else class="danger">
       <h3 class="danger-title">{{ t("danger.title") }}</h3>
       <p>{{ tn("danger.body", tracks().length) }}</p>
@@ -213,6 +261,10 @@
       <span :if="ui.selectionTab === 'edit'" class="keys">
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
         <Key variant="primary" :disabled="library.saving || tracks().length === 0" @click="saveEdits()">{{ library.saving ? t("editor.saving") : t("editor.save") }}</Key>
+      </span>
+      <span :elseif="ui.selectionTab === 'rename'" class="keys">
+        <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
+        <Key variant="primary" :disabled="library.saving || reading() || !canRename(plans())" @click="rename()">{{ library.saving ? t("rename.renaming") : tn("rename.run", renameCount()) }}</Key>
       </span>
       <span :elseif="ui.selectionTab === 'danger'" class="keys">
         <Key variant="ghost" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
@@ -286,6 +338,18 @@
   .info-facts { display: grid; gap: var(--mm-space-2); margin: 0; }
   .info-facts div { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--mm-space-3); }
   .artist { color: var(--mm-fg-muted); }
+
+  /* Rename */
+  .rename { display: grid; gap: var(--mm-space-3); }
+  .rename-head { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--mm-space-3); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); overflow-wrap: anywhere; }
+  .preview td { overflow-wrap: anywhere; }
+  .preview .state { width: 1%; white-space: nowrap; text-align: right; }
+  .preview tr.unchanged td { color: var(--mm-fg-subtle); }
+  .preview tr.wrong td { color: var(--mm-bad); }
+  .flag { padding: 1px var(--mm-space-2); border-radius: var(--mm-radius-full); background: var(--mm-sunken); font-size: var(--mm-text-xs); }
+  .wrong .flag { background: var(--mm-bad-soft); }
+  @media (max-width: 720px) { .rename-head { grid-template-columns: minmax(0, 1fr); } }
 
   /* Delete */
   .danger { display: grid; gap: var(--mm-space-2); max-width: 34rem; }
