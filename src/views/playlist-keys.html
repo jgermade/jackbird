@@ -1,0 +1,27 @@
+<script :setup lang="ts">
+  // The playlist dialog's keys, in its `Modal`'s foot or its `SubModal`'s:
+  // Cancel, and Create, Save or Delete by what it asks (see PlaylistForm).
+  // A view over lib/playlists.ts.
+
+  const Key = await import("../../theme/default/components/key.html")
+
+  const { t } = await import("../lib/i18n")
+  const { ui } = await import("../lib/ui")
+  const { closePlaylistDialog, playlistForm, playlistReady, submitPlaylistDialog } = await import("../lib/playlists")
+
+  const mode = (): string => ui.playlist?.mode ?? ""
+  const submit = () => {
+    if (playlistReady()) void submitPlaylistDialog()
+  }
+</script>
+
+<span class="keys">
+  <Key variant="ghost" :disabled="playlistForm.busy" @click="closePlaylistDialog()">{{ t("editor.cancel") }}</Key>
+  <Key :if="mode() === 'delete'" variant="danger" :disabled="!playlistReady()" @click="submit()">{{ t("playlist.delete") }}</Key>
+  <Key :elseif="mode() === 'queue'" variant="primary" :disabled="!playlistReady()" @click="submit()">{{ t("playlist.save") }}</Key>
+  <Key :else variant="primary" :disabled="!playlistReady()" @click="submit()">{{ t("playlist.create") }}</Key>
+</span>
+
+<style scoped>
+  .keys { display: flex; justify-content: flex-end; gap: var(--mm-space-2); width: 100%; }
+</style>

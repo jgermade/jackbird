@@ -3,15 +3,16 @@
   // the deck's footer, which stays in view and in use: its list key closes
   // the panel, its transport plays, and its first key clears what comes next
   // while the panel is open (see DeckKeys). Its head says where the queue
-  // comes from, with a key to close it; the queue's list (QueueList) fills
-  // the rest and scrolls. See RECORD/2026-11-04.github-actions-workflows.WIP.md
+  // comes from, with a key to save it as a playlist (W8) and one to close
+  // it; the queue's list (QueueList) fills the rest and scrolls. See RECORD/2026-11-04.github-actions-workflows.WIP.md
   // (the footers after W4).
 
   const Key = await import("../../theme/default/components/key.html")
   const QueueList = await import("./queue-list.html")
 
   const { t } = await import("../lib/i18n")
-  const { queueEyebrow, queueTitle } = await import("../lib/player")
+  const { queueEntries, queueEyebrow, queueTitle } = await import("../lib/player")
+  const { openPlaylistDialog } = await import("../lib/playlists")
   const { ui } = await import("../lib/ui")
 </script>
 
@@ -21,9 +22,14 @@
       <span class="mm-legend">{{ queueEyebrow() }}</span>
       <h2 class="title">{{ queueTitle() }}</h2>
     </div>
-    <Key square size="sm" variant="ghost" :label="t('queue.close')" :title="t('queue.close')" @click="ui.queueOpen = false">
-      <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
-    </Key>
+    <span class="keys">
+      <Key square size="sm" variant="ghost" :label="t('queue.saveAsPlaylist')" :title="t('queue.saveAsPlaylist')" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue' })">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4h8M2 7.5h8M2 11h5M12 9.5v5M9.5 12h5" /></svg>
+      </Key>
+      <Key square size="sm" variant="ghost" :label="t('queue.close')" :title="t('queue.close')" @click="ui.queueOpen = false">
+        <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+      </Key>
+    </span>
   </header>
   <div class="body"><QueueList /></div>
 </section>
@@ -61,5 +67,6 @@
     white-space: nowrap;
   }
   .body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .keys { display: flex; flex: none; gap: var(--mm-space-1); }
   .icon { width: .75rem; height: .75rem; }
 </style>

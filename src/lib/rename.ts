@@ -1,8 +1,8 @@
 // Renaming the selected tracks from their tags (the selection dialog's
 // Rename tab): the pattern, kept for the next time; the plan for the
 // selection; and the renaming itself, which the library, `.meta/`, the
-// selection, the current row, the queue and the player follow. The pattern
-// and the plan are helpers/rename.ts. See
+// selection, the current row, the queue, the player and the root's
+// playlists follow. The pattern and the plan are helpers/rename.ts. See
 // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00, 22:12, W5's plan).
 
 import { $computed, $reactive, $toRaw } from "jq79";
@@ -13,6 +13,7 @@ import { library } from "./library";
 import { flushMeta } from "./meta";
 import { Opaque } from "./opaque";
 import { followRename } from "./player";
+import { followRenameInPlaylists } from "./playlists";
 import { updateRoots } from "./roots";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 
@@ -110,6 +111,7 @@ export async function renameSelected(): Promise<boolean> {
     if (done.size > 0) {
       updateRoots((roots) => roots.map((item) => (item.id === root.id ? renamedRoot(item, done) : item)));
       followRename(root.id, done);
+      followRenameInPlaylists(root.id, done);
       await flushMeta(root.id).catch(() => undefined);
     }
     library.saving = false;

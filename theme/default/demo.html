@@ -17,6 +17,7 @@
   const Menu = await import("./components/menu.html")
   const Meter = await import("./components/meter.html")
   const Modal = await import("./components/modal.html")
+  const SubModal = await import("./components/sub-modal.html")
   const Panel = await import("./components/panel.html")
   const Reel = await import("./components/reel.html")
   const Select = await import("./components/select.html")
@@ -202,6 +203,7 @@
   const playSelection = () => { if (selected.length > 0) playTrack(Math.min(...selected)) }
 
   let infoOpen: boolean = false
+  let noteOpen: boolean = false
 
   // ---- swatches, read back once the islands are on the page ------------------
 
@@ -652,7 +654,7 @@
   <section class="section" aria-labelledby="h-modal">
     <div class="head">
       <h2 id="h-modal">Modal</h2>
-      <p>On the native dialog: Escape, the close key and a click outside all ask the owner to close it.</p>
+      <p>On the native dialog: Escape, the close key and a click outside all ask the owner to close it. A SubModal comes down out of its head, over its body alone.</p>
     </div>
     <div class="items">
       <Key @click="infoOpen = true">Open track info</Key>
@@ -664,7 +666,15 @@
         <div class="row"><span class="mm-legend">Audio checksum</span><span class="mono">3f9a…c21e</span></div>
         <div class="row"><span class="mm-legend">State</span><Lamp tone="ok">Saved</Lamp></div>
       </div>
+      <SubModal :open="noteOpen" title="Add a note" close-label="Close" @close="noteOpen = false">
+        <TextInput label="Note" placeholder="Best take of the session" />
+        <template :slot.foot>
+          <Key variant="ghost" @click="noteOpen = false">Cancel</Key>
+          <Key variant="primary" @click="noteOpen = false">Add</Key>
+        </template>
+      </SubModal>
       <template :slot.foot>
+        <Key variant="ghost" @click="noteOpen = true">Add a note…</Key>
         <Key variant="primary" @click="infoOpen = false">Done</Key>
       </template>
     </Modal>

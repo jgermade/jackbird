@@ -9,9 +9,9 @@ import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
 import { detailScope, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
-import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
+import { orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
-import { albumKey, artistKey, buildViewRows, groupKeys, type ViewLabels } from "../helpers/views";
+import { albumKey, artistKey, buildViewRows, type ViewLabels } from "../helpers/views";
 import type { LibraryView, Mp3Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
@@ -205,15 +205,6 @@ export function toggleFolder(folder: string): void {
   }));
 }
 
-/** Opens every folder (Files), or every group of the view, keeping the other views' open groups. */
-export function expandAllFolders(): void {
-  updateActive((root) => {
-    const view = root.view ?? "files";
-    const keys = view === "files" ? collectFolderPaths(root.tracks) : groupKeys(view, root.tracks, viewLabels(), root.playlists ?? []);
-    return { ...root, expandedAlbums: [...new Set([...root.expandedAlbums, ...keys])] };
-  });
-}
-
 /** Lists the active root by `view`; the current row stays if the view has it. */
 export function setView(view: LibraryView): void {
   updateActive((root) => (root.view === view ? root : { ...root, view }));
@@ -231,10 +222,6 @@ export function goToGroup(trackId: string, group: "album" | "artist"): void {
   const view: LibraryView = group === "album" ? "albums" : "artists";
   const key = group === "album" ? albumKey(track) : artistKey(track);
   updateActive((root) => ({ ...root, view, activeRowKey: key }));
-}
-
-export function collapseAllFolders(): void {
-  updateActive((root) => ({ ...root, expandedAlbums: [], expandedDiscs: [] }));
 }
 
 /** Drops the selected tracks from the library (not from disk): they come back when the folder is opened again. */
@@ -287,10 +274,22 @@ export function playFromTree(rowKey: string): void {
   }
   const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
   const trackIds = playOrder(scope).map((track) => track.id);
-  const index = row.kind === "track" && row.trackId ? trackIds.indexOf(row.trackId) : 0;
+  const index = row.kind === "track" && row.trackId ? placeOf(row, rows, trackIds) : 0;
   if (trackIds.length > 0 && index !== -1) {
     playQueue(queueOf(root.id, trackIds, scope.label), index);
   }
+}
+
+/**
+ * Where a track row is in the tracks it plays with: a playlist's entry by its
+ * place (a track can be in a playlist twice; the missing entries before it
+ * do not count), any other track by its id.
+ */
+function placeOf(row: WizardTreeRow, rows: readonly WizardTreeRow[], trackIds: readonly string[]): number {
+  if (row.playlistIndex === undefined) {
+    return trackIds.indexOf(row.trackId ?? "");
+  }
+  return rows.filter((other) => other.parentKey === row.parentKey && other.trackId && (other.playlistIndex ?? 0) < (row.playlistIndex ?? 0)).length;
 }
 
 /**
@@ -337,6 +336,17 @@ export function queueTracks(trackIds: readonly string[], where: "next" | "end"):
   const tracks = orderDetailPlaylist(root.tracks.filter((track) => wanted.has(track.id)));
   const label = tracks.length === 1 ? tracks[0].metadata.title || tracks[0].name : tn("tracks.count", tracks.length);
   queue(tracks, label, where);
+}
+
+/** A folder row's (or a view's group's) tracks, in the order they play, and its name. */
+export function folderTracks(rowKey: string): { label: string; trackIds: string[] } | null {
+  const { root, rows } = derive();
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row || row.kind !== "album") {
+    return null;
+  }
+  const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
+  return { label: scope.label, trackIds: playOrder(scope).map((track) => track.id) };
 }
 
 /** Queues a folder row's tracks, in the order the folder plays them, next or at the end. */

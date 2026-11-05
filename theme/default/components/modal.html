@@ -25,6 +25,9 @@
   // emits `close`; short of that it springs back. Keys and tabs in the header
   // still take their clicks, unless the press turned into a drag.
   //
+  // A `SubModal` written in its body comes down out of its head, over the
+  // body alone (see sub-modal.html).
+  //
   // **Part of the default theme**: imports `Key`, and draws only with
   // `tokens.css` (and `content.css` for the eyebrow). See
   // `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -192,6 +195,10 @@
     padding: var(--mm-space-3) var(--mm-space-3) var(--mm-space-3) var(--mm-space-5);
     border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
     background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+    /* Above what a SubModal lays over the body (its sheet and its veil), so
+       a sheet comes out from under the head rather than across it. */
+    position: relative;
+    z-index: 2;
   }
   .titles { display: grid; gap: 2px; min-width: 0; }
   /* With tabs, they draw the header's bottom line, and the open one joins the body. */

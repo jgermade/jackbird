@@ -5,6 +5,7 @@
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
+import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
 import type { GroupingMode, LibraryView, Mp3Track, RootWorkspace } from "../types";
@@ -13,6 +14,7 @@ import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
 import { dropFromQueue } from "./player";
+import { loadPlaylists } from "./playlists";
 
 /** Replaces the roots with `update(current)`, as a setState updater would. */
 export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[]): void {
@@ -104,7 +106,12 @@ export async function hydrateRoot(
   // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
   void (async () => {
     try {
-      const mp3Files = (await walk(vfs))
+      const walked = await walk(vfs);
+      // The playlists are read beside the tracks, and do not hold them up.
+      void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
+        console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
+      );
+      const mp3Files = walked
         .filter((entry) => entry.path.toLowerCase().endsWith(".mp3"))
         .map((entry) => ({
           name: entry.path.split("/").at(-1) ?? entry.path,
@@ -327,7 +334,14 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
     return;
   }
 
-  const currentFiles = (await walk(root.vfs)).filter((entry) => entry.path.toLowerCase().endsWith(".mp3"));
+  const walked = await walk(root.vfs);
+  // Playlists made or deleted elsewhere since: read them again.
+  const playlistPaths = walked.map((entry) => entry.path).filter(isPlaylistFile);
+  const knownPlaylists = new Set((root.playlists ?? []).map((playlist) => playlist.path));
+  if (playlistPaths.length !== knownPlaylists.size || playlistPaths.some((path) => !knownPlaylists.has(path))) {
+    void loadPlaylists(root.id, walked.map((entry) => entry.path));
+  }
+  const currentFiles = walked.filter((entry) => entry.path.toLowerCase().endsWith(".mp3"));
   const currentPaths = new Set(currentFiles.map((file) => file.path));
   const knownPaths = new Set(root.tracks.map((track) => track.relativePath));
   if (currentFiles.length === root.tracks.length && [...currentPaths].every((path) => knownPaths.has(path))) {

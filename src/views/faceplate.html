@@ -43,6 +43,12 @@
   $: folderLabel = library.loading ? t("picker.scanning") : hasRoots ? t("picker.addRoot") : t("picker.openLibrary")
   // On a computer the key reads "+ Folder" once a root is open; on a phone, the + alone.
   $: folderText = library.loading ? t("picker.scanning") : hasRoots ? t("picker.folder") : t("picker.openLibrary")
+  // Choosing a pane on a phone closes the queue's panel over it.
+  const pickPane = (pane: "library" | "details") => {
+    ui.pane = pane
+    ui.queueOpen = false
+  }
+
   // Read through a function: the active root is boxed (see Opaque in lib/workspace.ts).
   const selectedCount = (): number => activeRoot.value.data?.selectedTrackIds.length ?? 0
 
@@ -94,7 +100,7 @@
 
     <div class="controls"><DeckKeys place="header" /></div>
     <div class="pane-pick">
-      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="ui.pane = $event.detail; ui.queueOpen = false"
+      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="pickPane($event.detail)"
                  :options="[{ value: 'library', label: t('library.title') }, { value: 'details', label: t('panels.details') }]" />
     </div>
   </div>

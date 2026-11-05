@@ -36,6 +36,21 @@
 
   const titleOf = (track: Track): string => track.metadata.title || track.name
 
+  // Over the heading: what is shown, by the library's view (a folder, a
+  // playlist, or the view's name).
+  const VIEW_NAMES: Record<string, string> = {
+    artists: "views.artists",
+    albumsByArtist: "views.albumsByArtist",
+    albums: "views.albums",
+    compilations: "views.compilations",
+    songs: "views.songs"
+  }
+  const eyebrow = (): string => {
+    const view = root()?.view ?? "files"
+    if (view === "playlists") return t("playlist.eyebrow")
+    return VIEW_NAMES[view] ? t(VIEW_NAMES[view]) : t("album.folder")
+  }
+
   // A disc's box, by its track count: ticked when all its tracks are
   // selected, a dash when some are. A click selects them all, or, when all
   // are, none; the rest of the selection stays.
@@ -83,7 +98,7 @@
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">
       <header class="scope-head">
-        <span class="mm-legend">{{ t("album.folder") }}</span>
+        <span class="mm-legend">{{ eyebrow() }}</span>
         <h2>{{ scope().label }}</h2>
         <p>{{ tn("album.count", albums().length) }}, {{ tn("tracks.count", scope().tracks.length) }}</p>
       </header>

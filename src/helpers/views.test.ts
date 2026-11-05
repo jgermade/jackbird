@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track as fixture } from "./fixtures.test-support.ts";
-import { albumFolder, albumKey, artistKey, buildViewRows, groupKeys } from "./views.ts";
+import { albumFolder, albumKey, artistKey, buildViewRows } from "./views.ts";
 
 const labels = { unknownArtist: "Unknown artist", unknownAlbum: "No album", variousArtists: "Various", missing: "Missing", locale: "en" };
 
@@ -91,14 +91,5 @@ describe("buildViewRows", () => {
       [false, 3, "@pl:Playlists/Road.m3u8#3"]
     ]);
     assert.equal(rows[3].meta, "Missing");
-  });
-});
-
-describe("groupKeys", () => {
-  it("lists every group of a view, and none of Songs", () => {
-    assert.deepEqual(groupKeys("compilations", tracks, labels), [albumKey(tracks[4])]);
-    // Five artists, and one album each (the unknown artist's is "No album").
-    assert.equal(groupKeys("albumsByArtist", tracks, labels).length, 5 + 5);
-    assert.deepEqual(groupKeys("songs", tracks, labels), []);
   });
 });

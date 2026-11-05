@@ -33,9 +33,8 @@ its place, and your first click or key anywhere resumes it.
 ## The library
 
 The left panel lists the active root's folders and tracks. A click on a folder's triangle or
-its folder glyph opens or closes it (an open folder draws an open folder). **Expand all** and
-**Collapse all** open and close every folder. Choosing a folder shows what it holds on the right, and choosing a
-track shows its folder. Until you choose one, the right panel shows the whole root.
+its folder glyph opens or closes it (an open folder draws an open folder). Choosing a folder shows
+what it holds on the right, and choosing a track shows its folder. Until you choose one, the right panel shows the whole root.
 
 A click on a track plays it (its folder, from that track): on a computer, a ▶ at the end of the
 row shows when the pointer is over it, and the track playing shows moving bars there. Each folder
@@ -52,8 +51,8 @@ keys at the top right.
 
 ### Views
 
-The keys under the library's title list the root in other ways; the one down is the view open, and
-each folder keeps its own across visits:
+The keys at the top of the library list the root in other ways; the one down is the view open, and
+each folder keeps its own across visits. The number after them is how many tracks the folder has.
 
 - **Files**: its folders, as above.
 - **Playlists**: its playlist files (see [Playlists](#playlists)).
@@ -70,6 +69,38 @@ keyboard, the selection, ▶ and ⋮ work as in Files; choosing an artist or an 
 right, and a track plays its group (or, in Songs, the list) from it, in the order shown. A track's
 ⋮ also has **Go to album** and **Go to artist**, which switch to that view with the album or the
 artist shown on the right.
+
+## Playlists
+
+A playlist is a `.m3u8` or `.m3u` file in the folder you opened, anywhere in it: jackbird lists
+the ones it finds in the **Playlists** view, and other players (VLC, foobar2000, Winamp…) read the
+ones jackbird writes. Each opens into its tracks, in its order, the number beside it saying how
+many it has. A track the playlist names that is not in the library (moved, deleted, outside the
+folder, or a web address) stays in it, dimmed, as "Not in the library".
+
+- **Add to playlist…**, in a track's or a folder's menu, asks which playlist: one of the folder's,
+  or a new one by name. A new playlist is written as `Playlists/<name>.m3u8` at the top of the
+  folder; a name already used is refused.
+- A playlist's ⋮: **Play**, **Play next**, **Add to queue**, **Open in Details** and **Delete
+  playlist…**, which deletes its file once you confirm (its tracks stay where they are).
+- A track's ⋮ in a playlist adds **Move up**, **Move down** and **Remove from playlist** (the
+  file stays where it is). A track not in the library has only those three.
+- **Save as playlist…**, in the queue, saves it in one of the open folders, by name (on a
+  computer it opens as a sheet over the queue's list, under its head; **Escape** or a click on the
+  dimmed list closes the sheet alone). A playlist can only hold tracks of its own folder, so the
+  queue's tracks from other folders are left out: the dialog says how many before you save.
+
+Playing a playlist (or a track of it) plays it in its order. Renaming tracks in jackbird updates
+the playlists of their folder that name them.
+
+jackbird writes a playlist as UTF-8 text: `#EXTM3U`, then for each track an `#EXTINF` line with
+"Artist - Title" and its path relative to the playlist's folder, with forward slashes, which VLC
+and other players open. It reads `#EXTINF` titles and lengths, paths with backslashes, `.m3u` files
+in UTF-8 or in the older Windows-1252, and the paths other players write: relative ones with
+`%20` escapes, and absolute ones or `file:///` addresses (VLC writes these), which it finds in the
+folder by their end (`/home/me/Music/Jazz/So What.mp3` is `Jazz/So What.mp3` in a folder opened at
+`Music`). When it changes a playlist made by another player, it keeps its tracks and their titles,
+writing their paths relative, but not the player's other `#` lines; a `.m3u` is written in UTF-8.
 
 ## Albums
 
@@ -110,6 +141,8 @@ when there is more than one folder.
   tracks, **Alt+Up** and **Alt+Down** move the one you are on, and **Delete** takes it out.
 - **Clear upcoming** (in the dialog's foot, or the phone's bottom bar) takes out everything after
   the track playing.
+- **Save as playlist…** (in the dialog's foot, or the phone panel's head) saves it as a playlist
+  (see [Playlists](#playlists)).
 
 Tracks get into the queue from their menus (below): **Play next** puts them right after the one
 playing, **Add to queue** at the end. With nothing queued, they become the queue, the first one
@@ -136,13 +169,15 @@ Every track and every folder has a menu behind its ⋮ key, at the end of its ro
 when the pointer is over the row (always on a touch screen, and on the current, selected and
 playing rows), and on each track on the right.
 
-- **A track**: **Play next**, **Add to queue**, **Edit tags…**, **Info…**, **Rename…** and
+- **A track**: **Play next**, **Add to queue**, **Add to playlist…**, **Go to album**, **Go to
+  artist**, **Edit tags…**, **Info…**, **Rename…** and
   **Remove from library…** (the selection's dialog on that tab). On the right, also **Show in library**, which
   opens the track in the tree. When the track is selected, the menu acts on the whole selection
   and says how many tracks ("Add 3 tracks to queue"); when it is not, the dialog's items make it
   the selection first.
-- **A folder**: **Play** (from its first track), **Play next**, **Add to queue** (its tracks, in
-  the order it plays them) and **Open in Details**.
+- **A folder** (or an artist, an album): **Play** (from its first track), **Play next**, **Add to
+  queue**, **Add to playlist…** (its tracks, in the order it plays them) and **Open in Details**.
+- **A playlist** and its tracks: see [Playlists](#playlists).
 
 With the keyboard, **Tab** to a ⋮ key and press **Enter**: **Up**, **Down**, **Home** and **End**
 move through the menu, **Enter** chooses, **Escape** closes it. On a phone the menu opens as a
@@ -224,8 +259,8 @@ browser.
 
 ## What jackbird writes
 
-- In your folders: the tags and covers of the tracks you save, and `.meta/mp3-manager.json` in
-  each folder you open.
+- In your folders: the tags and covers of the tracks you save, the names of the files you rename,
+  the playlists you make, change or delete, and `.meta/mp3-manager.json` in each folder you open.
 - In your browser: the open roots, so they can be reopened (IndexedDB), and your theme and
   language (local storage).
 

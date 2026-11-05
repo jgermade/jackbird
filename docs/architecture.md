@@ -24,7 +24,8 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
 1. **Pick.** `openFolder()` (`src/lib/roots.ts`) asks for a folder with `FSAAdapter.pick()`.
 2. **Render what is known.** `hydrateRoot()` reads `.meta/mp3-manager.json` (`src/lib/meta.ts`)
    and shows its tracks at once.
-3. **Walk.** In the background, `walk()` lists the folder's `.mp3` files.
+3. **Walk.** In the background, `walk()` lists the folder's `.mp3` files, and its `.m3u8` and
+   `.m3u` playlists, which `src/lib/playlists.ts` reads beside the tracks (see below).
 4. **Read.** New and changed files are read as bytes; `readTrackMetadataFromBytes()` parses their
    tags (with `jsmediatags`) and `calculateDualChecksums()` hashes the whole file and its audio
    alone (without the ID3 tag). The snapshot in `.meta/` is written again.
@@ -34,6 +35,16 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
    `writeTrackMetadataToBytes()` writes them into the file's bytes (with `browser-id3-writer`).
 7. **Write.** The bytes go back through the root's VFS, and the library and `.meta/` record the
    new tags and checksums.
+
+## Playlists
+
+`src/lib/playlists.ts` is what the library does with a root's playlists (make one, add to it, move
+and take out its entries, delete it, save the queue as one), over one interface, `PlaylistStore`
+(list, exists, save, delete), so the views do not know where a playlist lives. In a folder, local
+or in the cloud, it is an M3U file over the root's `VFSAdapter` (`m3uPlaylists`): read and written
+by `src/helpers/m3u.ts`, its entries' paths relative to its own folder. On the family instance it
+will be rows of its database, behind the same interface. A playlist's change shows at once and its
+file is written after the writes before it, so the last one written is what the library shows.
 
 Beside that flow, `src/main.ts` starts three things:
 

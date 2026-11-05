@@ -183,10 +183,3 @@ export function buildViewRows(
   }
   return rows;
 }
-
-/** Every group's key in a view (not Files), for Expand all. */
-export function groupKeys(view: Exclude<LibraryView, "files">, tracks: readonly Mp3Track[], labels: ViewLabels, playlists: readonly Playlist[] = []): string[] {
-  return buildViewRows(view, tracks, "all", labels, playlists)
-    .filter((row) => row.kind === "album")
-    .map((row) => row.album);
-}

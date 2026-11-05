@@ -24,8 +24,8 @@ gantt
     W7 The 3-column spectrum on phones          :done, w7, after w4, 1d
   section Library
     W5 Renaming the selected tracks             :done, w5, after w7, 3d
-    W6 Library views                            :w6, after w5, 5d
-    W8 Playlists (.m3u8 in folders)             :w8, after w6, 5d
+    W6 Library views                            :done, w6, after w5, 5d
+    W8 Playlists (.m3u8 in folders)             :done, w8, after w6, 5d
 ```
 
 | Step | Scope | Done when |

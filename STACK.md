@@ -103,20 +103,23 @@ mp3-manager/
 │   ├── html-modules.d.ts        # *.html imports are jq79 components
 │   ├── helpers/                 # Pure functions, each with a .test.ts beside it:
 │   │                            # metadata, tracks, tree, snapshot, format, i18n,
-│   │                            # selection, scope, albums, session, queue, rename, views, spectrum, id3v2
+│   │                            # selection, scope, albums, session, queue, rename, views, m3u,
+│   │                            # playlists, spectrum, id3v2
 │   ├── assets/brand/            # jackbird-metal.svg: the logo (faceplate, landing, favicon)
 │   ├── components/
 │   │   └── cover-drop.html      # Store-free: a cover to drop, choose or remove
 │   ├── views/
-│   │   ├── app.html             # Root: faceplate, workspace, the two dialogs
+│   │   ├── app.html             # Root: faceplate, workspace, the dialogs
 │   │   ├── faceplate.html       # Brand, the deck's keys (the panel selector on phones), display,
 │   │   │                        # root tabs (one tab with a picker on phones), folder key, selection
 │   │   ├── deck-keys.html       # Transport, list and preferences keys (header, or phones' footer)
 │   │   ├── workspace.html       # The two panes (swipeable on phones, the keys in a footer), Escape
-│   │   ├── library.html         # The tree, its head, messages and scan meter
+│   │   ├── library.html         # The tree (or a view), its head (view keys, count), messages, scan meter
 │   │   ├── album-sheet.html     # Landing, albums and discs
 │   │   ├── selection-dialog.html # The selection: Info, Edit, Rename and Delete tabs
-│   │   ├── queue-dialog.html    # The queue on a computer: its list, and Clear upcoming
+│   │   ├── queue-dialog.html    # The queue on a computer: its list, Save as playlist, Clear upcoming
+│   │   ├── playlist-dialog.html # The playlist dialog as a Modal: add to one, delete one, save the queue
+│   │   ├── playlist-form.html   # Its form (also the queue dialog's SubModal); playlist-keys.html its keys
 │   │   ├── queue-panel.html     # The queue on a phone: a panel above the footer
 │   │   ├── queue-list.html      # The queue's tracks: covers, drag, play, remove
 │   │   └── preferences-dialog.html # Tone and language
@@ -128,7 +131,8 @@ mp3-manager/
 │       ├── editor.ts            # The metadata form; openEditor, saveEdits
 │       ├── player.ts            # The one Audio element; nowPlaying, the queue's actions and entries
 │       ├── opaque.ts            # Opaque: derived values handed to views boxed
-│       ├── menus.ts             # The rows' ⋮ menus: what a track's or folder's offers, and doing it
+│       ├── menus.ts             # The rows' ⋮ menus: track, folder, playlist, entry; and doing it
+│       ├── playlists.ts         # Playlists over PlaylistStore (.m3u8 files now): make, add, move, delete
 │       ├── rename.ts            # Renaming the selection by a %field% pattern; the library follows
 │       ├── media.ts             # A track's file as a URL to play, without reading it
 │       ├── session.ts           # restoreSession, keepSessionSaved
@@ -143,7 +147,8 @@ mp3-manager/
 │   ├── fonts.css, fonts/        # Self-hosted woff2 + OFL licences
 │   ├── content.css              # Classes for plain markup (legend, table, display rows)
 │   ├── base.css                 # Box sizing; the body's ground, ink and type
-│   ├── components/*.html        # jq79: key, key-bank, display, meter, lamp, tabs, modal, menu, …
+│   ├── components/*.html        # jq79: key, key-bank (its recess shaped to the keys), display, meter,
+│   │                            # lamp, tabs, modal, sub-modal, menu, …
 │   └── index.html, demo.ts/.html # The demo page
 ├── crates/                      # Rust: jackbird's tag engine (Cargo.toml at the root is its workspace)
 │   ├── id3/                     # jackbird-id3: ID3v2 frames, text and picture codecs

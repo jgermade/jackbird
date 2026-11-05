@@ -1,0 +1,252 @@
+<script :setup="{ open = false, title = '', width = '26rem', closeLabel = 'Close', dismissible = true }: Props" lang="ts">
+  // A modal inside a modal: a sheet that comes down out of its parent's head
+  // and covers the parent's body only. The parent's head stays lit, so it is
+  // still clear whose this is, and its close key still closes both.
+  //
+  //   <Modal :open="queueOpen" title="Queue" @close="queueOpen = false">
+  //     …
+  //     <SubModal :open="saving" title="Save as playlist" close-label="Close" @close="saving = false">
+  //       …
+  //       <template :slot.foot><Key variant="primary">Save</Key></template>
+  //     </SubModal>
+  //   </Modal>
+  //
+  // Written anywhere inside the parent `Modal`'s body. **Opened with `show()`,
+  // not `showModal()`**: a second modal would make everything under it inert,
+  // the parent's head included. What the top layer would do is done here: the
+  // rest of the parent is made `inert` (but its head), a veil covers the
+  // parent's body and asks to close when clicked, and Escape is taken before
+  // it reaches the parent, so it closes this one alone. Escape, the veil and
+  // the close key only emit `close`; the owner closes it with `:open`. When
+  // the parent closes under it, it goes at once and emits `close`, so the
+  // parent does not open again with it inside.
+  //
+  // **Narrower than its parent** and centred under its head: `width` at most,
+  // and always 1.5rem in from each side, so it reads as a sheet laid over the
+  // parent and not as the parent's body changing; as tall as its content, up
+  // to the parent's body, and its body scrolls past that.
+  //
+  // Placed against the parent dialog (`position: absolute`), not the
+  // viewport: on phones the `Modal` is a sheet moved with a transform, which
+  // makes it the containing block of anything inside, and it can be dragged.
+  //
+  // **Part of the default theme**: imports `Key`, and draws only with
+  // `tokens.css`. After luu's `SubModal` (github.com/jgermade/luu,
+  // `web/theme/default/components/sub-modal.html`); see
+  // `RECORD/2026-11-04.github-actions-workflows.WIP.md` (the sub-modal).
+
+  type Props = { open?: boolean | ""; title?: string; width?: string; closeLabel?: string; dismissible?: boolean | "" }
+  type Room = { top: number; width: number; height: number }
+
+  const Key = await import("./key.html")
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: isOpen = flag(open)
+  $: isDismissible = flag(dismissible)
+  const titleId = `mm-sub-${Math.random().toString(36).slice(2, 9)}`
+
+  // ---- where it goes ---------------------------------------------------------
+
+  // The parent dialog, and its body's room, in the dialog's own pixels (its
+  // layout, so the parent's transform does not count).
+  let parent: HTMLDialogElement | null = null
+  let room: Room | null = null
+  const fit = () => {
+    if (!parent?.open) return
+    const head = parent.querySelector(":scope > header") as HTMLElement | null
+    const top = head ? head.offsetTop + head.offsetHeight : 0
+    room = { top, width: parent.clientWidth, height: Math.max(0, parent.clientHeight - top) }
+  }
+  $: covered = room ? `top:${room.top}px;left:0;width:${room.width}px;height:${room.height}px` : "display:none"
+  // In CSS rather than here, so `width` can be any length: the narrower of it
+  // and the parent less 1.5rem a side, centred.
+  const sheetFor = (at: Room | null, wide: string): string => {
+    if (!at) return ""
+    const w = `min(${wide}, ${at.width}px - 3rem)`
+    return `top:${at.top}px;left:calc((${at.width}px - ${w}) / 2);width:${w};max-height:${at.height}px`
+  }
+  $: sheet = sheetFor(room, width)
+
+  // What `inert` was put on, to give back: at each level from this up to the
+  // parent, the siblings not on the way, but the parent's head.
+  let veiled: HTMLElement[] = []
+  const veil = (from: Element | null) => {
+    for (let at = from; at && at !== parent; at = at.parentElement) {
+      for (const sibling of Array.from(at.parentElement?.children ?? []) as HTMLElement[]) {
+        if (sibling === at || sibling.inert) continue
+        if (sibling.tagName === "HEADER" && sibling.parentElement === parent) continue
+        sibling.inert = true
+        veiled.push(sibling)
+      }
+    }
+  }
+  const unveil = () => {
+    for (const element of veiled) element.inert = false
+    veiled = []
+  }
+
+  // Escape, on the window and before anything else: the parent is the modal,
+  // and its `cancel` would close it. Taken here, it closes this one.
+  const escape = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || !(($self("dialog") as HTMLDialogElement | null)?.open)) return
+    event.preventDefault()
+    event.stopPropagation()
+    ask()
+  }
+
+  // ---- open and close --------------------------------------------------------
+
+  let leaving = false
+  let sizes: ResizeObserver | null = null
+  const exitMs = (): number => {
+    const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mm-duration"))
+    return Number.isFinite(ms) ? ms : 0
+  }
+  // The parent's own `close` only: this one's `close`, asking its owner to
+  // close it, bubbles to the parent's dialog under the same name.
+  const parentClosed = (event: Event) => {
+    if (event.target !== parent) return
+    done()
+    $emit("close")
+  }
+  const show = () => {
+    const dialog = $self("dialog") as HTMLDialogElement | null
+    if (!dialog || dialog.open || !isOpen) return
+    parent = (dialog.parentElement?.closest("dialog[open]") as HTMLDialogElement | null) ?? null
+    leaving = false
+    fit()
+    veil($self(".sub-root"))
+    dialog.show()
+    window.addEventListener("keydown", escape, true)
+    parent?.addEventListener("close", parentClosed)
+    if (parent) {
+      sizes = new ResizeObserver(() => fit())
+      sizes.observe(parent)
+    }
+    requestAnimationFrame(() => {
+      const first = dialog.querySelector(":scope > .body :is(input, select, textarea, button):not(:disabled)") as HTMLElement | null
+      first?.focus()
+    })
+  }
+  const done = () => {
+    ;($self("dialog") as HTMLDialogElement | null)?.close()
+    leaving = false
+    unveil()
+    window.removeEventListener("keydown", escape, true)
+    parent?.removeEventListener("close", parentClosed)
+    sizes?.disconnect()
+    sizes = null
+  }
+  const hide = () => {
+    const dialog = $self("dialog") as HTMLDialogElement | null
+    if (!dialog?.open || leaving) return
+    const ms = exitMs()
+    if (!ms) return done()
+    leaving = true
+    window.setTimeout(done, ms)
+  }
+  const ask = () => {
+    if (isDismissible) $emit("close")
+  }
+
+  await $mounted()
+  const refit = () => fit()
+  window.addEventListener("resize", refit)
+  $destroyed(() => {
+    window.removeEventListener("resize", refit)
+    window.removeEventListener("keydown", escape, true)
+    parent?.removeEventListener("close", parentClosed)
+    sizes?.disconnect()
+    unveil()
+  })
+  $: isOpen ? requestAnimationFrame(show) : hide()
+</script>
+
+<div class="sub-root">
+  <div class="veil" :class.shown="isOpen || leaving" :class.leaving="leaving" :style="covered" @click="ask()"></div>
+  <dialog class="sub" :class.leaving="leaving" :style="sheet" :aria-labelledby="titleId">
+    <header class="head">
+      <h3 class="title" :id="titleId">{{ title }}</h3>
+      <Key :if="isDismissible" variant="ghost" square size="sm" :label="closeLabel" :title="closeLabel" @click="ask()">
+        <svg class="close-icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+      </Key>
+    </header>
+    <div class="body"><slot /></div>
+    <footer :if="$slots.foot" class="foot"><slot.foot /></footer>
+  </dialog>
+</div>
+
+<style scoped>
+  .sub-root { display: contents; }
+
+  /* Over the parent's body only, its head lit above. */
+  .veil {
+    position: absolute;
+    z-index: 1;
+    display: none;
+    background: var(--mm-overlay);
+  }
+  .veil.shown { display: block; animation: fade var(--mm-duration) var(--mm-ease); }
+  /* The way out is keyframes of its own, not `fade` reversed: an animation
+     whose name stays the same is not started again. */
+  .veil.leaving { animation: fade-out var(--mm-duration) ease forwards; }
+
+  /* The sheet: out of the head above it, with no edge along its top. */
+  .sub {
+    position: absolute;
+    inset: auto;
+    z-index: 1;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border-style: none solid solid;
+    border-width: var(--mm-border-width);
+    border-color: var(--mm-border-strong);
+    border-radius: 0 0 var(--mm-radius-lg) var(--mm-radius-lg);
+    background: var(--mm-surface);
+    color: var(--mm-fg);
+    box-shadow: var(--mm-shadow-md);
+    overflow: hidden;
+  }
+  .sub[open] {
+    display: flex;
+    flex-direction: column;
+    animation: sheet var(--mm-duration-slow) var(--mm-ease);
+  }
+  .sub.leaving { animation: sheet-out var(--mm-duration) ease forwards; }
+  @keyframes sheet { from { opacity: 0; transform: translateY(-1.5rem); } }
+  @keyframes sheet-out { to { opacity: 0; transform: translateY(-1rem); } }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes fade-out { to { opacity: 0; } }
+
+  .head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mm-space-3);
+    padding: var(--mm-space-2) var(--mm-space-2) var(--mm-space-2) var(--mm-space-5);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-sunken);
+  }
+  .title {
+    margin: 0;
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-heading);
+    font-weight: 700;
+    font-size: var(--mm-text-md);
+    line-height: var(--mm-leading-tight);
+  }
+  .close-icon { width: .75rem; height: .75rem; }
+  .body { flex: 1 1 auto; min-height: 0; padding: var(--mm-space-5); overflow: auto; }
+  .foot {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--mm-space-2);
+    padding: var(--mm-space-3) var(--mm-space-5);
+    border-top: var(--mm-border-width) solid var(--mm-border);
+  }
+</style>
