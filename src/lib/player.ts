@@ -69,6 +69,14 @@ export const nowPlaying = $computed((): NowPlaying | null => {
   };
 });
 
+/**
+ * Whether a failed `play()` was only interrupted (a pause, or another track,
+ * before it started): not an error to show.
+ */
+function interrupted(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 /** What a track of the queue is keyed on: its root and its id. */
 function keyOf(item: QueueItem): string {
   return `${item.rootId}:${item.trackId}`;
@@ -81,10 +89,23 @@ export type QueueEntry = {
   artist: string;
   /** The open root it is in. */
   rootLabel: string;
+  /** Its cover, as a data URL; null without one. */
+  cover: string | null;
   state: "played" | "current" | "upcoming";
   /** No longer in the library (removed from it since it was queued). */
   missing: boolean;
 };
+
+/** The queue's heading: where it comes from (or "Queue"). */
+export function queueTitle(): string {
+  return playback.queue?.sourceLabel || t("queue.title");
+}
+
+/** The line above the queue's heading: "Queue · 3 of 12" (or "Queue"). */
+export function queueEyebrow(): string {
+  const queue = playback.queue;
+  return queue && queue.items.length > 0 ? t("queue.eyebrow", { position: playback.index + 1, total: queue.items.length }) : t("queue.title");
+}
 
 /** The queue's tracks for its dialog, boxed (see Opaque): read `.value.data` in views. */
 export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
@@ -103,6 +124,7 @@ export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
         title: track ? track.metadata.title || track.name : item.trackId.split("/").pop() || item.trackId,
         artist: track?.metadata.artist ?? "",
         rootLabel: root?.label ?? "",
+        cover: track?.metadata.coverDataUrl ?? null,
         state: at < index ? "played" : at === index ? "current" : "upcoming",
         missing: !track
       };
@@ -309,7 +331,7 @@ async function load(current: NowPlaying | null): Promise<void> {
     }
     await audio.play();
   } catch (error) {
-    if (loadedKey === key) {
+    if (loadedKey === key && !interrupted(error)) {
       playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
       playback.playing = false;
     }
@@ -357,7 +379,22 @@ if (audio) {
   for (const type of ["playing", "canplay", "pause", "emptied"] as const) {
     audio.addEventListener(type, settle);
   }
-  nowPlaying.$on("value", (value: NowPlaying | null) => void load(value), { immediate: true });
+  // Once per change of the queue: its queue and index are written one after
+  // the other, and in between the old index can point at another track of the
+  // new queue; loading on each write would start that track for a moment.
+  let loadQueued = false;
+  nowPlaying.$on(
+    "value",
+    () => {
+      if (loadQueued) return;
+      loadQueued = true;
+      queueMicrotask(() => {
+        loadQueued = false;
+        void load($toRaw(nowPlaying).value);
+      });
+    },
+    { immediate: true }
+  );
 }
 
 /**
@@ -371,7 +408,7 @@ export function playQueue(queue: PlaybackQueue, index: number): void {
   const item = queue.items[index];
   if (audio && audio.src && audio.paused && item && keyOf(item) === loadedKey) {
     void audio.play().catch((error: unknown) => {
-      playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
+      if (!interrupted(error)) playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
     });
   }
 }
@@ -381,10 +418,19 @@ function position(): QueuePosition {
   return { queue, index };
 }
 
-/** Puts a new position in place; `paused`: its current track loads without playing. */
+/**
+ * Puts a new position in place; `paused`: its current track loads without
+ * playing. A paused start still pending for the same current track stays
+ * (two quick additions to an empty queue must not start the music).
+ */
 function apply(next: QueuePosition, paused = false): void {
   const item = next.queue?.items[next.index];
-  startPaused = paused && item ? keyOf(item) : null;
+  const key = item ? keyOf(item) : null;
+  if (paused && key) {
+    startPaused = key;
+  } else if (startPaused !== key) {
+    startPaused = null;
+  }
   playback.queue = next.queue;
   playback.index = next.index;
 }
@@ -450,6 +496,8 @@ export function dropFromQueue(gone: (item: QueueItem) => boolean): void {
 /** Pauses or resumes the loaded track. */
 export function togglePlay(): void {
   if (!audio?.src) {
+    // Still loading a track meant to start paused: it plays once loaded.
+    startPaused = null;
     return;
   }
   if (Date.now() - resumedAt < 1000) {
@@ -458,7 +506,7 @@ export function togglePlay(): void {
   }
   if (audio.paused) {
     void audio.play().catch((error: unknown) => {
-      playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
+      if (!interrupted(error)) playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
     });
   } else {
     audio.pause();

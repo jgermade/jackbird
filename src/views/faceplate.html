@@ -92,7 +92,7 @@
 
     <div class="controls"><DeckKeys place="header" /></div>
     <div class="pane-pick">
-      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="ui.pane = $event.detail"
+      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="ui.pane = $event.detail; ui.queueOpen = false"
                  :options="[{ value: 'library', label: t('library.title') }, { value: 'details', label: t('panels.details') }]" />
     </div>
   </div>

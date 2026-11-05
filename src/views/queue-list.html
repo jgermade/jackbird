@@ -1,0 +1,267 @@
+<script :setup lang="ts">
+  // The queue as a list, in the queue's dialog (computers) and its panel
+  // (phones): the tracks queued from any open roots with their covers (the
+  // one playing larger), the played ones dimmed, the current one with its
+  // bars. A click (or Enter) plays a track, the current one pauses or
+  // resumes. A track's grip (⠿) drags it to another place (mouse, pen or
+  // touch); × removes it (not the current one). Up, Down, Home and End move
+  // between tracks, Alt with Up or Down moves the track, Delete removes it.
+  // A view over the queue's actions in lib/player.ts. See
+  // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3;
+  // the drag, the covers and the footers after W4).
+
+  const EqBars = await import("../../theme/default/components/eq-bars.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Stripes = await import("../../theme/default/components/stripes.html")
+
+  const { t } = await import("../lib/i18n")
+  const { playback } = await import("../lib/playback")
+  const { moveInQueue, playAt, queueEntries, removeFromQueue } = await import("../lib/player")
+  const { ui } = await import("../lib/ui")
+
+  type Entry = { index: number; title: string; artist: string; rootLabel: string; cover: string | null; state: "played" | "current" | "upcoming"; missing: boolean }
+
+  // Read through functions, not `$:` copies: the entries are boxed (see Opaque).
+  const entries = (): Entry[] => queueEntries.value.data
+  const current = (): number => entries().findIndex((entry) => entry.state === "current")
+  const severalRoots = (): boolean => new Set(entries().map((entry) => entry.rootLabel)).size > 1
+  const subtitle = (entry: Entry): string => {
+    if (entry.missing) return t("queue.missing")
+    const parts = [entry.artist || t("album.unknownArtist")]
+    if (severalRoots() && entry.rootLabel) parts.push(entry.rootLabel)
+    return parts.join(" · ")
+  }
+  const itemId = (index: number): string => `queue-item-${index}`
+
+  // The track the keyboard is on.
+  let focused = -1
+  const focusOn = (index: number) => {
+    focused = Math.max(0, Math.min(entries().length - 1, index))
+    requestAnimationFrame(() => document.getElementById(itemId(focused))?.scrollIntoView({ block: "nearest" }))
+  }
+  // On opening: the current track in view, and the keyboard on it.
+  const opened = (open: boolean) => {
+    if (!open) return
+    focused = Math.max(0, current())
+    requestAnimationFrame(() => document.getElementById(itemId(focused))?.scrollIntoView({ block: "center" }))
+  }
+  $: opened(ui.queueOpen)
+
+  const play = (entry: Entry) => {
+    focused = entry.index
+    playAt(entry.index)
+  }
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= entries().length || from === to) return
+    moveInQueue(from, to)
+    focusOn(to)
+  }
+  const remove = (entry: Entry) => {
+    if (entry.state === "current") return
+    removeFromQueue(entry.index)
+    focusOn(entry.index)
+  }
+  const onKey = (event: KeyboardEvent) => {
+    const count = entries().length
+    if (count === 0) return
+    const at = focused < 0 ? Math.max(0, current()) : focused
+    if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      move(at, at + (event.key === "ArrowUp" ? -1 : 1))
+    } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      focusOn(at + (event.key === "ArrowUp" ? -1 : 1))
+    } else if (event.key === "Home" || event.key === "End") {
+      focusOn(event.key === "Home" ? 0 : count - 1)
+    } else if (event.key === "Enter" || event.key === " ") {
+      playAt(at)
+    } else if (event.key === "Delete" || event.key === "Backspace") {
+      remove(entries()[at])
+    } else {
+      return
+    }
+    event.preventDefault()
+  }
+
+  // Dragging a track by its grip. Its state lives in this closure, not in the
+  // component's store: it changes on every pointer move, and the rows are
+  // moved and marked straight on the page; the queue changes once, on release.
+  const drag = (() => {
+    const EDGE = 40
+    let from = -1
+    let to = -1
+    let startY = 0
+    let lastY = 0
+    let startScroll = 0
+    let rows: HTMLElement[] = []
+    let scroller: HTMLElement | null = null
+    let frame = 0
+
+    const scrollParent = (element: HTMLElement | null): HTMLElement | null => {
+      for (let node = element?.parentElement ?? null; node; node = node.parentElement) {
+        const overflow = getComputedStyle(node).overflowY
+        if ((overflow === "auto" || overflow === "scroll") && node.scrollHeight > node.clientHeight) return node
+      }
+      return null
+    }
+    const unmark = () => rows.forEach((row) => row.classList.remove("drop-before", "drop-after"))
+    // Where the track would land: after every other track whose middle is above the pointer.
+    const update = () => {
+      const others = rows.filter((_, index) => index !== from)
+      to = others.filter((row) => {
+        const box = row.getBoundingClientRect()
+        return box.top + box.height / 2 < lastY
+      }).length
+      const lifted = rows[from]
+      if (lifted) lifted.style.transform = `translateY(${lastY - startY + (scroller ? scroller.scrollTop - startScroll : 0)}px)`
+      unmark()
+      if (to === from) return
+      if (to < others.length) others[to].classList.add("drop-before")
+      else others[others.length - 1]?.classList.add("drop-after")
+    }
+    // Near the list's top or bottom edge, it scrolls.
+    const tick = () => {
+      if (from < 0) return
+      if (scroller) {
+        const box = scroller.getBoundingClientRect()
+        const step = lastY < box.top + EDGE ? -8 : lastY > box.bottom - EDGE ? 8 : 0
+        if (step) {
+          scroller.scrollTop += step
+          update()
+        }
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    const moveTo = (event: PointerEvent) => {
+      if (from < 0) return
+      lastY = event.clientY
+      update()
+    }
+    const end = (event: PointerEvent, drop: boolean) => {
+      const grip = event.currentTarget as HTMLElement
+      grip.removeEventListener("pointermove", moveTo)
+      grip.removeEventListener("pointerup", release)
+      grip.removeEventListener("pointercancel", cancel)
+      cancelAnimationFrame(frame)
+      const lifted = rows[from]
+      if (lifted) {
+        lifted.style.transform = ""
+        lifted.classList.remove("dragging")
+      }
+      unmark()
+      const [moved, target] = [from, to]
+      from = -1
+      rows = []
+      if (drop && target >= 0 && target !== moved) move(moved, target)
+    }
+    const release = (event: PointerEvent) => end(event, true)
+    const cancel = (event: PointerEvent) => end(event, false)
+
+    const start = (index: number, event: PointerEvent) => {
+      if (event.button !== 0 || from >= 0) return
+      const grip = event.currentTarget as HTMLElement
+      const list = grip.closest(".queue")
+      if (!list) return
+      event.preventDefault()
+      rows = Array.from(list.querySelectorAll<HTMLElement>(".item"))
+      from = index
+      to = index
+      startY = lastY = event.clientY
+      scroller = scrollParent(list as HTMLElement)
+      startScroll = scroller?.scrollTop ?? 0
+      rows[from]?.classList.add("dragging")
+      grip.setPointerCapture(event.pointerId)
+      grip.addEventListener("pointermove", moveTo)
+      grip.addEventListener("pointerup", release)
+      grip.addEventListener("pointercancel", cancel)
+      frame = requestAnimationFrame(tick)
+    }
+    return { start }
+  })()
+
+</script>
+
+<div class="queue-list">
+  <p :if="entries().length === 0" class="none">{{ t("queue.empty") }}</p>
+  <ol :else class="queue" role="listbox" tabindex="0" :aria-label="t('queue.title')"
+      :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
+    <li :each="entry in entries()" :key="entry.index" :id="itemId(entry.index)" role="option" class="item"
+        :class.played="entry.state === 'played'" :class.current="entry.state === 'current'"
+        :class.missing="entry.missing" :class.focused="entry.index === focused"
+        :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
+      <span class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
+            @pointerdown="drag.start(entry.index, $event)" @click.stop="null">
+        <svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="8" r="1.2" /><circle cx="7" cy="8" r="1.2" /><circle cx="3" cy="13" r="1.2" /><circle cx="7" cy="13" r="1.2" /></svg>
+      </span>
+      <span class="art" aria-hidden="true">
+        <img :if="entry.cover" :src="entry.cover" alt="" />
+        <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
+      </span>
+      <span class="text">
+        <span class="name">{{ entry.title }}</span>
+        <span class="sub">{{ subtitle(entry) }}</span>
+      </span>
+      <span class="cue"><EqBars :if="entry.state === 'current'" :active="playback.playing" /></span>
+      <span class="keys" @click.stop="null">
+        <Key square size="sm" variant="ghost" :label="t('queue.remove', { title: entry.title })" :title="t('queue.remove', { title: entry.title })"
+             :disabled="entry.state === 'current'" @click="remove(entry)">
+          <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+        </Key>
+      </span>
+    </li>
+  </ol>
+</div>
+
+<style scoped>
+  .queue-list { display: contents; }
+  .none { margin: 0; color: var(--mm-fg-muted); }
+  .queue { margin: 0; padding: 0; list-style: none; outline: none; }
+  .queue:focus-visible .focused { box-shadow: inset 0 0 0 2px var(--mm-accent); }
+  .item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.25rem auto minmax(0, 1fr) 1.25rem auto;
+    align-items: center;
+    gap: var(--mm-space-3);
+    min-height: 3rem;
+    padding: var(--mm-space-1) var(--mm-space-2) var(--mm-space-1) var(--mm-space-1);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    border-left: .1875rem solid transparent;
+    background: var(--mm-surface);
+    cursor: pointer;
+    user-select: none;
+  }
+  @media (hover: hover) { .item:hover { background: var(--mm-hover); } }
+  .item.current { padding-block: var(--mm-space-2); background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
+  .item.played .text, .item.played .art { opacity: .55; }
+  .item.missing .sub { color: var(--mm-bad); }
+
+  /* The grip: the one place a drag starts, and where a touch does not scroll. */
+  .grip { display: grid; place-items: center; align-self: stretch; color: var(--mm-fg-subtle); cursor: grab; touch-action: none; }
+  .grip svg { width: .625rem; height: 1rem; }
+  .item.dragging { z-index: 1; box-shadow: var(--mm-shadow-md); cursor: grabbing; opacity: .95; }
+  .item.dragging .grip { cursor: grabbing; }
+  .item.drop-before::before, .item.drop-after::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    left: 0;
+    height: 2px;
+    background: var(--mm-accent);
+  }
+  .item.drop-before::before { top: -1px; }
+  .item.drop-after::after { bottom: -1px; }
+
+  .art { display: block; width: 2.25rem; aspect-ratio: 1; overflow: hidden; border-radius: 3px; box-shadow: var(--mm-shadow-sm, 0 1px 2px rgb(0 0 0 / .15)); }
+  .current .art { width: 3.25rem; }
+  .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .no-cover { position: relative; display: block; height: 100%; background: var(--mm-display-bezel); }
+  .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 16%; }
+
+  .text { display: grid; min-width: 0; }
+  .name, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .name { color: var(--mm-fg); font-size: var(--mm-text-sm); }
+  .current .name { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); font-size: var(--mm-text-md); }
+  .sub { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
+  .cue { display: grid; place-items: center; }
+  .keys { display: flex; gap: var(--mm-space-1); }
+  .icon { width: .75rem; height: .75rem; }
+</style>

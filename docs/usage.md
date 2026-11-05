@@ -73,18 +73,22 @@ bar at the bottom: the gear, the transport keys, then the list key.
 ### The queue
 
 Playing a track queues its folder (or the albums on the right) from that track. The queue can hold
-tracks of every open folder: playing next and adding to the queue put tracks from anywhere right
-after the one playing, or at the end. Its dialog lists them in order: the ones already played are
-dimmed, the one playing is marked with its bars, and each folder's name follows its tracks' artist
+tracks of every open folder. The list key opens it, and closes it again; it stays down while the
+queue is open. On a computer the queue is a dialog; on a phone, a panel over the library that
+leaves the bottom bar in view and in use, its gear turned into **Clear upcoming** while the queue
+is open.
+
+Each track shows its cover (the stripes when it has none), the track playing a larger one, with
+its bars; the ones already played are dimmed, and each folder's name follows its tracks' artist
 when there is more than one folder.
 
 - A click (or **Enter**) plays a track; on the one playing, it pauses or resumes.
-- The arrow keys of each track move it up or down, and × takes it out of the queue (not the one
-  playing). With the keyboard: **Up**, **Down**, **Home** and **End** go through the tracks,
-  **Alt+Up** and **Alt+Down** move the one you are on, and **Delete** takes it out.
-- **Clear upcoming** takes out everything after the track playing.
-- **Show in library** opens the track playing in the library: its folders open in the tree and the
-  right panel shows its folder.
+- To move a track, drag it by its grip (⠿, at its left), with the mouse or a finger: a line shows
+  where it will land, and the list scrolls near its edges. × takes a track out of the queue (not
+  the one playing). With the keyboard: **Up**, **Down**, **Home** and **End** go through the
+  tracks, **Alt+Up** and **Alt+Down** move the one you are on, and **Delete** takes it out.
+- **Clear upcoming** (in the dialog's foot, or the phone's bottom bar) takes out everything after
+  the track playing.
 
 Tracks get into the queue from their menus (below): **Play next** puts them right after the one
 playing, **Add to queue** at the end. With nothing queued, they become the queue, the first one

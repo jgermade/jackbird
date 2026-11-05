@@ -12,7 +12,7 @@ import { t, tn } from "./i18n";
 import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
-import { dropFromQueue, nowPlaying } from "./player";
+import { dropFromQueue } from "./player";
 
 /** Replaces the roots with `update(current)`, as a setState updater would. */
 export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[]): void {
@@ -381,10 +381,3 @@ export function showInLibrary(rootId: string, trackId: string): void {
   );
 }
 
-/** Opens the root of the track playing at that track (see showInLibrary). */
-export function showQueueInLibrary(): void {
-  const playing = $toRaw(nowPlaying.value);
-  if (playing) {
-    showInLibrary(playing.rootId, playing.trackId);
-  }
-}
