@@ -1,0 +1,59 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { coverToDataUrl, dataUrlToCover, editFor } from "./cover.ts";
+import { emptyMetadata } from "./metadata.ts";
+
+describe("coverToDataUrl and dataUrlToCover", () => {
+  it("turn a picture into a data URL and back", () => {
+    const cover = { mime: "image/png", data: Uint8Array.of(0, 1, 2, 250, 255) };
+    const url = coverToDataUrl(cover);
+    assert.equal(url, "data:image/png;base64,AAEC+v8=");
+    assert.deepEqual(dataUrlToCover(url), cover);
+  });
+
+  it("handle a picture larger than one chunk", () => {
+    const data = new Uint8Array(100_000).map((_, index) => index % 251);
+    const back = dataUrlToCover(coverToDataUrl({ mime: "image/jpeg", data }));
+    assert.deepEqual(back?.data, data);
+  });
+
+  it("call a picture without a MIME type a JPEG, either way", () => {
+    assert.equal(coverToDataUrl({ mime: "", data: Uint8Array.of(1) }), "data:image/jpeg;base64,AQ==");
+    assert.deepEqual(dataUrlToCover("data:;base64,AQ=="), { mime: "image/jpeg", data: Uint8Array.of(1) });
+  });
+
+  it("read a data URL with parameters before base64", () => {
+    assert.deepEqual(dataUrlToCover("data:image/png;name=a.png;base64,AQ=="), { mime: "image/png", data: Uint8Array.of(1) });
+  });
+
+  it("give null for what is not a base64 data URL", () => {
+    assert.equal(dataUrlToCover("https://example.com/a.jpg"), null);
+    assert.equal(dataUrlToCover("data:image/png,raw"), null);
+    assert.equal(dataUrlToCover("data:image/png;base64,***"), null);
+  });
+});
+
+describe("editFor", () => {
+  const before = { ...emptyMetadata(), title: "So What", trackNumber: "1", coverDataUrl: "data:image/png;base64,AQ==" };
+
+  it("gives every field, the track number as the engine's track", () => {
+    const edit = editFor(before, { ...before, title: "Freddie Freeloader", trackNumber: "2/5", genre: "" });
+    assert.deepEqual(edit.fields, { title: "Freddie Freeloader", artist: "", album: "", year: "", genre: "", track: "2/5" });
+  });
+
+  it("keeps the cover when it is the track's own", () => {
+    assert.deepEqual(editFor(before, { ...before }).cover, { keep: true });
+    assert.deepEqual(editFor(emptyMetadata(), emptyMetadata()).cover, { keep: true });
+  });
+
+  it("removes the cover when the form has none", () => {
+    assert.deepEqual(editFor(before, { ...before, coverDataUrl: null }).cover, { remove: true });
+  });
+
+  it("sets a new cover, or keeps the old one when the new one is not a data URL", () => {
+    assert.deepEqual(editFor(before, { ...before, coverDataUrl: "data:image/jpeg;base64,Ag==" }).cover, {
+      set: { mime: "image/jpeg", data: Uint8Array.of(2) }
+    });
+    assert.deepEqual(editFor(before, { ...before, coverDataUrl: "blob:x" }).cover, { keep: true });
+  });
+});

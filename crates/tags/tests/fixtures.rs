@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use jackbird_tags::{Cover, Edit, Fields, Format, audio_region, format_of, read, write};
+use jackbird_tags::{Cover, CoverEdit, Edit, Fields, Format, audio_region, format_of, read, write};
 use serde_json::Value;
 
 fn root() -> PathBuf {
@@ -190,13 +190,62 @@ fn emptied_fields_go() {
 fn a_new_cover_replaces_the_one_shown() {
     for case in writable() {
         let edit = Edit {
-            cover: Some(new_cover()),
+            cover: CoverEdit::Set(new_cover()),
             ..Edit::default()
         };
         let out = write(&case.bytes, &edit).unwrap_or_else(|error| panic!("{}: {error}", case.name));
         let back = read(&out).unwrap();
         assert_eq!(back.cover, Some(new_cover()), "{}", case.name);
         assert_eq!(back.fields, case.fields, "{}", case.name);
+    }
+}
+
+/// How many pictures a file holds, counted by the format crates.
+fn pictures_in(bytes: &[u8]) -> usize {
+    match format_of(bytes) {
+        Some(Format::Flac) => jackbird_flac::read(bytes)
+            .unwrap()
+            .blocks
+            .iter()
+            .filter(|block| block.kind == jackbird_flac::PICTURE)
+            .count(),
+        _ => jackbird_id3::read(bytes).unwrap().map_or(0, |tag| {
+            tag.frames
+                .iter()
+                .filter(|frame| frame.id == "APIC" || frame.id == "PIC")
+                .count()
+        }),
+    }
+}
+
+#[test]
+fn removing_the_cover_takes_out_the_picture_shown_and_keeps_the_rest() {
+    for case in writable() {
+        let remove = Edit {
+            cover: CoverEdit::Remove,
+            ..Edit::default()
+        };
+        // Removed one by one, each picture goes, and the fields and the audio stay.
+        let mut bytes = case.bytes.clone();
+        let mut removed = 0;
+        while let Some(shown) = read(&bytes).unwrap().cover {
+            let out = write(&bytes, &remove).unwrap_or_else(|error| panic!("{}: {error}", case.name));
+            let back = read(&out).unwrap();
+            assert_eq!(back.fields, case.fields, "{}", case.name);
+            assert_eq!(
+                &out[audio_region(&out)],
+                &case.bytes[audio_region(&case.bytes)],
+                "{}",
+                case.name
+            );
+            assert!(out.len() <= bytes.len() || shown.data.is_empty(), "{}", case.name);
+            bytes = out;
+            removed += 1;
+            assert!(removed <= 4, "{}: the cover does not go", case.name);
+        }
+        assert_eq!(removed, pictures_in(&case.bytes), "{}", case.name);
+        // Nothing to remove: the same bytes.
+        assert_eq!(write(&bytes, &remove).unwrap(), bytes, "{}", case.name);
     }
 }
 
@@ -210,7 +259,7 @@ fn an_edit_that_changes_nothing_gives_the_same_bytes() {
             case.name
         );
         let same = Edit {
-            cover: case.cover.clone(),
+            cover: case.cover.clone().map_or(CoverEdit::Remove, CoverEdit::Set),
             ..Edit::all(&case.fields)
         };
         assert_eq!(write(&case.bytes, &same).unwrap(), case.bytes, "{}", case.name);
@@ -328,7 +377,7 @@ fn lofty_reads_what_jackbird_writes() {
         let out = write(
             &case.bytes,
             &Edit {
-                cover: Some(new_cover()),
+                cover: CoverEdit::Set(new_cover()),
                 ..Edit::all(&wanted)
             },
         )
@@ -373,7 +422,7 @@ fn rust_id3_reads_the_mp3s_jackbird_writes() {
         let out = write(
             &case.bytes,
             &Edit {
-                cover: Some(new_cover()),
+                cover: CoverEdit::Set(new_cover()),
                 ..Edit::all(&wanted)
             },
         )

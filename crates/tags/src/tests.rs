@@ -66,7 +66,7 @@ fn keeps_every_frame_the_editor_does_not_manage_untouched_and_in_order() {
         title: Some("After".into()),
         artist: Some("Artist".into()),
         year: Some("2020".into()),
-        cover: Some(cover("new")),
+        cover: CoverEdit::Set(cover("new")),
         ..Edit::default()
     };
     let out = write(&source, &edit).unwrap();
@@ -102,7 +102,7 @@ fn replaces_the_picture_shown_and_keeps_the_others() {
     let out = write(
         &source,
         &Edit {
-            cover: Some(cover("new")),
+            cover: CoverEdit::Set(cover("new")),
             ..Edit::default()
         },
     )
@@ -114,13 +114,62 @@ fn replaces_the_picture_shown_and_keeps_the_others() {
     let out = write(
         &source,
         &Edit {
-            cover: Some(cover("new")),
+            cover: CoverEdit::Set(cover("new")),
             ..Edit::default()
         },
     )
     .unwrap();
     let pictures: Vec<Frame> = frames_of(&out).into_iter().filter(|frame| frame.id == "APIC").collect();
     assert_eq!(pictures, [picture(4, "back"), picture(3, "new")]);
+}
+
+#[test]
+fn removes_the_picture_shown_and_keeps_the_others() {
+    let source = file(
+        Version::V23,
+        &[
+            text("TIT2", "Title"),
+            picture(4, "back"),
+            picture(3, "front"),
+            picture(0, "other"),
+        ],
+    );
+    let remove = Edit {
+        cover: CoverEdit::Remove,
+        ..Edit::default()
+    };
+    let out = write(&source, &remove).unwrap();
+    let pictures: Vec<Frame> = frames_of(&out).into_iter().filter(|frame| frame.id == "APIC").collect();
+    assert_eq!(pictures, [picture(4, "back"), picture(0, "other")]);
+    let back = read(&out).unwrap();
+    assert_eq!(back.cover, Some(cover("back")));
+    assert_eq!(back.fields.title, "Title");
+    // The only picture: no cover is shown after.
+    let source = file(Version::V24, &[text("TIT2", "Title"), picture(3, "front")]);
+    let out = write(&source, &remove).unwrap();
+    assert_eq!(ids(&out), ["TIT2"]);
+    assert_eq!(read(&out).unwrap().cover, None);
+    // No picture: the same bytes.
+    let source = file(Version::V23, &[text("TIT2", "Title")]);
+    assert_eq!(write(&source, &remove).unwrap(), source);
+}
+
+#[test]
+fn safeguard_3_refuses_a_removal_that_took_another_picture() {
+    let source = file(Version::V23, &[picture(3, "front"), picture(4, "back")]);
+    let wrong = file(Version::V23, &[picture(3, "front")]);
+    let change = Change {
+        changes: &[],
+        cover: Some(CoverChange::Remove),
+        fields: &Fields::default(),
+        shown_cover: None,
+    };
+    assert_eq!(
+        verify(Format::Mp3, &source, &wrong, &change).unwrap_err(),
+        Error::Refused(Refusal::Kept("a picture".into()))
+    );
+    let right = file(Version::V23, &[picture(4, "back")]);
+    assert!(verify(Format::Mp3, &source, &right, &change).is_ok());
 }
 
 #[test]
@@ -347,7 +396,7 @@ fn a_flac_with_comments_it_cannot_read_is_refused() {
         write(
             &fine,
             &Edit {
-                cover: Some(huge),
+                cover: CoverEdit::Set(huge),
                 ..Edit::default()
             }
         )

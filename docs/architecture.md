@@ -14,7 +14,7 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
   (a remote, synced store, for instance) can be plugged in later without touching the views. The
   one exception is playback: `src/lib/media.ts` gives the player the file itself, from the root's
   directory handle, so a track is not read into memory to be played.
-- **A metadata engine over bytes.** `src/lib/id3.ts` reads and writes ID3 tags on `Uint8Array`
+- **A metadata engine over bytes.** `src/lib/tags/` reads and writes tags on `Uint8Array`
   buffers, not on files, so it does not depend on where the bytes come from.
 - **Several roots at once.** Each open folder keeps its own tracks, selection, expanded folders
   and grouping.
@@ -26,13 +26,14 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
    and shows its tracks at once.
 3. **Walk.** In the background, `walk()` lists the folder's `.mp3` files, and its `.m3u8` and
    `.m3u` playlists, which `src/lib/playlists.ts` reads beside the tracks (see below).
-4. **Read.** New and changed files are read as bytes; `readTrackMetadataFromBytes()` parses their
-   tags (with `jsmediatags`) and `calculateDualChecksums()` hashes the whole file and its audio
-   alone (without the ID3 tag). The snapshot in `.meta/` is written again.
+4. **Read.** New and changed files are read as bytes; `readTags()` (`src/lib/tags/`) parses their
+   tags and `checksums()` hashes the whole file and its audio alone (without the tags). The
+   snapshot in `.meta/` is written again.
 5. **Edit.** The edit dialog fills the `editor` store (`src/lib/editor.ts`) with the values the
    selected tracks share.
-6. **Serialize.** `saveEdits()` merges the form into each track's tags, and
-   `writeTrackMetadataToBytes()` writes them into the file's bytes (with `browser-id3-writer`).
+6. **Serialize.** `saveEdits()` merges the form into each track's tags, and `writeTags()` writes
+   them into the file's bytes, or says why the engine refused (a save of several tracks stops
+   there, and the ones before it are recorded).
 7. **Write.** The bytes go back through the root's VFS, and the library and `.meta/` record the
    new tags and checksums.
 
@@ -56,9 +57,11 @@ Beside that flow, `src/main.ts` starts three things:
 
 ## The tag engine
 
-`src/lib/id3.ts` still reads and writes tags (MP3 only) with `jsmediatags` and
-`browser-id3-writer`. Its replacement is built and not yet wired in: three Rust crates in
-`crates/`, which E2 brings into the web app as WebAssembly and E4 into the desktop app natively.
+jackbird's tags are read and written by its own Rust crates in `crates/`: in the web app as
+WebAssembly (since E2), in the desktop app natively (E4). The web app reaches them through
+`src/lib/tags/` (`readTags`, `writeTags`, `checksums`), which loads the module the first time a
+file has to be read, written or hashed, so a library that reopens from `.meta/` never fetches it.
+The walk still takes `.mp3` files only; FLAC comes with E3.
 
 - **`jackbird-id3`** reads an ID3v2 tag (v2.2 to v2.4) into its frames as they are stored, and
   writes frames back; only the frames jackbird edits are decoded (text, pictures). A frame nobody
@@ -70,7 +73,13 @@ Beside that flow, `src/main.ts` starts three things:
   checksums stay valid), and writes that keep the audio where it was when the tag fits. Every
   write is checked before its bytes are given back: the result must read back as asked, its audio
   must be byte-identical, and every frame, block and comment it did not touch must be there, byte
-  for byte and in order; otherwise it is refused, with a code for the interface.
+  for byte and in order; otherwise it is refused, with a code for the interface. A cover can be
+  set, or removed (the picture shown goes, the others stay).
+- **`jackbird-tags-wasm`** is the WebAssembly module: no bindings crate, only a few exports over
+  an input and an output buffer it owns (`tags_input`, `tags_read`, `tags_write`, `tags_region`,
+  `tags_output_ptr`, `tags_output_len`, `tags_release`) and a small wire format
+  (`crates/tags-wasm/src/wire.rs`, mirrored by `src/helpers/tagwire.ts`). The glue on the web
+  side is `src/lib/tags/wasm.ts`. A trap leaves the module unused and the next call loads it again.
 
 ## Layers
 

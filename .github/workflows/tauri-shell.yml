@@ -45,11 +45,16 @@ jobs:
             libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb \
             gstreamer1.0-plugins-good gstreamer1.0-libav
 
+      # wasm32: npm run build builds the tag engine for the web first (scripts/build-wasm.mjs).
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: |
+            src-tauri
+            .
 
       - run: npm ci --no-audit --no-fund
 

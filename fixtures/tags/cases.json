@@ -425,7 +425,7 @@
       "name": "mp3-saved-by-jackbird",
       "file": "mp3-saved-by-jackbird.mp3",
       "format": "mp3",
-      "about": "mp3-v23-padded retitled by today's app (browser-id3-writer, then keepUneditedFrames)",
+      "about": "mp3-v23-padded retitled by the app before E2 (browser-id3-writer, then keepUneditedFrames)",
       "fields": {
         "title": "After",
         "artist": "Artist",

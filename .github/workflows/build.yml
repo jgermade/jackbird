@@ -33,6 +33,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      # The tag engine is built for the web as WebAssembly (scripts/build-wasm.mjs, run before
+      # npm test and npm run build). See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E2).
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
       - run: npm ci --no-audit --no-fund
 
       - run: npm test

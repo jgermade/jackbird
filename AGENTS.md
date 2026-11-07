@@ -30,7 +30,9 @@ assets such as styles, fonts and images):
 `crates/` holds jackbird's own Rust crates (the tag engine), one Cargo workspace whose
 `Cargo.toml` is at the root (`src-tauri/` stays its own project until E4). They do no I/O (bytes
 in, bytes out) and depend on nothing but each other; a dependency in `[dev-dependencies]` is for
-tests only. They are written from the formats' specifications; other libraries are references for
+tests only. `crates/tags-wasm` is the web app's WebAssembly module, built by
+`scripts/build-wasm.mjs` (not committed); its exports' `#[unsafe(no_mangle)]` is the only unsafe
+code the workspace allows, and it has no unsafe block. They are written from the formats' specifications; other libraries are references for
 behaviour and edge cases, and no code is copied from GPL or LGPL ones. Tests run on the shared
 fixtures in `fixtures/tags/` (made by `fixtures/tags/make.mjs`, whose expectations come from how
 each file is built). Run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --

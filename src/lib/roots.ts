@@ -10,7 +10,7 @@ import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../h
 import { collectFolderPaths } from "../helpers/tracks";
 import type { GroupingMode, LibraryView, Mp3Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
-import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
+import { checksums, readTags } from "./tags";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
 import { dropFromQueue } from "./player";
@@ -222,12 +222,12 @@ export async function hydrateRoot(
       async function readOne(file: (typeof staleOrNewFiles)[number]): Promise<void> {
         const readFrom = checksumNow(file.relativePath);
         const sourceBytes = await vfs.read(file.relativePath);
-        const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
+        const { fullChecksum, audioChecksum } = await checksums(sourceBytes);
         const stored = snapshot.tracks[file.relativePath];
         const metadata =
           stored && (stored.fullChecksum || stored.checksum) === fullChecksum
             ? stored.metadata
-            : await readTrackMetadataFromBytes(sourceBytes, file.name);
+            : await readTags(sourceBytes);
 
         const nowIso = new Date().toISOString();
         pendingUpdates.push({

@@ -3,7 +3,7 @@
 use jackbird_id3::{self as id3, Frame, Picture, Version, decode_picture, decode_text, encode_picture, encode_text};
 
 use crate::year::{self, Timestamp};
-use crate::{Cover, Error, Field, Fields, Format, Refusal, Tags};
+use crate::{Cover, CoverChange, Error, Field, Fields, Format, Refusal, Tags};
 
 /// The padding a tag gets when it no longer fits in the old one's room.
 const PADDING: usize = 1024;
@@ -148,7 +148,11 @@ fn year_frames(version: Version, value: &str) -> Result<Vec<(&'static str, Strin
     }
 }
 
-pub(crate) fn write(bytes: &[u8], changes: &[(Field, String)], cover: Option<&Cover>) -> Result<Vec<u8>, Error> {
+pub(crate) fn write(
+    bytes: &[u8],
+    changes: &[(Field, String)],
+    cover: Option<CoverChange<'_>>,
+) -> Result<Vec<u8>, Error> {
     let source = id3::read(bytes).map_err(|error| Error::Unreadable(error.to_string()))?;
     if let Some(tag) = &source {
         if tag.version == Version::V22 {
@@ -212,18 +216,26 @@ pub(crate) fn write(bytes: &[u8], changes: &[(Field, String)], cover: Option<&Co
         }
     }
 
-    if let Some(cover) = cover {
-        let picture = Picture {
-            mime: cover.mime.clone(),
-            kind: 3,
-            description: String::new(),
-            data: cover.data.clone(),
-        };
-        let frame = make("APIC", encode_picture(&picture, version));
-        match shown_picture(version, unsynchronised, &frames) {
-            Some((index, _)) => frames[index] = frame,
-            None => frames.push(frame),
+    match cover {
+        Some(CoverChange::Set(cover)) => {
+            let picture = Picture {
+                mime: cover.mime.clone(),
+                kind: 3,
+                description: String::new(),
+                data: cover.data.clone(),
+            };
+            let frame = make("APIC", encode_picture(&picture, version));
+            match shown_picture(version, unsynchronised, &frames) {
+                Some((index, _)) => frames[index] = frame,
+                None => frames.push(frame),
+            }
         }
+        Some(CoverChange::Remove) => {
+            if let Some((index, _)) = shown_picture(version, unsynchronised, &frames) {
+                frames.remove(index);
+            }
+        }
+        None => {}
     }
 
     let room = source.as_ref().map_or(0, |tag| tag.len);
@@ -246,12 +258,12 @@ pub(crate) fn write(bytes: &[u8], changes: &[(Field, String)], cover: Option<&Co
 /// Safeguard 3: every frame of the source that the changes do not touch is
 /// in the result, byte for byte and in order. The touched ones: the frames of
 /// a changed field (its family, for the year), the picture a new cover
-/// replaces, and those that ask to go with an altered tag.
+/// replaces or removes, and those that ask to go with an altered tag.
 pub(crate) fn check_kept(
     source: &[u8],
     out: &[u8],
     changes: &[(Field, String)],
-    cover: Option<&Cover>,
+    cover: Option<CoverChange<'_>>,
 ) -> Result<(), Error> {
     let kept = |what: String| Error::Refused(Refusal::Kept(what));
     let Ok(Some(before)) = id3::read(source) else {
@@ -305,15 +317,19 @@ pub(crate) fn check_kept(
                 expected.remove(at);
             }
         }
-        let is_new = |frame: &Frame| {
-            frame
-                .content(version, after.unsynchronised_v24())
-                .ok()
-                .and_then(|content| decode_picture(&content, version).ok())
-                .is_some_and(|picture| picture.kind == 3 && picture.data == cover.data && picture.mime == cover.mime)
-        };
-        if let Some(at) = found.iter().position(is_new) {
-            found.remove(at);
+        if let CoverChange::Set(cover) = cover {
+            let is_new = |frame: &Frame| {
+                frame
+                    .content(version, after.unsynchronised_v24())
+                    .ok()
+                    .and_then(|content| decode_picture(&content, version).ok())
+                    .is_some_and(|picture| {
+                        picture.kind == 3 && picture.data == cover.data && picture.mime == cover.mime
+                    })
+            };
+            if let Some(at) = found.iter().position(is_new) {
+                found.remove(at);
+            }
         }
     }
     if expected != found {

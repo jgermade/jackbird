@@ -8,3 +8,6 @@ dist/
 
 .tmp/
 /target/
+
+# The tag engine's WebAssembly module, built by scripts/build-wasm.mjs.
+src/lib/tags/engine.wasm

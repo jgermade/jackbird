@@ -4,22 +4,24 @@
   "version": "0.1.8",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/build-wasm.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/build-wasm.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
+    "pretest": "node scripts/build-wasm.mjs",
     "test": "npm run test:layers && npm run test:styles && npm run test:types && npm run test:unit && npm run test:coverage",
     "test:layers": "node scripts/check-layers.mjs",
     "test:styles": "node scripts/check-styles.mjs",
     "test:types": "tsc -p tsconfig.test.json",
     "test:unit": "mkdir -p .tmp/coverage && node --test --experimental-strip-types --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/helpers/**' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-exclude='src/**/*.test-support.ts' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=.tmp/coverage/lcov.info 'src/**/*.test.ts'",
-    "test:coverage": "node scripts/check-coverage.mjs .tmp/coverage/lcov.info 90"
+    "test:coverage": "node scripts/check-coverage.mjs .tmp/coverage/lcov.info 90",
+    "build:wasm": "node scripts/build-wasm.mjs --force"
   },
   "dependencies": {
     "@cloudauthn/vfs-sync": "^0.2.0",
-    "browser-id3-writer": "^6.3.0",
-    "jq79": "^0.7.8",
-    "jsmediatags": "^3.9.7"
+    "jq79": "^0.7.8"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

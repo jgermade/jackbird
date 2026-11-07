@@ -9,8 +9,9 @@
 import { $reactive, $toRaw } from "jq79";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "../helpers/metadata";
 import type { EditableMetadata, MetaRecord, Mp3Track } from "../types";
-import { t, tn } from "./i18n";
-import { calculateDualChecksums, writeTrackMetadataToBytes } from "./id3";
+import { t, tn, type MessageKey } from "./i18n";
+import { en } from "./locales/en";
+import { checksums, TagError, writeTags } from "./tags";
 import { library } from "./library";
 import { flushMeta } from "./meta";
 import { updateRoots } from "./roots";
@@ -67,14 +68,28 @@ export function confirmField(field: string, on: boolean): void {
   }
 }
 
+/** Why a track could not be saved, in the interface's language. */
+function reasonOf(error: unknown, metadata: EditableMetadata): string {
+  if (error instanceof TagError) {
+    const key = `tags.error.${error.code}`;
+    if (key in en) {
+      return t(key as MessageKey, { year: metadata.year });
+    }
+    return error.message;
+  }
+  return error instanceof Error ? error.message : t("message.saveFailed");
+}
+
 /**
  * Writes the form to every selected track: a field the selection varied in
  * and the form left empty keeps each track's own value (see mergeDraft). Each
  * file gets its new tags and checksums; then the library takes the new
  * tracks and records, merged into the root as it is now, and `.meta/` is
  * written from it (flushMeta). `library.saving` is set throughout, which
- * holds the verifier off. Says what was saved, or why not, and closes the
- * editor when it all worked.
+ * holds the verifier off. A track the engine refuses stops the save there:
+ * the tracks before it stay saved and are recorded, and the message names it
+ * and why. Says what was saved, or why not, and closes the editor when it
+ * all worked.
  */
 export async function saveEdits(): Promise<void> {
   const root = activeRoot.value.data;
@@ -93,36 +108,50 @@ export async function saveEdits(): Promise<void> {
     const varied = getVariedFields(tracks);
     const records: Record<string, MetaRecord> = {};
     const saved = new Map<string, Mp3Track>();
+    // The track that could not be saved, and why: the ones before it are saved and recorded.
+    let failed: { track: Mp3Track; reason: string } | null = null;
 
     for (const track of tracks) {
       const metadata = mergeDraft(track.metadata, draft, varied, confirmed);
-      const bytes = await writeTrackMetadataToBytes(await root.vfs.read(track.relativePath), metadata);
-      await root.vfs.write(track.relativePath, bytes);
-      const { fullChecksum, audioChecksum } = await calculateDualChecksums(bytes);
-      const nowIso = new Date().toISOString();
-      // The date the disk gave the file, which the next load compares with:
-      // one of our own would make it read every edited file again.
-      const lastModified = (await root.vfs.stat(track.relativePath).catch(() => null))?.mtime ?? Date.now();
-      const checked = { checksum: fullChecksum, fullChecksum, audioChecksum, size: bytes.byteLength, lastModified, lastVerifiedAt: nowIso, metadata };
+      try {
+        const bytes = await writeTags(await root.vfs.read(track.relativePath), track.metadata, metadata);
+        await root.vfs.write(track.relativePath, bytes);
+        const { fullChecksum, audioChecksum } = await checksums(bytes);
+        const nowIso = new Date().toISOString();
+        // The date the disk gave the file, which the next load compares with:
+        // one of our own would make it read every edited file again.
+        const lastModified = (await root.vfs.stat(track.relativePath).catch(() => null))?.mtime ?? Date.now();
+        const checked = { checksum: fullChecksum, fullChecksum, audioChecksum, size: bytes.byteLength, lastModified, lastVerifiedAt: nowIso, metadata };
 
-      records[track.relativePath] = { ...checked, updatedAt: nowIso };
-      saved.set(track.id, { ...track, ...checked });
+        records[track.relativePath] = { ...checked, updatedAt: nowIso };
+        saved.set(track.id, { ...track, ...checked });
+      } catch (error) {
+        failed = { track, reason: reasonOf(error, metadata) };
+        break;
+      }
     }
 
-    // The files are written: the library shows them even if `.meta/` fails.
-    updateRoots((roots) =>
-      roots.map((item) =>
-        item.id === root.id
-          ? {
-              ...item,
-              tracks: item.tracks.map((one) => saved.get(one.id) ?? one),
-              metaSnapshot: { ...item.metaSnapshot, tracks: { ...item.metaSnapshot.tracks, ...records } }
-            }
-          : item
-      )
-    );
-    await flushMeta(root.id);
+    if (saved.size > 0) {
+      // The files are written: the library shows them even if `.meta/` fails.
+      updateRoots((roots) =>
+        roots.map((item) =>
+          item.id === root.id
+            ? {
+                ...item,
+                tracks: item.tracks.map((one) => saved.get(one.id) ?? one),
+                metaSnapshot: { ...item.metaSnapshot, tracks: { ...item.metaSnapshot.tracks, ...records } }
+              }
+            : item
+        )
+      );
+      await flushMeta(root.id);
+    }
 
+    if (failed) {
+      const message = t("message.saveFailedFor", { name: failed.track.name, reason: failed.reason });
+      library.errorMessage = saved.size > 0 ? `${message} ${tn("message.savedBefore", saved.size)}` : message;
+      return;
+    }
     const target = tracks.length === 1 ? tracks[0].name : tn("tracks.count", tracks.length);
     library.infoMessage = t("message.saved", { target });
     ui.selectionOpen = false;

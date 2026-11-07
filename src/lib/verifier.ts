@@ -15,7 +15,7 @@ import { $toRaw } from "jq79";
 import { applyVerification, checksumOf, type Verification } from "../helpers/snapshot";
 import { tracksToVerify } from "../helpers/tracks";
 import type { RootWorkspace } from "../types";
-import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
+import { checksums, readTags } from "./tags";
 import { library } from "./library";
 import { flushMeta } from "./meta";
 import { updateRoots } from "./roots";
@@ -37,11 +37,11 @@ function openRoot(rootId: string): RootWorkspace | null {
 /** Reads one track's file: its checksums and, if it changed, its tags, size and date. */
 async function inspect(root: RootWorkspace, track: RootWorkspace["tracks"][number]): Promise<Verification> {
   const bytes = await root.vfs.read(track.relativePath);
-  const { fullChecksum, audioChecksum } = await calculateDualChecksums(bytes);
+  const { fullChecksum, audioChecksum } = await checksums(bytes);
   if (fullChecksum === checksumOf(track)) {
     return { fullChecksum, audioChecksum };
   }
-  const [metadata, stat] = await Promise.all([readTrackMetadataFromBytes(bytes, track.name), root.vfs.stat(track.relativePath)]);
+  const [metadata, stat] = await Promise.all([readTags(bytes), root.vfs.stat(track.relativePath)]);
   return { fullChecksum, audioChecksum, file: { metadata, size: bytes.byteLength, lastModified: stat?.mtime ?? track.lastModified } };
 }
 

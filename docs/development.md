@@ -5,8 +5,11 @@
 - Node.js 22.6 or later: the unit tests run TypeScript directly with `--experimental-strip-types`.
 - A Chromium-based browser to run the app.
 - `make`, for the shortcuts below (optional: the npm scripts do the same).
-- Rust (stable, with `rustfmt` and `clippy`), only to work on the tag crates in `crates/` until
-  the app builds them in (E2).
+- Rust (stable) with the `wasm32-unknown-unknown` target (`rustup target add
+  wasm32-unknown-unknown`): `npm run dev`, `npm test` and `npm run build` first build the tag
+  engine into `src/lib/tags/engine.wasm` (`scripts/build-wasm.mjs`, skipped when it is newer than
+  every file under `crates/`; `npm run build:wasm` forces it). `rustfmt` and `clippy` to work on
+  the crates.
 
 ## Scripts
 
@@ -28,9 +31,11 @@ older than `package-lock.json`. A bare `make` lists them.
 2. **`test:styles`** (`scripts/check-styles.mjs`): no shorthand with `var()` overridden by its own
    longhand in one block (jq79's scoping would drop it), and no `:hover` rule outside
    `@media (hover: hover)`, so touch screens get no hover states.
-3. **`test:types`**: a type check of the helpers and their tests (`tsconfig.test.json`).
-4. **`test:unit`**: the helpers' tests (`src/**/*.test.ts`), on Node's own test runner, with no
-   framework. It also writes coverage to `.tmp/coverage/lcov.info`.
+3. **`test:types`**: a type check of the helpers, `src/lib/tags/` and their tests
+   (`tsconfig.test.json`).
+4. **`test:unit`**: the tests (`src/**/*.test.ts`), on Node's own test runner, with no
+   framework: the helpers', and every fixture of `fixtures/tags/` against the built WebAssembly
+   module (`src/lib/tags/wasm.test.ts`). It also writes coverage to `.tmp/coverage/lcov.info`.
 5. **`test:coverage`** (`scripts/check-coverage.mjs`): every helper file must reach 90% of lines,
    branches and functions, and a helper that no test loads fails the check.
 
@@ -38,13 +43,14 @@ older than `package-lock.json`. A bare `make` lists them.
 
 `crates/` holds jackbird's own tag engine, in Rust, with no tag dependency (see
 [Architecture](architecture.md#the-tag-engine)): `jackbird-id3`, `jackbird-flac` and
-`jackbird-tags`, one Cargo workspace whose `Cargo.toml` is at the root.
+`jackbird-tags`, and `jackbird-tags-wasm` (the web app's module), one Cargo workspace whose
+`Cargo.toml` is at the root. The module is built with the workspace's `wasm` profile (for size).
 
 | Command | What it does |
 | --- | --- |
 | `cargo test --workspace` (`make test-crates`, with the two below) | The crates' unit tests, and `jackbird-tags`' tests on every fixture in `fixtures/tags/`. |
 | `cargo fmt --all --check` | The formatting (`rustfmt.toml`). |
-| `cargo clippy --workspace --all-targets -- -D warnings` | The lints, with warnings as errors, as CI runs them (`tags.yml`). |
+| `cargo clippy --workspace --all-targets -- -D warnings` | The lints, with warnings as errors, as CI runs them (`tags.yml`, which also lints and builds the module for `wasm32-unknown-unknown`). |
 
 The fixtures are small MP3 and FLAC files built byte by byte, committed with `cases.json`, which
 says what each must give; [their README](../fixtures/tags/README.md) says how to make them again.

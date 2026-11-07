@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Makes the tag fixtures shared by `cargo test` (crates/tags) and, from E2,
 // `npm test`: small MP3 and FLAC files whose tags and metadata blocks are
-// built byte by byte around a little `ffmpeg` audio, one saved as today's app
-// saves (browser-id3-writer, then keepUneditedFrames), and `cases.json`, which
+// built byte by byte around a little `ffmpeg` audio, one saved as the app saved
+// before E2 (kept as it was made), and `cases.json`, which
 // says what each must give. The expectations come from how each file is
 // built, never from the code under test.
 //
 //   node --experimental-strip-types --disable-warning=ExperimentalWarning fixtures/tags/make.mjs
 //
-// Needs `ffmpeg` and the npm dependencies. The files are committed, so the
+// Needs `ffmpeg`. The files are committed, so the
 // tests need neither. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md
 // (21:45 to 22:20).
 
@@ -18,8 +18,6 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ID3Writer } from "browser-id3-writer";
-import { keepUneditedFrames } from "../../src/helpers/id3v2.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "jackbird-fixtures-"));
@@ -202,7 +200,7 @@ const mp3 = (name, tagBytes, expected, { tail = null, about }) => {
   const start = tagBytes.length;
   let end = file.length;
   if (tail === id3v1) end -= 128;
-  if (tail && tail !== id3v1) end -= 32; // an APEv2 tag: only its footer is outside the region, as getAudioFrameSlice has it
+  if (tail && tail !== id3v1) end -= 32; // an APEv2 tag: only its footer is outside the region, as the audio region has it
   cases.push({ name, file: `${name}.mp3`, format: "mp3", about, ...expected, region: { start, end } , bytes: file });
 };
 const flacCase = (name, prefix, blocks, expected, about) => {
@@ -248,16 +246,12 @@ mp3("mp3-junk", tag(3, [text("TIT2", 0, "Junk"), text("TPE1", 0, "Artist")], { p
   expect({ ...EMPTY, title: "Junk", artist: "Artist" }, null, "unreadable"), { about: "bytes after the frames that are neither a frame nor padding (read; a save is refused)" });
 
 {
-  // What today's app writes when it retitles mp3-v23-padded: browser-id3-writer, then keepUneditedFrames.
-  const source = cases.find((c) => c.name === "mp3-v23-padded").bytes;
-  const writer = new ID3Writer(source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength));
-  writer.setFrame("TIT2", "After").setFrame("TPE1", ["Artist"]).setFrame("TALB", "Album").setFrame("TYER", "1959").setFrame("TCON", ["Jazz"]).setFrame("TRCK", "3/12");
-  writer.setFrame("APIC", { type: 3, data: cover("cover1.jpg"), description: "Cover", useUnicodeEncoding: false });
-  writer.addTag();
-  const written = new Uint8Array(writer.arrayBuffer);
-  const saved = Buffer.from(keepUneditedFrames(new Uint8Array(source), written));
+  // What the app wrote before E2 when it retitled mp3-v23-padded (browser-id3-writer, then
+  // keepUneditedFrames, both retired in E2): made by an earlier run of this script, and kept as
+  // it is, since nothing writes it that way any more.
+  const saved = readFileSync(join(here, "mp3-saved-by-jackbird.mp3"));
   const tagLength = 10 + ((saved[6] << 21) | (saved[7] << 14) | (saved[8] << 7) | saved[9]);
-  cases.push({ name: "mp3-saved-by-jackbird", file: "mp3-saved-by-jackbird.mp3", format: "mp3", about: "mp3-v23-padded retitled by today's app (browser-id3-writer, then keepUneditedFrames)",
+  cases.push({ name: "mp3-saved-by-jackbird", file: "mp3-saved-by-jackbird.mp3", format: "mp3", about: "mp3-v23-padded retitled by the app before E2 (browser-id3-writer, then keepUneditedFrames)",
     ...expect({ ...E0_FIELDS, title: "After" }, COVER1), region: { start: tagLength, end: saved.length }, bytes: saved });
 }
 

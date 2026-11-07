@@ -6,7 +6,7 @@ use jackbird_flac::{
     entry, image_size,
 };
 
-use crate::{Cover, Error, Field, Fields, Format, Refusal, Tags};
+use crate::{Cover, CoverChange, Error, Field, Fields, Format, Refusal, Tags};
 
 /// The padding the metadata gets when it no longer fits in the old room.
 const PADDING_BYTES: usize = 1024;
@@ -144,7 +144,11 @@ fn apply(comments: &mut Comments, field: Field, value: &str) {
     }
 }
 
-pub(crate) fn write(bytes: &[u8], changes: &[(Field, String)], cover: Option<&Cover>) -> Result<Vec<u8>, Error> {
+pub(crate) fn write(
+    bytes: &[u8],
+    changes: &[(Field, String)],
+    cover: Option<CoverChange<'_>>,
+) -> Result<Vec<u8>, Error> {
     let metadata = meta::read(bytes).map_err(unreadable)?;
     let mut blocks = metadata.blocks.clone();
     if !changes.is_empty() {
@@ -167,26 +171,34 @@ pub(crate) fn write(bytes: &[u8], changes: &[(Field, String)], cover: Option<&Co
         }
         blocks[index].body = comments.to_bytes();
     }
-    if let Some(cover) = cover {
-        let (width, height, depth) = image_size(&cover.data).unwrap_or((0, 0, 0));
-        let picture = Picture {
-            kind: 3,
-            mime: cover.mime.clone(),
-            description: String::new(),
-            width,
-            height,
-            depth,
-            colors: 0,
-            data: cover.data.clone(),
-        };
-        let block = Block {
-            kind: PICTURE,
-            body: encode_picture(&picture),
-        };
-        match shown_picture(&blocks) {
-            Some((index, _)) => blocks[index] = block,
-            None => blocks.push(block),
+    match cover {
+        Some(CoverChange::Set(cover)) => {
+            let (width, height, depth) = image_size(&cover.data).unwrap_or((0, 0, 0));
+            let picture = Picture {
+                kind: 3,
+                mime: cover.mime.clone(),
+                description: String::new(),
+                width,
+                height,
+                depth,
+                colors: 0,
+                data: cover.data.clone(),
+            };
+            let block = Block {
+                kind: PICTURE,
+                body: encode_picture(&picture),
+            };
+            match shown_picture(&blocks) {
+                Some((index, _)) => blocks[index] = block,
+                None => blocks.push(block),
+            }
         }
+        Some(CoverChange::Remove) => {
+            if let Some((index, _)) = shown_picture(&blocks) {
+                blocks.remove(index);
+            }
+        }
+        None => {}
     }
     let blocks = blocks.into_iter().filter(|block| block.kind != PADDING).collect();
     let arranged = meta::with_padding(blocks, metadata.len(), PADDING_BYTES);
@@ -215,12 +227,12 @@ fn compared(blocks: &[Block], comments_changed: bool, pictures_changed: bool) ->
 
 /// Safeguard 3: the ID3v2 tag before `fLaC`, every block, and every comment
 /// entry of a key the changes do not touch, byte for byte and in order; and
-/// every picture but the one a new cover replaces.
+/// every picture but the one a new cover replaces, or the one removed.
 pub(crate) fn check_kept(
     source: &[u8],
     out: &[u8],
     changes: &[(Field, String)],
-    cover: Option<&Cover>,
+    cover: Option<CoverChange<'_>>,
 ) -> Result<(), Error> {
     let kept = |what: &str| Error::Refused(Refusal::Kept(what.to_owned()));
     let before = meta::read(source).map_err(unreadable)?;
@@ -279,12 +291,14 @@ pub(crate) fn check_kept(
             expected.remove(at);
         }
         let mut found = pictures(&after.blocks);
-        let is_new = |block: &Block| {
-            decode_picture(&block.body)
-                .is_ok_and(|picture| picture.kind == 3 && picture.data == cover.data && picture.mime == cover.mime)
-        };
-        if let Some(at) = found.iter().position(is_new) {
-            found.remove(at);
+        if let CoverChange::Set(cover) = cover {
+            let is_new = |block: &Block| {
+                decode_picture(&block.body)
+                    .is_ok_and(|picture| picture.kind == 3 && picture.data == cover.data && picture.mime == cover.mime)
+            };
+            if let Some(at) = found.iter().position(is_new) {
+                found.remove(at);
+            }
         }
         if expected != found {
             return Err(kept("a picture"));

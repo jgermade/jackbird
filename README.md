@@ -30,7 +30,9 @@ dot-matrix display, labels printed like a faceplate's, and two tones, Silver and
 
 ## Quick start
 
-You need [Node.js](https://nodejs.org/) 22.6 or later and a Chromium-based desktop browser
+You need [Node.js](https://nodejs.org/) 22.6 or later, [Rust](https://rustup.rs/) stable with
+its WebAssembly target (`rustup target add wasm32-unknown-unknown`: jackbird's tag engine is
+built from source into the web app), and a Chromium-based desktop browser
 (Chrome, Edge, Brave, Opera). jackbird reads and writes your files through the File System Access
 API, which Firefox and Safari do not have.
 

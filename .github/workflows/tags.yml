@@ -1,6 +1,7 @@
-# jackbird's tag crates (crates/: jackbird-id3, jackbird-flac, jackbird-tags): formatting, clippy
-# with warnings as errors, and the tests, on the shared fixtures in fixtures/tags/. See
-# RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E1).
+# jackbird's tag crates (crates/: jackbird-id3, jackbird-flac, jackbird-tags, jackbird-tags-wasm):
+# formatting, clippy with warnings as errors, and the tests, on the shared fixtures in
+# fixtures/tags/; then the WebAssembly module, linted and built for its target. See
+# RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E1, E2).
 name: tags
 
 on:
@@ -35,6 +36,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
 
@@ -43,3 +45,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - run: cargo test --workspace --locked
+
+      - run: cargo clippy -p jackbird-tags-wasm --target wasm32-unknown-unknown --locked -- -D warnings
+
+      - run: cargo build -p jackbird-tags-wasm --profile wasm --target wasm32-unknown-unknown --locked

@@ -125,9 +125,23 @@ pub struct Tags {
     pub cover: Option<Cover>,
 }
 
+/// What a write does to the cover.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum CoverEdit {
+    /// Leaves the pictures as they are.
+    #[default]
+    Keep,
+    /// Replaces the picture shown (in place) with this front cover, or adds it.
+    /// The cover already shown leaves the pictures as they are.
+    Set(Cover),
+    /// Removes the picture shown; every other picture stays. Nothing to remove
+    /// leaves the pictures as they are.
+    Remove,
+}
+
 /// What a write changes: `None` leaves a field as it is, an empty string
-/// removes it; a field given its current value is left alone too. A cover
-/// replaces the one shown (in place), or is added.
+/// removes it; a field given its current value is left alone too. The cover
+/// changes as its [`CoverEdit`] says.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Edit {
     /// The new title.
@@ -142,8 +156,8 @@ pub struct Edit {
     pub genre: Option<String>,
     /// The new track number.
     pub track: Option<String>,
-    /// The new cover.
-    pub cover: Option<Cover>,
+    /// What happens to the cover.
+    pub cover: CoverEdit,
 }
 
 impl Edit {
@@ -156,7 +170,7 @@ impl Edit {
             year: Some(fields.year.clone()),
             genre: Some(fields.genre.clone()),
             track: Some(fields.track.clone()),
-            cover: None,
+            cover: CoverEdit::Keep,
         }
     }
 
@@ -259,10 +273,11 @@ pub fn write(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>, Error> {
             wanted.set(field, value.to_owned());
         }
     }
-    let cover = edit
-        .cover
-        .as_ref()
-        .filter(|cover| current.cover.as_ref() != Some(*cover));
+    let cover = match &edit.cover {
+        CoverEdit::Keep => None,
+        CoverEdit::Set(cover) => (current.cover.as_ref() != Some(cover)).then_some(CoverChange::Set(cover)),
+        CoverEdit::Remove => current.cover.is_some().then_some(CoverChange::Remove),
+    };
     if changes.is_empty() && cover.is_none() {
         return Ok(bytes.to_vec());
     }
@@ -274,21 +289,35 @@ pub fn write(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>, Error> {
         changes: &changes,
         cover,
         fields: &wanted,
-        shown_cover: cover.or(current.cover.as_ref()),
+        shown_cover: match cover {
+            Some(CoverChange::Set(cover)) => Some(cover),
+            _ => current.cover.as_ref(),
+        },
     };
     verify(format, bytes, &out, &change)?;
     Ok(out)
+}
+
+/// A change of the cover that a write makes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CoverChange<'a> {
+    /// The picture shown replaced with this front cover, or this one added.
+    Set(&'a Cover),
+    /// The picture shown removed.
+    Remove,
 }
 
 /// What a write was asked to do, as the safeguards check it.
 pub(crate) struct Change<'a> {
     /// The fields that change, and their new values.
     pub changes: &'a [(Field, String)],
-    /// The new cover, if it changes.
-    pub cover: Option<&'a Cover>,
+    /// The change of the cover, if it changes.
+    pub cover: Option<CoverChange<'a>>,
     /// Every field as the result must read.
     pub fields: &'a Fields,
-    /// The cover the result must show.
+    /// The cover the result must show. Not checked when the cover is
+    /// removed: safeguard 3 checks that every other picture stays, so the one
+    /// shown next is the source's.
     pub shown_cover: Option<&'a Cover>,
 }
 
@@ -302,7 +331,7 @@ pub(crate) fn verify(format: Format, source: &[u8], out: &[u8], change: &Change<
             back.fields, change.fields
         ))));
     }
-    if back.cover.as_ref() != change.shown_cover {
+    if change.cover != Some(CoverChange::Remove) && back.cover.as_ref() != change.shown_cover {
         return Err(Error::Refused(Refusal::Fields("the cover".into())));
     }
     // 2. The audio, and what follows it, unchanged.
