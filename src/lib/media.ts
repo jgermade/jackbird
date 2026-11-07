@@ -9,6 +9,7 @@
 // The file is a snapshot: once it is rewritten (a save, another program), the
 // browser stops reading it, without an error. The player opens it again.
 
+import { audioMimeType } from "../helpers/formats";
 import type { RootWorkspace } from "../types";
 
 export type Media = {
@@ -35,7 +36,9 @@ async function fileOf(root: RootWorkspace, relativePath: string): Promise<File> 
 /** Opens a track's file for playing. */
 export async function openMedia(root: RootWorkspace, relativePath: string): Promise<Media> {
   const file = await fileOf(root, relativePath);
-  const url = URL.createObjectURL(file);
+  // Typed by extension (E3-D2), so playing does not depend on the type the system gives the
+  // file (none, for .flac, on some): a slice is still the file on disk, not read into memory.
+  const url = URL.createObjectURL(file.slice(0, file.size, audioMimeType(relativePath) || file.type));
   return {
     url,
     changed: async (current) => {

@@ -10,7 +10,7 @@ export type TrackMetadata = {
   coverDataUrl: string | null;
 };
 
-export type Mp3Track = {
+export type Track = {
   id: string;
   name: string;
   relativePath: string;
@@ -109,7 +109,7 @@ export type RootWorkspace = {
   vfs: VFSAdapter;
   /** Kept here rather than on the adapter: it is what the session store persists. */
   rootHandle: FileSystemDirectoryHandle;
-  tracks: Mp3Track[];
+  tracks: Track[];
   selectedTrackId: string | null;
   selectedTrackIds: string[];
   selectionAnchorTrackId: string | null;

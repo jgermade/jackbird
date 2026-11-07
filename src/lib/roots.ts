@@ -5,10 +5,11 @@
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
+import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
-import type { GroupingMode, LibraryView, Mp3Track, RootWorkspace } from "../types";
+import type { GroupingMode, LibraryView, Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { checksums, readTags } from "./tags";
 import { library } from "./library";
@@ -48,7 +49,7 @@ export async function hydrateRoot(
   const snapshot = await readMetaSnapshot(vfs);
 
   const snapshotEntries = Object.entries(snapshot.tracks);
-  const initialTracks: Mp3Track[] = snapshotEntries.map(([relativePath, stored]) => ({
+  const initialTracks: Track[] = snapshotEntries.map(([relativePath, stored]) => ({
     id: relativePath,
     name: relativePath.split("/").at(-1) ?? relativePath,
     relativePath,
@@ -111,8 +112,8 @@ export async function hydrateRoot(
       void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
         console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
       );
-      const mp3Files = walked
-        .filter((entry) => entry.path.toLowerCase().endsWith(".mp3"))
+      const audioFiles = walked
+        .filter((entry) => isAudioFile(entry.path))
         .map((entry) => ({
           name: entry.path.split("/").at(-1) ?? entry.path,
           relativePath: entry.path,
@@ -121,16 +122,16 @@ export async function hydrateRoot(
         }));
 
       const snapshotPaths = new Set(Object.keys(snapshot.tracks));
-      const fsPaths = new Set(mp3Files.map((f) => f.relativePath));
+      const fsPaths = new Set(audioFiles.map((f) => f.relativePath));
 
       // Tracks removed from disk
       const removedPaths = [...snapshotPaths].filter((p) => !fsPaths.has(p));
 
       // New files not in snapshot
-      const newFiles = mp3Files.filter((f) => !snapshotPaths.has(f.relativePath));
+      const newFiles = audioFiles.filter((f) => !snapshotPaths.has(f.relativePath));
 
       // Files that exist in both but have changed size/lastModified
-      const modifiedFiles = mp3Files.filter((f) => {
+      const modifiedFiles = audioFiles.filter((f) => {
         const stored = snapshot.tracks[f.relativePath];
         return stored && (stored.size !== f.size || stored.lastModified !== f.lastModified);
       });
@@ -191,7 +192,7 @@ export async function hydrateRoot(
       // Counted against the walk, as the root's own count above: what is
       // already known, then one per file read, ending at the total (when the
       // last batch is flushed).
-      const totalAfterWalk = mp3Files.length;
+      const totalAfterWalk = audioFiles.length;
       let loadedCount = totalAfterWalk - staleOrNewFiles.length;
       let snapshotDirty = removedPaths.length > 0;
 
@@ -341,7 +342,7 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
   if (playlistPaths.length !== knownPlaylists.size || playlistPaths.some((path) => !knownPlaylists.has(path))) {
     void loadPlaylists(root.id, walked.map((entry) => entry.path));
   }
-  const currentFiles = walked.filter((entry) => entry.path.toLowerCase().endsWith(".mp3"));
+  const currentFiles = walked.filter((entry) => isAudioFile(entry.path));
   const currentPaths = new Set(currentFiles.map((file) => file.path));
   const knownPaths = new Set(root.tracks.map((track) => track.relativePath));
   if (currentFiles.length === root.tracks.length && [...currentPaths].every((path) => knownPaths.has(path))) {

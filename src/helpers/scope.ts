@@ -1,16 +1,16 @@
-import type { Mp3Track, WizardTreeRow } from "../types.ts";
+import type { Track, WizardTreeRow } from "../types.ts";
 
 /** What the album sheet shows: a label and the tracks under it. */
 export type Scope = {
   label: string;
-  tracks: Mp3Track[];
+  tracks: Track[];
   /** Whether `tracks` are in the order to play (a view's group, a playlist), not to be sorted by folder and number. */
   ordered?: boolean;
 };
 
 type ScopedRoot = {
   label: string;
-  tracks: Mp3Track[];
+  tracks: Track[];
   activeRowKey: string | null;
 };
 
@@ -29,7 +29,7 @@ export function detailScope(root: ScopedRoot | null, rows: readonly WizardTreeRo
   const row = root.activeRowKey ? rows.find((candidate) => candidate.key === root.activeRowKey) : undefined;
   if (row?.inView) {
     const byId = new Map(root.tracks.map((track) => [track.id, track]));
-    const tracksOf = (ids: readonly string[]): Mp3Track[] => ids.flatMap((id) => byId.get(id) ?? []);
+    const tracksOf = (ids: readonly string[]): Track[] => ids.flatMap((id) => byId.get(id) ?? []);
     const group = row.trackIds ? row : rows.find((candidate) => candidate.key === row.parentKey);
     if (group?.trackIds) {
       return { label: group.label, tracks: tracksOf(group.trackIds), ordered: true };

@@ -1,4 +1,4 @@
-import type { MetaRecord, MetaSnapshot, Mp3Track, TrackMetadata } from "../types.ts";
+import type { MetaRecord, MetaSnapshot, Track, TrackMetadata } from "../types.ts";
 
 /** A snapshot with no tracks. */
 export function emptySnapshot(): MetaSnapshot {
@@ -29,7 +29,7 @@ export function serializeMetaSnapshot(snapshot: MetaSnapshot): string {
 }
 
 /** The checksum the library holds for a track: the full one, else the legacy one. */
-export function checksumOf(track: Mp3Track): string {
+export function checksumOf(track: Track): string {
   return track.fullChecksum || track.checksum;
 }
 
@@ -44,7 +44,7 @@ export type Verification = {
   file?: { metadata: TrackMetadata; size: number; lastModified?: number };
 };
 
-type WithSnapshot = { tracks: Mp3Track[]; metaSnapshot: MetaSnapshot };
+type WithSnapshot = { tracks: Track[]; metaSnapshot: MetaSnapshot };
 
 /**
  * A root after the verifier checked one track, as new objects (nothing given
@@ -72,7 +72,7 @@ export function applyVerification<Root extends WithSnapshot>(
 
   const { fullChecksum, audioChecksum, file } = found;
   const facts = file ?? { metadata: track.metadata, size: track.size, lastModified: track.lastModified };
-  const verified: Mp3Track = { ...track, ...facts, checksum: fullChecksum, fullChecksum, audioChecksum, lastVerifiedAt: nowIso };
+  const verified: Track = { ...track, ...facts, checksum: fullChecksum, fullChecksum, audioChecksum, lastVerifiedAt: nowIso };
   const previous = root.metaSnapshot.tracks[track.relativePath];
 
   return {
@@ -116,7 +116,7 @@ export type ScanResult = {
  */
 export function applyScanResults<Root extends WithSnapshot>(root: Root, results: readonly ScanResult[]): Root {
   const byId = new Map(root.tracks.map((item) => [item.id, item]));
-  const changed = new Map<string, Mp3Track>();
+  const changed = new Map<string, Track>();
   const records: Record<string, MetaRecord> = {};
   for (const { trackId, readFrom, record } of results) {
     const track = changed.get(trackId) ?? byId.get(trackId);

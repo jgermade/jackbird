@@ -20,7 +20,7 @@ export const en = {
   "landing.title": "Your library, right where it is",
   "landing.body": "Open a music folder to browse its albums, review their metadata and edit covers without uploading your files anywhere.",
   "landing.open": "Open folder",
-  "landing.note": "Changes are written straight to your MP3 files.",
+  "landing.note": "Changes are written straight to your music files.",
 
   "library.title": "Library",
   "library.restoring": "Restoring tabs…",
@@ -206,8 +206,9 @@ export const en = {
 
   "info.relativePath": "Relative path",
   "info.fileName": "File name",
+  "info.format": "Format",
   "info.fullChecksum": "Full checksum",
-  "info.audioChecksum": "Audio checksum (without ID3)",
+  "info.audioChecksum": "Audio checksum (without tags)",
   "info.lastVerified": "Last verified",
   "info.totalFiles": "Total files:",
   "info.totalSize": "Total size:",

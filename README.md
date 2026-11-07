@@ -6,9 +6,9 @@
 
 <p align="center"><strong>Your library, right where it is.</strong></p>
 
-jackbird is a browser app for a local MP3 collection. Open a music folder and it lays out your
+jackbird is a browser app for a local music collection, MP3 and FLAC. Open a music folder and it lays out your
 albums with their covers, plays them, and lets you fix their tags and covers, one track or many at
-once. Changes are written straight into your MP3 files: there is no server, and nothing is
+once. Changes are written straight into your files: there is no server, and nothing is
 uploaded anywhere.
 
 Its interface, **Deck**, takes after old portable audio gear: keys that travel when pressed, a
@@ -41,7 +41,7 @@ make up
 ```
 
 It installs the dependencies the first time, then starts the dev server. Open
-<http://localhost:8666>, choose **Open folder** and pick a folder with MP3 files. The browser asks
+<http://localhost:8666>, choose **Open folder** and pick a folder with MP3 or FLAC files. The browser asks
 for permission to edit the files in it; jackbird needs it to save your changes.
 
 Run the checks with `make test`, and build for production with `make build` (into `dist/`). Each

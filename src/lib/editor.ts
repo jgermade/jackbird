@@ -8,7 +8,7 @@
 
 import { $reactive, $toRaw } from "jq79";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "../helpers/metadata";
-import type { EditableMetadata, MetaRecord, Mp3Track } from "../types";
+import type { EditableMetadata, MetaRecord, Track } from "../types";
 import { t, tn, type MessageKey } from "./i18n";
 import { en } from "./locales/en";
 import { checksums, TagError, writeTags } from "./tags";
@@ -107,9 +107,9 @@ export async function saveEdits(): Promise<void> {
   try {
     const varied = getVariedFields(tracks);
     const records: Record<string, MetaRecord> = {};
-    const saved = new Map<string, Mp3Track>();
+    const saved = new Map<string, Track>();
     // The track that could not be saved, and why: the ones before it are saved and recorded.
-    let failed: { track: Mp3Track; reason: string } | null = null;
+    let failed: { track: Track; reason: string } | null = null;
 
     for (const track of tracks) {
       const metadata = mergeDraft(track.metadata, draft, varied, confirmed);

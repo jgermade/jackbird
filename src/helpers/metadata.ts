@@ -1,4 +1,4 @@
-import type { EditableMetadata, Mp3Track, TrackMetadata } from "../types.ts";
+import type { EditableMetadata, Track, TrackMetadata } from "../types.ts";
 
 /** Which fields differ across a set of tracks. */
 export type VariedFields = Record<keyof TrackMetadata, boolean>;
@@ -20,7 +20,7 @@ export function emptyMetadata(): TrackMetadata {
  * The values a set of tracks share, for a batch editor: a field that differs
  * between any two tracks comes back empty (and the cover `null`).
  */
-export function computeCommonMetadata(tracks: Mp3Track[]): EditableMetadata {
+export function computeCommonMetadata(tracks: Track[]): EditableMetadata {
   if (tracks.length === 0) {
     return emptyMetadata();
   }
@@ -43,7 +43,7 @@ export function computeCommonMetadata(tracks: Mp3Track[]): EditableMetadata {
  * empty fields mean "keep each track's own value". One track or none varies
  * in nothing.
  */
-export function getVariedFields(tracks: Mp3Track[]): VariedFields {
+export function getVariedFields(tracks: Track[]): VariedFields {
   const first = tracks[0]?.metadata;
   const differs = (field: keyof TrackMetadata): boolean =>
     tracks.length > 1 && tracks.some((track) => track.metadata[field] !== first[field]);

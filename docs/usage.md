@@ -18,7 +18,7 @@ phone only the open root's tab shows, with a ⌄: tap it for the list of roots. 
 to it, close the open one with the × beside it in the list, or open another with **Add a folder**,
 at the end of the list.
 
-jackbird reads every `.mp3` file in the folder and its subfolders. The first time, it reads all of
+jackbird reads every `.mp3` and `.flac` file in the folder and its subfolders. The first time, it reads all of
 their tags. It then keeps what it learned in `.meta/mp3-manager.json` inside the folder, so the
 next time it shows the library at once and reads only the files that are new or have changed,
 in the background.
@@ -220,9 +220,12 @@ and each track keeps its own; drop or choose one and every track gets it.
 
 For the cover, drop an image on it or use **Choose image**; **Remove** takes it away.
 
-**Save changes** writes the tags and the cover into the MP3 files themselves. Every other tag the
-files carry (album artist, disc number, comments, lyrics, ReplayGain and the like) is kept as it
-was.
+**Save changes** writes the tags and the cover into the files themselves (ID3v2 tags in MP3,
+Vorbis comments and a picture block in FLAC). Every other tag the files carry (album artist, disc
+number, comments, lyrics, ReplayGain and the like) is kept as it was, and so is the audio, byte
+for byte. A save that would not keep them is refused, and says why. A FLAC file's year can be any
+text; an MP3's must be a date its tag can hold (a year, a year and month in v2.4, or a full date).
+The **Info** tab says each track's format.
 
 ## Renaming files
 

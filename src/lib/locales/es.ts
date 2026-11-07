@@ -21,7 +21,7 @@ export const es: Record<MessageKey, string> = {
   "landing.title": "Tu biblioteca, donde ya está",
   "landing.body": "Abre una carpeta de música para explorar sus álbumes, revisar sus metadatos y editar carátulas sin subir los archivos a ningún sitio.",
   "landing.open": "Abrir carpeta",
-  "landing.note": "Los cambios se escriben directamente en tus archivos MP3.",
+  "landing.note": "Los cambios se escriben directamente en tus archivos de música.",
 
   "library.title": "Biblioteca",
   "library.restoring": "Restaurando tabs...",
@@ -207,8 +207,9 @@ export const es: Record<MessageKey, string> = {
 
   "info.relativePath": "Ruta relativa",
   "info.fileName": "Nombre del archivo",
+  "info.format": "Formato",
   "info.fullChecksum": "Checksum completo",
-  "info.audioChecksum": "Checksum audio (sin ID3)",
+  "info.audioChecksum": "Checksum audio (sin etiquetas)",
   "info.lastVerified": "Última verificación",
   "info.totalFiles": "Total de archivos:",
   "info.totalSize": "Tamaño total:",

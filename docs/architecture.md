@@ -24,7 +24,7 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
 1. **Pick.** `openFolder()` (`src/lib/roots.ts`) asks for a folder with `FSAAdapter.pick()`.
 2. **Render what is known.** `hydrateRoot()` reads `.meta/mp3-manager.json` (`src/lib/meta.ts`)
    and shows its tracks at once.
-3. **Walk.** In the background, `walk()` lists the folder's `.mp3` files, and its `.m3u8` and
+3. **Walk.** In the background, `walk()` lists the folder's `.mp3` and `.flac` files (`src/helpers/formats.ts`), and its `.m3u8` and
    `.m3u` playlists, which `src/lib/playlists.ts` reads beside the tracks (see below).
 4. **Read.** New and changed files are read as bytes; `readTags()` (`src/lib/tags/`) parses their
    tags and `checksums()` hashes the whole file and its audio alone (without the tags). The
@@ -61,7 +61,8 @@ jackbird's tags are read and written by its own Rust crates in `crates/`: in the
 WebAssembly (since E2), in the desktop app natively (E4). The web app reaches them through
 `src/lib/tags/` (`readTags`, `writeTags`, `checksums`), which loads the module the first time a
 file has to be read, written or hashed, so a library that reopens from `.meta/` never fetches it.
-The walk still takes `.mp3` files only; FLAC comes with E3.
+The walk takes `.mp3` and `.flac` files (since E3); `src/helpers/formats.ts` is the one list of
+formats, with the MIME type the player gives each file.
 
 - **`jackbird-id3`** reads an ID3v2 tag (v2.2 to v2.4) into its frames as they are stored, and
   writes frames back; only the frames jackbird edits are decoded (text, pictures). A frame nobody
