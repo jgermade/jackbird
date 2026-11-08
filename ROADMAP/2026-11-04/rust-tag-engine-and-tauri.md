@@ -7,7 +7,7 @@ first, then the desktop app, with the daemon, the SQLite index and the sync mesh
 
 Dates are estimates from the day each step starts; each step ends with its "done when" met and a
 walkthrough in the record. E0, the spike, is done: the rest goes ahead with the changes the record
-lists (2026-11-04, 18:30 for E2, 21:45 to 22:20 for E1, 19:41 for E4's media URLs, the latter awaiting approval).
+lists (2026-11-04, 18:30 for E2, 21:45 to 22:20 for E1, 19:41 for E4's media URLs, approved with E4 on 2026-11-08).
 E1 is done too (2026-11-04): jackbird's own tag crates replaced `lofty`. The web plan that ran
 after it ([web-queue-views-renaming.md](web-queue-views-renaming.md)) is done as well. E2 is done
 (2026-11-07, record from 20:16): the web app reads, writes and hashes through the engine as
@@ -16,8 +16,10 @@ WebAssembly, and its former tag libraries are gone. E3 is done too (2026-11-07, 
 to 03:16), is done as well: the engine is given a file's tags and last bytes, never its audio, and
 returns a splice. E4, the desktop app, is done too (2026-11-08, record from 10:52; CI passes its
 unattended check on macOS, Windows and Linux). Next: the service
-([../2026-11-08/service.md](../2026-11-08/service.md), S1 to S4), then E5 and E6.
-After E4 comes the family instance ([family-instance.md](family-instance.md)).
+([../2026-11-08/service.md](../2026-11-08/service.md), S1 to S4; S1 and S2 done on 2026-11-08),
+then the rest of the family instance ([family-instance.md](family-instance.md)), E5 and E6.
+Left to the owner by hand on real machines: E4's bundles (a folder chosen, heard, edited, the app
+restarted).
 
 ```mermaid
 gantt

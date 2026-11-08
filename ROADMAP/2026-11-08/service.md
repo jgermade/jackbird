@@ -33,5 +33,12 @@ gantt
 | S3 Sign-in and people | the two switches (sign-in, several people) in the interface; SMTP set up from it; one-time codes by email to sign up and sign in; passkeys on the instance's own address; roles; the first owner's console code | with sign-in on, two people with different roles each do what the role allows and nothing more |
 | S4 The online route | an outbound SSH connection to an online server, forwarding the service's port (a reverse tunnel, as intergate does), kept up by the service and set up from the interface | the service is reached from outside home through an online server, with nothing opened at home |
 
+S1 and S2 are done (2026-11-08); S3 is next, its plan to be drafted and approved first. Its
+starting point, from the owner's answers (record, 14:14 to 15:01): sign-in has no passwords, one-time
+codes by email (SMTP set up from the interface) to sign up and sign in, and passkeys to sign in
+without the code; the first owner claims the instance with a one-time code on the server's console
+before SMTP is set up (assumed, to confirm); sign-in and several people are two independent
+switches; roles as in the record's 21:32.
+
 Decided separately: system users (the service as root, record 14:57), the content-addressed store
 and the metadata layers (F1), what the desktop app does when the service is installed but stopped.
