@@ -15,8 +15,8 @@ WebAssembly, and its former tag libraries are gone. E3 is done too (2026-11-07, 
 22:28): FLAC libraries open, play, edit and save. E2b, asked after E3 (record, 2026-11-08 03:09
 to 03:16), is done as well: the engine is given a file's tags and last bytes, never its audio, and
 returns a splice. E4, the desktop app, is done too (2026-11-08, record from 10:52; CI passes its
-unattended check on macOS, Windows and Linux). Next: the service (S1, proposed at 15:01 in the
-record), awaiting the owner's go.
+unattended check on macOS, Windows and Linux). Next: the service
+([../2026-11-08/service.md](../2026-11-08/service.md), S1 to S4), then E5 and E6.
 After E4 comes the family instance ([family-instance.md](family-instance.md)).
 
 ```mermaid
