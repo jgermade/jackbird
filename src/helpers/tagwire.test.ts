@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { WIRE_FIELDS, decodeError, decodeRegion, decodeTags, encodeWrite } from "./tagwire.ts";
+import { WIRE_FIELDS, decodeError, decodeLayout, decodeSplice, decodeTags, encodeLayout, encodeRead, encodeWrite } from "./tagwire.ts";
 
 const u32 = (value: number) => [value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, value >>> 24];
 const run = (bytes: number[]) => [...u32(bytes.length), ...bytes];
@@ -44,34 +44,60 @@ describe("decodeTags", () => {
   });
 });
 
-describe("decodeError and decodeRegion", () => {
-  it("read an error's code and message", () => {
+describe("decodeError", () => {
+  it("reads an error's code and message", () => {
     assert.deepEqual(decodeError(Uint8Array.from([...text("id3v22"), ...text("ID3v2.2 tags are read but not written")])), {
       code: "id3v22",
       message: "ID3v2.2 tags are read but not written"
     });
   });
+});
 
-  it("read a region's start and end", () => {
-    assert.deepEqual(decodeRegion(Uint8Array.of(10, 0, 0, 0, 4, 3, 2, 1)), { start: 10, end: 0x01020304 });
-    assert.throws(() => decodeRegion(Uint8Array.of(1, 2, 3)), /ends early/);
+// The layout of wire.rs' tests: FLAC, tags_end 10, audio 10..256.
+const LAYOUT = [1, 10, 0, 0, 0, 10, 0, 0, 0, 0, 1, 0, 0];
+const flac = { format: "flac", tagsEnd: 10, audio: { start: 10, end: 256 } } as const;
+
+describe("decodeLayout and decodeSplice", () => {
+  it("read a layout, or how many first bytes the engine needs", () => {
+    assert.deepEqual(decodeLayout(Uint8Array.from([0, ...LAYOUT])), { known: flac });
+    assert.deepEqual(decodeLayout(Uint8Array.of(0, 0, ...LAYOUT.slice(1))), { known: { ...flac, format: "mp3" } });
+    assert.deepEqual(decodeLayout(Uint8Array.of(0, 255, ...LAYOUT.slice(1))), { known: { ...flac, format: null } });
+    assert.deepEqual(decodeLayout(Uint8Array.of(1, 4, 3, 2, 1)), { needHead: 0x01020304 });
+    assert.throws(() => decodeLayout(Uint8Array.of(0, 7, ...LAYOUT.slice(1))), /format 7/);
+  });
+
+  it("read a splice: where the replaced bytes end, and a copy of what replaces them", () => {
+    const bytes = Uint8Array.of(7, 0, 0, 0, 110, 101, 119);
+    const splice = decodeSplice(bytes);
+    assert.deepEqual(splice, { replaceEnd: 7, with: Uint8Array.of(110, 101, 119) });
+    bytes[4] = 0;
+    assert.equal(splice.with[0], 110);
+  });
+});
+
+describe("encodeLayout and encodeRead", () => {
+  it("write the length, the tail and the head; or the layout and the head", () => {
+    assert.deepEqual(encodeLayout(300, Uint8Array.of(1, 2), Uint8Array.of(9)), Uint8Array.of(44, 1, 0, 0, 2, 0, 0, 0, 1, 2, 9));
+    assert.deepEqual(encodeRead(flac, Uint8Array.of(9, 9)), Uint8Array.from([...LAYOUT, 9, 9]));
+    assert.deepEqual(encodeRead({ ...flac, format: null }, Uint8Array.of())[0], 255);
+    assert.deepEqual(encodeRead({ ...flac, format: "mp3" }, Uint8Array.of())[0], 0);
   });
 });
 
 describe("encodeWrite", () => {
-  it("writes the fields given, in order, then the cover, then the file", () => {
-    const file = Uint8Array.of(0x49, 0x44, 0x33);
-    const bytes = encodeWrite({ fields: { title: "Título", album: "", year: "1959", track: "3/12" }, cover: { set: { mime: "image/png", data: Uint8Array.of(9, 8, 7) } } }, file);
-    // The request of wire.rs' test `reads_an_edit_and_where_the_file_starts`.
+  it("writes the fields given, in order, then the cover, the layout and the head", () => {
+    const head = Uint8Array.of(0x66, 0x4c, 0x61, 0x43);
+    const bytes = encodeWrite({ fields: { title: "Título", album: "", year: "1959", track: "3/12" }, cover: { set: { mime: "image/png", data: Uint8Array.of(9, 8, 7) } } }, flac, head);
+    // The request of wire.rs' test `reads_a_write_request`.
     assert.deepEqual(
       bytes,
-      Uint8Array.from([1, ...text("Título"), 0, 1, ...text(""), 1, ...text("1959"), 0, 1, ...text("3/12"), 1, ...text("image/png"), ...run([9, 8, 7]), 0x49, 0x44, 0x33])
+      Uint8Array.from([1, ...text("Título"), 0, 1, ...text(""), 1, ...text("1959"), 0, 1, ...text("3/12"), 1, ...text("image/png"), ...run([9, 8, 7]), ...LAYOUT, 0x66, 0x4c, 0x61, 0x43])
     );
   });
 
   it("marks a cover kept with 0 and removed with 2", () => {
-    const none = Uint8Array.of(0, 0, 0, 0, 0, 0);
-    assert.deepEqual(encodeWrite({ fields: {}, cover: { keep: true } }, Uint8Array.of(5)), Uint8Array.of(...none, 0, 5));
-    assert.deepEqual(encodeWrite({ fields: {}, cover: { remove: true } }, Uint8Array.of()), Uint8Array.of(...none, 2));
+    const none = [0, 0, 0, 0, 0, 0];
+    assert.deepEqual(encodeWrite({ fields: {}, cover: { keep: true } }, flac, Uint8Array.of(5)), Uint8Array.from([...none, 0, ...LAYOUT, 5]));
+    assert.deepEqual(encodeWrite({ fields: {}, cover: { remove: true } }, flac, Uint8Array.of()), Uint8Array.from([...none, 2, ...LAYOUT]));
   });
 });

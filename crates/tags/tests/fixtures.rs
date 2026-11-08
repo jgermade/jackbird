@@ -6,7 +6,10 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use jackbird_tags::{Cover, CoverEdit, Edit, Fields, Format, audio_region, format_of, read, write};
+use jackbird_tags::{
+    Cover, CoverEdit, Edit, FIRST_HEAD, Fields, FileLayout, Format, Layout, TAIL_LEN, audio_region, format_of, layout,
+    read, read_head, write, write_head,
+};
 use serde_json::Value;
 
 fn root() -> PathBuf {
@@ -446,5 +449,138 @@ fn rust_id3_reads_the_mp3s_jackbird_writes() {
             "{}: {pictures:?}",
             case.name
         );
+    }
+}
+
+// ---------------------------------------------------------------- by head and splice
+
+fn tail_of(bytes: &[u8]) -> &[u8] {
+    &bytes[bytes.len().saturating_sub(TAIL_LEN)..]
+}
+
+/// The layout as an app finds it: the first head, then what it asks for. Gives the layout and how
+/// many heads it took.
+fn found(bytes: &[u8]) -> (FileLayout, usize) {
+    let mut given = FIRST_HEAD.min(bytes.len());
+    for steps in 1..=4 {
+        match layout(&bytes[..given], tail_of(bytes), bytes.len() as u64).unwrap() {
+            Layout::Known(found) => return (found, steps),
+            Layout::NeedHead(n) => {
+                assert!(
+                    n as usize > given && n as usize <= bytes.len(),
+                    "asked for {n} with {given}"
+                );
+                given = n as usize;
+            }
+        }
+    }
+    panic!("no layout in four steps");
+}
+
+/// Where each fixture's tags end, from its own format's reader.
+fn tags_end(case: &Case) -> u64 {
+    match case.format {
+        Format::Flac => jackbird_flac::read(&case.bytes).unwrap().audio as u64,
+        Format::Mp3 => match jackbird_id3::read(&case.bytes) {
+            Ok(Some(tag)) => tag.len as u64,
+            _ => {
+                if case.bytes.starts_with(b"ID3") {
+                    case.bytes.len() as u64
+                } else {
+                    0
+                }
+            }
+        },
+    }
+}
+
+#[test]
+fn layout_gives_each_fixtures_format_tags_and_region() {
+    for case in cases() {
+        let (layout, steps) = found(&case.bytes);
+        assert_eq!(layout.format, Some(case.format), "{}", case.name);
+        assert_eq!(layout.tags_end, tags_end(&case), "{}", case.name);
+        assert_eq!(
+            layout.audio,
+            case.region.0 as u64..case.region.1 as u64,
+            "{}",
+            case.name
+        );
+        assert_eq!(steps, 1, "{}: the fixtures fit the first head", case.name);
+        let tags = read_head(&case.bytes[..layout.tags_end as usize], &layout);
+        assert_eq!(tags, read(&case.bytes), "{}", case.name);
+    }
+}
+
+#[test]
+fn layout_from_any_head_asks_for_more_or_knows_the_same() {
+    for case in cases() {
+        let (whole, _) = found(&case.bytes);
+        let len = case.bytes.len();
+        for given in 0..=len {
+            let mut at = given;
+            // From any head, following what it asks for ends at the same layout.
+            loop {
+                match layout(&case.bytes[..at], tail_of(&case.bytes), len as u64).unwrap() {
+                    Layout::Known(found) => {
+                        assert_eq!(found, whole, "{} from {given}", case.name);
+                        break;
+                    }
+                    Layout::NeedHead(n) => {
+                        assert!(
+                            n as usize > at && n as usize <= len,
+                            "{} from {given}: {n} at {at}",
+                            case.name
+                        );
+                        at = n as usize;
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_head_and_splice_path_gives_the_whole_files_bytes() {
+    let edits = [
+        Edit {
+            title: Some("New title".into()),
+            ..Edit::default()
+        },
+        Edit {
+            cover: CoverEdit::Set(new_cover()),
+            ..Edit::all(&Fields {
+                title: "Título".into(),
+                artist: "Artist B".into(),
+                album: "Album B".into(),
+                year: "2002".into(),
+                genre: "Rock".into(),
+                track: "2/3".into(),
+            })
+        },
+        Edit {
+            cover: CoverEdit::Remove,
+            ..Edit::default()
+        },
+        Edit {
+            artist: Some(String::new()),
+            genre: Some(String::new()),
+            ..Edit::default()
+        },
+        Edit::default(),
+    ];
+    for case in cases() {
+        let (layout, _) = found(&case.bytes);
+        let end = layout.tags_end as usize;
+        for edit in &edits {
+            // Only the tags are given: nothing after them is needed.
+            let by_head = write_head(&case.bytes[..end], &layout, edit).map(|splice| {
+                assert_eq!(splice.replace, 0..layout.tags_end, "{}", case.name);
+                let mut out = splice.with;
+                out.extend_from_slice(&case.bytes[end..]);
+                out
+            });
+            assert_eq!(by_head, write(&case.bytes, edit), "{}: {edit:?}", case.name);
+        }
     }
 }

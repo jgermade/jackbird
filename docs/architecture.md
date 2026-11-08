@@ -64,6 +64,16 @@ file has to be read, written or hashed, so a library that reopens from `.meta/` 
 The walk takes `.mp3` and `.flac` files (since E3); `src/helpers/formats.ts` is the one list of
 formats, with the MIME type the player gives each file.
 
+The engine never sees a file's audio (since E2b). `layout(head, tail, length)` says where the tags
+end and where the audio region is, from the file's first bytes and its last 160 (for ID3v1 and
+APEv2); when the head is too short for the tags, it says how many first bytes it needs, and the
+caller asks again. `read_head` reads the tags alone, and `write_head` gives a splice: the file's
+first `tags_end` bytes replaced with the new tags, the rest left as it is. The web app
+(`src/lib/tags/engine.ts`) hands the module only those parts, so the module's memory follows the
+size of the tags, not of the file; before it gives a saved file back, it checks that its audio
+region hashes as the source's did. The desktop app (E4) will read those ranges from disk and write
+the splice in place.
+
 - **`jackbird-id3`** reads an ID3v2 tag (v2.2 to v2.4) into its frames as they are stored, and
   writes frames back; only the frames jackbird edits are decoded (text, pictures). A frame nobody
   edits goes back byte for byte, in its place.
@@ -72,12 +82,14 @@ formats, with the MIME type the player gives each file.
 - **`jackbird-tags`** is jackbird's layer: the six fields and the cover over both formats, the
   audio region the checksums hash (for MP3 exactly `getAudioFrameSlice`'s, so existing `.meta/`
   checksums stay valid), and writes that keep the audio where it was when the tag fits. Every
-  write is checked before its bytes are given back: the result must read back as asked, its audio
-  must be byte-identical, and every frame, block and comment it did not touch must be there, byte
-  for byte and in order; otherwise it is refused, with a code for the interface. A cover can be
+  write is checked before its bytes are given back: the new tags must read back as asked, end
+  exactly where their own header or last block says the audio starts, and keep every frame, block
+  and comment the edit did not touch, byte for byte and in order; otherwise the write is refused,
+  with a code for the interface. Whole-file `read` and `write` are built on the same functions,
+  and `write` also checks the whole result's audio region byte for byte. A cover can be
   set, or removed (the picture shown goes, the others stay).
 - **`jackbird-tags-wasm`** is the WebAssembly module: no bindings crate, only a few exports over
-  an input and an output buffer it owns (`tags_input`, `tags_read`, `tags_write`, `tags_region`,
+  an input and an output buffer it owns (`tags_input`, `tags_layout`, `tags_read`, `tags_write`,
   `tags_output_ptr`, `tags_output_len`, `tags_release`) and a small wire format
   (`crates/tags-wasm/src/wire.rs`, mirrored by `src/helpers/tagwire.ts`). The glue on the web
   side is `src/lib/tags/wasm.ts`. A trap leaves the module unused and the next call loads it again.

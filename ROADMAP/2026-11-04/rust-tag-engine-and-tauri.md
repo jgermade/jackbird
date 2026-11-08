@@ -12,8 +12,9 @@ E1 is done too (2026-11-04): jackbird's own tag crates replaced `lofty`. The web
 after it ([web-queue-views-renaming.md](web-queue-views-renaming.md)) is done as well. E2 is done
 (2026-11-07, record from 20:16): the web app reads, writes and hashes through the engine as
 WebAssembly, and its former tag libraries are gone. E3 is done too (2026-11-07, record from
-22:28): FLAC libraries open, play, edit and save. E4 (the desktop app) is next, awaiting the
-owner's go.
+22:28): FLAC libraries open, play, edit and save. E2b, asked after E3 (record, 2026-11-08 03:09
+to 03:16), is done as well: the engine is given a file's tags and last bytes, never its audio, and
+returns a splice. E4 (the desktop app) is next, awaiting the owner's go.
 After E4 comes the family instance ([family-instance.md](family-instance.md)).
 
 ```mermaid
@@ -27,8 +28,9 @@ gantt
     E1 Own tag crates (id3, flac, tags)       :done, e1, after e0, 5d
     E2 The engine in the web app (wasm)        :done, e2, after e1, 5d
     E3 FLAC                                    :done, e3, after e2, 4d
+    E2b The engine by ranges and splices       :done, e2b, after e3, 3d
   section Desktop
-    E4 Tauri v2 desktop app                    :e4, after e2, 10d
+    E4 Tauri v2 desktop app                    :e4, after e2b, 10d
     E5 Native audio output (hi-fi, optional)   :e5, after e4, 10d
   section Mobile
     E6 Tauri v2 mobile (spike, then Player)    :e6, after e5, 10d
@@ -40,6 +42,7 @@ gantt
 | E1 Tag engine (**done**, 2026-11-04) | jackbird's own crates, with no tag dependency (record, 21:45 to 22:20): `crates/id3` (ID3v2 frames kept as raw bytes, text and picture codecs), `crates/flac` (blocks, Vorbis comment entries, pictures), `crates/tags` (the six fields and the cover over both, the audio region, the year rule, the refusals and three safeguards: fields read back, audio byte-identical, every unedited frame, block and comment kept byte for byte), with `cargo test` on shared fixtures | the fixtures pass, including every case the TypeScript `id3v2` tests cover |
 | E2 Engine in the web (**done**, 2026-11-07) | `crates/tags-wasm` (no bindings crate: E2-D1, record 2026-11-07 20:16), covers removable (`CoverEdit`), `src/lib/tags/` with one interface and its wasm implementation, loaded lazily; `jsmediatags`, `browser-id3-writer` and `src/helpers/id3v2.ts` retired; checksums keep their definitions | `npm test` runs the fixtures against the wasm build; an existing `.meta/` reopens without re-reading any file; the first load is no slower |
 | E3 FLAC (**done**, 2026-11-07) | the walk takes `.flac`; MIME types by extension; `Mp3Track` becomes `Track`; texts no longer say MP3 only | a FLAC library opens, plays, edits and saves, and every saved file decodes with `ffmpeg` and keeps its unedited comments and blocks |
+| E2b By ranges (**done**, 2026-11-08) | the engine takes a file's head and tail (`layout`, `read_head`) and returns a splice (`write_head`); the module never gets the audio; the web app checks a saved file's audio region before giving it back; `AGENTS.md`'s rule of the crates says so | the module's memory after reading and saving a 150 MB file is about the size of its tags; every fixture gives the same bytes by both paths |
 | E4 Tauri desktop | `src-tauri/`: the same UI in the webview; a native `VFSAdapter` over Tauri commands and the folder dialog; tags and checksums run natively, on paths (no whole files over the IPC); the session keeps paths; playback streams from disk; release builds for macOS, Windows and Linux in GitHub Actions | the desktop app opens a folder, plays, edits and reopens it after a restart on all three systems |
 | E5 Native output | optional: decoding and output in Rust, with exclusive / bit-perfect modes where the system offers them; the analyser fed from Rust; `<audio>` stays as the fallback | a 24/96 FLAC plays bit-perfect on at least one system, checked with a loopback or the device's own sample-rate display |
 | E6 Mobile | a spike on file access (Android SAF, iOS security-scoped bookmarks), then a Player-first app | decided by the spike, recorded before any build |

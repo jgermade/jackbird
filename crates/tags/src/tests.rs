@@ -725,3 +725,77 @@ fn fields_and_edits_by_field() {
     }
     assert_eq!(Edit::default().get(Field::Title), None);
 }
+
+// ---------------------------------------------------------------- by head and splice
+
+fn layout_whole(bytes: &[u8]) -> FileLayout {
+    let tail = &bytes[bytes.len().saturating_sub(TAIL_LEN)..];
+    match layout(bytes, tail, bytes.len() as u64).unwrap() {
+        Layout::Known(found) => found,
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn the_structural_safeguard_refuses_tags_that_do_not_end_where_they_say() {
+    let source = file(Version::V23, &[text("TIT2", "Before")]);
+    let layout = layout_whole(&source);
+    let source_tags = &source[..layout.tags_end as usize];
+    let splice = write_head(
+        &source,
+        &layout,
+        &Edit {
+            title: Some("After".into()),
+            ..Edit::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(splice.replace, 0..layout.tags_end);
+    let changes = [(Field::Title, "After".to_owned())];
+    let fields = Fields {
+        title: "After".into(),
+        ..Fields::default()
+    };
+    assert!(verify_head(Format::Mp3, source_tags, &splice.with, &change(&changes, &fields, None)).is_ok());
+    // A byte too many after the tag: the audio would start a byte late.
+    let mut late = splice.with.clone();
+    late.push(0);
+    assert_eq!(
+        verify_head(Format::Mp3, source_tags, &late, &change(&changes, &fields, None)).unwrap_err(),
+        Error::Refused(Refusal::Audio)
+    );
+    // A tag one byte short of its size cannot be read back: refused too.
+    let early = &splice.with[..splice.with.len() - 1];
+    assert!(verify_head(Format::Mp3, source_tags, early, &change(&changes, &fields, None)).is_err());
+}
+
+#[test]
+fn layout_asks_for_the_tag_then_knows() {
+    let mut source = file(Version::V24, &[text("TIT2", "Title"), picture(3, &"x".repeat(100))]);
+    source.extend(b"TAG");
+    source.extend([0; 125]);
+    let len = source.len() as u64;
+    let tail = &source[source.len() - TAIL_LEN..];
+    assert_eq!(layout(&source[..4], tail, len).unwrap(), Layout::NeedHead(10));
+    let tag_len = 10 + 64 + 10 + 6 + 10 + 114;
+    assert_eq!(
+        layout(&source[..10], tail, len).unwrap(),
+        Layout::NeedHead(tag_len as u64 + 4)
+    );
+    let known = layout_whole(&source);
+    assert_eq!(
+        layout(&source[..tag_len + 4], tail, len).unwrap(),
+        Layout::Known(known.clone())
+    );
+    assert_eq!(known.tags_end, tag_len as u64);
+    assert_eq!(known.audio, tag_len as u64..len - 128);
+    assert_eq!(read_head(&source[..tag_len], &known).unwrap(), read(&source).unwrap());
+    // A head shorter than the tags, or a tail that is not the file's, is refused.
+    assert_eq!(read_head(&source[..20], &known).unwrap_err().code(), "unreadable");
+    assert_eq!(layout(&source[..10], &tail[1..], len).unwrap_err().code(), "unreadable");
+    // Not a format the engine reads: the region all the same, by the MP3 rule.
+    let other = [0u8; 300];
+    let found = layout_whole(&other);
+    assert_eq!((found.format, found.tags_end, found.audio.clone()), (None, 0, 0..300));
+    assert_eq!(read_head(&other, &found).unwrap_err(), Error::NotSupported);
+}

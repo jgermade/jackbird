@@ -7,24 +7,45 @@
  * The module is built by `scripts/build-wasm.mjs` into `./engine.wasm`.
  */
 import { TagError } from "./error.ts";
-import { decodeError, decodeRegion, decodeTags, encodeWrite, type WireEdit, type WireError, type WireTags } from "../../helpers/tagwire.ts";
+import {
+  decodeError,
+  decodeLayout,
+  decodeSplice,
+  decodeTags,
+  encodeLayout,
+  encodeRead,
+  encodeWrite,
+  type WireEdit,
+  type WireError,
+  type WireLayout,
+  type WireLayoutAnswer,
+  type WireSplice,
+  type WireTags
+} from "../../helpers/tagwire.ts";
 
 type Exports = {
   memory: WebAssembly.Memory;
   tags_input(length: number): number;
+  tags_layout(): number;
   tags_read(): number;
   tags_write(): number;
-  tags_region(): number;
   tags_output_ptr(): number;
   tags_output_len(): number;
   tags_release(): void;
 };
 
-/** What the module does. Once a call breaks the module (`broken`), it is not used again. */
+/**
+ * What the module does, on a file's first bytes (`head`) and last ones
+ * (`tail`), never its audio. Once a call breaks the module (`broken`), it is
+ * not used again.
+ */
 export type Engine = {
-  read(file: Uint8Array): WireTags;
-  write(file: Uint8Array, edit: WireEdit): Uint8Array;
-  region(file: Uint8Array): { start: number; end: number };
+  /** Where the tags end and the audio is, or how many first bytes that needs. */
+  layout(head: Uint8Array, tail: Uint8Array, length: number): WireLayoutAnswer;
+  /** The tags, from at least the first `layout.tagsEnd` bytes. */
+  read(head: Uint8Array, layout: WireLayout): WireTags;
+  /** The splice that saves `edit`, from at least the first `layout.tagsEnd` bytes. */
+  write(head: Uint8Array, layout: WireLayout, edit: WireEdit): WireSplice;
   readonly broken: boolean;
 };
 
@@ -60,9 +81,9 @@ export function engineOf(instance: WebAssembly.Instance): Engine {
   };
 
   return {
-    read: (file) => decodeTags(call(file, exports.tags_read)),
-    write: (file, edit) => call(encodeWrite(edit, file), exports.tags_write),
-    region: (file) => decodeRegion(call(file, exports.tags_region)),
+    layout: (head, tail, length) => decodeLayout(call(encodeLayout(length, tail, head), exports.tags_layout)),
+    read: (head, layout) => decodeTags(call(encodeRead(layout, head), exports.tags_read)),
+    write: (head, layout, edit) => decodeSplice(call(encodeWrite(edit, layout, head), exports.tags_write)),
     get broken() {
       return broken;
     }

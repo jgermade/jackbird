@@ -30,6 +30,27 @@ export type WireEdit = {
 /** An error the engine gives: a stable code (`Error::code()`) and a message in English. */
 export type WireError = { code: string; message: string };
 
+/** Where a file's tags end and its audio is (`FileLayout`); `format` null for a file the engine does not read. */
+export type WireLayout = {
+  format: "mp3" | "flac" | null;
+  /** The first byte after the tags: a save replaces the bytes before it. */
+  tagsEnd: number;
+  /** The region the audio checksum hashes. */
+  audio: { start: number; end: number };
+};
+
+/** What `tags_layout` answers: the layout, or how many first bytes it needs. */
+export type WireLayoutAnswer = { known: WireLayout } | { needHead: number };
+
+/** What a save writes: the file's bytes up to `replaceEnd` replaced with `with`. */
+export type WireSplice = { replaceEnd: number; with: Uint8Array };
+
+/** How many of a file's last bytes the engine reads (`TAIL_LEN`). */
+export const TAIL_LEN = 160;
+
+/** How many first bytes to give the engine the first time (`FIRST_HEAD`). */
+export const FIRST_HEAD = 64 * 1024;
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -74,6 +95,22 @@ class Reader {
   string(): string {
     return decoder.decode(this.run());
   }
+
+  layout(): WireLayout {
+    const format = this.byte();
+    if (format !== 0 && format !== 1 && format !== 255) {
+      throw new Error(`the engine's answer has format ${format}`);
+    }
+    const tagsEnd = this.u32();
+    const start = this.u32();
+    return { format: format === 0 ? "mp3" : format === 1 ? "flac" : null, tagsEnd, audio: { start, end: this.u32() } };
+  }
+
+  rest(): Uint8Array {
+    const out = this.bytes.subarray(this.at);
+    this.at = this.bytes.length;
+    return out;
+  }
 }
 
 /** A read's result. The cover's bytes are a copy, free of the buffer they came in. */
@@ -97,41 +134,20 @@ export function decodeError(bytes: Uint8Array): WireError {
   return { code: reader.string(), message: reader.string() };
 }
 
-/** A region: the first byte and the one after the last. */
-export function decodeRegion(bytes: Uint8Array): { start: number; end: number } {
+/** `tags_layout`'s answer. */
+export function decodeLayout(bytes: Uint8Array): WireLayoutAnswer {
   const reader = new Reader(bytes);
-  return { start: reader.u32(), end: reader.u32() };
+  return reader.byte() === 0 ? { known: reader.layout() } : { needHead: reader.u32() };
 }
 
-/** The request of a write: the edit, then the file. */
-export function encodeWrite(edit: WireEdit, file: Uint8Array): Uint8Array {
-  const parts: Uint8Array[] = [];
-  const u32 = (value: number) => {
-    const out = new Uint8Array(4);
-    new DataView(out.buffer).setUint32(0, value, true);
-    parts.push(out);
-  };
-  const run = (bytes: Uint8Array) => {
-    u32(bytes.length);
-    parts.push(bytes);
-  };
-  for (const field of WIRE_FIELDS) {
-    const value = edit.fields[field];
-    if (value === undefined) {
-      parts.push(Uint8Array.of(0));
-    } else {
-      parts.push(Uint8Array.of(1));
-      run(encoder.encode(value));
-    }
-  }
-  if ("set" in edit.cover) {
-    parts.push(Uint8Array.of(1));
-    run(encoder.encode(edit.cover.set.mime));
-    run(edit.cover.set.data);
-  } else {
-    parts.push(Uint8Array.of("remove" in edit.cover ? 2 : 0));
-  }
-  parts.push(file);
+/** `tags_write`'s answer. The new bytes are a copy, free of the buffer they came in. */
+export function decodeSplice(bytes: Uint8Array): WireSplice {
+  const reader = new Reader(bytes);
+  return { replaceEnd: reader.u32(), with: reader.rest().slice() };
+}
+
+/** Joins runs of bytes into one. */
+function joined(parts: Uint8Array[]): Uint8Array {
   const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
   let at = 0;
   for (const part of parts) {
@@ -139,4 +155,42 @@ export function encodeWrite(edit: WireEdit, file: Uint8Array): Uint8Array {
     at += part.length;
   }
   return out;
+}
+
+const u32 = (value: number): Uint8Array => {
+  const out = new Uint8Array(4);
+  new DataView(out.buffer).setUint32(0, value, true);
+  return out;
+};
+
+const run = (bytes: Uint8Array): Uint8Array[] => [u32(bytes.length), bytes];
+
+function layoutBytes(layout: WireLayout): Uint8Array[] {
+  const format = layout.format === "mp3" ? 0 : layout.format === "flac" ? 1 : 255;
+  return [Uint8Array.of(format), u32(layout.tagsEnd), u32(layout.audio.start), u32(layout.audio.end)];
+}
+
+/** `tags_layout`'s request: the file's length, its tail, its head. */
+export function encodeLayout(length: number, tail: Uint8Array, head: Uint8Array): Uint8Array {
+  return joined([u32(length), ...run(tail), head]);
+}
+
+/** `tags_read`'s request: the layout, then the head. */
+export function encodeRead(layout: WireLayout, head: Uint8Array): Uint8Array {
+  return joined([...layoutBytes(layout), head]);
+}
+
+/** `tags_write`'s request: the edit, the layout, then the head. */
+export function encodeWrite(edit: WireEdit, layout: WireLayout, head: Uint8Array): Uint8Array {
+  const parts: Uint8Array[] = [];
+  for (const field of WIRE_FIELDS) {
+    const value = edit.fields[field];
+    parts.push(...(value === undefined ? [Uint8Array.of(0)] : [Uint8Array.of(1), ...run(encoder.encode(value))]));
+  }
+  if ("set" in edit.cover) {
+    parts.push(Uint8Array.of(1), ...run(encoder.encode(edit.cover.set.mime)), ...run(edit.cover.set.data));
+  } else {
+    parts.push(Uint8Array.of("remove" in edit.cover ? 2 : 0));
+  }
+  return joined([...parts, ...layoutBytes(layout), head]);
 }

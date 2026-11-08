@@ -54,8 +54,9 @@ This document describes the technical stack and codebase architecture implemente
   for the web as WebAssembly (`crates/tags-wasm`, no bindings crate: a few exports over two
   buffers and ~80 lines of hand-written glue in `src/lib/tags/wasm.ts`). The module (~100 KB,
   ~40 KB gzipped) is built by `scripts/build-wasm.mjs` before `dev`, `test` and `build`, is not
-  committed, and is loaded only when a file has to be read, written or hashed. Checksums stay
-  SHA-1 through WebCrypto, over the engine's audio region.
+  committed, and is loaded only when a file has to be read, written or hashed. It is given a
+  file's tags and last bytes, never its audio (`src/lib/tags/engine.ts`), so its memory follows
+  the size of the tags. Checksums stay SHA-1 through WebCrypto, over the engine's audio region.
 - **Session persistence**: `src/lib/session.ts` restores the open roots on load and saves them
   whenever they change; `src/lib/rootSessionStore.ts` keeps their handles and grouping mode in
   IndexedDB (`mp3-manager` database).
