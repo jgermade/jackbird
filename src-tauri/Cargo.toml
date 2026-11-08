@@ -1,9 +1,10 @@
 [package]
 name = "jackbird"
-version = "0.1.6"
-description = "jackbird as a desktop app: E0's Tauri v2 shell (see RECORD/2026-08-11.musikmatch-rust-migration.WIP.md)"
-edition = "2021"
-publish = false
+description = "jackbird as a desktop app: the web interface in Tauri's webview, its files, tags and checksums through jackbird-core (E4)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [lib]
 # The library form Tauri needs for mobile builds later; the binary only calls `run`.
@@ -14,5 +15,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.7.4", features = [] }
 
 [dependencies]
+jackbird-core = { path = "../crates/core" }
+jackbird-tags = { path = "../crates/tags" }
 tauri = { version = "=2.12.5", features = ["protocol-asset"] }
 tauri-plugin-dialog = "=2.8.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "=1.0.145"
+
+[lints]
+workspace = true

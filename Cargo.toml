@@ -1,10 +1,9 @@
 # jackbird's Rust crates: its own tag engine, with no tag dependency (E1 of
 # ROADMAP/2026-11-04/rust-tag-engine-and-tauri.md; the reasoning is in
 # RECORD/2026-08-11.musikmatch-rust-migration.WIP.md, 21:45 to 22:20).
-# src-tauri/ keeps its own lock and target until E4 brings it in.
+# src-tauri/ (the desktop app) joined in E4.
 [workspace]
-members = ["crates/id3", "crates/flac", "crates/tags", "crates/tags-wasm"]
-exclude = ["src-tauri"]
+members = ["crates/id3", "crates/flac", "crates/tags", "crates/tags-wasm", "crates/core", "src-tauri"]
 resolver = "3"
 
 [workspace.package]

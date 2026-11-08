@@ -2,20 +2,19 @@
 // (hydrateRoot), choose one, close one, and show the playing queue in it.
 // They write the `library` store; the views read it.
 
-import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { emptyMetadata } from "../helpers/metadata";
 import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
-import type { GroupingMode, LibraryView, Track, RootWorkspace } from "../types";
+import type { GroupingMode, LibraryView, RootSource, RootWorkspace, Track } from "../types";
 import { t, tn } from "./i18n";
-import { checksums, readTags } from "./tags";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
 import { dropFromQueue } from "./player";
 import { loadPlaylists } from "./playlists";
+import { pickSource } from "./sources";
 
 /** Replaces the roots with `update(current)`, as a setState updater would. */
 export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[]): void {
@@ -28,9 +27,8 @@ export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[])
  * reads the tags of new and changed files.
  */
 export async function hydrateRoot(
-  vfs: VFSAdapter,
+  source: RootSource,
   options: {
-    rootHandle: FileSystemDirectoryHandle;
     rootId?: string;
     rootLabel?: string;
     groupingMode?: GroupingMode;
@@ -41,6 +39,7 @@ export async function hydrateRoot(
     view?: LibraryView;
   }
 ): Promise<void> {
+  const vfs = source.vfs;
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const rootLabel = options.rootLabel ?? (vfs.name || t("roots.fallbackName", { number: $toRaw(library).roots.length + 1 }));
   const groupingMode = options.groupingMode ?? "wizard";
@@ -68,7 +67,7 @@ export async function hydrateRoot(
       id: rootId,
       label: rootLabel,
       vfs,
-      rootHandle: options.rootHandle,
+      source,
       tracks: initialTracks,
       selectedTrackId: null,
       selectedTrackIds: [],
@@ -107,7 +106,7 @@ export async function hydrateRoot(
   // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
   void (async () => {
     try {
-      const walked = await walk(vfs);
+      const walked = await source.walk();
       // The playlists are read beside the tracks, and do not hold them up.
       void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
         console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
@@ -222,13 +221,11 @@ export async function hydrateRoot(
       // Reads one file's checksums and tags into the next flush.
       async function readOne(file: (typeof staleOrNewFiles)[number]): Promise<void> {
         const readFrom = checksumNow(file.relativePath);
-        const sourceBytes = await vfs.read(file.relativePath);
-        const { fullChecksum, audioChecksum } = await checksums(sourceBytes);
         const stored = snapshot.tracks[file.relativePath];
-        const metadata =
-          stored && (stored.fullChecksum || stored.checksum) === fullChecksum
-            ? stored.metadata
-            : await readTags(sourceBytes);
+        const known = stored ? stored.fullChecksum || stored.checksum : undefined;
+        const found = await source.inspect(file.relativePath, known);
+        const { fullChecksum, audioChecksum } = found;
+        const metadata = found.metadata ?? stored?.metadata ?? emptyMetadata();
 
         const nowIso = new Date().toISOString();
         pendingUpdates.push({
@@ -309,11 +306,10 @@ export async function openFolder(): Promise<void> {
   library.infoMessage = null;
 
   try {
-    if (!isFSAAvailable()) {
-      throw new Error(t("message.noFsa"));
+    const source = await pickSource();
+    if (source) {
+      await hydrateRoot(source, {});
     }
-    const vfs = await FSAAdapter.pick();
-    await hydrateRoot(vfs, { rootHandle: vfs.root });
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : t("message.scanFailed");
   } finally {
@@ -335,7 +331,7 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
     return;
   }
 
-  const walked = await walk(root.vfs);
+  const walked = await root.source.walk();
   // Playlists made or deleted elsewhere since: read them again.
   const playlistPaths = walked.map((entry) => entry.path).filter(isPlaylistFile);
   const knownPlaylists = new Set((root.playlists ?? []).map((playlist) => playlist.path));
@@ -350,8 +346,7 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
   }
 
   library.infoMessage = t("message.resyncing", { name: root.label });
-  await hydrateRoot(root.vfs, {
-    rootHandle: root.rootHandle,
+  await hydrateRoot(root.source, {
     rootId: root.id,
     rootLabel: root.label,
     groupingMode: root.groupingMode,
@@ -371,6 +366,7 @@ export function closeRoot(rootId: string): void {
   }
 
   dropFromQueue((item) => item.rootId === rootId);
+  roots[index].source.close();
 
   const nextRoots = roots.filter((root) => root.id !== rootId);
   library.roots = nextRoots;

@@ -8,6 +8,7 @@ import "../theme/default/tokens.css";
 import "../theme/default/content.css";
 import "../theme/default/base.css";
 import { keepPlaybackSaved, restorePlayback } from "./lib/player";
+import { isDesktop } from "./lib/platform";
 import { keepSessionSaved, restoreSession } from "./lib/session";
 import { startVerifier } from "./lib/verifier";
 import App from "./views/app.html";
@@ -20,3 +21,7 @@ void restoreSession().then(() => {
   restorePlayback();
   keepPlaybackSaved();
 });
+// The desktop app's unattended check (desktop.yml), only when the app is started for it.
+if (isDesktop) {
+  void import("./lib/sources/check").then((check) => check.runCheckIfAsked());
+}

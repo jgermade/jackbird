@@ -1,4 +1,4 @@
-import type { VFSAdapter } from "@cloudauthn/vfs-sync";
+import type { VFSAdapter, WalkedFile } from "@cloudauthn/vfs-sync";
 
 export type TrackMetadata = {
   title: string;
@@ -105,10 +105,10 @@ export type GroupingMode = "flat" | "wizard";
 export type RootWorkspace = {
   id: string;
   label: string;
-  /** The storage seam. Nothing above this line knows which backend is behind it. */
+  /** The storage seam for small files (`.meta/`, playlists) and renames: `source.vfs`. */
   vfs: VFSAdapter;
-  /** Kept here rather than on the adapter: it is what the session store persists. */
-  rootHandle: FileSystemDirectoryHandle;
+  /** Where the root lives (the browser's folder, or the desktop app's path), and the work done on its files. */
+  source: RootSource;
   tracks: Track[];
   selectedTrackId: string | null;
   selectedTrackIds: string[];
@@ -136,4 +136,47 @@ export type QueueItem = {
 export type PlaybackQueue = {
   items: QueueItem[];
   sourceLabel: string;
+};
+
+/** A file as a source finds it: its size and date, both checksums, and its tags when they were read. */
+export type Inspection = {
+  size: number;
+  lastModified: number | undefined;
+  fullChecksum: string;
+  audioChecksum: string;
+  /** Null when the file still has the checksum the caller knew: its tags were not read again. */
+  metadata: TrackMetadata | null;
+};
+
+/** What the player's <audio> element plays a track from. */
+export type MediaHandle = {
+  url: string;
+  /** Whether the file was rewritten since it was opened (its size or date). */
+  changed: () => Promise<boolean>;
+  /** Gives the URL back; the media is no use after it. */
+  release: () => void;
+};
+
+/**
+ * Where a root lives, and the work on its files, so that nothing above knows
+ * whether it is the browser's folder (File System Access, the tag engine as
+ * wasm) or the desktop app's (a path, the engine natively, no file bytes over
+ * the IPC). See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4-D1, E4-D2).
+ */
+export type RootSource = {
+  readonly kind: "browser" | "desktop";
+  /** The small-file adapter: `.meta/`, playlists, renames, deletes. */
+  readonly vfs: VFSAdapter;
+  /** What the session keeps to reopen it: a directory handle, or a path. */
+  readonly saved: FileSystemDirectoryHandle | string;
+  /** Every file under it, with its size and date. */
+  walk(): Promise<WalkedFile[]>;
+  /** One file's checksums, size and date; its tags too, unless its full checksum is still `known`. */
+  inspect(path: string, known?: string): Promise<Inspection>;
+  /** Writes `metadata` over the tags the library held (`previous`); the file as it is after. */
+  save(path: string, previous: TrackMetadata, metadata: TrackMetadata): Promise<Inspection>;
+  /** Opens a track's file for playing, without reading it into memory. */
+  openMedia(path: string): Promise<MediaHandle>;
+  /** The root was closed: on the desktop, nothing under it can be reached any more. */
+  close(): void;
 };

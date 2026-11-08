@@ -11,7 +11,7 @@ import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } fro
 import type { EditableMetadata, MetaRecord, Track } from "../types";
 import { t, tn, type MessageKey } from "./i18n";
 import { en } from "./locales/en";
-import { checksums, TagError, writeTags } from "./tags";
+import { TagError } from "./tags";
 import { library } from "./library";
 import { flushMeta } from "./meta";
 import { updateRoots } from "./roots";
@@ -114,14 +114,13 @@ export async function saveEdits(): Promise<void> {
     for (const track of tracks) {
       const metadata = mergeDraft(track.metadata, draft, varied, confirmed);
       try {
-        const bytes = await writeTags(await root.vfs.read(track.relativePath), track.metadata, metadata);
-        await root.vfs.write(track.relativePath, bytes);
-        const { fullChecksum, audioChecksum } = await checksums(bytes);
+        const written = await root.source.save(track.relativePath, track.metadata, metadata);
+        const { fullChecksum, audioChecksum } = written;
         const nowIso = new Date().toISOString();
         // The date the disk gave the file, which the next load compares with:
         // one of our own would make it read every edited file again.
-        const lastModified = (await root.vfs.stat(track.relativePath).catch(() => null))?.mtime ?? Date.now();
-        const checked = { checksum: fullChecksum, fullChecksum, audioChecksum, size: bytes.byteLength, lastModified, lastVerifiedAt: nowIso, metadata };
+        const lastModified = written.lastModified ?? Date.now();
+        const checked = { checksum: fullChecksum, fullChecksum, audioChecksum, size: written.size, lastModified, lastVerifiedAt: nowIso, metadata };
 
         records[track.relativePath] = { ...checked, updatedAt: nowIso };
         saved.set(track.id, { ...track, ...checked });

@@ -5,12 +5,12 @@
 // nothing it keeps has changed. See
 // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
 
-import { FSAAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { sameSession, sessionOf, type Session } from "../helpers/session";
 import { library } from "./library";
 import { loadRootSession, saveRootSession } from "./rootSessionStore";
 import { hydrateRoot } from "./roots";
+import { restoreSource } from "./sources";
 
 /**
  * Reopens the roots saved last time that still have permission, in their
@@ -24,12 +24,11 @@ export async function restoreSession(): Promise<void> {
     const reopened: string[] = [];
 
     for (const saved of session.roots) {
-      const vfs = FSAAdapter.fromHandle(saved.handle);
-      if (!(await vfs.ensurePermission())) {
+      const source = await restoreSource(saved.handle).catch(() => null);
+      if (!source) {
         continue;
       }
-      await hydrateRoot(vfs, {
-        rootHandle: saved.handle,
+      await hydrateRoot(source, {
         rootId: saved.id,
         rootLabel: saved.label,
         groupingMode: saved.groupingMode,
@@ -59,7 +58,7 @@ export async function restoreSession(): Promise<void> {
  * reading). Returns the function that stops it.
  */
 export function keepSessionSaved(): () => void {
-  let last: Session<FileSystemDirectoryHandle> | null = null;
+  let last: Session<FileSystemDirectoryHandle | string> | null = null;
 
   return library.$effect(() => {
     // Read first, so the effect wakes on all three.

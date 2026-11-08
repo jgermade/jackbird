@@ -4,15 +4,16 @@
   "version": "../package.json",
   "identifier": "es.germade.jackbird",
   "build": {
-    "frontendDist": "frontend",
-    "beforeBuildCommand": "npm run build && node src-tauri/e0/prepare.mjs"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:8666",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [],
     "security": {
       "csp": null,
-      "assetProtocol": { "enable": true, "scope": ["**"] }
+      "assetProtocol": { "enable": true, "scope": [] }
     }
   },
   "bundle": {

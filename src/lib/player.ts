@@ -3,7 +3,7 @@
 // player. It plays the queue in `playback`, each track from the root it
 // belongs to (a queue spans the open roots), and writes back whether it
 // plays, where it is and how long the track is. It plays the file itself
-// (lib/media.ts), not a copy of its bytes, and opens it again when it is
+// (the root's source: lib/sources/), not a copy of its bytes, and opens it again when it is
 // rewritten (see refresh). The queue's actions (play next, add, move,
 // remove…) are here too; their list logic is helpers/queue.ts.
 
@@ -20,10 +20,9 @@ import {
 } from "../helpers/queue";
 import { parsePlaybackState } from "../helpers/session";
 import { spectrumBands } from "../helpers/spectrum";
-import type { PlaybackQueue, QueueItem } from "../types";
+import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { t } from "./i18n";
 import { library } from "./library";
-import { openMedia, type Media } from "./media";
 import { Opaque } from "./opaque";
 import { playback } from "./playback";
 import { SESSION_KEYS, readSession, writeSession } from "./storage";
@@ -133,12 +132,18 @@ export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
 });
 
 const audio: HTMLAudioElement | null = typeof Audio === "function" ? new Audio() : null;
+// The analyser reads the element only when its media is not cross-origin, as it is from the
+// desktop app's asset protocol on Windows and its local server on Linux (E4-D5): asked for with
+// CORS, those allow it; a blob: URL in the browser is same-origin anyway.
+if (audio) {
+  audio.crossOrigin = "anonymous";
+}
 
 // Bookkeeping, not state: which track the element holds, where its file is,
 // the file it opened, and the date the library gave it then.
 let loadedKey: string | null = null;
 let loaded: { rootId: string; relativePath: string; lastModified?: number } | null = null;
-let media: Media | null = null;
+let media: MediaHandle | null = null;
 
 // After a reload: the track to come back to, where in it, and whether it was
 // playing (see restorePlayback). Taken by the load of that track.
@@ -242,10 +247,10 @@ async function refresh(force = false): Promise<void> {
   }
   refreshing = true;
   try {
-    if (!force && !(await opened.changed(root))) {
+    if (!force && !(await opened.changed())) {
       return;
     }
-    const next = await openMedia(root, target.relativePath);
+    const next = await root.source.openMedia(target.relativePath);
     if (loadedKey !== key || media !== opened) {
       next.release();
       return;
@@ -303,7 +308,7 @@ async function load(current: NowPlaying | null): Promise<void> {
     if (!root) {
       throw new Error(t("playback.folderGone"));
     }
-    const opened = await openMedia(root, current.relativePath);
+    const opened = await root.source.openMedia(current.relativePath);
     if (loadedKey !== key) {
       opened.release();
       return;
