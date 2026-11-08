@@ -7,12 +7,15 @@
 //!   `[::1]`, with its port), so a page elsewhere cannot reach it by pointing its own name at
 //!   127.0.0.1 ("DNS rebinding");
 //! - a request from another site is refused (`Sec-Fetch-Site: cross-site`, or an `Origin` that is
-//!   not the service's), and one that changes anything must come from its own page.
+//!   not the service's), and one that changes anything must come from its own page;
+//! - the desktop app's page, its interface while it is installed (S2), is the one other origin
+//!   answered, with CORS for itself alone.
 //!
 //! The interface's side is `src/lib/sources/service.ts`; the JSON is `jackbird-api`'s, the same
 //! the desktop app speaks.
 
 pub mod config;
+pub mod install;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -139,7 +142,7 @@ struct Info {
 async fn info() -> Json<Info> {
     Json(Info {
         name: "jackbird-service",
-        version: env!("CARGO_PKG_VERSION"),
+        version: env!("JACKBIRD_VERSION"),
     })
 }
 
@@ -382,13 +385,49 @@ async fn guard(State(service): State<Arc<Service>>, request: Request, next: Next
     if !hosts.iter().any(|own| own == host) {
         return refuse("this service answers only on this machine, by its own address");
     }
-    if headers.get("sec-fetch-site").map(HeaderValue::as_bytes) == Some(b"cross-site") {
+    let origin = headers
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    // The desktop app's page, which is the service's interface while it is installed (S2-D4).
+    let desktop = origin.as_deref().filter(|origin| DESKTOP_ORIGINS.contains(origin));
+    if desktop.is_none() && headers.get("sec-fetch-site").map(HeaderValue::as_bytes) == Some(b"cross-site") {
         return refuse("a request from another site");
     }
-    let origin = headers.get(header::ORIGIN).and_then(|value| value.to_str().ok());
     let own_origin = |origin: &str| hosts.iter().any(|own| origin == format!("http://{own}"));
-    if origin.is_some_and(|origin| !own_origin(origin)) {
+    if origin
+        .as_deref()
+        .is_some_and(|origin| !own_origin(origin) && desktop.is_none())
+    {
         return refuse("a request from another origin");
+    }
+    if let Some(desktop) = desktop {
+        let desktop = HeaderValue::from_str(desktop).expect("a known origin");
+        if request.method() == Method::OPTIONS {
+            let mut answer = StatusCode::NO_CONTENT.into_response();
+            let headers = answer.headers_mut();
+            headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, desktop);
+            headers.insert(
+                header::ACCESS_CONTROL_ALLOW_METHODS,
+                HeaderValue::from_static("GET, POST"),
+            );
+            headers.insert(
+                header::ACCESS_CONTROL_ALLOW_HEADERS,
+                HeaderValue::from_static("content-type, range"),
+            );
+            headers.insert(header::ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("600"));
+            headers.insert(header::VARY, HeaderValue::from_static("origin"));
+            return answer;
+        }
+        let mut answer = next.run(request).await;
+        let headers = answer.headers_mut();
+        headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, desktop);
+        headers.insert(
+            header::ACCESS_CONTROL_EXPOSE_HEADERS,
+            HeaderValue::from_static("content-range, content-length, accept-ranges"),
+        );
+        headers.insert(header::VARY, HeaderValue::from_static("origin"));
+        return answer;
     }
     let changes = !matches!(*request.method(), Method::GET | Method::HEAD);
     if changes && origin.is_none() {
@@ -396,6 +435,10 @@ async fn guard(State(service): State<Arc<Service>>, request: Request, next: Next
     }
     next.run(request).await
 }
+
+/// The desktop app's page origins (Tauri v2: `tauri://localhost` on macOS and Linux,
+/// `http://tauri.localhost` on Windows), answered with CORS for themselves alone.
+const DESKTOP_ORIGINS: [&str; 3] = ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"];
 
 /// The service's routes, behind its guards.
 pub fn router(service: Arc<Service>) -> Router {

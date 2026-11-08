@@ -393,3 +393,38 @@ async fn folders_of_the_machine_are_listed_for_the_dialog() {
         (StatusCode::NOT_FOUND, Some("not-found"))
     );
 }
+
+#[tokio::test]
+async fn the_desktop_apps_page_is_answered_with_cors_for_itself_alone() {
+    let app = app();
+    for desktop in ["tauri://localhost", "http://tauri.localhost"] {
+        let (status, headers, _) = call(Method::OPTIONS, "/api/roots")
+            .header("origin", desktop)
+            .header("sec-fetch-site", "cross-site")
+            .on(&app)
+            .await;
+        assert_eq!(status, StatusCode::NO_CONTENT, "{desktop}");
+        assert_eq!(headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], desktop);
+        let (status, headers, _) = call(Method::GET, "/api/roots")
+            .header("origin", desktop)
+            .header("sec-fetch-site", "cross-site")
+            .on(&app)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{desktop}");
+        assert_eq!(headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], desktop);
+        let open = call(Method::POST, "/api/roots")
+            .header("origin", desktop)
+            .json(json!({ "path": library() }));
+        assert_eq!(open.on(&app).await.0, StatusCode::OK, "{desktop}");
+    }
+    // Its own page gets no CORS headers; another origin, even one like the app's, nothing.
+    let (_, headers, _) = call(Method::GET, "/api/roots").on(&app).await;
+    assert!(headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
+    for other in ["tauri://evil", "http://tauri.localhost.evil.example", "null"] {
+        assert_eq!(
+            call(Method::GET, "/api/roots").header("origin", other).on(&app).await.0,
+            StatusCode::FORBIDDEN,
+            "{other}"
+        );
+    }
+}
