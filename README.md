@@ -53,6 +53,10 @@ interface: `make desktop` starts it in development mode, and `make desktop-build
 installers. Each release attaches them, unsigned for now, so macOS and Windows warn when they are
 opened. On Linux it needs WebKitGTK (see [Development](docs/development.md)).
 
+And as a service: `make service` builds `jackbird-service`, one binary with the web inside, and
+starts it on <http://localhost:4646>. Its page opens folders of the machine it runs on, in any
+browser. For now it is open and answers only on that machine; signing in comes later.
+
 ## Documentation
 
 - [Using jackbird](docs/usage.md)

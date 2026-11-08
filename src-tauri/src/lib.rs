@@ -11,9 +11,9 @@ mod media;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use jackbird_core::{Entry, Error, Inspection, Root, Stat};
-use jackbird_tags::{Cover, CoverEdit, Edit};
-use serde::{Deserialize, Serialize};
+use jackbird_api::{EntryJson, Failure, InspectionJson, Metadata, Opened, StatJson, edit_for, failure};
+use jackbird_core::{Error, Root};
+use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
@@ -32,29 +32,6 @@ enum Media {
 
 type Answer<T> = Result<T, Failure>;
 
-/// An error as the interface gets it: a code for its texts, and a message.
-#[derive(Serialize)]
-struct Failure {
-    code: String,
-    message: String,
-}
-
-impl From<Error> for Failure {
-    fn from(error: Error) -> Self {
-        Failure {
-            code: error.code().into(),
-            message: error.to_string(),
-        }
-    }
-}
-
-fn failure(code: &str, message: impl Into<String>) -> Failure {
-    Failure {
-        code: code.into(),
-        message: message.into(),
-    }
-}
-
 fn root_of(roots: &State<'_, Roots>, root: &str) -> Answer<Root> {
     roots
         .0
@@ -71,13 +48,6 @@ async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, Error> + S
         .await
         .map_err(|error| failure("io", error.to_string()))?
         .map_err(Failure::from)
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Opened {
-    path: String,
-    name: String,
 }
 
 /// Registers a folder as an open root, and lets the asset protocol reach it where it is used.
@@ -131,42 +101,6 @@ fn open_root(app: AppHandle, path: String) -> Answer<Opened> {
 fn close_root(roots: State<'_, Roots>, root: String) {
     if let Ok(mut open) = roots.0.lock() {
         open.remove(&root);
-    }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct StatJson {
-    kind: &'static str,
-    size: u64,
-    mtime: u64,
-}
-
-impl From<Stat> for StatJson {
-    fn from(stat: Stat) -> Self {
-        StatJson {
-            kind: if stat.folder { "directory" } else { "file" },
-            size: stat.size,
-            mtime: stat.mtime,
-        }
-    }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct EntryJson {
-    name: String,
-    path: String,
-    stat: StatJson,
-}
-
-impl From<Entry> for EntryJson {
-    fn from(entry: Entry) -> Self {
-        EntryJson {
-            name: entry.name,
-            path: entry.path,
-            stat: entry.stat.into(),
-        }
     }
 }
 
@@ -261,56 +195,6 @@ async fn mkdir(roots: State<'_, Roots>, root: String, path: String) -> Answer<()
     blocking(move || root.mkdir(&path)).await
 }
 
-/// The tags as the interface keeps them (`TrackMetadata`), the cover a data URL.
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct Metadata {
-    title: String,
-    artist: String,
-    album: String,
-    year: String,
-    genre: String,
-    track_number: String,
-    cover_data_url: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InspectionJson {
-    size: u64,
-    last_modified: u64,
-    full_checksum: String,
-    audio_checksum: String,
-    metadata: Option<Metadata>,
-}
-
-impl From<Inspection> for InspectionJson {
-    fn from(found: Inspection) -> Self {
-        InspectionJson {
-            size: found.stat.size,
-            last_modified: found.stat.mtime,
-            full_checksum: found.full_checksum,
-            audio_checksum: found.audio_checksum,
-            metadata: found.tags.map(|(fields, cover)| Metadata {
-                title: fields.title,
-                artist: fields.artist,
-                album: fields.album,
-                year: fields.year,
-                genre: fields.genre,
-                track_number: fields.track,
-                cover_data_url: cover.map(|cover| {
-                    let mime = if cover.mime.is_empty() {
-                        "image/jpeg"
-                    } else {
-                        &cover.mime
-                    };
-                    format!("data:{mime};base64,{}", jackbird_core::base64_encode(&cover.data))
-                }),
-            }),
-        }
-    }
-}
-
 /// A file's size, date and checksums, and its tags unless its full checksum is still `known`.
 #[tauri::command]
 async fn inspect(roots: State<'_, Roots>, root: String, path: String, known: Option<String>) -> Answer<InspectionJson> {
@@ -318,39 +202,6 @@ async fn inspect(roots: State<'_, Roots>, root: String, path: String, known: Opt
     blocking(move || jackbird_core::inspect(&root, &path, known.as_deref()))
         .await
         .map(Into::into)
-}
-
-/// A data URL's picture, or `None` when it is not a base64 data URL.
-fn cover_of(url: &str) -> Option<Cover> {
-    let (head, data) = url.strip_prefix("data:")?.split_once(',')?;
-    let mime = head.strip_suffix(";base64")?.split(';').next().unwrap_or("");
-    Some(Cover {
-        data: jackbird_core::base64_decode(data)?,
-        mime: if mime.is_empty() {
-            "image/jpeg".into()
-        } else {
-            mime.into()
-        },
-    })
-}
-
-/// The edit that writes `metadata` over the tags the library held (`previous`), as
-/// `editFor` (`src/helpers/cover.ts`) makes it in the browser.
-fn edit_for(previous: &Metadata, metadata: Metadata) -> Edit {
-    let cover = match (&previous.cover_data_url, &metadata.cover_data_url) {
-        (before, now) if before == now => CoverEdit::Keep,
-        (_, None) => CoverEdit::Remove,
-        (_, Some(url)) => cover_of(url).map_or(CoverEdit::Keep, CoverEdit::Set),
-    };
-    Edit {
-        title: Some(metadata.title),
-        artist: Some(metadata.artist),
-        album: Some(metadata.album),
-        year: Some(metadata.year),
-        genre: Some(metadata.genre),
-        track: Some(metadata.track_number),
-        cover,
-    }
 }
 
 /// Writes new tags into a file; the file as it is after.
@@ -457,45 +308,6 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn metadata(cover: Option<&str>) -> Metadata {
-        Metadata {
-            title: "T".into(),
-            artist: String::new(),
-            album: String::new(),
-            year: String::new(),
-            genre: String::new(),
-            track_number: "1".into(),
-            cover_data_url: cover.map(Into::into),
-        }
-    }
-
-    #[test]
-    fn edits_keep_set_or_remove_the_cover_as_the_browser_does() {
-        let png = "data:image/png;base64,AQI=";
-        assert_eq!(
-            edit_for(&metadata(Some(png)), metadata(Some(png))).cover,
-            CoverEdit::Keep
-        );
-        assert_eq!(edit_for(&metadata(None), metadata(None)).cover, CoverEdit::Keep);
-        assert_eq!(edit_for(&metadata(Some(png)), metadata(None)).cover, CoverEdit::Remove);
-        assert_eq!(
-            edit_for(&metadata(None), metadata(Some(png))).cover,
-            CoverEdit::Set(Cover {
-                data: vec![1, 2],
-                mime: "image/png".into()
-            })
-        );
-        assert_eq!(
-            edit_for(&metadata(None), metadata(Some("blob:x"))).cover,
-            CoverEdit::Keep
-        );
-        let edit = edit_for(&metadata(None), metadata(None));
-        assert_eq!((edit.title.as_deref(), edit.track.as_deref()), (Some("T"), Some("1")));
-        assert_eq!(cover_of("data:;base64,AQ==").unwrap().mime, "image/jpeg");
-        assert_eq!(cover_of("data:image/png;name=a;base64,AQ==").unwrap().mime, "image/png");
-        assert!(cover_of("data:image/png,raw").is_none());
-    }
 
     #[test]
     fn headers_are_percent_decoded() {

@@ -121,6 +121,20 @@ of the app (`src-tauri/src/lib.rs`) over `crates/core`:
 
 `crates/core` has no Tauri in it: the service (S1, planned) will put it behind HTTP.
 
+## The service
+
+`jackbird-service` (`crates/service`, since S1) puts `crates/core` behind HTTP and serves the web
+build from the same origin, so a browser on the machine uses folders of it with no File System
+Access API. The page finds it by asking `/api/info` (`src/lib/platform.ts`); its roots are then
+`src/lib/sources/service.ts`, and a folder is chosen in a dialog of the machine's folders
+(`src/views/folder-dialog.html`). The JSON is `crates/api`'s, the same the desktop app speaks.
+
+Until sign-in comes (S3) it is open, so it keeps to the machine: it listens on the loopback
+address only; every request must name it by its own address and port (`Host`), which keeps out a
+page that points its own name at 127.0.0.1; a request from another site is refused
+(`Sec-Fetch-Site`, `Origin`), and one that changes anything must come from its own page. Its
+configuration keeps its port (4646) and its open folders, which it reopens when it starts.
+
 ## Layers
 
 The UI is made of [jq79](https://github.com/jgermade/jq79) components, and the code lives in four

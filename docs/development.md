@@ -71,6 +71,19 @@ reached through `crates/core` by path (see [Architecture](architecture.md#the-de
 | `make desktop-test` | The app's lints and tests (`cargo clippy -p jackbird`, `cargo test -p jackbird`). |
 | `node scripts/desktop-check.mjs target/release/jackbird` | The unattended check `desktop.yml` runs on the three systems (under `xvfb-run -a` on a Linux machine without a display): the fixtures opened, read, a title saved, an MP3 and a FLAC played, the library reopened after a restart. |
 
+## The service
+
+`crates/service` is `jackbird-service` (S1): `crates/core` behind HTTP (axum), with the web build
+embedded in a release binary (`npm run build` first) and served from the same origin (see
+[Architecture](architecture.md#the-service)).
+
+| Command | What it does |
+| --- | --- |
+| `npm run service` (`make service`) | The web build, then the service in release mode on <http://localhost:4646>. |
+| `jackbird-service [--port N] [--config PATH]` | The binary: its configuration (the port, the open folders) is `~/.config/jackbird/service.json` on Linux, `~/Library/Application Support/jackbird/service.json` on macOS, `%APPDATA%\jackbird\service.json` on Windows, or `JACKBIRD_SERVICE_CONFIG`. |
+| `cargo test -p jackbird-service` | Its tests, through its router. |
+| `node scripts/service-check.cjs target/release/jackbird-service [a long FLAC]` | The unattended check `service.yml` runs on the three systems: Chromium (Playwright) on its page opens a folder, saves a title, plays, and finds the folder again after a restart. |
+
 ## Translations
 
 The interface is in English (the source and the fallback) and Spanish. No text is written inline:

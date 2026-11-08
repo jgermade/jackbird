@@ -3,7 +3,7 @@
 # RECORD/2026-08-11.musikmatch-rust-migration.WIP.md, 21:45 to 22:20).
 # src-tauri/ (the desktop app) joined in E4.
 [workspace]
-members = ["crates/id3", "crates/flac", "crates/tags", "crates/tags-wasm", "crates/core", "src-tauri"]
+members = ["crates/id3", "crates/flac", "crates/tags", "crates/tags-wasm", "crates/core", "crates/api", "crates/service", "src-tauri"]
 resolver = "3"
 
 [workspace.package]

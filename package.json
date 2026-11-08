@@ -19,7 +19,8 @@
     "test:coverage": "node scripts/check-coverage.mjs .tmp/coverage/lcov.info 90",
     "build:wasm": "node scripts/build-wasm.mjs --force",
     "desktop": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "service": "npm run build && cargo run --release -p jackbird-service --locked"
   },
   "dependencies": {
     "@cloudauthn/vfs-sync": "^0.2.0",

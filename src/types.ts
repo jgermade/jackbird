@@ -164,7 +164,7 @@ export type MediaHandle = {
  * the IPC). See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4-D1, E4-D2).
  */
 export type RootSource = {
-  readonly kind: "browser" | "desktop";
+  readonly kind: "browser" | "desktop" | "service";
   /** The small-file adapter: `.meta/`, playlists, renames, deletes. */
   readonly vfs: VFSAdapter;
   /** What the session keeps to reopen it: a directory handle, or a path. */

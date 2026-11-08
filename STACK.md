@@ -74,6 +74,11 @@ This document describes the technical stack and codebase architecture implemente
   Linux, WebView2 on Windows), files through `crates/core` by path, playback from the asset
   protocol or, on Linux, a local server. Bundles: `.dmg`, NSIS, `.deb` and AppImage, unsigned.
 
+### Service
+- **`jackbird-service`** (`crates/service`): axum 0.8.9 on tokio 1.54.1, `tower-http` 0.7.1 for
+  ranged file reads, the web build embedded with `rust-embed` 8.13.0; the JSON of `crates/api`
+  (serde). One binary per system, built by `service.yml`.
+
 ### Build Tools & Tooling
 - **Bundler & Dev Server**: Vite (`^5.4.8`), with two entries: the app (`index.html`) and the
   theme demo (`theme/default/index.html`).

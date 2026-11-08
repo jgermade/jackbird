@@ -15,8 +15,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.7.4", features = [] }
 
 [dependencies]
+jackbird-api = { path = "../crates/api" }
 jackbird-core = { path = "../crates/core" }
-jackbird-tags = { path = "../crates/tags" }
 tauri = { version = "=2.12.5", features = ["protocol-asset"] }
 tauri-plugin-dialog = "=2.8.4"
 serde = { version = "1", features = ["derive"] }

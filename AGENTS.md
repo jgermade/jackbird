@@ -34,7 +34,8 @@ given the ranges of a file they ask for (its head and its last bytes) and return
 splice: the tags to put in place of the old ones); the audio never passes through them. `crates/core` is the one crate that touches the file system,
 by design: open folders (roots) and the paths under them (none leads out, links included), and
 tags, checksums and saves on files, streamed, never holding the audio in memory; the desktop app
-wraps it in commands, and the service will wrap it in HTTP. The tag crates depend on nothing but
+wraps it in commands, and the service (`crates/service`) in HTTP, both speaking `crates/api`'s
+JSON. The tag crates depend on nothing but
 each other (`crates/core` adds `sha1`); a dependency in `[dev-dependencies]` is for
 tests only. `crates/tags-wasm` is the web app's WebAssembly module, built by
 `scripts/build-wasm.mjs` (not committed); its exports' `#[unsafe(no_mangle)]` is the only unsafe

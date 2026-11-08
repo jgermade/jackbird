@@ -1,0 +1,85 @@
+<script :setup lang="ts">
+  // Choosing a folder of the machine jackbird's service runs on (S1-D5): its
+  // subfolders to go into, the way up, and "Open this folder". Shown only
+  // when the page is served by the service. A view over lib/folders.ts. See
+  // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S1).
+
+  const Modal = await import("../../theme/default/components/modal.html")
+  const Key = await import("../../theme/default/components/key.html")
+
+  const { t } = await import("../lib/i18n")
+  const { cancelFolderChoice, chooseThisFolder, enterFolder, folderPicker } = await import("../lib/folders")
+
+  type Folder = { name: string; path: string }
+  const here = () => folderPicker.here
+  const folders = (): Folder[] => here()?.folders ?? []
+</script>
+
+<div class="folder-dialog">
+  <Modal :open="folderPicker.open" :eyebrow="t('folders.eyebrow')" :title="t('folders.title')" size="sm" :close-label="t('folders.close')" @close="cancelFolderChoice()">
+    <div class="body">
+      <div class="where">
+        <Key size="sm" variant="ghost" :disabled="!here()?.parent || folderPicker.busy" :label="t('folders.up')" :title="t('folders.up')" @click="enterFolder(here()?.parent ?? undefined)">↑</Key>
+        <span class="path" :title="here()?.path ?? ''">{{ here()?.path ?? "" }}</span>
+      </div>
+      <p :if="folderPicker.error" class="failure">{{ folderPicker.error }}</p>
+      <p :if="here() && folders().length === 0" class="hint">{{ t("folders.none") }}</p>
+      <ul :if="folders().length > 0" class="list">
+        <li :each="folder in folders()" :key="folder.path">
+          <button type="button" class="choice" :disabled="folderPicker.busy" @click="enterFolder(folder.path)">
+            <span class="name">{{ folder.name }}</span>
+            <span class="meta">›</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <template :slot.foot>
+      <span class="keys">
+        <Key variant="ghost" @click="cancelFolderChoice()">{{ t("editor.cancel") }}</Key>
+        <Key variant="primary" :disabled="!here() || folderPicker.busy" @click="chooseThisFolder()">{{ t("folders.open") }}</Key>
+      </span>
+    </template>
+  </Modal>
+</div>
+
+<style scoped>
+  .folder-dialog { display: contents; }
+  .body { display: grid; gap: var(--mm-space-3); }
+  .where { display: flex; align-items: center; gap: var(--mm-space-2); min-width: 0; }
+  .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); color: var(--mm-fg-muted); direction: rtl; text-align: left; }
+  .list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    max-height: 20rem;
+    overflow-y: auto;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    list-style: none;
+  }
+  .list li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .choice {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mm-space-3);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    font: inherit;
+    font-size: var(--mm-text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  @media (hover: hover) { .choice:hover:not(:disabled) { background: var(--mm-hover); } }
+  .choice:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .choice:disabled { opacity: .45; cursor: default; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { flex: none; color: var(--mm-fg-subtle); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+  .keys { display: flex; justify-content: flex-end; gap: var(--mm-space-2); width: 100%; }
+</style>
