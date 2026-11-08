@@ -11,9 +11,17 @@ import { TagError } from "../tags";
 
 type Failure = { code?: string; message?: string };
 
+/** Where the service is: the page's own origin, or, in the desktop app, its address (S2). */
+let base = "";
+
+/** Asks the service at this address (`http://127.0.0.1:4646`) instead of the page's own origin. */
+export function useServiceAt(address: string): void {
+  base = address.replace(/\/$/, "");
+}
+
 /** One request to the service; its failure becomes a TagError with the service's code. */
 async function api(path: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(`/api/${path}`, init);
+  const response = await fetch(`${base}/api/${path}`, init);
   if (!response.ok) {
     const failure: Failure = await response.json().catch(() => ({}));
     throw new TagError(failure.code ?? "io", failure.message ?? `${response.status} ${response.statusText}`);
@@ -62,7 +70,7 @@ function serviceSource(root: string, name: string): RootSource {
     async openMedia(path): Promise<MediaHandle> {
       const before = await vfs.stat(path);
       return {
-        url: `/api/media?${at(root, path)}`,
+        url: `${base}/api/media?${at(root, path)}`,
         changed: async () => {
           const now = await vfs.stat(path);
           return now?.size !== before?.size || now?.mtime !== before?.mtime;

@@ -5,7 +5,7 @@
 //! jackbird-service [--port N] [--config PATH]           serve (the default)
 //! jackbird-service install [--with-system] [--user NAME --uid N --home PATH --config PATH]
 //!                          [--password-file PATH]        (Windows, with the system)
-//! jackbird-service uninstall | start | stop | status    (status: one line of JSON)
+//! jackbird-service uninstall | update | start | stop | status    (status: one line of JSON)
 //! jackbird-service --version
 //! ```
 //!
@@ -19,7 +19,7 @@ use jackbird_service::install::{self, Os, Person, Way};
 
 fn usage() -> ! {
     eprintln!(
-        "usage: jackbird-service [--port N] [--config PATH]\n       jackbird-service install [--with-system] [--user NAME --uid N --home PATH --config PATH] [--password-file PATH]\n       jackbird-service uninstall | start | stop | status | --version"
+        "usage: jackbird-service [--port N] [--config PATH]\n       jackbird-service install [--with-system] [--user NAME --uid N --home PATH --config PATH] [--password-file PATH]\n       jackbird-service uninstall | update | start | stop | status | --version"
     );
     std::process::exit(2);
 }
@@ -79,7 +79,12 @@ fn person(flags: &[(String, String)]) -> Person {
         user: user.unwrap_or_else(|| fail("install", "who the service is for is not known (--user)")),
         uid,
         home: home.unwrap_or_else(|| fail("install", "the home folder is not known (--home)")),
-        config: flag(flags, "--config").map_or_else(config::default_path, PathBuf::from),
+        // Run as an administrator for a person (`--home`), their own configuration, not root's.
+        config: match (flag(flags, "--config"), flag(flags, "--home")) {
+            (Some(path), _) => PathBuf::from(path),
+            (None, Some(home)) => config::path_in(std::path::Path::new(home)),
+            (None, None) => config::default_path(),
+        },
     }
 }
 
@@ -161,6 +166,10 @@ fn main() {
         Some("uninstall") => match install::uninstall(os, &person(&flags(&args[1..]))) {
             Ok(way) => println!("{}", serde_json::json!({ "uninstalled": way })),
             Err(why) => fail("uninstall", why),
+        },
+        Some("update") => match install::update(os, &person(&flags(&args[1..]))) {
+            Ok(way) => println!("{}", serde_json::json!({ "updated": way })),
+            Err(why) => fail("update", why),
         },
         Some(command @ ("start" | "stop")) => {
             match install::start_or_stop(os, &person(&flags(&args[1..])), command == "start") {

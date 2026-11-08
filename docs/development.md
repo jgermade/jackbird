@@ -81,7 +81,9 @@ embedded in a release binary (`npm run build` first) and served from the same or
 | --- | --- |
 | `npm run service` (`make service`) | The web build, then the service in release mode on <http://localhost:4646>. |
 | `jackbird-service [--port N] [--config PATH]` | The binary: its configuration (the port, the open folders) is `~/.config/jackbird/service.json` on Linux, `~/Library/Application Support/jackbird/service.json` on macOS, `%APPDATA%\jackbird\service.json` on Windows, or `JACKBIRD_SERVICE_CONFIG`. |
-| `cargo test -p jackbird-service` | Its tests, through its router. |
+| `jackbird-service install [--with-system]`, `uninstall`, `update`, `start`, `stop`, `status` | Installs it the way the system starts things, as the person running it: at logon (a systemd user unit, a launchd agent, a task at logon) or, as an administrator, with the system (a systemd system unit with `User=`, a launchd daemon with `UserName`, a Windows service logged on as the person: `--password-file`). `status` is a line of JSON. Linux needs systemd. |
+| `node scripts/sidecar.mjs` | Builds the service in release mode and copies it to `src-tauri/binaries/` for the desktop app to carry (`externalBin`); `tauri.conf.json` runs it before every build. |
+| `cargo test -p jackbird-service` | Its tests, through its router, and the files each system's installation writes. |
 | `node scripts/service-check.cjs target/release/jackbird-service [a long FLAC]` | The unattended check `service.yml` runs on the three systems: Chromium (Playwright) on its page opens a folder, saves a title, plays, and finds the folder again after a restart. |
 
 ## Translations

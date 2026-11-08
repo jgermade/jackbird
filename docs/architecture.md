@@ -135,6 +135,15 @@ page that points its own name at 127.0.0.1; a request from another site is refus
 (`Sec-Fetch-Site`, `Origin`), and one that changes anything must come from its own page. Its
 configuration keeps its port (4646) and its open folders, which it reopens when it starts.
 
+The desktop app carries the service's binary beside its own and installs it from its
+Preferences (S2, `src-tauri/src/service.rs` running `jackbird-service install` and its kin;
+`crates/service/src/install.rs` knows each system): at logon, or with the system through the
+system's own prompt, always running as the person. While it is installed the app is only its
+interface (`src/lib/desktop-service.ts`): its roots are the service's, reached over HTTP from the
+app's page, which the service answers with CORS for that page alone; a stopped service is started,
+never replaced by the app's own backend behind the person's back. When the app's copy is newer than
+the installed one, it says so and offers Update.
+
 ## Layers
 
 The UI is made of [jq79](https://github.com/jgermade/jq79) components, and the code lives in four

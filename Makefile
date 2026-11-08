@@ -31,6 +31,7 @@ service: node_modules/.package-lock.json
 	npm run service
 
 desktop-test:
+	npm run build && node scripts/sidecar.mjs
 	cargo clippy -p jackbird --all-targets --locked -- -D warnings
 	cargo test -p jackbird --locked
 

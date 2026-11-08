@@ -1,17 +1,37 @@
 <script :setup lang="ts">
   // The preferences, in a dialog: the tone (Silver or Graphite) and the
-  // interface language, each language named in itself. A view over
-  // lib/preferences.ts. See RECORD/2026-11-03.deck-design-system.WIP.md
-  // (steps 6 and 7).
+  // interface language, each language named in itself; in the desktop app,
+  // the service (S2): its state, and Install (at logon, or with the system),
+  // Start, Update and Uninstall. A view over lib/preferences.ts and
+  // lib/desktop-service.ts. See RECORD/2026-11-03.deck-design-system.WIP.md
+  // (steps 6 and 7) and RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S2).
 
   const Field = await import("../../theme/default/components/field.html")
   const Modal = await import("../../theme/default/components/modal.html")
   const Select = await import("../../theme/default/components/select.html")
   const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { languageName, t } = await import("../lib/i18n")
   const { LANGUAGES, preferences, setLanguage, setTheme } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
+  const { isDesktop } = await import("../lib/platform")
+  const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
+
+  // On Windows, starting with the system runs the service as the person: Windows asks for their password.
+  const onWindows = /Windows/.test(navigator.userAgent)
+  let password: string = ""
+  const opened = (open: boolean) => {
+    if (open && isDesktop) void refreshServiceStatus()
+  }
+  $: opened(ui.preferencesOpen)
+  const way = (): string => (serviceState.status?.installed === "system" ? t("service.waySystem") : t("service.wayLogon"))
+  const stateText = (): string => {
+    const status = serviceState.status
+    if (!status?.installed) return t("service.none")
+    return status.running ? t("service.running", { way: way(), address: `http://localhost:${status.port}` }) : t("service.stopped", { way: way() })
+  }
 
   $: isDark = preferences.theme === "dark"
   const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
@@ -26,6 +46,27 @@
           <p>{{ isDark ? t("preferences.darkOn") : t("preferences.lightOn") }}</p>
         </div>
         <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
+      </section>
+      <section :if="isDesktop" class="pref service">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("service.title") }}</h3>
+          <p>{{ t("service.about") }}</p>
+          <p class="state">{{ stateText() }}</p>
+        </div>
+        <p :if="serviceState.error" class="failure">{{ serviceState.error }}</p>
+        <div :if="!serviceState.status?.installed" class="install">
+          <Key :disabled="serviceState.busy" @click="installService(false)">{{ t("service.install") }}</Key>
+          <Field :if="onWindows" :label="t('service.password')" control="service-password" :hint="t('service.passwordHint')">
+            <TextInput id="service-password" type="password" autocomplete="current-password" :model="password" @input="password = $event.detail" />
+          </Field>
+          <Key variant="ghost" :disabled="serviceState.busy || (onWindows && !password)" :title="t('service.systemHint')" @click="installService(true, password)">{{ t("service.installSystem") }}</Key>
+          <p class="hint">{{ t("service.systemHint") }}</p>
+        </div>
+        <div :else class="keys">
+          <Key :if="serviceState.updateAvailable" variant="primary" :disabled="serviceState.busy" @click="updateService()">{{ t("service.update") }}</Key>
+          <Key :if="!serviceState.status?.running" :disabled="serviceState.busy" @click="startService()">{{ t("service.start") }}</Key>
+          <Key variant="danger" :disabled="serviceState.busy" @click="uninstallService()">{{ t("service.uninstall") }}</Key>
+        </div>
       </section>
       <section class="pref">
         <Field :label="t('preferences.language')" control="preferences-language" :hint="t('preferences.languageHint')">
@@ -44,4 +85,10 @@
   .text { display: grid; gap: var(--mm-space-1); }
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .service { display: grid; gap: var(--mm-space-3); }
+  .service .state { color: var(--mm-fg); }
+  .install { display: grid; gap: var(--mm-space-2); justify-items: start; }
+  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
 </style>

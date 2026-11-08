@@ -12,7 +12,7 @@ import { isAudioFile } from "../../helpers/formats";
 import { emptyMetadata } from "../../helpers/metadata";
 import { library } from "../library";
 import { hydrateRoot } from "../roots";
-import { restoreDesktopSource } from "./desktop";
+import { restoreSource } from "./index";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -69,7 +69,7 @@ export async function runCheckIfAsked(): Promise<void> {
   }
   const report: Record<string, unknown> = { folder, userAgent: navigator.userAgent, drawn: Boolean(document.querySelector("#app")?.children.length) };
   try {
-    const source = await restoreDesktopSource(folder);
+    const source = await restoreSource(folder);
     if (!source) {
       throw new Error("the folder could not be opened");
     }

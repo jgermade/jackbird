@@ -7,6 +7,7 @@
 //! The interface's side is `src/lib/sources/desktop.ts`.
 
 mod media;
+mod service;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -291,7 +292,13 @@ pub fn run() {
             media_url,
             check_folder,
             check_restore,
-            check_report
+            check_report,
+            service::service_status,
+            service::service_install,
+            service::service_uninstall,
+            service::service_update,
+            service::service_start,
+            service::choose_folder
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))

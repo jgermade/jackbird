@@ -74,3 +74,16 @@ pub fn default_path() -> PathBuf {
     };
     base.join("jackbird").join("service.json")
 }
+
+/// The configuration of the person whose home this is, as `default_path` finds it when they run
+/// it: for installing with the system, which runs as an administrator, for them.
+pub fn path_in(home: &Path) -> PathBuf {
+    let base = if cfg!(windows) {
+        home.join("AppData").join("Roaming")
+    } else if cfg!(target_os = "macos") {
+        home.join("Library/Application Support")
+    } else {
+        home.join(".config")
+    };
+    base.join("jackbird").join("service.json")
+}

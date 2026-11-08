@@ -51,6 +51,9 @@ for (const extension of [".mp3", ".flac"]) {
   if (!played || played.error || !(played.played > 0)) problems.push(`${extension} did not play: ${JSON.stringify(played)}`);
 }
 const shown = (holding) => (holding ?? []).find((root) => root.path === folder);
+// With the service installed (S2), the app is its interface: its roots are the service's.
+const kind = process.env.JACKBIRD_CHECK_KIND ?? "desktop";
+if (shown(report.library)?.kind !== kind) problems.push(`the root is ${shown(report.library)?.kind}, not ${kind}`);
 if (shown(report.library)?.tracks !== audio.length) problems.push(`the library shows ${JSON.stringify(report.library)}`);
 if (shown(restored.restored)?.tracks !== audio.length) problems.push(`after a restart: ${JSON.stringify(restored.restored)}`);
 if (problems.length > 0) {

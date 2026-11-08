@@ -427,21 +427,64 @@ fn utf16(text: &str) -> Vec<u8> {
     out
 }
 
-/// Copies the binary to its place (over an older one, which the caller stopped first).
+/// Copies the binary to its place: written beside it and renamed over it, so an older one still
+/// running is replaced whole (and keeps running until it is restarted).
 pub fn copy_binary(from: &Path, to: &Path) -> Result<(), String> {
+    if from == to {
+        return Ok(());
+    }
     if let Some(parent) = to.parent() {
         std::fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
     }
-    if from != to {
-        std::fs::copy(from, to).map_err(|error| format!("{}: {error}", to.display()))?;
-    }
+    let beside = to.with_extension("new");
+    std::fs::copy(from, &beside).map_err(|error| format!("{}: {error}", beside.display()))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(to, std::fs::Permissions::from_mode(0o755))
-            .map_err(|error| format!("{}: {error}", to.display()))?;
+        std::fs::set_permissions(&beside, std::fs::Permissions::from_mode(0o755))
+            .map_err(|error| format!("{}: {error}", beside.display()))?;
     }
-    Ok(())
+    std::fs::rename(&beside, to).map_err(|error| {
+        let _ = std::fs::remove_file(&beside);
+        format!("{}: {error}", to.display())
+    })
+}
+
+/// The commands that restart it, installed this way (after its binary was replaced).
+pub fn restart(os: Os, way: Way, person: &Person) -> Vec<Vec<String>> {
+    match (os, way) {
+        (Os::Linux, Way::Logon) => vec![vec![s("systemctl"), s("--user"), s("restart"), s(UNIT)]],
+        (Os::Linux, Way::System) => vec![vec![s("systemctl"), s("restart"), s(UNIT)]],
+        (Os::Macos, Way::Logon) => vec![vec![
+            s("launchctl"),
+            s("kickstart"),
+            s("-k"),
+            format!("gui/{}/{LABEL}", person.uid),
+        ]],
+        (Os::Macos, Way::System) => vec![vec![s("launchctl"), s("kickstart"), s("-k"), format!("system/{LABEL}")]],
+        (Os::Windows, way) => vec![control(os, way, person, false), control(os, way, person, true)],
+    }
+}
+
+/// Replaces the installed binary with this one and restarts it. On Windows it is stopped first,
+/// since a running program's file cannot be replaced there.
+pub fn update(os: Os, person: &Person) -> Result<Way, String> {
+    let way = installed(os, person).ok_or("the service is not installed")?;
+    let here = std::env::current_exe().map_err(|error| format!("this binary: {error}"))?;
+    let commands = restart(os, way, person);
+    if os == Os::Windows {
+        let _ = run_command(&commands[0]);
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+    copy_binary(&here, &binary_path(os, way, person))?;
+    for command in if os == Os::Windows {
+        &commands[1..]
+    } else {
+        &commands[..]
+    } {
+        run_command(command)?;
+    }
+    Ok(way)
 }
 
 /// Uninstalls whichever way it is installed: stopped, unregistered, the registration and the
@@ -607,6 +650,36 @@ mod tests {
             ["sc.exe", "delete", "jackbird-service"]
         );
         assert_eq!(utf16("A")[..], [0xff, 0xfe, b'A', 0]);
+    }
+
+    #[test]
+    fn restarting_after_an_update() {
+        assert_eq!(
+            restart(Os::Linux, Way::Logon, &person()),
+            [["systemctl", "--user", "restart", "jackbird.service"]]
+        );
+        assert_eq!(
+            restart(Os::Macos, Way::System, &person()),
+            [["launchctl", "kickstart", "-k", "system/es.germade.jackbird.service"]]
+        );
+        assert_eq!(
+            restart(Os::Windows, Way::Logon, &person())[0],
+            ["schtasks", "/End", "/TN", "jackbird-service"]
+        );
+    }
+
+    #[test]
+    fn a_binary_is_replaced_whole() {
+        let folder = std::env::temp_dir().join(format!("jackbird-copy-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let (from, to) = (folder.join("new"), folder.join("bin/jackbird-service"));
+        std::fs::write(&from, b"new").unwrap();
+        copy_binary(&from, &to).unwrap();
+        std::fs::write(&from, b"newer").unwrap();
+        copy_binary(&from, &to).unwrap();
+        assert_eq!(std::fs::read(&to).unwrap(), b"newer");
+        assert!(!to.with_extension("new").exists());
+        copy_binary(&to, &to).unwrap();
     }
 
     #[test]
