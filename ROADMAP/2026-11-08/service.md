@@ -19,7 +19,7 @@ gantt
   axisFormat %d %b
   section Service
     S1 The service over local folders              :done, s1, 2026-11-08, 1d
-    S2 Install from the desktop app                :s2, after s1, 5d
+    S2 Install from the desktop app                :done, s2, after s1, 1d
     S3 Sign-in and people                          :s3, after s2, 8d
     S4 The online route                            :s4, after s3, 4d
   section Then
@@ -29,7 +29,7 @@ gantt
 | Step | Scope | Done when |
 | --- | --- | --- |
 | S1 The service (**done**, 2026-11-08; CI on the three systems, the owner's run by hand pending) | `crates/core` behind HTTP (axum) over local folders: the desktop's operations (walk, inspect, save, small files), ranged reads for playback, the web build served from it; one person, open, on the machine only | the web, served by the service, opens a folder on the machine, plays, edits and reopens it after a restart of the service, on the three systems |
-| S2 Install | from the desktop app: the service's binary put in place and registered the way each system starts things (a systemd user unit, a launchd agent, a Windows service or a task at logon), started, stopped, removed; the app only an interface while it is installed | the desktop app installs the service, uses it, and removes it, on the three systems |
+| S2 Install (**done**, 2026-11-08; CI on the three systems, Windows' "with the system" by hand pending) | from the desktop app: the service's binary put in place and registered the way each system starts things (a systemd user unit, a launchd agent, a Windows service or a task at logon), started, stopped, removed; the app only an interface while it is installed | the desktop app installs the service, uses it, and removes it, on the three systems |
 | S3 Sign-in and people | the two switches (sign-in, several people) in the interface; SMTP set up from it; one-time codes by email to sign up and sign in; passkeys on the instance's own address; roles; the first owner's console code | with sign-in on, two people with different roles each do what the role allows and nothing more |
 | S4 The online route | an outbound SSH connection to an online server, forwarding the service's port (a reverse tunnel, as intergate does), kept up by the service and set up from the interface | the service is reached from outside home through an online server, with nothing opened at home |
 
