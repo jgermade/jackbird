@@ -540,13 +540,20 @@ mod tests {
     #[test]
     fn linux_units_run_as_the_person_and_restart() {
         let at_logon = install_plan(Os::Linux, Way::Logon, &person(), None);
-        assert_eq!(
-            at_logon.binary,
-            PathBuf::from("/home/ana/.local/share/jackbird/bin/jackbird-service")
-        );
+        // Built as the code builds them, so the separators are the host's (the tests run on all three).
+        let binary = person().home.join(".local/share/jackbird/bin").join("jackbird-service");
+        assert_eq!(at_logon.binary, binary);
         let (path, unit) = &at_logon.files[0];
-        assert_eq!(path, &PathBuf::from("/home/ana/.config/systemd/user/jackbird.service"));
-        assert!(unit.contains("ExecStart=\"/home/ana/.local/share/jackbird/bin/jackbird-service\" --config \"/home/ana/.config/jackbird/service.json\"\n"));
+        assert_eq!(
+            path,
+            &person().home.join(".config/systemd/user").join("jackbird.service")
+        );
+        let exec = format!(
+            "ExecStart=\"{}\" --config \"{}\"\n",
+            binary.display().to_string().replace('\\', "\\\\"),
+            person().config.display()
+        );
+        assert!(unit.contains(&exec), "{unit}");
         assert!(
             unit.contains("Restart=on-failure") && unit.contains("WantedBy=default.target") && !unit.contains("User=")
         );
@@ -558,10 +565,10 @@ mod tests {
         let with_system = install_plan(Os::Linux, Way::System, &person(), None);
         assert_eq!(
             with_system.binary,
-            PathBuf::from("/usr/local/lib/jackbird/jackbird-service")
+            PathBuf::from("/usr/local/lib/jackbird").join("jackbird-service")
         );
         let (path, unit) = &with_system.files[0];
-        assert_eq!(path, &PathBuf::from("/etc/systemd/system/jackbird.service"));
+        assert_eq!(path, &PathBuf::from("/etc/systemd/system").join("jackbird.service"));
         assert!(unit.contains("User=ana\n") && unit.contains("WantedBy=multi-user.target"));
         assert_eq!(
             with_system.commands[1],
@@ -597,9 +604,16 @@ mod tests {
         let (path, plist) = &at_logon.files[0];
         assert_eq!(
             path,
-            &PathBuf::from("/home/ana/Library/LaunchAgents/es.germade.jackbird.service.plist")
+            &person()
+                .home
+                .join("Library/LaunchAgents")
+                .join("es.germade.jackbird.service.plist")
         );
-        assert!(plist.contains("<string>/home/ana/Library/Application Support/jackbird/bin/jackbird-service</string>"));
+        let binary = person()
+            .home
+            .join("Library/Application Support/jackbird/bin")
+            .join("jackbird-service");
+        assert!(plist.contains(&format!("<string>{}</string>", binary.display())));
         assert!(plist.contains("<key>KeepAlive</key>") && !plist.contains("UserName"));
         assert_eq!(at_logon.commands[0][..3], ["launchctl", "bootstrap", "gui/501"]);
         let with_system = install_plan(Os::Macos, Way::System, &person(), None);
@@ -610,7 +624,7 @@ mod tests {
         );
         assert_eq!(
             with_system.files[0].0,
-            PathBuf::from("/Library/LaunchDaemons/es.germade.jackbird.service.plist")
+            PathBuf::from("/Library/LaunchDaemons").join("es.germade.jackbird.service.plist")
         );
         assert_eq!(with_system.commands[0][..3], ["launchctl", "bootstrap", "system"]);
         assert_eq!(

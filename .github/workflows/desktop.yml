@@ -119,7 +119,8 @@ jobs:
           "$service" install
           running
           "$service" status
-          JACKBIRD_CHECK_KIND=service "${run[@]}" node scripts/desktop-check.mjs "$app"
+          # (An empty array under `set -u` is an error in macOS's bash 3.2: hence the `+` form.)
+          JACKBIRD_CHECK_KIND=service ${run[@]+"${run[@]}"} node scripts/desktop-check.mjs "$app"
           "$service" uninstall
           "$service" status | grep -q '"installed":null'
           if [ "$RUNNER_OS" != Windows ]; then
