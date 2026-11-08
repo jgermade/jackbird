@@ -10,6 +10,10 @@
   engine into `src/lib/tags/engine.wasm` (`scripts/build-wasm.mjs`, skipped when it is newer than
   every file under `crates/`; `npm run build:wasm` forces it). `rustfmt` and `clippy` to work on
   the crates.
+- For the desktop app only: on Linux, WebKitGTK and its kin (on Ubuntu: `libwebkit2gtk-4.1-dev
+  build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`, and
+  `gstreamer1.0-plugins-good gstreamer1.0-libav` to play); on macOS and Windows, nothing more
+  than Rust (Xcode's command-line tools; WebView2, which Windows 11 has).
 
 ## Scripts
 
@@ -54,6 +58,18 @@ older than `package-lock.json`. A bare `make` lists them.
 
 The fixtures are small MP3 and FLAC files built byte by byte, committed with `cases.json`, which
 says what each must give; [their README](../fixtures/tags/README.md) says how to make them again.
+
+## The desktop app
+
+`src-tauri/` is the desktop app (Tauri v2): the web build in the system's webview, and its files
+reached through `crates/core` by path (see [Architecture](architecture.md#the-desktop-app)).
+
+| Command | What it does |
+| --- | --- |
+| `npm run desktop` (`make desktop`) | The app in development mode, over the dev server. |
+| `npm run desktop:build` (`make desktop-build`) | The release build and its bundles, into `target/release/bundle/`. |
+| `make desktop-test` | The app's lints and tests (`cargo clippy -p jackbird`, `cargo test -p jackbird`). |
+| `node scripts/desktop-check.mjs target/release/jackbird` | The unattended check `desktop.yml` runs on the three systems (under `xvfb-run -a` on a Linux machine without a display): the fixtures opened, read, a title saved, an MP3 and a FLAC played, the library reopened after a restart. |
 
 ## Translations
 

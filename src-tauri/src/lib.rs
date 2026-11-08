@@ -396,6 +396,12 @@ fn check_folder() -> Option<String> {
     std::env::var("JACKBIRD_CHECK_FOLDER").ok()
 }
 
+/// Whether this run of the unattended check is the one after a restart (`JACKBIRD_CHECK_RESTORE`).
+#[tauri::command]
+fn check_restore() -> bool {
+    std::env::var_os("JACKBIRD_CHECK_RESTORE").is_some()
+}
+
 /// The unattended check's report: printed, written to `JACKBIRD_CHECK_REPORT` when set, and the app quits.
 #[tauri::command]
 fn check_report(app: AppHandle, report: String) {
@@ -433,6 +439,7 @@ pub fn run() {
             save,
             media_url,
             check_folder,
+            check_restore,
             check_report
         ])
         .setup(|app| {

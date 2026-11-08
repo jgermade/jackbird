@@ -48,6 +48,11 @@ Run the checks with `make test`, and build for production with `make build` (int
 one runs its npm script (`npm run dev`, `npm test`, `npm run build`), which also work on their own
 after `npm install`.
 
+jackbird also runs as a desktop app (Tauri v2) on macOS, Windows and Linux, with the same
+interface: `make desktop` starts it in development mode, and `make desktop-build` makes its
+installers. Each release attaches them, unsigned for now, so macOS and Windows warn when they are
+opened. On Linux it needs WebKitGTK (see [Development](docs/development.md)).
+
 ## Documentation
 
 - [Using jackbird](docs/usage.md)

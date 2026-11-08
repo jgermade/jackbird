@@ -17,7 +17,9 @@
     "test:types": "tsc -p tsconfig.test.json",
     "test:unit": "mkdir -p .tmp/coverage && node --test --experimental-strip-types --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/helpers/**' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-exclude='src/**/*.test-support.ts' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=.tmp/coverage/lcov.info 'src/**/*.test.ts'",
     "test:coverage": "node scripts/check-coverage.mjs .tmp/coverage/lcov.info 90",
-    "build:wasm": "node scripts/build-wasm.mjs --force"
+    "build:wasm": "node scripts/build-wasm.mjs --force",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "dependencies": {
     "@cloudauthn/vfs-sync": "^0.2.0",

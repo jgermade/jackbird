@@ -68,6 +68,12 @@ This document describes the technical stack and codebase architecture implemente
   `tn` (plurals via `Intl.PluralRules`) over the catalogues in `src/lib/locales/`. The
   language follows the browser until one is chosen in Preferences, and sets `<html lang>`.
 
+### Desktop
+- **Tauri v2** (`tauri` 2.12.5, `tauri-plugin-dialog` 2.8.4; `@tauri-apps/api` and
+  `@tauri-apps/cli` 2.12.4): the same web build in the system's webview (WebKit on macOS and
+  Linux, WebView2 on Windows), files through `crates/core` by path, playback from the asset
+  protocol or, on Linux, a local server. Bundles: `.dmg`, NSIS, `.deb` and AppImage, unsigned.
+
 ### Build Tools & Tooling
 - **Bundler & Dev Server**: Vite (`^5.4.8`), with two entries: the app (`index.html`) and the
   theme demo (`theme/default/index.html`).

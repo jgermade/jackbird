@@ -21,13 +21,15 @@ jackbird runs entirely in the browser: there is no backend. This page gives the 
 
 ## From a folder to a saved tag
 
-1. **Pick.** `openFolder()` (`src/lib/roots.ts`) asks for a folder with `FSAAdapter.pick()`.
+1. **Pick.** `openFolder()` (`src/lib/roots.ts`) asks for a folder (`src/lib/sources/`): the
+   browser's picker, or the desktop app's dialog. The root keeps its `RootSource`.
 2. **Render what is known.** `hydrateRoot()` reads `.meta/mp3-manager.json` (`src/lib/meta.ts`)
    and shows its tracks at once.
 3. **Walk.** In the background, `walk()` lists the folder's `.mp3` and `.flac` files (`src/helpers/formats.ts`), and its `.m3u8` and
    `.m3u` playlists, which `src/lib/playlists.ts` reads beside the tracks (see below).
-4. **Read.** New and changed files are read as bytes; `readTags()` (`src/lib/tags/`) parses their
-   tags and `checksums()` hashes the whole file and its audio alone (without the tags). The
+4. **Read.** New and changed files go to the source's `inspect()`: in the browser they are read as
+   bytes, `readTags()` (`src/lib/tags/`) parses their tags and `checksums()` hashes the whole file
+   and its audio alone (without the tags); in the desktop app one command does it by path. The
    snapshot in `.meta/` is written again.
 5. **Edit.** The edit dialog fills the `editor` store (`src/lib/editor.ts`) with the values the
    selected tracks share.
@@ -93,6 +95,31 @@ the splice in place.
   `tags_output_ptr`, `tags_output_len`, `tags_release`) and a small wire format
   (`crates/tags-wasm/src/wire.rs`, mirrored by `src/helpers/tagwire.ts`). The glue on the web
   side is `src/lib/tags/wasm.ts`. A trap leaves the module unused and the next call loads it again.
+
+## The desktop app
+
+The desktop app (`src-tauri/`, Tauri v2, since E4) shows the same web build in the system's
+webview. Where a root lives is the one difference, behind `RootSource` (`src/types.ts`,
+`src/lib/sources/`): `browser.ts` is a folder chosen through the File System Access API, its tags
+worked out by the engine as wasm; `desktop.ts` is a path, and every file operation is a command
+of the app (`src-tauri/src/lib.rs`) over `crates/core`:
+
+- **Only open folders**: a root is registered when the person picks it in the system's dialog, or
+  when the app's own session reopens it; every path is relative to a root and refused if it
+  leaves it (`..`, an absolute path, a link that leads out).
+- **No file bytes over the IPC to read or hash**: `inspect` reads a file's head and tail for its
+  tags and hashes it in 1 MiB chunks; `save` writes the engine's splice in place when the new tags
+  are as long as the old ones, and otherwise a new file beside the old one, checked and renamed
+  over it; either way the audio region is hashed again and must be the source's. Only small files
+  (`.meta/`, playlists) cross whole.
+- **Playback**: macOS and Windows play from Tauri's asset protocol, whose scope holds only the open
+  roots; Linux's webview cannot, so a server on 127.0.0.1 (a random port, a token per run, only
+  files the app handed out a URL for, byte ranges) gives them (`src-tauri/src/media.rs`).
+- **The session keeps paths**, in the same IndexedDB store, and reopens them at start.
+- `src/lib/sources/check.ts` is the unattended check `desktop.yml` runs; it does nothing unless
+  the app is started for it.
+
+`crates/core` has no Tauri in it: the service (S1, planned) will put it behind HTTP.
 
 ## Layers
 

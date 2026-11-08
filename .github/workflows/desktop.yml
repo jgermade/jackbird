@@ -1,0 +1,106 @@
+# The desktop app (src-tauri/, over crates/core): builds its bundles on Linux, macOS and Windows,
+# runs the unattended check on each (scripts/desktop-check.mjs; Linux under Xvfb) and uploads
+# the bundles. release.yml calls it with the new tag and attaches them to the release.
+# Unsigned: macOS and Windows warn when the bundles are opened.
+# See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4).
+name: desktop
+
+on:
+  push:
+    paths:
+      - "src-tauri/**"
+      - "crates/**"
+      - "src/lib/sources/**"
+      - "scripts/desktop-check.mjs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/desktop.yml"
+  pull_request:
+    paths:
+      - "src-tauri/**"
+      - "crates/**"
+      - "src/lib/sources/**"
+      - "scripts/desktop-check.mjs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to build. Empty builds the commit that started the run.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: App on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.04: an AppImage built on it runs on newer systems too.
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Linux packages (Tauri's, a virtual display, and GStreamer's decoders)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev \
+            libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb \
+            gstreamer1.0-plugins-good gstreamer1.0-libav
+
+      # wasm32: npm run build builds the tag engine for the web first (scripts/build-wasm.mjs).
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: The app's own lints and tests
+        if: runner.os == 'Linux'
+        run: |
+          cargo clippy -p jackbird --all-targets --locked -- -D warnings
+          cargo test -p jackbird --locked
+
+      # Runs npm run build first (beforeBuildCommand in tauri.conf.json).
+      - name: Build the app and its bundles (unsigned)
+        run: npx tauri build
+
+      - name: The unattended check
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux) xvfb-run -a node scripts/desktop-check.mjs target/release/jackbird ;;
+            Windows) node scripts/desktop-check.mjs target/release/jackbird.exe ;;
+            macOS) node scripts/desktop-check.mjs target/release/jackbird ;;
+          esac
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: desktop-${{ runner.os }}
+          path: |
+            target/release/bundle/deb/*.deb
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/dmg/*.dmg
+            target/release/bundle/nsis/*.exe
+          if-no-files-found: error

@@ -42,9 +42,10 @@ jobs:
 
       - run: cargo fmt --all --check
 
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # The desktop app (the `jackbird` package) needs WebKitGTK to build: desktop.yml checks it.
+      - run: cargo clippy --workspace --exclude jackbird --all-targets --locked -- -D warnings
 
-      - run: cargo test --workspace --locked
+      - run: cargo test --workspace --exclude jackbird --locked
 
       - run: cargo clippy -p jackbird-tags-wasm --target wasm32-unknown-unknown --locked -- -D warnings
 

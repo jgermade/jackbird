@@ -2,12 +2,16 @@
 // started with JACKBIRD_CHECK_FOLDER, it opens that folder through the same
 // source the app uses, inspects every track, saves a title into one of them
 // and reads it back, plays one MP3 and one FLAC for a few seconds through a
-// Web Audio analyser, and reports what it found as JSON; then the app quits.
-// Nothing happens otherwise. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md.
+// Web Audio analyser, then opens the folder in the library as a person would
+// (so the session keeps it), and reports what it found as JSON; then the app
+// quits. Started again with JACKBIRD_CHECK_RESTORE, it reports what the
+// session reopened. Nothing happens otherwise. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md.
 
 import { invoke } from "@tauri-apps/api/core";
 import { isAudioFile } from "../../helpers/formats";
 import { emptyMetadata } from "../../helpers/metadata";
+import { library } from "../library";
+import { hydrateRoot } from "../roots";
 import { restoreDesktopSource } from "./desktop";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -40,7 +44,25 @@ async function play(url: string): Promise<{ played: number; analyser: number; er
   }
 }
 
+/** Waits until the library has its roots loaded (or 20 s). */
+async function settled(): Promise<void> {
+  for (let step = 0; step < 200; step += 1) {
+    if (!library.restoring && library.roots.length > 0 && library.roots.every((root) => !root.loadingMetadata)) {
+      return;
+    }
+    await wait(100);
+  }
+}
+
+/** What the library holds: each root's path and how many tracks it shows. */
+const holding = () => library.roots.map((root) => ({ path: root.source.saved, tracks: root.tracks.length, kind: root.source.kind }));
+
 export async function runCheckIfAsked(): Promise<void> {
+  if (await invoke<boolean>("check_restore").catch(() => false)) {
+    await settled();
+    await invoke("check_report", { report: JSON.stringify({ restored: holding() }) });
+    return;
+  }
   const folder = await invoke<string | null>("check_folder").catch(() => null);
   if (!folder) {
     return;
@@ -74,6 +96,11 @@ export async function runCheckIfAsked(): Promise<void> {
       }
     }
     report.played = played;
+    // As a person opens a folder: the library shows it and the session keeps it.
+    await hydrateRoot(source, {});
+    await settled();
+    report.library = holding();
+    await wait(1500);
   } catch (error) {
     report.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   }
