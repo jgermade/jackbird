@@ -1,5 +1,7 @@
-# Bumps the version, builds the new tag (build.yml), publishes a GitHub release with the build
-# attached as <repo>-vX.Y.Z.zip and, if the `deploy` box is ticked, deploys it (deploy.yml).
+# Bumps the version, builds the new tag (build.yml), the desktop app's bundles (desktop.yml) and
+# the service's binaries (service.yml), publishes a GitHub release with the build attached as
+# <repo>-vX.Y.Z.zip and the bundles and binaries beside it, and, if the `deploy` box is ticked,
+# deploys it (deploy.yml).
 #
 # Pushes and releases made with the workflow token start no other workflow, which is why
 # build.yml and deploy.yml are called here instead of reacting to the push or the release.
@@ -73,9 +75,23 @@ jobs:
     with:
       ref: ${{ needs.version.outputs.tag }}
 
+  desktop:
+    name: Desktop app
+    needs: version
+    uses: ./.github/workflows/desktop.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+
+  service:
+    name: Service
+    needs: version
+    uses: ./.github/workflows/service.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+
   release:
     name: Publish release
-    needs: [version, build]
+    needs: [version, build, desktop, service]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -95,8 +111,20 @@ jobs:
           (cd dist && zip -qr "../$asset" .)
           echo "ASSET=$asset" >> "$GITHUB_ENV"
 
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: desktop-*
+          path: desktop
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: service-*
+          path: service
+          merge-multiple: true
+
       - name: Create the release
-        run: gh release create "$TAG" "$ASSET" --title "$TAG" --generate-notes --verify-tag
+        run: gh release create "$TAG" "$ASSET" desktop/* service/* --title "$TAG" --generate-notes --verify-tag
 
   deploy:
     name: Deploy

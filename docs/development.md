@@ -5,8 +5,15 @@
 - Node.js 22.6 or later: the unit tests run TypeScript directly with `--experimental-strip-types`.
 - A Chromium-based browser to run the app.
 - `make`, for the shortcuts below (optional: the npm scripts do the same).
-- Rust (stable, with `rustfmt` and `clippy`), only to work on the tag crates in `crates/` until
-  the app builds them in (E2).
+- Rust (stable) with the `wasm32-unknown-unknown` target (`rustup target add
+  wasm32-unknown-unknown`): `npm run dev`, `npm test` and `npm run build` first build the tag
+  engine into `src/lib/tags/engine.wasm` (`scripts/build-wasm.mjs`, skipped when it is newer than
+  every file under `crates/`; `npm run build:wasm` forces it). `rustfmt` and `clippy` to work on
+  the crates.
+- For the desktop app only: on Linux, WebKitGTK and its kin (on Ubuntu: `libwebkit2gtk-4.1-dev
+  build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`, and
+  `gstreamer1.0-plugins-good gstreamer1.0-libav` to play); on macOS and Windows, nothing more
+  than Rust (Xcode's command-line tools; WebView2, which Windows 11 has).
 
 ## Scripts
 
@@ -28,9 +35,11 @@ older than `package-lock.json`. A bare `make` lists them.
 2. **`test:styles`** (`scripts/check-styles.mjs`): no shorthand with `var()` overridden by its own
    longhand in one block (jq79's scoping would drop it), and no `:hover` rule outside
    `@media (hover: hover)`, so touch screens get no hover states.
-3. **`test:types`**: a type check of the helpers and their tests (`tsconfig.test.json`).
-4. **`test:unit`**: the helpers' tests (`src/**/*.test.ts`), on Node's own test runner, with no
-   framework. It also writes coverage to `.tmp/coverage/lcov.info`.
+3. **`test:types`**: a type check of the helpers, `src/lib/tags/` and their tests
+   (`tsconfig.test.json`).
+4. **`test:unit`**: the tests (`src/**/*.test.ts`), on Node's own test runner, with no
+   framework: the helpers', and every fixture of `fixtures/tags/` against the built WebAssembly
+   module (`src/lib/tags/wasm.test.ts`). It also writes coverage to `.tmp/coverage/lcov.info`.
 5. **`test:coverage`** (`scripts/check-coverage.mjs`): every helper file must reach 90% of lines,
    branches and functions, and a helper that no test loads fails the check.
 
@@ -38,16 +47,44 @@ older than `package-lock.json`. A bare `make` lists them.
 
 `crates/` holds jackbird's own tag engine, in Rust, with no tag dependency (see
 [Architecture](architecture.md#the-tag-engine)): `jackbird-id3`, `jackbird-flac` and
-`jackbird-tags`, one Cargo workspace whose `Cargo.toml` is at the root.
+`jackbird-tags`, and `jackbird-tags-wasm` (the web app's module), one Cargo workspace whose
+`Cargo.toml` is at the root. The module is built with the workspace's `wasm` profile (for size).
 
 | Command | What it does |
 | --- | --- |
 | `cargo test --workspace` (`make test-crates`, with the two below) | The crates' unit tests, and `jackbird-tags`' tests on every fixture in `fixtures/tags/`. |
 | `cargo fmt --all --check` | The formatting (`rustfmt.toml`). |
-| `cargo clippy --workspace --all-targets -- -D warnings` | The lints, with warnings as errors, as CI runs them (`tags.yml`). |
+| `cargo clippy --workspace --all-targets -- -D warnings` | The lints, with warnings as errors, as CI runs them (`tags.yml`, which also lints and builds the module for `wasm32-unknown-unknown`). |
 
 The fixtures are small MP3 and FLAC files built byte by byte, committed with `cases.json`, which
 says what each must give; [their README](../fixtures/tags/README.md) says how to make them again.
+
+## The desktop app
+
+`src-tauri/` is the desktop app (Tauri v2): the web build in the system's webview, and its files
+reached through `crates/core` by path (see [Architecture](architecture.md#the-desktop-app)).
+
+| Command | What it does |
+| --- | --- |
+| `npm run desktop` (`make desktop`) | The app in development mode, over the dev server. |
+| `npm run desktop:build` (`make desktop-build`) | The release build and its bundles, into `target/release/bundle/`. |
+| `make desktop-test` | The app's lints and tests (`cargo clippy -p jackbird`, `cargo test -p jackbird`). |
+| `node scripts/desktop-check.mjs target/release/jackbird` | The unattended check `desktop.yml` runs on the three systems (under `xvfb-run -a` on a Linux machine without a display): the fixtures opened, read, a title saved, an MP3 and a FLAC played, the library reopened after a restart. |
+
+## The service
+
+`crates/service` is `jackbird-service` (S1): `crates/core` behind HTTP (axum), with the web build
+embedded in a release binary (`npm run build` first) and served from the same origin (see
+[Architecture](architecture.md#the-service)).
+
+| Command | What it does |
+| --- | --- |
+| `npm run service` (`make service`) | The web build, then the service in release mode on <http://localhost:4646>. |
+| `jackbird-service [--port N] [--config PATH]` | The binary: its configuration (the port, the open folders) is `~/.config/jackbird/service.json` on Linux, `~/Library/Application Support/jackbird/service.json` on macOS, `%APPDATA%\jackbird\service.json` on Windows, or `JACKBIRD_SERVICE_CONFIG`. |
+| `jackbird-service install [--with-system]`, `uninstall`, `update`, `start`, `stop`, `status` | Installs it the way the system starts things, as the person running it: at logon (a systemd user unit, a launchd agent, a task at logon) or, as an administrator, with the system (a systemd system unit with `User=`, a launchd daemon with `UserName`, a Windows service logged on as the person: `--password-file`). `status` is a line of JSON. Linux needs systemd. |
+| `node scripts/sidecar.mjs` | Builds the service in release mode and copies it to `src-tauri/binaries/` for the desktop app to carry (`externalBin`); `tauri.conf.json` runs it before every build. |
+| `cargo test -p jackbird-service` | Its tests, through its router, and the files each system's installation writes. |
+| `node scripts/service-check.cjs target/release/jackbird-service [a long FLAC]` | The unattended check `service.yml` runs on the three systems: Chromium (Playwright) on its page opens a folder, saves a title, plays, and finds the folder again after a restart. |
 
 ## Translations
 

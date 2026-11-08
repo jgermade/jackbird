@@ -6,9 +6,9 @@
 
 <p align="center"><strong>Your library, right where it is.</strong></p>
 
-jackbird is a browser app for a local MP3 collection. Open a music folder and it lays out your
+jackbird is a browser app for a local music collection, MP3 and FLAC. Open a music folder and it lays out your
 albums with their covers, plays them, and lets you fix their tags and covers, one track or many at
-once. Changes are written straight into your MP3 files: there is no server, and nothing is
+once. Changes are written straight into your files: there is no server, and nothing is
 uploaded anywhere.
 
 Its interface, **Deck**, takes after old portable audio gear: keys that travel when pressed, a
@@ -30,7 +30,9 @@ dot-matrix display, labels printed like a faceplate's, and two tones, Silver and
 
 ## Quick start
 
-You need [Node.js](https://nodejs.org/) 22.6 or later and a Chromium-based desktop browser
+You need [Node.js](https://nodejs.org/) 22.6 or later, [Rust](https://rustup.rs/) stable with
+its WebAssembly target (`rustup target add wasm32-unknown-unknown`: jackbird's tag engine is
+built from source into the web app), and a Chromium-based desktop browser
 (Chrome, Edge, Brave, Opera). jackbird reads and writes your files through the File System Access
 API, which Firefox and Safari do not have.
 
@@ -39,12 +41,24 @@ make up
 ```
 
 It installs the dependencies the first time, then starts the dev server. Open
-<http://localhost:8666>, choose **Open folder** and pick a folder with MP3 files. The browser asks
+<http://localhost:8666>, choose **Open folder** and pick a folder with MP3 or FLAC files. The browser asks
 for permission to edit the files in it; jackbird needs it to save your changes.
 
 Run the checks with `make test`, and build for production with `make build` (into `dist/`). Each
 one runs its npm script (`npm run dev`, `npm test`, `npm run build`), which also work on their own
 after `npm install`.
+
+jackbird also runs as a desktop app (Tauri v2) on macOS, Windows and Linux, with the same
+interface: `make desktop` starts it in development mode, and `make desktop-build` makes its
+installers. Each release attaches them, unsigned for now, so macOS and Windows warn when they are
+opened. On Linux it needs WebKitGTK (see [Development](docs/development.md)).
+
+And as a service: `make service` builds `jackbird-service`, one binary with the web inside, and
+starts it on <http://localhost:4646>. Its page opens folders of the machine it runs on, in any
+browser. For now it is open and answers only on that machine; signing in comes later. The
+desktop app carries it and installs it from its Preferences, to start when you log in (no
+administrator rights) or with the system (administrator rights once); while it is installed, the
+app is its interface. On Linux this needs systemd.
 
 ## Documentation
 

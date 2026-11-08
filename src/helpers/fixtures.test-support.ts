@@ -1,7 +1,7 @@
-import type { Mp3Track, TrackMetadata } from "../types.ts";
+import type { Track, TrackMetadata } from "../types.ts";
 
 /** A track for tests: every field defaulted, any of them overridable. */
-export function track(relativePath: string, metadata: Partial<TrackMetadata> = {}, id = relativePath): Mp3Track {
+export function track(relativePath: string, metadata: Partial<TrackMetadata> = {}, id = relativePath): Track {
   return {
     id,
     name: relativePath.split("/").pop() ?? relativePath,

@@ -1,10 +1,11 @@
-// The saved session (the open roots' handles and the active root) in
-// IndexedDB, which can hold directory handles where localStorage cannot.
+// The saved session (the open roots' handles, or the desktop app's paths, and
+// the active root) in IndexedDB, which can hold directory handles where
+// localStorage cannot.
 // lib/session.ts decides when to read and write it.
 
 import type { Session } from "../helpers/session";
 
-type PersistedSession = Session<FileSystemDirectoryHandle>;
+type PersistedSession = Session<FileSystemDirectoryHandle | string>;
 
 const DB_NAME = "mp3-manager";
 const STORE_NAME = "session";

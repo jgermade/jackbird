@@ -15,7 +15,6 @@ import { $toRaw } from "jq79";
 import { applyVerification, checksumOf, type Verification } from "../helpers/snapshot";
 import { tracksToVerify } from "../helpers/tracks";
 import type { RootWorkspace } from "../types";
-import { calculateDualChecksums, readTrackMetadataFromBytes } from "./id3";
 import { library } from "./library";
 import { flushMeta } from "./meta";
 import { updateRoots } from "./roots";
@@ -36,13 +35,12 @@ function openRoot(rootId: string): RootWorkspace | null {
 
 /** Reads one track's file: its checksums and, if it changed, its tags, size and date. */
 async function inspect(root: RootWorkspace, track: RootWorkspace["tracks"][number]): Promise<Verification> {
-  const bytes = await root.vfs.read(track.relativePath);
-  const { fullChecksum, audioChecksum } = await calculateDualChecksums(bytes);
-  if (fullChecksum === checksumOf(track)) {
+  const found = await root.source.inspect(track.relativePath, checksumOf(track));
+  const { fullChecksum, audioChecksum, metadata } = found;
+  if (!metadata) {
     return { fullChecksum, audioChecksum };
   }
-  const [metadata, stat] = await Promise.all([readTrackMetadataFromBytes(bytes, track.name), root.vfs.stat(track.relativePath)]);
-  return { fullChecksum, audioChecksum, file: { metadata, size: bytes.byteLength, lastModified: stat?.mtime ?? track.lastModified } };
+  return { fullChecksum, audioChecksum, file: { metadata, size: found.size, lastModified: found.lastModified ?? track.lastModified } };
 }
 
 /** How many times a track is read again because a save started while it was read. */

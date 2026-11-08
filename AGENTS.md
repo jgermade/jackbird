@@ -27,15 +27,24 @@ assets such as styles, fonts and images):
 
 ### Rust crates
 
-`crates/` holds jackbird's own Rust crates (the tag engine), one Cargo workspace whose
-`Cargo.toml` is at the root (`src-tauri/` stays its own project until E4). They do no I/O (bytes
-in, bytes out) and depend on nothing but each other; a dependency in `[dev-dependencies]` is for
-tests only. They are written from the formats' specifications; other libraries are references for
+`crates/` holds jackbird's own Rust crates, one Cargo workspace whose `Cargo.toml` is at the root,
+with the desktop app (`src-tauri/`, Tauri v2) in it. The tag crates (`id3`, `flac`, `tags`,
+`tags-wasm`) do no I/O: they are
+given the ranges of a file they ask for (its head and its last bytes) and return what to write (a
+splice: the tags to put in place of the old ones); the audio never passes through them. `crates/core` is the one crate that touches the file system,
+by design: open folders (roots) and the paths under them (none leads out, links included), and
+tags, checksums and saves on files, streamed, never holding the audio in memory; the desktop app
+wraps it in commands, and the service (`crates/service`) in HTTP, both speaking `crates/api`'s
+JSON. The tag crates depend on nothing but
+each other (`crates/core` adds `sha1`); a dependency in `[dev-dependencies]` is for
+tests only. `crates/tags-wasm` is the web app's WebAssembly module, built by
+`scripts/build-wasm.mjs` (not committed); its exports' `#[unsafe(no_mangle)]` is the only unsafe
+code the workspace allows, and it has no unsafe block. They are written from the formats' specifications; other libraries are references for
 behaviour and edge cases, and no code is copied from GPL or LGPL ones. Tests run on the shared
 fixtures in `fixtures/tags/` (made by `fixtures/tags/make.mjs`, whose expectations come from how
 each file is built). Run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --
--D warnings` and `cargo test --workspace` (or `make test-crates`) before committing a change to
-them.
+-D warnings` and `cargo test --workspace` (or `make test-crates`, and `make desktop-test` for the
+desktop app, which needs WebKitGTK on Linux) before committing a change to them.
 
 jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.md`):
 

@@ -25,7 +25,8 @@ export type Session<Handle> = {
 type OpenRoot<Handle> = {
   id: string;
   label: string;
-  rootHandle: Handle;
+  /** Where the root lives; the session keeps what it saved of it (a handle, a path). */
+  source: { readonly saved: Handle };
   groupingMode: GroupingMode;
   expandedAlbums: readonly string[];
   activeRowKey: string | null;
@@ -38,7 +39,7 @@ export function sessionOf<Handle>(roots: readonly OpenRoot<Handle>[], activeRoot
     roots: roots.map((root) => ({
       id: root.id,
       label: root.label,
-      handle: root.rootHandle,
+      handle: root.source.saved,
       groupingMode: root.groupingMode,
       expandedAlbums: [...root.expandedAlbums],
       activeRowKey: root.activeRowKey,

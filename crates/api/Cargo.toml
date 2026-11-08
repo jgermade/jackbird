@@ -1,0 +1,15 @@
+[package]
+name = "jackbird-api"
+description = "The JSON jackbird's interface and its Rust side speak: over Tauri's IPC (the desktop app) and over HTTP (the service)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+jackbird-core = { path = "../core" }
+jackbird-tags = { path = "../tags" }
+serde = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true

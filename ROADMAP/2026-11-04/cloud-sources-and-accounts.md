@@ -6,7 +6,8 @@ The reasoning is in
 [RECORD/2026-08-11.musikmatch-rust-migration.WIP.md](../../RECORD/2026-08-11.musikmatch-rust-migration.WIP.md)
 (extensions of 2026-11-04, 20:59 to 21:32): Google Drive and Box as sources over vfs-sync's
 `VFSAdapter`, in the web and the app, with or without the family instance. The public account first
-proposed here (C3, C3b) is gone: the instance's accounts are F2's.
+proposed here (C3, C3b) is gone: the instance's accounts are the service's (S3 of
+[../2026-11-08/service.md](../2026-11-08/service.md), which took over F2's sign-in).
 
 Dates are estimates, from the day F5 is planned to end; each step ends with its "done when" met and a
 walkthrough in the record. C0 is a spike that decides how C1 and C2 go.

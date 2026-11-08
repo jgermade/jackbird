@@ -7,6 +7,11 @@ outside home by whatever route the owner picks (a private network, a reverse pro
 [RECORD/2026-08-11.musikmatch-rust-migration.WIP.md](../../RECORD/2026-08-11.musikmatch-rust-migration.WIP.md)
 (extensions of 2026-11-04, 21:22 to 21:40, and 21:35 for the instance's modes).
 
+Since 2026-11-08 the service ([../2026-11-08/service.md](../2026-11-08/service.md)) comes first:
+it is this instance's backend, over local folders, installed from the desktop app (S1, S2), with
+sign-in and people (S3, which takes over F2's sign-in, passkeys and roles) and the online route
+(S4). F1's store, F3, F4 and F5 follow it.
+
 Dates are estimates, from the day E4 is planned to end; each step ends with its "done when" met and
 a walkthrough in the record. F0 is a spike that decides the rest.
 

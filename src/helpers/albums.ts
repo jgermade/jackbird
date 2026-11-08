@@ -1,10 +1,10 @@
-import type { Mp3Track } from "../types.ts";
+import type { Track } from "../types.ts";
 import { inferDiscNumber, trackNumberOrder } from "./tracks.ts";
 
 export type AlbumDisc = {
   number: number;
   /** In track-number order; tracks without one last, as they came. */
-  tracks: Mp3Track[];
+  tracks: Track[];
 };
 
 export type AlbumGroup = {
@@ -23,8 +23,8 @@ export type AlbumGroup = {
  * with no album tag goes under `untitled`. Year, genre and cover are the
  * album's first track's. Albums are sorted by title in `locale`.
  */
-export function groupAlbums(tracks: readonly Mp3Track[], untitled: string, locale: string): AlbumGroup[] {
-  const albums = new Map<string, { group: AlbumGroup; discs: Map<number, Mp3Track[]> }>();
+export function groupAlbums(tracks: readonly Track[], untitled: string, locale: string): AlbumGroup[] {
+  const albums = new Map<string, { group: AlbumGroup; discs: Map<number, Track[]> }>();
 
   for (const track of tracks) {
     const album = track.metadata.album.trim();

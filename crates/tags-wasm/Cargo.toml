@@ -1,0 +1,23 @@
+[package]
+name = "jackbird-tags-wasm"
+description = "jackbird-tags for the web app: a few plain WebAssembly exports over two buffers, with no bindings dependency"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jackbird-tags = { path = "../tags" }
+
+# The workspace's lints, but `unsafe_code` is "deny", not "forbid": an export
+# needs `#[unsafe(no_mangle)]`, which that lint counts as unsafe code. Each
+# export allows it alone; the crate has no unsafe block.
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

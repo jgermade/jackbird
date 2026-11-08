@@ -5,8 +5,8 @@ import { parsePlaybackState, parseViewState, sameSession, sessionOf } from "./se
 const music = { name: "Music" };
 const podcasts = { name: "Podcasts" };
 const open = [
-  { id: "1", label: "Music", rootHandle: music, groupingMode: "wizard" as const, tracks: [], expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles", view: "files" as const },
-  { id: "2", label: "Podcasts", rootHandle: podcasts, groupingMode: "flat" as const, tracks: [], expandedAlbums: [], activeRowKey: null, view: "artists" as const }
+  { id: "1", label: "Music", source: { saved: music }, groupingMode: "wizard" as const, tracks: [], expandedAlbums: ["Jazz", "Jazz/Miles"], activeRowKey: "folder:Jazz/Miles", view: "files" as const },
+  { id: "2", label: "Podcasts", source: { saved: podcasts }, groupingMode: "flat" as const, tracks: [], expandedAlbums: [], activeRowKey: null, view: "artists" as const }
 ];
 
 describe("sessionOf", () => {
@@ -53,7 +53,7 @@ describe("sameSession", () => {
   it("differs when the order, a label, a handle or the grouping changes", () => {
     assert.equal(sameSession(saved, sessionOf([open[1], open[0]], "1")), false);
     assert.equal(sameSession(saved, sessionOf([{ ...open[0], label: "Música" }, open[1]], "1")), false);
-    assert.equal(sameSession(saved, sessionOf([{ ...open[0], rootHandle: { name: "Music" } }, open[1]], "1")), false);
+    assert.equal(sameSession(saved, sessionOf([{ ...open[0], source: { saved: { name: "Music" } } }, open[1]], "1")), false);
     assert.equal(sameSession(saved, sessionOf([open[0], { ...open[1], groupingMode: "wizard" as const }], "1")), false);
   });
 

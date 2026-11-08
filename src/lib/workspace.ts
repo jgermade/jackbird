@@ -12,7 +12,7 @@ import { nextSelection, selectMany } from "../helpers/selection";
 import { orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
 import { albumKey, artistKey, buildViewRows, type ViewLabels } from "../helpers/views";
-import type { LibraryView, Mp3Track, RootWorkspace, WizardTreeRow } from "../types";
+import type { LibraryView, Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
 import { addToQueue, dropFromQueue, nowPlaying, playNext, playQueue, togglePlay } from "./player";
@@ -88,7 +88,7 @@ export const detailAlbums = $computed(
   (): Opaque<AlbumGroup[]> => new Opaque(groupAlbums(derive().scope.tracks, t("album.untitled"), preferences.language))
 );
 
-export const selectedTracks = $computed((): Opaque<Mp3Track[]> => {
+export const selectedTracks = $computed((): Opaque<Track[]> => {
   const { root } = derive();
   if (!root || root.selectedTrackIds.length === 0) {
     return new Opaque([]);
@@ -103,7 +103,7 @@ function current(): RootWorkspace | null {
 }
 
 /** A scope's tracks in the order they play: a view's own, else by folder, disc and number. */
-function playOrder(scope: Scope): Mp3Track[] {
+function playOrder(scope: Scope): Track[] {
   return scope.ordered ? scope.tracks : orderDetailPlaylist(scope.tracks);
 }
 
@@ -311,7 +311,7 @@ export function menuTargetCount(trackId: string): number {
   return root?.selectedTrackIds.includes(trackId) ? root.selectedTrackIds.length : 1;
 }
 
-function queue(tracks: Mp3Track[], label: string, where: "next" | "end"): void {
+function queue(tracks: Track[], label: string, where: "next" | "end"): void {
   const root = current();
   if (!root || tracks.length === 0) {
     return;

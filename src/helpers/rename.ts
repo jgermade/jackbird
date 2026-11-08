@@ -7,7 +7,7 @@
  * 22:12 and W5's plan).
  */
 
-import type { Mp3Track } from "../types.ts";
+import type { Track } from "../types.ts";
 import { inferDiscNumber } from "./tracks.ts";
 
 /** The fields a pattern can use. */
@@ -28,7 +28,7 @@ export type RenamePlan = {
   status: RenameStatus;
 };
 
-type Named = Pick<Mp3Track, "id" | "name" | "relativePath" | "metadata">;
+type Named = Pick<Track, "id" | "name" | "relativePath" | "metadata">;
 
 const folderOf = (path: string): string => path.slice(0, path.lastIndexOf("/") + 1);
 
@@ -75,7 +75,7 @@ export function fillPattern(pattern: string, track: Named, width = 2): string {
     year: track.metadata.year,
     genre: track.metadata.genre,
     track: number === null ? "" : String(number).padStart(width, "0"),
-    disc: String(inferDiscNumber(track as Mp3Track)),
+    disc: String(inferDiscNumber(track as Track)),
     filename: track.name.slice(0, track.name.length - extensionOf(track.name).length)
   };
   return pattern.replace(/%(\w+)%/g, (whole, field: string) => (field.toLowerCase() in values ? values[field.toLowerCase()] : whole));

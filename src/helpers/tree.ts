@@ -1,8 +1,8 @@
-import type { Mp3Track, WizardTreeRow } from "../types.ts";
+import type { Track, WizardTreeRow } from "../types.ts";
 
 type FolderNode = {
   folders: Map<string, FolderNode>;
-  tracks: Mp3Track[];
+  tracks: Track[];
 };
 
 /**
@@ -11,7 +11,7 @@ type FolderNode = {
  * only appears when its path is in `expandedFolders`. A track is labelled
  * by its title, or by its file name when it has none.
  */
-export function buildWizardRows(tracks: Mp3Track[], expandedFolders: readonly string[]): WizardTreeRow[] {
+export function buildWizardRows(tracks: Track[], expandedFolders: readonly string[]): WizardTreeRow[] {
   const root: FolderNode = { folders: new Map(), tracks: [] };
   for (const track of tracks) {
     let node = root;

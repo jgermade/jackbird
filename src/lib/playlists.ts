@@ -10,6 +10,7 @@
 
 import type { VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $reactive, $toRaw } from "jq79";
+import { isAudioFile } from "../helpers/formats";
 import { parseM3u, playlistName, serializeM3u } from "../helpers/m3u";
 import {
   decodePlaylist,
@@ -50,7 +51,7 @@ export function m3uPlaylists(vfs: VFSAdapter): PlaylistStore {
     async list(files) {
       const found: Playlist[] = [];
       // What a path written outside the folder (VLC's absolute ones) may be.
-      const audio = files.filter((file) => /\.mp3$/i.test(file));
+      const audio = files.filter(isAudioFile);
       for (const path of files.filter(isPlaylistFile)) {
         try {
           const text = decodePlaylist(await vfs.read(path), path);

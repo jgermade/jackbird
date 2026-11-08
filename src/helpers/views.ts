@@ -7,7 +7,7 @@
  * RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and W6's plan).
  */
 
-import type { LibraryView, Mp3Track, Playlist, WizardTreeRow } from "../types.ts";
+import type { LibraryView, Track, Playlist, WizardTreeRow } from "../types.ts";
 import { orderDetailPlaylist } from "./tracks.ts";
 
 /** The words and the order a view needs. */
@@ -19,12 +19,12 @@ export type ViewLabels = {
   locale: string;
 };
 
-type Group = { key: string; label: string; meta: string; tracks: Mp3Track[]; known: boolean };
+type Group = { key: string; label: string; meta: string; tracks: Track[]; known: boolean };
 
 const DISC_FOLDER = /^(?:cd|disc)[ _-]?\d+$/i;
 
 /** The folder an album is in: a track's folder, its parent when that is a "Disc N" or "CD N" one. */
-export function albumFolder(track: Pick<Mp3Track, "relativePath">): string {
+export function albumFolder(track: Pick<Track, "relativePath">): string {
   const folders = track.relativePath.split("/").slice(0, -1);
   if (folders.length > 0 && DISC_FOLDER.test(folders[folders.length - 1])) {
     folders.pop();
@@ -33,17 +33,17 @@ export function albumFolder(track: Pick<Mp3Track, "relativePath">): string {
 }
 
 /** The key of a track's artist's group. */
-export function artistKey(track: Pick<Mp3Track, "metadata">): string {
+export function artistKey(track: Pick<Track, "metadata">): string {
   return `@artist:${track.metadata.artist.trim().toLowerCase()}`;
 }
 
 /** The key of a track's album's group: its album tag, without case, in its album's folder. */
-export function albumKey(track: Pick<Mp3Track, "metadata" | "relativePath">): string {
+export function albumKey(track: Pick<Track, "metadata" | "relativePath">): string {
   return `@album:${albumFolder(track)}::${track.metadata.album.trim().toLowerCase()}`;
 }
 
-function grouped(tracks: readonly Mp3Track[], keyOf: (track: Mp3Track) => string, labelOf: (track: Mp3Track) => string, metaOf: (tracks: Mp3Track[]) => string, locale: string): Group[] {
-  const groups = new Map<string, Mp3Track[]>();
+function grouped(tracks: readonly Track[], keyOf: (track: Track) => string, labelOf: (track: Track) => string, metaOf: (tracks: Track[]) => string, locale: string): Group[] {
+  const groups = new Map<string, Track[]>();
   for (const track of tracks) {
     const key = keyOf(track);
     groups.set(key, [...(groups.get(key) ?? []), track]);
@@ -56,16 +56,16 @@ function grouped(tracks: readonly Mp3Track[], keyOf: (track: Mp3Track) => string
     .sort((left, right) => Number(right.known) - Number(left.known) || left.label.localeCompare(right.label, locale));
 }
 
-const artistsOf = (tracks: readonly Mp3Track[], labels: ViewLabels): Group[] =>
+const artistsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] =>
   grouped(tracks, artistKey, (track) => track.metadata.artist.trim(), () => "", labels.locale).map((group) => ({
     ...group,
     label: group.label || labels.unknownArtist
   }));
 
 /** How many artists an album's tracks have (without case). */
-const artistCount = (tracks: readonly Mp3Track[]): number => new Set(tracks.map((track) => track.metadata.artist.trim().toLowerCase())).size;
+const artistCount = (tracks: readonly Track[]): number => new Set(tracks.map((track) => track.metadata.artist.trim().toLowerCase())).size;
 
-const albumsOf = (tracks: readonly Mp3Track[], labels: ViewLabels): Group[] =>
+const albumsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] =>
   grouped(
     tracks,
     albumKey,
@@ -81,7 +81,7 @@ const albumsOf = (tracks: readonly Mp3Track[], labels: ViewLabels): Group[] =>
  */
 export function buildViewRows(
   view: Exclude<LibraryView, "files">,
-  tracks: readonly Mp3Track[],
+  tracks: readonly Track[],
   expanded: readonly string[] | "all",
   labels: ViewLabels,
   playlists: readonly Playlist[] = []
@@ -104,7 +104,7 @@ export function buildViewRows(
     });
     return isOpen;
   };
-  const trackRow = (track: Mp3Track, parentKey: string | null, depth: number, meta: string): void => {
+  const trackRow = (track: Track, parentKey: string | null, depth: number, meta: string): void => {
     rows.push({
       key: `track:${track.id}`,
       kind: "track",

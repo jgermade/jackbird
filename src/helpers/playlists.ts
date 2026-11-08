@@ -6,7 +6,7 @@
  * (22:00, 22:12 and W8's plan).
  */
 
-import type { Mp3Track, Playlist, PlaylistEntry } from "../types.ts";
+import type { Track, Playlist, PlaylistEntry } from "../types.ts";
 import { safeName } from "./rename.ts";
 
 /** The folder at the root where a new playlist is written. */
@@ -45,7 +45,7 @@ export function pathTaken(path: string, taken: readonly string[]): boolean {
 }
 
 /** A track's entry: its path, and "Artist - Title" (or the title alone) for `#EXTINF`. */
-export function entryFor(track: Pick<Mp3Track, "relativePath" | "metadata">): PlaylistEntry {
+export function entryFor(track: Pick<Track, "relativePath" | "metadata">): PlaylistEntry {
   const title = track.metadata.title.trim();
   const artist = track.metadata.artist.trim();
   return { path: track.relativePath, raw: track.relativePath, title: title ? (artist ? `${artist} - ${title}` : title) : undefined };

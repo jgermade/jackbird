@@ -15,7 +15,7 @@ This document describes the technical stack and codebase architecture implemente
   over a directory handle, `walk` to list a folder). Each open root keeps its adapter
   (`RootWorkspace.vfs`), so the rest of the app never touches file handles directly and a
   different backend can be plugged in later.
-- **Metadata engine over bytes**: `src/lib/id3.ts` reads/writes ID3 tags on `Uint8Array`
+- **Metadata engine over bytes**: `src/lib/tags/` reads and writes tags on `Uint8Array`
   buffers, not on file handles, so it stays decoupled from the storage backend.
 - **Multi-root workspaces**: Several folders ("roots") can be open at once as tabs; each root
   keeps its own track list, selection, expanded folders and grouping mode.
@@ -50,11 +50,13 @@ This document describes the technical stack and codebase architecture implemente
 - **Web Audio API**: the player's audio element goes through an `AnalyserNode` on its way to the
   speakers, for the display's spectrum analyser (above 640px wide), in an `AudioContext` at the
   device's rate with `latencyHint: "playback"`; the bands span 40 Hz–16 kHz whatever the rate.
-- **ID3 tagging**: `jsmediatags` (`^3.9.7`, imported from
-  `jsmediatags/dist/jsmediatags.min.js` to avoid Vite resolution issues with the package
-  root) for reading tags, and `browser-id3-writer` (`^6.3.0`) for writing them back. Their
-  replacement is built (E1) and not yet wired in (E2): jackbird's own tag crates in `crates/`
-  (below), with no tag dependency.
+- **Tagging**: jackbird's own tag crates in `crates/` (below), with no tag dependency, built
+  for the web as WebAssembly (`crates/tags-wasm`, no bindings crate: a few exports over two
+  buffers and ~80 lines of hand-written glue in `src/lib/tags/wasm.ts`). The module (~100 KB,
+  ~40 KB gzipped) is built by `scripts/build-wasm.mjs` before `dev`, `test` and `build`, is not
+  committed, and is loaded only when a file has to be read, written or hashed. It is given a
+  file's tags and last bytes, never its audio (`src/lib/tags/engine.ts`), so its memory follows
+  the size of the tags. Checksums stay SHA-1 through WebCrypto, over the engine's audio region.
 - **Session persistence**: `src/lib/session.ts` restores the open roots on load and saves them
   whenever they change; `src/lib/rootSessionStore.ts` keeps their handles and grouping mode in
   IndexedDB (`mp3-manager` database).
@@ -65,6 +67,17 @@ This document describes the technical stack and codebase architecture implemente
 - **Languages**: English (source and fallback) and Spanish. `src/lib/i18n.ts` gives `t` and
   `tn` (plurals via `Intl.PluralRules`) over the catalogues in `src/lib/locales/`. The
   language follows the browser until one is chosen in Preferences, and sets `<html lang>`.
+
+### Desktop
+- **Tauri v2** (`tauri` 2.12.5, `tauri-plugin-dialog` 2.8.4; `@tauri-apps/api` and
+  `@tauri-apps/cli` 2.12.4): the same web build in the system's webview (WebKit on macOS and
+  Linux, WebView2 on Windows), files through `crates/core` by path, playback from the asset
+  protocol or, on Linux, a local server. Bundles: `.dmg`, NSIS, `.deb` and AppImage, unsigned.
+
+### Service
+- **`jackbird-service`** (`crates/service`): axum 0.8.9 on tokio 1.54.1, `tower-http` 0.7.1 for
+  ranged file reads, the web build embedded with `rust-embed` 8.13.0; the JSON of `crates/api`
+  (serde). One binary per system, built by `service.yml`.
 
 ### Build Tools & Tooling
 - **Bundler & Dev Server**: Vite (`^5.4.8`), with two entries: the app (`index.html`) and the
@@ -173,15 +186,17 @@ mp3-manager/
 
 ### Track identification & metadata
 - Tracks are found by walking the root through the VFS, read as bytes, and parsed into
-  `TrackMetadata` (title, artist, album, year, genre, track number, cover) via `jsmediatags`.
+  `TrackMetadata` (title, artist, album, year, genre, track number, cover) by the tag engine.
 - A full checksum and an audio-only checksum (without the ID3 tag) are computed per track for
   change detection and cached in a per-root `.meta/mp3-manager.json` snapshot
   (`MetaSnapshot` / `MetaRecord`). A background verifier re-checks tracks whose checksums are
   missing or more than a day old, re-reading the tags of a file changed outside the app. It
   holds off while a save is under way and never records over what a save recorded; `.meta/` is
   written through one queue per root (`flushMeta`), always from the library's latest state.
-- Edits are written back as ID3 tags with `browser-id3-writer`, serialized to bytes, and
-  written in place through the VFS; `.meta/` is updated with the new checksums.
+- Edits are written into the file's bytes by the tag engine, which keeps every frame it does not
+  edit and refuses a write that fails its safeguards, and written in place through the VFS;
+  `.meta/` is updated with the new checksums. A save of several tracks that one refuses stops
+  there: the tracks before it stay saved and recorded.
 
 ### The library
 - The active root is shown as a folder tree (folders, discs, tracks) next to an album sheet

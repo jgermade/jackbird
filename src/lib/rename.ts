@@ -7,7 +7,7 @@
 
 import { $computed, $reactive, $toRaw } from "jq79";
 import { RENAME_PRESETS, planRenames, type RenamePlan } from "../helpers/rename";
-import type { MetaRecord, Mp3Track, RootWorkspace } from "../types";
+import type { MetaRecord, Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
 import { flushMeta } from "./meta";
@@ -53,7 +53,7 @@ const nameOf = (path: string): string => path.split("/").pop() ?? path;
 /** A root with `renames` (old path to new) applied to its tracks, records, selection and current row. */
 function renamedRoot(root: RootWorkspace, renames: ReadonlyMap<string, string>): RootWorkspace {
   const move = (id: string): string => renames.get(id) ?? id;
-  const tracks: Mp3Track[] = root.tracks.map((track) => {
+  const tracks: Track[] = root.tracks.map((track) => {
     const to = renames.get(track.id);
     return to ? { ...track, id: to, relativePath: to, name: nameOf(to) } : track;
   });

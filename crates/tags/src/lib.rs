@@ -22,7 +22,7 @@ mod year;
 
 use std::fmt;
 
-pub use region::{audio_region, format_of};
+pub use region::{FIRST_HEAD, FileLayout, Layout, TAIL_LEN, audio_region, format_of, layout};
 
 /// The formats the engine reads and writes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -125,9 +125,23 @@ pub struct Tags {
     pub cover: Option<Cover>,
 }
 
+/// What a write does to the cover.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum CoverEdit {
+    /// Leaves the pictures as they are.
+    #[default]
+    Keep,
+    /// Replaces the picture shown (in place) with this front cover, or adds it.
+    /// The cover already shown leaves the pictures as they are.
+    Set(Cover),
+    /// Removes the picture shown; every other picture stays. Nothing to remove
+    /// leaves the pictures as they are.
+    Remove,
+}
+
 /// What a write changes: `None` leaves a field as it is, an empty string
-/// removes it; a field given its current value is left alone too. A cover
-/// replaces the one shown (in place), or is added.
+/// removes it; a field given its current value is left alone too. The cover
+/// changes as its [`CoverEdit`] says.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Edit {
     /// The new title.
@@ -142,8 +156,8 @@ pub struct Edit {
     pub genre: Option<String>,
     /// The new track number.
     pub track: Option<String>,
-    /// The new cover.
-    pub cover: Option<Cover>,
+    /// What happens to the cover.
+    pub cover: CoverEdit,
 }
 
 impl Edit {
@@ -156,7 +170,7 @@ impl Edit {
             year: Some(fields.year.clone()),
             genre: Some(fields.genre.clone()),
             track: Some(fields.track.clone()),
-            cover: None,
+            cover: CoverEdit::Keep,
         }
     }
 
@@ -240,17 +254,53 @@ impl std::error::Error for Error {}
 /// Reads a file's fields and cover. Lenient: what cannot be read reads as
 /// empty, so an MP3 with a broken tag reads as untagged.
 pub fn read(bytes: &[u8]) -> Result<Tags, Error> {
-    match format_of(bytes).ok_or(Error::NotSupported)? {
+    read_format(format_of(bytes).ok_or(Error::NotSupported)?, bytes)
+}
+
+fn read_format(format: Format, bytes: &[u8]) -> Result<Tags, Error> {
+    match format {
         Format::Mp3 => Ok(mp3::read(bytes)),
         Format::Flac => flac::read(bytes),
     }
 }
 
-/// Writes `edit` into a file's bytes and gives the new file, checked by the
-/// three safeguards. An edit that changes nothing gives the same bytes.
-pub fn write(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>, Error> {
-    let format = format_of(bytes).ok_or(Error::NotSupported)?;
-    let current = read(bytes)?;
+/// The tags of a file of this layout: `head` is at least its first
+/// `layout.tags_end` bytes. Reads as [`read`] does on the whole file.
+pub fn read_head(head: &[u8], layout: &FileLayout) -> Result<Tags, Error> {
+    let format = layout.format.ok_or(Error::NotSupported)?;
+    read_format(format, tags_of(head, layout)?)
+}
+
+/// The file's first `tags_end` bytes, out of `head`.
+fn tags_of<'a>(head: &'a [u8], layout: &FileLayout) -> Result<&'a [u8], Error> {
+    usize::try_from(layout.tags_end)
+        .ok()
+        .and_then(|end| head.get(..end))
+        .ok_or_else(|| Error::Unreadable("the head is shorter than the tags".into()))
+}
+
+/// What a save writes: the file's bytes in `replace` (always from its start)
+/// replaced with `with`. The rest of the file, its audio and whatever follows
+/// it, stays as it is.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Splice {
+    /// The bytes replaced: `0..tags_end`.
+    pub replace: std::ops::Range<u64>,
+    /// What replaces them: the new tags.
+    pub with: Vec<u8>,
+}
+
+/// Writes `edit` into the tags of a file of this layout (`head` is at least
+/// its first `layout.tags_end` bytes) and gives the splice that saves it,
+/// checked by the safeguards: (1) the new tags read back as asked, (2) they
+/// end exactly where their own header or last block says the audio starts,
+/// so the source's bytes after `tags_end` follow them unchanged, (3) every
+/// frame, block and comment the edit does not touch is kept, byte for byte
+/// and in order. An edit that changes nothing gives the same bytes back.
+pub fn write_head(head: &[u8], layout: &FileLayout, edit: &Edit) -> Result<Splice, Error> {
+    let format = layout.format.ok_or(Error::NotSupported)?;
+    let source = tags_of(head, layout)?;
+    let current = read_format(format, source)?;
     let mut wanted = current.fields.clone();
     let mut changes = Vec::new();
     for field in Field::ALL {
@@ -259,62 +309,139 @@ pub fn write(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>, Error> {
             wanted.set(field, value.to_owned());
         }
     }
-    let cover = edit
-        .cover
-        .as_ref()
-        .filter(|cover| current.cover.as_ref() != Some(*cover));
+    let cover = match &edit.cover {
+        CoverEdit::Keep => None,
+        CoverEdit::Set(cover) => (current.cover.as_ref() != Some(cover)).then_some(CoverChange::Set(cover)),
+        CoverEdit::Remove => current.cover.is_some().then_some(CoverChange::Remove),
+    };
+    let splice = |with: Vec<u8>| Splice {
+        replace: 0..layout.tags_end,
+        with,
+    };
     if changes.is_empty() && cover.is_none() {
-        return Ok(bytes.to_vec());
+        return Ok(splice(source.to_vec()));
     }
     let out = match format {
-        Format::Mp3 => mp3::write(bytes, &changes, cover)?,
-        Format::Flac => flac::write(bytes, &changes, cover)?,
+        Format::Mp3 => mp3::write(source, &changes, cover)?,
+        Format::Flac => flac::write(source, &changes, cover)?,
     };
     let change = Change {
         changes: &changes,
         cover,
         fields: &wanted,
-        shown_cover: cover.or(current.cover.as_ref()),
+        shown_cover: match cover {
+            Some(CoverChange::Set(cover)) => Some(cover),
+            _ => current.cover.as_ref(),
+        },
     };
-    verify(format, bytes, &out, &change)?;
+    verify_head(format, source, &out, &change)?;
+    Ok(splice(out))
+}
+
+/// The layout of a whole file.
+fn layout_of(bytes: &[u8]) -> Result<FileLayout, Error> {
+    let tail = &bytes[bytes.len().saturating_sub(TAIL_LEN)..];
+    match layout(bytes, tail, bytes.len() as u64)? {
+        Layout::Known(layout) => Ok(layout),
+        Layout::NeedHead(_) => Err(Error::Unreadable("the whole file is not enough".into())),
+    }
+}
+
+/// Writes `edit` into a whole file and gives the new file: [`write_head`]'s
+/// splice applied, then checked again on the whole (its audio region, and
+/// whatever follows it, byte-identical to the source's). An edit that
+/// changes nothing gives the same bytes.
+pub fn write(bytes: &[u8], edit: &Edit) -> Result<Vec<u8>, Error> {
+    format_of(bytes).ok_or(Error::NotSupported)?;
+    let layout = layout_of(bytes)?;
+    let Splice { replace, with } = write_head(bytes, &layout, edit)?;
+    let end = replace.end as usize;
+    if with == bytes[..end] {
+        return Ok(bytes.to_vec());
+    }
+    let mut out = with;
+    out.extend_from_slice(&bytes[end..]);
+    check_audio(bytes, &out)?;
     Ok(out)
+}
+
+/// A change of the cover that a write makes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CoverChange<'a> {
+    /// The picture shown replaced with this front cover, or this one added.
+    Set(&'a Cover),
+    /// The picture shown removed.
+    Remove,
 }
 
 /// What a write was asked to do, as the safeguards check it.
 pub(crate) struct Change<'a> {
     /// The fields that change, and their new values.
     pub changes: &'a [(Field, String)],
-    /// The new cover, if it changes.
-    pub cover: Option<&'a Cover>,
+    /// The change of the cover, if it changes.
+    pub cover: Option<CoverChange<'a>>,
     /// Every field as the result must read.
     pub fields: &'a Fields,
-    /// The cover the result must show.
+    /// The cover the result must show. Not checked when the cover is
+    /// removed: safeguard 3 checks that every other picture stays, so the one
+    /// shown next is the source's.
     pub shown_cover: Option<&'a Cover>,
 }
 
-/// The three safeguards, on a write's result.
-pub(crate) fn verify(format: Format, source: &[u8], out: &[u8], change: &Change<'_>) -> Result<(), Error> {
-    // 1. Read back as asked.
-    let back = read(out).map_err(|error| Error::Refused(Refusal::Fields(error.to_string())))?;
+/// Safeguard 1: the result reads as asked. Not the cover after a removal:
+/// safeguard 3 checks that every other picture stays, so the one shown next
+/// is the source's.
+fn check_fields(format: Format, out: &[u8], change: &Change<'_>) -> Result<(), Error> {
+    let back = read_format(format, out).map_err(|error| Error::Refused(Refusal::Fields(error.to_string())))?;
     if back.fields != *change.fields {
         return Err(Error::Refused(Refusal::Fields(format!(
             "{:?} instead of {:?}",
             back.fields, change.fields
         ))));
     }
-    if back.cover.as_ref() != change.shown_cover {
+    if change.cover != Some(CoverChange::Remove) && back.cover.as_ref() != change.shown_cover {
         return Err(Error::Refused(Refusal::Fields("the cover".into())));
     }
-    // 2. The audio, and what follows it, unchanged.
+    Ok(())
+}
+
+/// Safeguard 2 on whole files: the audio region, and whatever follows it,
+/// byte-identical.
+fn check_audio(source: &[u8], out: &[u8]) -> Result<(), Error> {
     let (before, after) = (audio_region(source), audio_region(out));
     if source[before.start..] != out[after.start..] || before.len() != after.len() {
         return Err(Error::Refused(Refusal::Audio));
     }
-    // 3. Everything untouched kept: checked by each format, on the result.
+    Ok(())
+}
+
+/// Safeguard 3: everything untouched kept, checked by each format.
+fn check_kept(format: Format, source: &[u8], out: &[u8], change: &Change<'_>) -> Result<(), Error> {
     match format {
         Format::Mp3 => mp3::check_kept(source, out, change.changes, change.cover),
         Format::Flac => flac::check_kept(source, out, change.changes, change.cover),
     }
+}
+
+/// The three safeguards on whole files, as the tests drive them; a save runs
+/// [`verify_head`] on the tags, then [`check_audio`] on the whole.
+#[cfg(test)]
+pub(crate) fn verify(format: Format, source: &[u8], out: &[u8], change: &Change<'_>) -> Result<(), Error> {
+    check_fields(format, out, change)?;
+    check_audio(source, out)?;
+    check_kept(format, source, out, change)
+}
+
+/// The safeguards on new tags alone (`out`), against the source's (`source`,
+/// its first `tags_end` bytes): (1) and (3) as [`verify`]; (2) the new tags
+/// end exactly where their own header (MP3) or last block (FLAC) says, so
+/// the audio that follows them is where it was in the source.
+pub(crate) fn verify_head(format: Format, source: &[u8], out: &[u8], change: &Change<'_>) -> Result<(), Error> {
+    check_fields(format, out, change)?;
+    if region::declared_end(out, format) != Some(out.len()) {
+        return Err(Error::Refused(Refusal::Audio));
+    }
+    check_kept(format, source, out, change)
 }
 
 #[cfg(test)]

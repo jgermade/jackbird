@@ -7,12 +7,13 @@ SHA-1), its audio region (start, end, SHA-1) and what a save of a new title give
 error's code).
 
 The tags and FLAC metadata blocks are built byte by byte around half a second of `ffmpeg` audio,
-and one file is saved as today's app saves (`browser-id3-writer`, then `keepUneditedFrames`), so the
-expectations come from how each file was built, not from the code under test. The audio regions of
-the MP3 files are the ones `getAudioFrameSlice` (`src/lib/id3.ts`) gives.
+and one file was saved as the app saved before E2 (`browser-id3-writer`, then `keepUneditedFrames`,
+both retired since; the script keeps that file as it is), so the expectations come from how each
+file was built, not from the code under test. The audio regions of the MP3 files are the ones the
+app's checksums always hashed (`getAudioFrameSlice` before E2, `jackbird_tags::audio_region` now).
 
 They are committed, so the tests need neither `ffmpeg` nor Node. To make them again (the same bytes
-for the same `ffmpeg`), after `npm ci`:
+for the same `ffmpeg`):
 
 ```bash
 node --experimental-strip-types --disable-warning=ExperimentalWarning fixtures/tags/make.mjs

@@ -15,12 +15,12 @@ list, selected track, metadata draft, grouping mode, and wizard tree expansion. 
 in code as `RootWorkspace`.
 
 ### Track
-A single MP3 file inside a root, identified by `id` (a VFS file id) and `relativePath`.
-Carries its `size`, a content `checksum`, and its parsed `metadata`. Modeled as
-`Mp3Track`.
+A single audio file (MP3 or FLAC, `src/helpers/formats.ts`) inside a root, identified by `id`
+(a VFS file id) and `relativePath`. Carries its `size`, a content `checksum`, and its parsed
+`metadata`. Modeled as `Track` (`Mp3Track` until E3).
 
-### Metadata (ID3 tags)
-The editable ID3 fields of a track: `title`, `artist`, `album`, `year`, `genre`,
+### Metadata (tags)
+The editable tag fields of a track (ID3v2 frames in MP3, Vorbis comments in FLAC): `title`, `artist`, `album`, `year`, `genre`,
 `trackNumber`, and `coverDataUrl`. Modeled as `TrackMetadata`; `EditableMetadata` is the
 same shape used for the in-progress editor draft.
 
