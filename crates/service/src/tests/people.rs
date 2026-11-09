@@ -51,12 +51,17 @@ fn smtp() -> Smtp {
 
 /// A service with SMTP set up and an outbox, open, with its first person (the owner).
 pub(super) fn instance() -> (Arc<Service>, Router, Outbox) {
+    instance_with(None)
+}
+
+/// The same, with a library (F1).
+pub(super) fn instance_with(library: Option<jackbird_store::Library>) -> (Arc<Service>, Router, Outbox) {
     let outbox = Outbox::default();
     let settings = Config {
         smtp: Some(smtp()),
         ..Config::default()
     };
-    let service = Service::with_mailer(settings, None, Store::memory(), Box::new(outbox.clone()));
+    let service = Service::with_library(settings, None, Store::memory(), Box::new(outbox.clone()), library);
     let app = router(Arc::clone(&service));
     (service, app, outbox)
 }
@@ -371,7 +376,14 @@ async fn codes_answer_the_same_for_unknown_addresses_burn_after_five_tries_and_a
 
 /// The roles' cookies on an instance with sign-in on: owner, admin, editor, listener.
 pub(super) async fn family() -> (Arc<Service>, Router, Outbox, [String; 4]) {
-    let (service, app, outbox) = instance();
+    family_with(None).await
+}
+
+/// The same, with a library (F1).
+pub(super) async fn family_with(
+    library: Option<jackbird_store::Library>,
+) -> (Arc<Service>, Router, Outbox, [String; 4]) {
+    let (service, app, outbox) = instance_with(library);
     let owner = turn_signin_on(&app, &outbox, "owner@example.com").await;
     let mut cookies = vec![owner.clone()];
     for (email, role) in [

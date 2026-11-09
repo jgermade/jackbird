@@ -26,6 +26,7 @@ pub mod access;
 pub mod auth;
 pub mod config;
 pub mod install;
+mod library_api;
 pub mod mail;
 mod passkeys;
 pub mod people;
@@ -79,6 +80,10 @@ pub struct Service {
     pub network: tokio::sync::watch::Sender<bool>,
     /// Sends email (SMTP; a fake one in tests).
     pub(crate) mailer: Box<dyn mail::Mailer>,
+    /// The family library (F1), when it could be opened.
+    pub(crate) library: Option<Arc<jackbird_store::Library>>,
+    /// The import from a folder of the machine under way, or the last one.
+    pub(crate) importing: std::sync::Mutex<library_api::ImportState>,
 }
 
 impl Service {
@@ -89,12 +94,23 @@ impl Service {
         Service::with_mailer(settings, config, store, Box::new(mail::SmtpMailer))
     }
 
-    /// The same, with another way of sending email (tests).
+    /// The same, with another way of sending email (tests), and no library.
     pub fn with_mailer(
         settings: Config,
         config: Option<PathBuf>,
         store: Store,
         mailer: Box<dyn mail::Mailer>,
+    ) -> Arc<Service> {
+        Service::with_library(settings, config, store, mailer, None)
+    }
+
+    /// The same, with the family library (F1).
+    pub fn with_library(
+        settings: Config,
+        config: Option<PathBuf>,
+        store: Store,
+        mailer: Box<dyn mail::Mailer>,
+        library: Option<jackbird_store::Library>,
     ) -> Arc<Service> {
         let open = settings
             .roots
@@ -119,6 +135,8 @@ impl Service {
             console_key,
             network,
             mailer,
+            library: library.map(Arc::new),
+            importing: std::sync::Mutex::new(library_api::ImportState::default()),
         })
     }
 
@@ -206,7 +224,7 @@ impl IntoResponse for ApiError {
 pub(crate) type Answer<T> = Result<T, ApiError>;
 
 /// Runs file work off the async threads.
-async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, Error> + Send + 'static) -> Answer<T> {
+pub(crate) async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, Error> + Send + 'static) -> Answer<T> {
     tokio::task::spawn_blocking(work)
         .await
         .map_err(|error| ApiError::from(failure("io", error.to_string())))?
@@ -627,18 +645,21 @@ pub fn router(service: Arc<Service>) -> Router {
         .route("/inspect", post(inspect))
         .route("/media", get(media))
         .merge(people_api::own())
-        .merge(passkeys::own());
+        .merge(passkeys::own())
+        .merge(library_api::listeners());
     let editor = Router::new()
         .route("/write", post(write))
         .route("/delete", post(delete))
         .route("/mkdir", post(mkdir))
         .route("/rename", post(rename))
-        .route("/save", post(save));
+        .route("/save", post(save))
+        .merge(library_api::editors());
     let owner = Router::new()
         .route("/roots", post(open_root))
         .route("/roots/close", post(close_root))
         .route("/folders", get(folders))
-        .merge(people_api::owners());
+        .merge(people_api::owners())
+        .merge(library_api::owners());
     let api = Router::new()
         .route("/info", get(info))
         .merge(people_api::open())

@@ -215,7 +215,29 @@ async fn run_server(
     let store = jackbird_service::people::Store::open(&config::database_path(&path))
         .unwrap_or_else(|error| fail("the people's database cannot be opened", error));
     let config = Config { port, ..config };
-    let service = jackbird_service::Service::new(config, Some(path.clone()), store);
+    // The family library (F1): where the configuration says, or the person's data folder.
+    let folder = if config.library.is_empty() {
+        config::default_library()
+    } else {
+        PathBuf::from(&config.library)
+    };
+    let library = match jackbird_store::Library::open(&folder) {
+        Ok(library) => Some(library),
+        Err(error) => {
+            eprintln!(
+                "jackbird-service: the library at {} cannot be opened: {error}",
+                folder.display()
+            );
+            None
+        }
+    };
+    let service = jackbird_service::Service::with_library(
+        config,
+        Some(path.clone()),
+        store,
+        Box::new(jackbird_service::mail::SmtpMailer),
+        library,
+    );
     // The console's key, readable by this person alone (`setup`, `signin off`).
     if let Err(error) = config::write_private(&config::console_key_path(&path), service.console_key().as_bytes()) {
         eprintln!("jackbird-service: the console's key cannot be written: {error}");

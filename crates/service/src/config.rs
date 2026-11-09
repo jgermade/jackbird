@@ -54,6 +54,9 @@ pub struct Config {
     /// The SMTP server, once set up.
     #[serde(default)]
     pub smtp: Option<Smtp>,
+    /// The family library's folder (F1); empty: [`default_library`].
+    #[serde(default)]
+    pub library: String,
 }
 
 fn default_port() -> u16 {
@@ -74,6 +77,7 @@ impl Default for Config {
             network: false,
             proxies: default_proxies(),
             smtp: None,
+            library: String::new(),
         }
     }
 }
@@ -119,6 +123,22 @@ pub fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     {
         std::fs::write(path, bytes)
     }
+}
+
+/// Where the family library lives unless the configuration says otherwise: the person's own data
+/// folder (`$XDG_DATA_HOME` or `~/.local/share` on Linux, `~/Library/Application Support` on
+/// macOS, `%LOCALAPPDATA%` on Windows), in `jackbird/library`.
+pub fn default_library() -> PathBuf {
+    let var = |name: &str| std::env::var_os(name).map(PathBuf::from);
+    let base = if cfg!(windows) {
+        var("LOCALAPPDATA").unwrap_or_else(|| PathBuf::from("."))
+    } else if cfg!(target_os = "macos") {
+        var("HOME").map_or_else(|| PathBuf::from("."), |home| home.join("Library/Application Support"))
+    } else {
+        var("XDG_DATA_HOME")
+            .unwrap_or_else(|| var("HOME").map_or_else(|| PathBuf::from("."), |home| home.join(".local/share")))
+    };
+    base.join("jackbird").join("library")
 }
 
 /// The people's database, beside the configuration.
