@@ -218,13 +218,76 @@ async function report(page) {
     }
     console.log("the files on the machine are as they were");
 
+    // ── F4: an edit on an old version is refused and shown.
+    await owner.reload();
+    await owner.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
+    await editor.getByRole("button", { name: "More for Retitled by Luis" }).first().click();
+    await editor.getByRole("menuitem", { name: "Edit tags…" }).first().click();
+    await editor.getByLabel("Title", { exact: true }).fill("Second edit by Luis");
+    await editor.getByRole("button", { name: "Save changes" }).click();
+    await editor.getByText("Second edit by Luis").first().waitFor({ timeout: 15000 });
+    await owner.getByRole("button", { name: "More for Retitled by Luis" }).first().click();
+    await owner.getByRole("menuitem", { name: "Edit tags…" }).first().click();
+    await owner.getByLabel("Title", { exact: true }).fill("The owner's, on an old version");
+    await owner.getByRole("button", { name: "Save changes" }).click();
+    await owner.getByText(/changed since you opened it/).first().waitFor({ timeout: 15000 });
+    const shown = await owner.getByLabel("Title", { exact: true }).inputValue();
+    console.log("owner's save on an old version refused; the form shows:", shown);
+    if (shown !== "Second edit by Luis") fail(`the form shows ${shown}`);
+    await owner.getByRole("button", { name: "Cancel" }).first().click();
+
+    // ── F4: deleted into the trash, restored by the owner.
+    const deleted = await editor.evaluate(async () => (await fetch("/api/library/delete?path=Uploads%2FLuis%2Fape.mp3", { method: "POST" })).status);
+    if (deleted !== 204) fail(`the delete answered ${deleted}`);
+    await owner.getByRole("button", { name: "Open preferences" }).first().click();
+    await owner.getByRole("button", { name: "People and sign-in…" }).click();
+    await owner.getByRole("tab", { name: "Trash" }).click();
+    await owner.getByText("Uploads/Luis/ape.mp3").waitFor({ timeout: 15000 });
+    await owner.getByRole("button", { name: "Restore" }).first().click();
+    await owner.getByText("The trash is empty.").first().waitFor({ timeout: 15000 });
+    const back = await owner.evaluate(async () => (await (await fetch("/api/library/walk")).json()).some((entry) => entry.path === "Uploads/Luis/ape.mp3"));
+    if (!back) fail("the song did not come back from the trash");
+    console.log("a song deleted into the trash and restored");
+    await owner.getByRole("tab", { name: "Backups" }).click();
+    await owner.getByRole("button", { name: "Take one now" }).click();
+    await owner.getByText("Snapshot taken.").waitFor({ timeout: 15000 });
+    await owner.keyboard.press("Escape");
+
+    // ── F4: away from home with restic (where it is installed): backed up, wiped, restored.
+    const restic = require("node:child_process").spawnSync("restic", ["version"], { encoding: "utf8" });
+    if (restic.status === 0) {
+      const libraryFolder = path.join(env.XDG_DATA_HOME, "jackbird", "library");
+      const repository = path.join(home, "restic");
+      const run = (...args) => {
+        const done = require("node:child_process").spawnSync("restic", ["-r", repository, ...args], {
+          encoding: "utf8",
+          env: { ...process.env, RESTIC_PASSWORD: "check" }
+        });
+        if (done.status !== 0) fail(`restic ${args[0]}: ${done.stderr}`);
+        return done.stdout;
+      };
+      run("init");
+      service.kill();
+      await new Promise((resolve) => service.on("exit", resolve));
+      run("backup", "--quiet", libraryFolder);
+      fs.rmSync(libraryFolder, { recursive: true, force: true });
+      run("restore", "latest", "--target", "/");
+      service = start();
+      await ready();
+      await listener.reload();
+      await listener.getByText("Second edit by Luis").first().waitFor({ timeout: 30000 });
+      console.log("the library backed up with restic, wiped, restored and seen again");
+    } else {
+      console.log("restic is not installed here: its part is skipped");
+    }
+
     // ── A restart: the library is as it was.
     service.kill();
     await new Promise((resolve) => service.on("exit", resolve));
     service = start();
     await ready();
     await listener.reload();
-    await listener.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
+    await listener.getByText("Second edit by Luis").first().waitFor({ timeout: 30000 });
     await listener.screenshot({ path: path.join(home, "library.png") });
     console.log("library-check: ok", path.join(home, "library.png"));
   } catch (error) {

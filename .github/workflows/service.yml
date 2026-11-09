@@ -5,7 +5,9 @@
 # sign-in's (scripts/signin-check.cjs, S3: email set up with a local SMTP sink, sign-in turned on
 # by the owner's code, an editor and a listener invited, a code and a passkey, each role's limits,
 # the log, sessions kept across a restart), and the family library's (scripts/library-check.cjs,
-# F1: an owner's import, an editor's upload and retitle, a listener's playback and download). The binaries are uploaded; release.yml calls it with
+# F1, F3, F4: an owner's import, an editor's upload and retitle, a listener's playback and download,
+# their own versions, a stale save refused, the trash, and on Linux the library backed up with restic,
+# wiped and restored). The binaries are uploaded; release.yml calls it with
 # the new tag and attaches them. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S1, S3, F1).
 name: service
 
@@ -89,10 +91,10 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright@1.63.0
           npx playwright install --with-deps chromium
 
-      - name: A long FLAC to play (Linux)
+      - name: A long FLAC to play, and restic for the library's copy away from home (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg restic
           ffmpeg -v error -f lavfi -i "sine=frequency=440:duration=20" -c:a flac \
             -metadata TITLE="Blue Tone" -metadata ARTIST="Test Artist" "$RUNNER_TEMP/cd.flac"
           echo "LONG=$RUNNER_TEMP/cd.flac" >> "$GITHUB_ENV"

@@ -91,6 +91,22 @@ function reasonOf(error: unknown, metadata: EditableMetadata): string {
 }
 
 /**
+ * A song someone else saved since it was read (F4): its tags as they are now, in the library and
+ * in the form, for the person to apply theirs again.
+ */
+async function showAsItIsNow(rootId: string, track: Track): Promise<void> {
+  const root = $toRaw(library).roots.find((item) => item.id === rootId);
+  const now = await root?.source.inspect(track.relativePath).catch(() => null);
+  if (!now?.metadata) return;
+  const fresh: Track = { ...track, metadata: now.metadata, checksum: now.fullChecksum, fullChecksum: now.fullChecksum, audioChecksum: now.audioChecksum };
+  updateRoots((roots) =>
+    roots.map((item) => (item.id === rootId ? { ...item, tracks: item.tracks.map((one) => (one.id === track.id ? fresh : one)) } : item))
+  );
+  editor.form = computeCommonMetadata(selectedTracks.value.data);
+  editor.confirmed = [];
+}
+
+/**
  * Writes the form to every selected track: a field the selection varied in
  * and the form left empty keeps each track's own value (see mergeDraft). Each
  * file gets its new tags and checksums; then the library takes the new
@@ -119,12 +135,14 @@ export async function saveEdits(): Promise<void> {
     const records: Record<string, MetaRecord> = {};
     const saved = new Map<string, Track>();
     // The track that could not be saved, and why: the ones before it are saved and recorded.
-    let failed: { track: Track; reason: string } | null = null;
+    let failed: { track: Track; reason: string; stale?: boolean } | null = null;
 
     for (const track of tracks) {
       const metadata = mergeDraft(track.metadata, draft, varied, confirmed);
       try {
-        const written = await root.source.save(track.relativePath, track.metadata, metadata, $toRaw(editor).scope);
+        // In the family library (F4), the version read goes with it: a song changed since is refused.
+        const expected = inLibrary() ? track.fullChecksum : undefined;
+        const written = await root.source.save(track.relativePath, track.metadata, metadata, $toRaw(editor).scope, expected);
         const { fullChecksum, audioChecksum } = written;
         const nowIso = new Date().toISOString();
         // The date the disk gave the file, which the next load compares with:
@@ -135,7 +153,7 @@ export async function saveEdits(): Promise<void> {
         records[track.relativePath] = { ...checked, updatedAt: nowIso };
         saved.set(track.id, { ...track, ...checked });
       } catch (error) {
-        failed = { track, reason: reasonOf(error, metadata) };
+        failed = { track, reason: reasonOf(error, metadata), stale: error instanceof TagError && error.code === "stale" };
         break;
       }
     }
@@ -159,6 +177,7 @@ export async function saveEdits(): Promise<void> {
     if (failed) {
       const message = t("message.saveFailedFor", { name: failed.track.name, reason: failed.reason });
       library.errorMessage = saved.size > 0 ? `${message} ${tn("message.savedBefore", saved.size)}` : message;
+      if (failed.stale) await showAsItIsNow(root.id, failed.track);
       return;
     }
     const target = tracks.length === 1 ? tracks[0].name : tn("tracks.count", tracks.length);

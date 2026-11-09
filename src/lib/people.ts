@@ -12,7 +12,10 @@ import type { Me } from "./account";
 import { preferences } from "./preferences";
 import { post, serviceJson, setServiceToken, usesToken } from "./sources/service";
 
-export type PeopleTab = "people" | "signin" | "log";
+export type PeopleTab = "people" | "signin" | "log" | "trash" | "backups";
+export type TrashedSong = { id: number; path: string; by: string; at: number };
+export type JobState = { running: boolean; done: number; total: number; at: number | null; result: unknown; error: string | null };
+export type Backups = { folder: string; snapshots: string[]; scrub: JobState; export: JobState };
 export type Change = { at: number; person: string; action: string; root: string; path: string };
 export type SmtpShown = { host: string; port: number; security: string; username: string; from: string; password: boolean };
 export type Settings = { signin: boolean; address: string; network: boolean; proxies: string[] };
@@ -27,6 +30,10 @@ export const people = $reactive({
   busy: false,
   error: "",
   notice: "",
+  /** The library's trash (F4). */
+  trash: [] as TrashedSong[],
+  /** Its snapshots, scrub and export (F4). */
+  backups: null as Backups | null,
   /** Turning sign-in on: the address the code went to, and the attempt. */
   setupEmail: "",
   setupAttempt: ""
@@ -140,4 +147,51 @@ export function cancelSetup(): void {
 export async function signinOff(): Promise<void> {
   const answer = await busy(() => serviceJson("signin", post({ on: false })));
   if (answer) location.reload();
+}
+
+// ─── The library's safety (F4) ───────────────────────────────────────────────
+
+export async function loadTrash(): Promise<void> {
+  const trash = await serviceJson<TrashedSong[]>("library/trash").catch(() => null);
+  if (trash) people.trash = trash;
+}
+
+export async function restoreSong(id: number, restoredNotice: string): Promise<void> {
+  await busy(() => serviceJson("library/trash/restore", post({ id })), restoredNotice);
+  await loadTrash();
+}
+
+export async function emptyTrash(emptiedNotice: string): Promise<void> {
+  await busy(() => serviceJson("library/trash/empty", post()), emptiedNotice);
+  await loadTrash();
+}
+
+export async function loadBackups(): Promise<void> {
+  const backups = await serviceJson<Backups>("library/backups").catch(() => null);
+  if (backups) people.backups = backups;
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Follows the scrub and the export while either runs. */
+async function follow(): Promise<void> {
+  do {
+    await wait(500);
+    await loadBackups();
+  } while (people.open && (people.backups?.scrub.running || people.backups?.export.running));
+}
+
+export async function takeSnapshot(takenNotice: string): Promise<void> {
+  const backups = await busy(() => serviceJson<Backups>("library/backups/snapshot", post()), takenNotice);
+  if (backups) people.backups = backups;
+}
+
+export async function startScrub(): Promise<void> {
+  await busy(() => serviceJson("library/backups/scrub", post()));
+  await follow();
+}
+
+export async function exportLibrary(path: string): Promise<void> {
+  await busy(() => serviceJson("library/export", post({ path })));
+  await follow();
 }

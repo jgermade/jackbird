@@ -137,14 +137,31 @@ export const LIBRARY = "@library";
 
 const inLibrary = (path = ""): string => `path=${encodeURIComponent(path)}`;
 
-/** The family library as a root: songs by their places in it, small files beside them. */
+/**
+ * The family library as a root: songs by their places in it, small files beside them. A small
+ * file is written with the size and date it was read at (F4), so a shared playlist changed since
+ * is not written over (`stale`).
+ */
 function libraryVfs(name: string): VFSAdapter {
+  const seen = new Map<string, { size: number; mtime: number }>();
+  const stat = async (path: string): Promise<VFSStat | null> => {
+    const found = await json<(VFSStat & { size: number; mtime: number }) | null>(`library/stat?${inLibrary(path)}`);
+    if (found) seen.set(path, { size: found.size, mtime: found.mtime });
+    return found;
+  };
   return {
     name,
     list: (path) => json<VFSListEntry[]>(`library/list?${inLibrary(path)}`),
-    read: async (path) => new Uint8Array(await (await api(`library/read?${inLibrary(path)}`)).arrayBuffer()),
+    read: async (path) => {
+      const bytes = new Uint8Array(await (await api(`library/read?${inLibrary(path)}`)).arrayBuffer());
+      await stat(path).catch(() => null);
+      return bytes;
+    },
     write: async (path, data) => {
-      await api(`library/write?${inLibrary(path)}`, { method: "POST", body: data as Uint8Array<ArrayBuffer> });
+      const read = seen.get(path);
+      const version = read ? `&size=${read.size}&mtime=${read.mtime}` : "";
+      await api(`library/write?${inLibrary(path)}${version}`, { method: "POST", body: data as Uint8Array<ArrayBuffer> });
+      await stat(path).catch(() => null);
     },
     delete: async (path) => {
       await api(`library/delete?${inLibrary(path)}`, post());
@@ -152,7 +169,7 @@ function libraryVfs(name: string): VFSAdapter {
     rename: async (from, to) => {
       await api("library/rename", post({ from, to }));
     },
-    stat: (path) => json<VFSStat | null>(`library/stat?${inLibrary(path)}`),
+    stat,
     mkdir: async (path) => {
       await api(`library/mkdir?${inLibrary(path)}`, post());
     }
@@ -170,8 +187,8 @@ export async function librarySource(): Promise<RootSource | null> {
     saved: LIBRARY,
     walk: () => json("library/walk"),
     inspect: (path, known) => json<Inspection>("library/inspect", post({ path, known: known ?? null })),
-    save: (path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine") =>
-      json<Inspection>("library/save", post({ path, previous, metadata, scope: scope ?? "family" })),
+    save: (path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine", expected?: string) =>
+      json<Inspection>("library/save", post({ path, previous, metadata, scope: scope ?? "family", expected })),
     async openMedia(path): Promise<MediaHandle> {
       const before = await vfs.stat(path);
       const grant = usesToken() ? `&t=${encodeURIComponent(await mediaToken())}` : "";

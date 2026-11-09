@@ -20,8 +20,8 @@
   const { account } = await import("../lib/account")
   const { assignable, canManage } = await import("../helpers/roles")
   const {
-    addPerson, cancelSetup, confirmSetupCode, loadLog, people, removePerson, saveSettings, saveSmtp,
-    sendSetupCode, signinOff, testSmtp, updatePerson
+    addPerson, cancelSetup, confirmSetupCode, emptyTrash, exportLibrary, loadBackups, loadLog, loadTrash, people, removePerson,
+    restoreSong, saveSettings, saveSmtp, sendSetupCode, signinOff, startScrub, takeSnapshot, testSmtp, updatePerson
   } = await import("../lib/people")
 
   type Role = "listener" | "editor" | "admin" | "owner"
@@ -32,11 +32,38 @@
   const tabs = () => [
     { id: "people", label: t("people.tabPeople") },
     { id: "signin", label: t("people.tabSignin") },
-    { id: "log", label: t("people.tabLog") }
+    { id: "log", label: t("people.tabLog") },
+    ...(importing.available ? [{ id: "trash", label: t("people.tabTrash") }] : []),
+    ...(importing.available && owner() ? [{ id: "backups", label: t("people.tabBackups") }] : [])
   ]
-  const choose = (tab: "people" | "signin" | "log") => {
+  const choose = (tab: "people" | "signin" | "log" | "trash" | "backups") => {
     people.tab = tab
     if (tab === "log") void loadLog()
+    if (tab === "trash") void loadTrash()
+    if (tab === "backups") void loadBackups()
+  }
+  // The library's safety (F4).
+  const { importing } = await import("../lib/importing")
+  const { chooseMachineFolder } = await import("../lib/folders")
+  const exportTo = async () => {
+    const path = await chooseMachineFolder()
+    if (path !== null) await exportLibrary(path)
+  }
+  const scrubText = (): string => {
+    const scrub = people.backups?.scrub
+    if (!scrub) return ""
+    if (scrub.running) return t("backups.scrubbing", { done: scrub.done, total: scrub.total })
+    if (!scrub.at) return t("backups.neverScrubbed")
+    const bad = (scrub.result as unknown[] | null)?.length ?? 0
+    return bad === 0 ? t("backups.scrubOk", { date: when(scrub.at / 1000) }) : t("backups.scrubBad", { count: bad, date: when(scrub.at / 1000) })
+  }
+  const exportText = (): string => {
+    const job = people.backups?.export
+    if (!job || (!job.running && !job.at)) return ""
+    if (job.running) return t("backups.exporting", { done: job.done, total: job.total })
+    if (job.error) return job.error
+    const result = job.result as { written: number; failed: unknown[] } | null
+    return t("backups.exported", { written: result?.written ?? 0, failed: result?.failed.length ?? 0 })
   }
 
   // The person being changed (an id), or someone new (0), and the form's fields.
@@ -235,6 +262,40 @@
       </div>
     </section>
 
+    <section :if="people.tab === 'trash'" class="tab">
+      <p class="hint">{{ t("trash.about") }}</p>
+      <p :if="people.trash.length === 0" class="hint">{{ t("trash.empty") }}</p>
+      <ul :else class="log">
+        <li :each="song in people.trash" :key="song.id" class="trashed">
+          <span class="when">{{ when(song.at / 1000) }} · {{ song.by }}</span>
+          <span class="path">{{ song.path }}</span>
+          <Key size="sm" variant="ghost" :disabled="people.busy" @click="restoreSong(song.id, t('trash.restored'))">{{ t("trash.restore") }}</Key>
+        </li>
+      </ul>
+      <div :if="people.trash.length > 0" class="keys">
+        <Key variant="danger" :disabled="people.busy" @click="emptyTrash(t('trash.emptied'))">{{ t("trash.emptyNow") }}</Key>
+      </div>
+    </section>
+
+    <section :if="people.tab === 'backups'" class="tab">
+      <p class="hint">{{ t("backups.about", { folder: people.backups?.folder ?? "" }) }}</p>
+      <h3 class="mm-legend is-ink">{{ t("backups.snapshots") }}</h3>
+      <p class="hint">{{ (people.backups?.snapshots.length ?? 0) > 0 ? people.backups?.snapshots.slice().reverse().join(" · ") : t("backups.none") }}</p>
+      <div class="keys">
+        <Key variant="secondary" :disabled="people.busy" @click="takeSnapshot(t('backups.taken'))">{{ t("backups.takeNow") }}</Key>
+      </div>
+      <h3 class="mm-legend is-ink">{{ t("backups.scrub") }}</h3>
+      <p class="hint">{{ scrubText() }}</p>
+      <div class="keys">
+        <Key variant="secondary" :disabled="people.busy || people.backups?.scrub.running" @click="startScrub()">{{ t("backups.scrubNow") }}</Key>
+      </div>
+      <h3 class="mm-legend is-ink">{{ t("backups.export") }}</h3>
+      <p class="hint">{{ exportText() || t("backups.exportAbout") }}</p>
+      <div class="keys">
+        <Key variant="secondary" :disabled="people.busy || people.backups?.export.running" @click="exportTo()">{{ t("backups.exportNow") }}</Key>
+      </div>
+    </section>
+
     <section :if="people.tab === 'log'" class="tab">
       <p :if="people.log.length === 0" class="hint">{{ t("log.empty") }}</p>
       <ul :else class="log">
@@ -287,6 +348,9 @@
   .status { grid-column: 1 / -1; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
   .status.off { color: var(--mm-bad); }
   .log li { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-2) var(--mm-space-3); font-size: var(--mm-text-sm); }
+  .trashed { grid-template-columns: 1fr auto; align-items: center; }
+  .trashed .when, .trashed .path { grid-column: 1; }
+  .trashed :last-child { grid-column: 2; grid-row: 1 / span 2; }
   .when { color: var(--mm-fg-subtle); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); }
   .path { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); word-break: break-all; }
   .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
