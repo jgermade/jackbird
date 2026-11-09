@@ -20,7 +20,6 @@ gantt
   title The family instance
   dateFormat YYYY-MM-DD
   axisFormat %d %b
-  section Decide
   section Server
     F1 The server and its store                    :done, f1, 2026-11-09, 1d
     F2 Modes, people, roles, passkeys (S3)         :done, f2, 2026-11-09, 1d
