@@ -89,6 +89,8 @@ jobs:
 
       - name: The check, in the emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          QEMU_AUDIO_DRV: none
         with:
           # API 34's emulator went away under the app on GitHub's runners (2026-11-09); 33 is tried.
           api-level: 33
@@ -99,7 +101,9 @@ jobs:
           disable-animations: true
           # The host-side GPU emulation (SwiftShader) took the whole emulator down once the app drew its
           # interface: the guest draws in software instead, with more memory.
-          emulator-options: -no-window -gpu guest -no-snapshot -noaudio -no-boot-anim
+          # With -noaudio, the emulator went away as soon as the app played a song: it has a sound card
+          # now, its output thrown away (QEMU_AUDIO_DRV=none, below).
+          emulator-options: -no-window -gpu guest -no-snapshot -no-boot-anim
           ram-size: 4096M
           script: mkdir -p /tmp/jackbird-phone-shots && node scripts/phone-check.mjs android "$(find src-tauri/gen/android -name '*.apk' | grep -i debug | head -1)"
 
