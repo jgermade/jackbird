@@ -1,37 +1,55 @@
 //! jackbird's service (S1, RECORD/2026-08-11.musikmatch-rust-migration.WIP.md, 2026-11-08
-//! 17:43): `jackbird-core` behind HTTP, and the web build served from the same origin. One
-//! person, open, on the machine only, until S3 brings sign-in:
+//! 17:43): `jackbird-core` behind HTTP, and the web build served from the same origin; with
+//! people, roles and sign-in since S3 (2026-11-09, 10:45 to 11:57).
 //!
-//! - it listens on the loopback address only (`main.rs`);
+//! Open (sign-in off), it answers on the machine only:
+//!
+//! - it refuses a peer that is not the machine itself, and a request a proxy forwarded;
 //! - every request must name the service itself as its `Host` (`localhost`, `127.0.0.1` or
 //!   `[::1]`, with its port), so a page elsewhere cannot reach it by pointing its own name at
-//!   127.0.0.1 ("DNS rebinding");
+//!   127.0.0.1 ("DNS rebinding").
+//!
+//! With sign-in on, any name is answered (the instance's address behind a proxy, the home
+//! network), since without a session nothing but signing in is. Either way:
+//!
 //! - a request from another site is refused (`Sec-Fetch-Site: cross-site`, or an `Origin` that is
-//!   not the service's), and one that changes anything must come from its own page;
+//!   not the service's), and one that changes anything must come from its own page (or carry an
+//!   `Authorization`, which no other site can set);
 //! - the desktop app's page, its interface while it is installed (S2), is the one other origin
-//!   answered, with CORS for itself alone.
+//!   answered, with CORS for itself alone;
+//! - every route asks for a role (`access.rs`), and every change to the folders is logged.
 //!
 //! The interface's side is `src/lib/sources/service.ts`; the JSON is `jackbird-api`'s, the same
 //! the desktop app speaks.
 
+pub mod access;
+pub mod auth;
 pub mod config;
 pub mod install;
+pub mod mail;
+pub mod people;
+mod people_api;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use axum::body::{Body, Bytes};
-use axum::extract::{DefaultBodyLimit, Query, Request, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, Query, Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::{Extension, Json, Router};
 use jackbird_api::{EntryJson, Failure, InspectionJson, Metadata, Opened, StatJson, edit_for, failure};
 use jackbird_core::{Error, Root};
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
+
+use crate::access::{Client, require};
+use crate::auth::{Codes, Signer};
+use crate::config::Config;
+use crate::people::{Person, Role, Store};
 
 /// The web build (`npm run build`), in the binary of a release build; read from `dist/` in a
 /// debug one. Missing when the binary was built without it: the API still works.
@@ -40,26 +58,87 @@ use tower::ServiceExt;
 #[allow_missing = true]
 struct Web;
 
-/// What the service holds: its open roots, its port, and where its configuration is kept.
+/// What the service holds: its open roots, its settings and where they are kept, its people,
+/// and what signing in needs.
 pub struct Service {
     roots: RwLock<HashMap<String, Root>>,
     port: u16,
+    settings: RwLock<Config>,
     config: Option<PathBuf>,
+    /// The people, their sessions and passkeys, the log.
+    pub store: Store,
+    pub(crate) signer: Signer,
+    pub(crate) codes: Codes,
+    /// The console's key (`config::console_key_path`): `Authorization: Console <key>` acts as an
+    /// owner, for `jackbird-service setup` and `signin off`.
+    pub(crate) console_key: String,
+    /// Whether it should listen on the home network too (sign-in on and the network allowed);
+    /// `main.rs` follows it.
+    pub network: tokio::sync::watch::Sender<bool>,
+    /// Sends email (SMTP; a fake one in tests).
+    pub(crate) mailer: Box<dyn mail::Mailer>,
 }
 
 impl Service {
-    /// A service on `port`, keeping its roots in the configuration at `config` (none in tests).
-    /// The roots the configuration lists are opened again; one that is gone is left out.
-    pub fn new(port: u16, config: Option<PathBuf>, roots: &[String]) -> Arc<Service> {
-        let open = roots
+    /// A service with `settings`, kept in the configuration at `config` (none in tests), with
+    /// its people in `store`. The roots the settings list are opened again; one that is gone is
+    /// left out.
+    pub fn new(settings: Config, config: Option<PathBuf>, store: Store) -> Arc<Service> {
+        Service::with_mailer(settings, config, store, Box::new(mail::SmtpMailer))
+    }
+
+    /// The same, with another way of sending email (tests).
+    pub fn with_mailer(
+        settings: Config,
+        config: Option<PathBuf>,
+        store: Store,
+        mailer: Box<dyn mail::Mailer>,
+    ) -> Arc<Service> {
+        let open = settings
+            .roots
             .iter()
             .filter_map(|path| Root::open(path).ok().map(|root| (path.clone(), root)))
             .collect();
+        let signer = Signer::new(store.secret("signer"));
+        let console_key = {
+            use base64::Engine;
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(people::random::<32>())
+        };
+        let (network, _) = tokio::sync::watch::channel(settings.signin && settings.network);
         Arc::new(Service {
             roots: RwLock::new(open),
-            port,
+            port: settings.port,
+            settings: RwLock::new(settings),
             config,
+            store,
+            signer,
+            codes: Codes::default(),
+            console_key,
+            network,
+            mailer,
         })
+    }
+
+    /// The console's key, for `main.rs` to write where the console finds it.
+    pub fn console_key(&self) -> &str {
+        &self.console_key
+    }
+
+    /// Its settings as they are now.
+    pub fn settings(&self) -> Config {
+        self.settings
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Changes its settings and keeps them.
+    pub(crate) fn change_settings(&self, change: impl FnOnce(&mut Config)) {
+        let mut settings = self.settings.write().unwrap_or_else(std::sync::PoisonError::into_inner);
+        change(&mut settings);
+        self.network.send_replace(settings.signin && settings.network);
+        drop(settings);
+        self.save_config();
     }
 
     fn root(&self, path: &str) -> Result<Root, ApiError> {
@@ -80,17 +159,22 @@ impl Service {
         if let (Some(path), Ok(roots)) = (&self.config, self.roots.read()) {
             let mut paths: Vec<String> = roots.keys().cloned().collect();
             paths.sort();
-            let _ = config::Config {
-                port: self.port,
-                roots: paths,
-            }
-            .save(path);
+            let mut settings = self.settings.write().unwrap_or_else(std::sync::PoisonError::into_inner);
+            settings.roots = paths;
+            let _ = settings.save(path);
         }
     }
 }
 
 /// An error as an HTTP answer: a status, and `jackbird-api`'s failure as JSON.
-pub struct ApiError(StatusCode, Failure);
+pub struct ApiError(pub(crate) StatusCode, pub(crate) Failure);
+
+impl ApiError {
+    /// An answer with a status, a code and a message.
+    pub(crate) fn new(status: StatusCode, code: &str, message: impl Into<String>) -> ApiError {
+        ApiError(status, failure(code, message))
+    }
+}
 
 impl From<Failure> for ApiError {
     fn from(failure: Failure) -> Self {
@@ -116,7 +200,7 @@ impl IntoResponse for ApiError {
     }
 }
 
-type Answer<T> = Result<T, ApiError>;
+pub(crate) type Answer<T> = Result<T, ApiError>;
 
 /// Runs file work off the async threads.
 async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, Error> + Send + 'static) -> Answer<T> {
@@ -167,7 +251,11 @@ struct OpenRoot {
     path: String,
 }
 
-async fn open_root(State(service): State<Arc<Service>>, Json(body): Json<OpenRoot>) -> Answer<Json<Opened>> {
+async fn open_root(
+    State(service): State<Arc<Service>>,
+    Extension(person): Extension<Person>,
+    Json(body): Json<OpenRoot>,
+) -> Answer<Json<Opened>> {
     let path = body.path.clone();
     let root = blocking(move || Root::open(&path)).await?;
     let opened = Opened {
@@ -178,8 +266,9 @@ async fn open_root(State(service): State<Arc<Service>>, Json(body): Json<OpenRoo
         .roots
         .write()
         .map_err(|_| ApiError::from(failure("io", "the roots' list")))?
-        .insert(body.path, root);
+        .insert(body.path.clone(), root);
     service.save_config();
+    service.store.log(&person.name, "open", &body.path, "");
     Ok(Json(opened))
 }
 
@@ -188,13 +277,18 @@ struct CloseRoot {
     root: String,
 }
 
-async fn close_root(State(service): State<Arc<Service>>, Json(body): Json<CloseRoot>) -> Answer<StatusCode> {
+async fn close_root(
+    State(service): State<Arc<Service>>,
+    Extension(person): Extension<Person>,
+    Json(body): Json<CloseRoot>,
+) -> Answer<StatusCode> {
     service
         .roots
         .write()
         .map_err(|_| ApiError::from(failure("io", "the roots' list")))?
         .remove(&body.root);
     service.save_config();
+    service.store.log(&person.name, "close", &body.root, "");
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -272,9 +366,16 @@ async fn read(State(service): State<Arc<Service>>, Query(at): Query<At>) -> Answ
     Ok(([(header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response())
 }
 
-async fn write(State(service): State<Arc<Service>>, Query(at): Query<At>, body: Bytes) -> Answer<StatusCode> {
+async fn write(
+    State(service): State<Arc<Service>>,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+    body: Bytes,
+) -> Answer<StatusCode> {
     let root = service.root(&at.root)?;
-    blocking(move || root.write(&at.path, &body)).await?;
+    let path = at.path.clone();
+    blocking(move || root.write(&path, &body)).await?;
+    service.store.log(&person.name, "write", &at.root, &at.path);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -284,15 +385,27 @@ async fn stat(State(service): State<Arc<Service>>, Query(at): Query<At>) -> Answ
     Ok(Json(stat.map(Into::into)))
 }
 
-async fn delete(State(service): State<Arc<Service>>, Query(at): Query<At>) -> Answer<StatusCode> {
+async fn delete(
+    State(service): State<Arc<Service>>,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<StatusCode> {
     let root = service.root(&at.root)?;
-    blocking(move || root.delete(&at.path)).await?;
+    let path = at.path.clone();
+    blocking(move || root.delete(&path)).await?;
+    service.store.log(&person.name, "delete", &at.root, &at.path);
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn mkdir(State(service): State<Arc<Service>>, Query(at): Query<At>) -> Answer<StatusCode> {
+async fn mkdir(
+    State(service): State<Arc<Service>>,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<StatusCode> {
     let root = service.root(&at.root)?;
-    blocking(move || root.mkdir(&at.path)).await?;
+    let path = at.path.clone();
+    blocking(move || root.mkdir(&path)).await?;
+    service.store.log(&person.name, "mkdir", &at.root, &at.path);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -303,9 +416,20 @@ struct Rename {
     to: String,
 }
 
-async fn rename(State(service): State<Arc<Service>>, Json(body): Json<Rename>) -> Answer<StatusCode> {
+async fn rename(
+    State(service): State<Arc<Service>>,
+    Extension(person): Extension<Person>,
+    Json(body): Json<Rename>,
+) -> Answer<StatusCode> {
     let root = service.root(&body.root)?;
-    blocking(move || root.rename(&body.from, &body.to)).await?;
+    let (from, to) = (body.from.clone(), body.to.clone());
+    blocking(move || root.rename(&from, &to)).await?;
+    service.store.log(
+        &person.name,
+        "rename",
+        &body.root,
+        &format!("{} → {}", body.from, body.to),
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -330,10 +454,16 @@ struct Save {
     metadata: Metadata,
 }
 
-async fn save(State(service): State<Arc<Service>>, Json(body): Json<Save>) -> Answer<Json<InspectionJson>> {
+async fn save(
+    State(service): State<Arc<Service>>,
+    Extension(person): Extension<Person>,
+    Json(body): Json<Save>,
+) -> Answer<Json<InspectionJson>> {
     let root = service.root(&body.root)?;
     let edit = edit_for(&body.previous, body.metadata);
-    let found = blocking(move || jackbird_core::save(&root, &body.path, &edit)).await?;
+    let path = body.path.clone();
+    let found = blocking(move || jackbird_core::save(&root, &path, &edit)).await?;
+    service.store.log(&person.name, "save", &body.root, &body.path);
     Ok(Json(found.into()))
 }
 
@@ -373,36 +503,75 @@ fn own_hosts(port: u16) -> [String; 3] {
     ]
 }
 
-/// The guards of an open service on the machine (the module's documentation).
-async fn guard(State(service): State<Arc<Service>>, request: Request, next: Next) -> Response {
-    let headers: &HeaderMap = request.headers();
-    let refuse = |why: &str| (StatusCode::FORBIDDEN, Json(failure("outside", why))).into_response();
-    let hosts = own_hosts(service.port);
-    let host = headers
-        .get(header::HOST)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("");
-    if !hosts.iter().any(|own| own == host) {
-        return refuse("this service answers only on this machine, by its own address");
+/// Whether an address is the machine itself.
+fn loopback(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_loopback(),
+        std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.to_ipv4_mapped().is_some_and(|v4| v4.is_loopback()),
     }
-    let origin = headers
-        .get(header::ORIGIN)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_owned);
+}
+
+/// The guards (the module's documentation).
+async fn guard(State(service): State<Arc<Service>>, mut request: Request, next: Next) -> Response {
+    let refuse = |why: &str| (StatusCode::FORBIDDEN, Json(failure("outside", why))).into_response();
+    let settings = service.settings();
+    let headers: &HeaderMap = request.headers();
+    let text = |name: header::HeaderName| {
+        headers
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned)
+    };
+    // No peer is known only when the router is called directly (tests): the machine itself.
+    let peer = request
+        .extensions()
+        .get::<ConnectInfo<std::net::SocketAddr>>()
+        .map_or(std::net::IpAddr::from([127, 0, 0, 1]), |info| info.0.ip());
+    let forwarded = headers.contains_key("x-forwarded-for") || headers.contains_key(header::FORWARDED);
+    let proxied = forwarded && settings.proxies.iter().any(|proxy| proxy.parse() == Ok(peer));
+    let host = text(header::HOST).unwrap_or_default();
+    let hosts = own_hosts(service.port);
+    if !settings.signin {
+        if !loopback(peer) || forwarded {
+            return refuse("this service answers only on this machine until sign-in is turned on");
+        }
+        if !hosts.contains(&host) {
+            return refuse("this service answers only on this machine, by its own address");
+        }
+    } else if host.is_empty() {
+        return refuse("a request without a host");
+    }
+    let secure = proxied && headers.get("x-forwarded-proto").map(HeaderValue::as_bytes) == Some(b"https");
+    let ip = if proxied {
+        text(header::HeaderName::from_static("x-forwarded-for"))
+            .and_then(|list| list.split(',').next_back().map(|ip| ip.trim().to_owned()))
+            .unwrap_or_else(|| peer.to_string())
+    } else {
+        peer.to_string()
+    };
+    let own_origin = format!("{}://{host}", if secure { "https" } else { "http" });
+    let origin = text(header::ORIGIN);
     // The desktop app's page, which is the service's interface while it is installed (S2-D4).
-    let desktop = origin.as_deref().filter(|origin| DESKTOP_ORIGINS.contains(origin));
+    let desktop = origin
+        .as_deref()
+        .filter(|origin| DESKTOP_ORIGINS.contains(origin))
+        .map(str::to_owned);
     if desktop.is_none() && headers.get("sec-fetch-site").map(HeaderValue::as_bytes) == Some(b"cross-site") {
         return refuse("a request from another site");
     }
-    let own_origin = |origin: &str| hosts.iter().any(|own| origin == format!("http://{own}"));
     if origin
         .as_deref()
-        .is_some_and(|origin| !own_origin(origin) && desktop.is_none())
+        .is_some_and(|origin| origin != own_origin && desktop.is_none())
     {
         return refuse("a request from another origin");
     }
+    let changes = !matches!(*request.method(), Method::GET | Method::HEAD | Method::OPTIONS);
+    if changes && origin.is_none() && !headers.contains_key(header::AUTHORIZATION) {
+        return refuse("a request that changes something must come from the service's own page");
+    }
+    request.extensions_mut().insert(Client { ip, secure });
     if let Some(desktop) = desktop {
-        let desktop = HeaderValue::from_str(desktop).expect("a known origin");
+        let desktop = HeaderValue::from_str(&desktop).expect("a known origin");
         if request.method() == Method::OPTIONS {
             let mut answer = StatusCode::NO_CONTENT.into_response();
             let headers = answer.headers_mut();
@@ -413,7 +582,7 @@ async fn guard(State(service): State<Arc<Service>>, request: Request, next: Next
             );
             headers.insert(
                 header::ACCESS_CONTROL_ALLOW_HEADERS,
-                HeaderValue::from_static("content-type, range"),
+                HeaderValue::from_static("content-type, range, authorization"),
             );
             headers.insert(header::ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("600"));
             headers.insert(header::VARY, HeaderValue::from_static("origin"));
@@ -429,10 +598,6 @@ async fn guard(State(service): State<Arc<Service>>, request: Request, next: Next
         headers.insert(header::VARY, HeaderValue::from_static("origin"));
         return answer;
     }
-    let changes = !matches!(*request.method(), Method::GET | Method::HEAD);
-    if changes && origin.is_none() {
-        return refuse("a request that changes something must come from the service's own page");
-    }
     next.run(request).await
 }
 
@@ -440,24 +605,40 @@ async fn guard(State(service): State<Arc<Service>>, request: Request, next: Next
 /// `http://tauri.localhost` on Windows), answered with CORS for themselves alone.
 const DESKTOP_ORIGINS: [&str; 3] = ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"];
 
-/// The service's routes, behind its guards.
+/// The routes of a role: the person is checked, and handed to them.
+fn of(service: &Arc<Service>, role: Role, routes: Router<Arc<Service>>) -> Router<Arc<Service>> {
+    routes.route_layer(middleware::from_fn_with_state((Arc::clone(service), role), require))
+}
+
+/// The service's routes, each behind the role it needs (S3-D9, 11:57), and the guards.
 pub fn router(service: Arc<Service>) -> Router {
-    let api = Router::new()
-        .route("/info", get(info))
-        .route("/roots", get(roots).post(open_root))
-        .route("/roots/close", post(close_root))
-        .route("/folders", get(folders))
+    let listener = Router::new()
+        .route("/roots", get(roots))
         .route("/walk", get(walk))
         .route("/list", get(list))
         .route("/read", get(read))
-        .route("/write", post(write))
         .route("/stat", get(stat))
+        .route("/inspect", post(inspect))
+        .route("/media", get(media))
+        .merge(people_api::own());
+    let editor = Router::new()
+        .route("/write", post(write))
         .route("/delete", post(delete))
         .route("/mkdir", post(mkdir))
         .route("/rename", post(rename))
-        .route("/inspect", post(inspect))
-        .route("/save", post(save))
-        .route("/media", get(media));
+        .route("/save", post(save));
+    let owner = Router::new()
+        .route("/roots", post(open_root))
+        .route("/roots/close", post(close_root))
+        .route("/folders", get(folders))
+        .merge(people_api::owners());
+    let api = Router::new()
+        .route("/info", get(info))
+        .merge(people_api::open())
+        .merge(of(&service, Role::Listener, listener))
+        .merge(of(&service, Role::Editor, editor))
+        .merge(of(&service, Role::Admin, people_api::admins()))
+        .merge(of(&service, Role::Owner, owner));
     Router::new()
         .nest("/api", api)
         .fallback(get(web))

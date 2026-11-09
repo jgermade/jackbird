@@ -6,10 +6,14 @@
 //! jackbird-service install [--with-system] [--user NAME --uid N --home PATH --config PATH]
 //!                          [--password-file PATH]        (Windows, with the system)
 //! jackbird-service uninstall | update | start | stop | status    (status: one line of JSON)
+//! jackbird-service setup [--port N] [--config PATH]    SMTP and an owner's address, by a code (S3)
+//! jackbird-service signin off [--port N] [--config PATH]
 //! jackbird-service --version
 //! ```
 //!
-//! It listens on 127.0.0.1 (and ::1) only, on the configuration's port (4646 by default).
+//! It listens on 127.0.0.1 (and ::1), on the configuration's port (4646 by default); with
+//! sign-in on and the home network allowed, on every address too. `setup` and `signin off` talk
+//! to the running service with the console's key, which only its own person can read.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -19,7 +23,7 @@ use jackbird_service::install::{self, Os, Person, Way};
 
 fn usage() -> ! {
     eprintln!(
-        "usage: jackbird-service [--port N] [--config PATH]\n       jackbird-service install [--with-system] [--user NAME --uid N --home PATH --config PATH] [--password-file PATH]\n       jackbird-service uninstall | update | start | stop | status | --version"
+        "usage: jackbird-service [--port N] [--config PATH]\n       jackbird-service install [--with-system] [--user NAME --uid N --home PATH --config PATH] [--password-file PATH]\n       jackbird-service uninstall | update | start | stop | status | --version\n       jackbird-service setup | signin off [--config PATH]"
     );
     std::process::exit(2);
 }
@@ -177,6 +181,8 @@ fn main() {
                 Err(why) => fail(command, why),
             }
         }
+        Some("setup") => console::setup(&flags(&args[1..])),
+        Some("signin") if args.get(1).map(String::as_str) == Some("off") => console::signin_off(&flags(&args[2..])),
         #[cfg(windows)]
         Some("windows-service") => windows::run(),
         _ => serve(&args),
@@ -198,15 +204,24 @@ fn serve(args: &[String]) {
     });
 }
 
-/// Serves on 127.0.0.1 and ::1 until `shutdown` ends.
+/// Serves on 127.0.0.1 and ::1 until `shutdown` ends; on every address too while sign-in is on
+/// and the owner allowed the home network.
 async fn run_server(
     port: u16,
     path: PathBuf,
     config: Config,
     shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) {
-    let service = jackbird_service::Service::new(port, Some(path.clone()), &config.roots);
-    let app = jackbird_service::router(service);
+    let store = jackbird_service::people::Store::open(&config::database_path(&path))
+        .unwrap_or_else(|error| fail("the people's database cannot be opened", error));
+    let config = Config { port, ..config };
+    let service = jackbird_service::Service::new(config, Some(path.clone()), store);
+    // The console's key, readable by this person alone (`setup`, `signin off`).
+    if let Err(error) = config::write_private(&config::console_key_path(&path), service.console_key().as_bytes()) {
+        eprintln!("jackbird-service: the console's key cannot be written: {error}");
+    }
+    let mut network = service.network.subscribe();
+    let app = jackbird_service::router(service).into_make_service_with_connect_info::<SocketAddr>();
     let v4 = tokio::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)))
         .await
         .unwrap_or_else(|error| {
@@ -220,6 +235,44 @@ async fn run_server(
         let app = app.clone();
         tokio::spawn(async move { axum::serve(v6, app).await });
     }
+    // The home network: each of the machine's own addresses (not 0.0.0.0, which the loopback's
+    // port is in the way of on Linux), looked at again every 30 s for new ones, while it is
+    // wanted; all dropped when sign-in or the network goes off.
+    {
+        let app = app.clone();
+        tokio::spawn(async move {
+            let mut serving: std::collections::HashMap<std::net::IpAddr, tokio::task::JoinHandle<()>> =
+                std::collections::HashMap::new();
+            loop {
+                if *network.borrow_and_update() {
+                    for ip in network_addresses() {
+                        if serving.contains_key(&ip) {
+                            continue;
+                        }
+                        match tokio::net::TcpListener::bind(SocketAddr::new(ip, port)).await {
+                            Ok(listener) => {
+                                println!("jackbird-service: also on http://{}/", SocketAddr::new(ip, port));
+                                let app = app.clone();
+                                serving.insert(
+                                    ip,
+                                    tokio::spawn(async move {
+                                        let _ = axum::serve(listener, app).await;
+                                    }),
+                                );
+                            }
+                            Err(error) => eprintln!("jackbird-service: {ip}:{port}: {error}"),
+                        }
+                    }
+                } else {
+                    serving.drain().for_each(|(_, task)| task.abort());
+                }
+                let changed = tokio::time::timeout(std::time::Duration::from_secs(30), network.changed()).await;
+                if matches!(changed, Ok(Err(_))) {
+                    break;
+                }
+            }
+        });
+    }
     println!(
         "jackbird-service: http://localhost:{port}/ (configuration: {})",
         path.display()
@@ -227,6 +280,220 @@ async fn run_server(
     if let Err(error) = axum::serve(v4, app).with_graceful_shutdown(shutdown).await {
         eprintln!("jackbird-service: {error}");
     }
+}
+
+/// The console's commands (S3): they ask the running service, as an owner, with its key.
+mod console {
+    use std::io::{BufRead, Read, Write};
+    use std::net::SocketAddr;
+    use std::path::PathBuf;
+
+    use serde_json::{Value, json};
+
+    use super::{Config, config, fail, flag};
+
+    struct Local {
+        port: u16,
+        key: String,
+    }
+
+    fn local(flags: &[(String, String)]) -> Local {
+        let path = flag(flags, "--config").map_or_else(config::default_path, PathBuf::from);
+        let port = flag(flags, "--port")
+            .and_then(|port| port.parse().ok())
+            .unwrap_or_else(|| Config::load(&path).map_or(config::PORT, |config| config.port));
+        let key = std::fs::read_to_string(config::console_key_path(&path)).unwrap_or_else(|error| {
+            fail(
+                "the console's key",
+                format!("{error}: is the service running, as this person?"),
+            )
+        });
+        Local { port, key }
+    }
+
+    impl Local {
+        /// One request to the service; its status and its JSON.
+        fn call(&self, method: &str, path: &str, body: Option<Value>) -> (u16, Value) {
+            let mut stream = std::net::TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], self.port)))
+                .unwrap_or_else(|error| fail("the service does not answer", error));
+            let body = body.map(|body| body.to_string()).unwrap_or_default();
+            let port = self.port;
+            let key = &self.key;
+            let request = format!(
+                "{method} /api{path} HTTP/1.1\r\nHost: localhost:{port}\r\nAuthorization: Console {key}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream
+                .write_all(request.as_bytes())
+                .unwrap_or_else(|error| fail("the service", error));
+            let mut response = String::new();
+            stream
+                .read_to_string(&mut response)
+                .unwrap_or_else(|error| fail("the service", error));
+            let status = response
+                .split(' ')
+                .nth(1)
+                .and_then(|code| code.parse().ok())
+                .unwrap_or(0);
+            let body = response.split_once("\r\n\r\n").map_or("", |(_, body)| body);
+            (status, serde_json::from_str(body).unwrap_or(Value::Null))
+        }
+
+        /// The same, failing with the service's message unless it succeeded.
+        fn must(&self, method: &str, path: &str, body: Option<Value>) -> Value {
+            let (status, answer) = self.call(method, path, body);
+            if !(200..300).contains(&status) {
+                fail(
+                    path.trim_start_matches('/'),
+                    answer["message"].as_str().unwrap_or("the service refused it"),
+                );
+            }
+            answer
+        }
+    }
+
+    fn ask(question: &str, current: &str) -> String {
+        if current.is_empty() {
+            print!("{question}: ");
+        } else {
+            print!("{question} [{current}]: ");
+        }
+        let _ = std::io::stdout().flush();
+        let mut line = String::new();
+        if std::io::stdin().lock().read_line(&mut line).unwrap_or(0) == 0 {
+            fail("setup", "no answer");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            current.to_owned()
+        } else {
+            line.to_owned()
+        }
+    }
+
+    /// SMTP (kept or changed), then an owner's address, confirmed by the code sent there: sign-in
+    /// is on. With sign-in on already, it confirms an owner's new address (a way back in).
+    pub fn setup(flags: &[(String, String)]) {
+        let service = local(flags);
+        let smtp = service.must("GET", "/smtp", None);
+        let text = |name: &str| smtp[name].as_str().unwrap_or("").to_owned();
+        let change = smtp.is_null()
+            || ask(
+                &format!(
+                    "Email is sent through {}:{}. Change it? (y/N)",
+                    text("host"),
+                    smtp["port"]
+                ),
+                "n",
+            )
+            .to_lowercase()
+            .starts_with('y');
+        if change {
+            println!("The SMTP server codes and invitations are sent through.");
+            let host = ask("Host", &text("host"));
+            let current = text("security");
+            let security = ask(
+                "Security (tls, starttls, none)",
+                if current.is_empty() { "starttls" } else { &current },
+            );
+            let default_port = if security == "tls" { "465" } else { "587" };
+            let port: u16 = ask(
+                "Port",
+                &smtp["port"]
+                    .as_u64()
+                    .map_or(default_port.to_owned(), |port| port.to_string()),
+            )
+            .parse()
+            .unwrap_or_else(|_| fail("setup", "not a port"));
+            let username = ask("User name", &text("username"));
+            let password = ask(
+                if smtp["password"] == true {
+                    "Password (empty keeps it; shown as typed)"
+                } else {
+                    "Password (shown as typed)"
+                },
+                "",
+            );
+            let from = ask("Sender (empty: the user name)", &text("from"));
+            let mut body =
+                json!({ "host": host, "port": port, "security": security, "username": username, "from": from });
+            if !password.is_empty() {
+                body["password"] = json!(password);
+            }
+            service.must("POST", "/smtp", Some(body));
+        }
+        let people = service.must("GET", "/people", None);
+        let owners: Vec<&Value> = people
+            .as_array()
+            .map(|people| people.iter().filter(|person| person["role"] == "owner").collect())
+            .unwrap_or_default();
+        let owner = match owners.as_slice() {
+            [] => fail("setup", "no owner"),
+            [one] => *one,
+            several => {
+                for (at, owner) in several.iter().enumerate() {
+                    println!(
+                        "{}. {} {}",
+                        at + 1,
+                        owner["name"].as_str().unwrap_or(""),
+                        owner["email"].as_str().unwrap_or("")
+                    );
+                }
+                let at: usize = ask("Which owner", "1").parse().unwrap_or(0);
+                several
+                    .get(at.wrapping_sub(1))
+                    .copied()
+                    .unwrap_or_else(|| fail("setup", "no such owner"))
+            }
+        };
+        let email = ask(
+            &format!("{}'s email address", owner["name"].as_str().unwrap_or("The owner")),
+            owner["email"].as_str().unwrap_or(""),
+        );
+        let attempt = service.must(
+            "POST",
+            "/setup/email",
+            Some(json!({ "email": email, "person": owner["id"] })),
+        );
+        println!("A code was sent to {email}.");
+        loop {
+            let code = ask("Code", "");
+            let (status, answer) = service.call(
+                "POST",
+                "/setup/code",
+                Some(json!({ "attempt": attempt["attempt"], "code": code })),
+            );
+            match (status, answer["code"].as_str()) {
+                (200, _) => break,
+                (_, Some("wrong")) => println!("That code is not right."),
+                _ => fail("setup", answer["message"].as_str().unwrap_or("the code was refused")),
+            }
+        }
+        println!("Sign-in is on; {email} signs in as an owner.");
+    }
+
+    /// Turns sign-in off: people are profiles again, and it answers on the machine only.
+    pub fn signin_off(flags: &[(String, String)]) {
+        local(flags).must("POST", "/signin", Some(json!({ "on": false })));
+        println!("Sign-in is off: jackbird answers on this machine only.");
+    }
+}
+
+/// The machine's own addresses on its networks: not the loopback, not IPv6's link-local ones
+/// (which need a scope a browser's address does not carry).
+fn network_addresses() -> Vec<std::net::IpAddr> {
+    if_addrs::get_if_addrs()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|interface| interface.ip())
+        .filter(|ip| {
+            !ip.is_loopback()
+                && match ip {
+                    std::net::IpAddr::V4(_) => true,
+                    std::net::IpAddr::V6(v6) => (v6.segments()[0] & 0xffc0) != 0xfe80,
+                }
+        })
+        .collect()
 }
 
 /// Running under Windows' Service Control Manager (installed with the system, S2): it reports

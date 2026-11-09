@@ -10,7 +10,6 @@ use serde_json::{Value, json};
 
 use super::*;
 
-const PORT: u16 = 4646;
 const HOST: &str = "localhost:4646";
 const ORIGIN: &str = "http://localhost:4646";
 
@@ -44,6 +43,7 @@ struct Call {
     uri: String,
     headers: Vec<(&'static str, String)>,
     body: Body,
+    peer: Option<std::net::SocketAddr>,
 }
 
 fn call(method: Method, uri: impl Into<String>) -> Call {
@@ -52,6 +52,7 @@ fn call(method: Method, uri: impl Into<String>) -> Call {
         uri: uri.into(),
         headers: vec![("host", HOST.into()), ("origin", ORIGIN.into())],
         body: Body::empty(),
+        peer: None,
     }
 }
 
@@ -70,12 +71,22 @@ impl Call {
         self
     }
 
+    /// From another machine (or a proxy) at `peer`.
+    fn from(mut self, peer: &str) -> Self {
+        self.peer = Some(peer.parse().unwrap());
+        self
+    }
+
     async fn on(self, app: &Router) -> (StatusCode, HeaderMap, Vec<u8>) {
         let mut request = Request::builder().method(self.method).uri(self.uri);
         for (name, value) in self.headers {
             request = request.header(name, value);
         }
-        let response = app.clone().oneshot(request.body(self.body).unwrap()).await.unwrap();
+        let mut request = request.body(self.body).unwrap();
+        if let Some(peer) = self.peer {
+            request.extensions_mut().insert(ConnectInfo(peer));
+        }
+        let response = app.clone().oneshot(request).await.unwrap();
         let (status, headers) = (response.status(), response.headers().clone());
         let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
         (status, headers, body.to_vec())
@@ -97,7 +108,11 @@ fn enc(text: &str) -> String {
 }
 
 fn app() -> Router {
-    router(Service::new(PORT, None, &[]))
+    router(Service::new(
+        config::Config::default(),
+        None,
+        crate::people::Store::memory(),
+    ))
 }
 
 #[tokio::test]
@@ -174,7 +189,11 @@ async fn the_guards_keep_other_sites_and_other_names_out() {
 async fn roots_open_close_and_come_back_from_the_configuration() {
     let config = scratch().join("service.json");
     let folder = library();
-    let app = router(Service::new(PORT, Some(config.clone()), &[]));
+    let app = router(Service::new(
+        config::Config::default(),
+        Some(config.clone()),
+        crate::people::Store::memory(),
+    ));
     let (status, opened) = call(Method::POST, "/api/roots")
         .json(json!({ "path": folder }))
         .value(&app)
@@ -185,7 +204,11 @@ async fn roots_open_close_and_come_back_from_the_configuration() {
     assert_eq!(saved.roots, std::slice::from_ref(&folder));
 
     // Restarted from its configuration: the root is open again.
-    let again = router(Service::new(PORT, Some(config.clone()), &saved.roots));
+    let again = router(Service::new(
+        saved.clone(),
+        Some(config.clone()),
+        crate::people::Store::memory(),
+    ));
     let (_, roots) = call(Method::GET, "/api/roots").value(&again).await;
     assert_eq!(roots[0]["path"], folder.as_str());
     let (status, _) = call(Method::POST, "/api/roots/close")
@@ -428,3 +451,5 @@ async fn the_desktop_apps_page_is_answered_with_cors_for_itself_alone() {
         );
     }
 }
+
+mod people;
