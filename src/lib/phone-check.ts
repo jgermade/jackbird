@@ -54,6 +54,12 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
   beacon(config, "started", { href: location.href, userAgent: navigator.userAgent });
   window.addEventListener("error", (event) => beacon(config, "error", String(event.message)));
   window.addEventListener("unhandledrejection", (event) => beacon(config, "rejection", String(event.reason)));
+  // A heartbeat: if it stops, the page's thread is stuck; if it goes on, a request is.
+  const started = Date.now();
+  const heartbeat = setInterval(() => beacon(config, "alive", Math.round((Date.now() - started) / 1000)), 5000);
+  // Each step has 30 seconds: one that hangs is reported, not waited for.
+  const within = <T>(step: string, work: Promise<T>): Promise<T> =>
+    Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${step}: no answer in 30 s`)), 30_000))]);
   const report: Record<string, unknown> = { userAgent: navigator.userAgent, drawn: Boolean(document.querySelector("#app")?.children.length) };
   try {
     const info = await fetch(`${config.address}/api/info`).then(
@@ -66,20 +72,22 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
     report.me = account.me ? { name: account.me.name, role: account.me.role } : null;
     beacon(config, "account", { me: report.me, error: account.error, needed: account.needed });
     const { openServiceFolder } = await import("./sources/service");
-    const source = await openServiceFolder(config.folder);
+    beacon(config, "opening", config.folder);
+    const source = await within("open the folder", openServiceFolder(config.folder));
     beacon(config, "folder");
-    const tracks = (await source.walk()).filter((entry) => isAudioFile(entry.path));
+    const tracks = (await within("walk", source.walk())).filter((entry) => isAudioFile(entry.path));
     report.tracks = tracks.length;
     beacon(config, "walked", tracks.length);
     const flac = tracks.find((track) => track.path.toLowerCase().endsWith(".flac"));
     if (flac) {
-      const media = await source.openMedia(flac.path);
+      const media = await within("open the media", source.openMedia(flac.path));
       report.played = { path: flac.path, ...(await play(media.url)) };
       beacon(config, "played", report.played);
     }
   } catch (error) {
     report.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   }
+  clearInterval(heartbeat);
   console.log(`JACKBIRD-CHECK ${JSON.stringify(report)}`);
   await fetch(config.report, { method: "POST", body: JSON.stringify(report) }).catch(() => undefined);
   await measureBackground(config).catch((error: unknown) => console.log(`JACKBIRD-BACKGROUND failed: ${error}`));

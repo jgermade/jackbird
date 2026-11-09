@@ -13,7 +13,7 @@
 // PHONE_MUSIC is the folder the build names. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E6).
 
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -84,7 +84,10 @@ const startLog = () => {
 const shot = join(process.env.PHONE_SHOTS ?? home, `${platform}.png`);
 const screenshot = () => {
   try {
-    if (platform === "android") writeFileSync(shot, execFileSync("adb", ["exec-out", "screencap", "-p"], { timeout: 30_000, maxBuffer: 1 << 26 }));
+    if (platform === "android") {
+      execFileSync("adb", ["shell", "screencap", "-p", "/sdcard/jackbird.png"], { timeout: 30_000 });
+      execFileSync("adb", ["pull", "/sdcard/jackbird.png", shot], { timeout: 30_000 });
+    }
     else execFileSync("xcrun", ["simctl", "io", "booted", "screenshot", shot], { timeout: 30_000 });
     console.log(`phone-check: screenshot at ${shot}`);
   } catch (error) {
