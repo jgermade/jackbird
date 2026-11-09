@@ -43,16 +43,24 @@ for (let step = 0; step < 50; step += 1) {
   await new Promise((done) => setTimeout(done, 200));
 }
 
-const reported = new Promise((done) => {
-  createServer((request, response) => {
-    let body = "";
-    request.on("data", (chunk) => (body += chunk));
-    request.on("end", () => {
-      response.writeHead(204, { "access-control-allow-origin": "*" }).end();
-      if (request.method === "POST") done(JSON.parse(body));
-    });
-  }).listen(4700);
-});
+// The reports by phase: the check's ("report"), then the background measurement's ("playing",
+// "background").
+const waiting = {};
+const phases = {};
+const phase = (name) => (phases[name] ??= new Promise((done) => (waiting[name] = done)));
+createServer((request, response) => {
+  let body = "";
+  request.on("data", (chunk) => (body += chunk));
+  request.on("end", () => {
+    response.writeHead(204, { "access-control-allow-origin": "*" }).end();
+    if (request.method !== "POST") return;
+    const name = new URL(request.url, "http://localhost").searchParams.get("phase") ?? "report";
+    phase(name);
+    waiting[name](JSON.parse(body || "{}"));
+  });
+}).listen(4700);
+const reported = phase("report");
+const within = (promise, ms) => Promise.race([promise, new Promise((done) => setTimeout(() => done(null), ms))]);
 
 const bundle = "es.germade.jackbird";
 if (platform === "android") {
@@ -73,8 +81,7 @@ if (platform === "android") {
   run("xcrun", ["simctl", "launch", phone.udid, bundle]);
 }
 
-const report = await Promise.race([reported, new Promise((done) => setTimeout(() => done(null), 240_000))]);
-server.kill();
+const report = await within(reported, 240_000);
 if (!report) {
   if (platform === "android") {
     try {
@@ -84,7 +91,31 @@ if (!report) {
     }
   }
   console.error("phone-check: no report in 4 minutes");
+  server.kill();
   process.exit(1);
+}
+
+// Background playback, measured (not required): once the minute of silence plays, the app goes to
+// the background for ten seconds (the home screen; on iOS, Settings in front of it), then comes back.
+let background = null;
+if (await within(phase("playing"), 60_000)) {
+  await new Promise((done) => setTimeout(done, 4000));
+  if (platform === "android") run("adb", ["shell", "input", "keyevent", "KEYCODE_HOME"]);
+  else run("xcrun", ["simctl", "launch", "booted", "com.apple.Preferences"]);
+  await new Promise((done) => setTimeout(done, 10_000));
+  if (platform === "android") run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
+  else run("xcrun", ["simctl", "launch", "booted", bundle]);
+  background = await within(phase("background"), 60_000);
+}
+server.kill();
+if (background?.samples) {
+  const hidden = background.samples.filter((sample) => sample.hidden);
+  const moved = hidden.length > 1 ? hidden[hidden.length - 1].position - hidden[0].position : 0;
+  report.background = { hiddenSeconds: hidden.length, movedWhileHidden: Math.round(moved * 10) / 10, samples: background.samples };
+  console.log(`phone-check: in the background ${hidden.length} s, the position moved ${moved.toFixed(1)} s`);
+} else {
+  report.background = null;
+  console.log("phone-check: no background measurement");
 }
 console.log(JSON.stringify(report, null, 2));
 const problems = [];

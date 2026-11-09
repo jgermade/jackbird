@@ -20,6 +20,7 @@
     "build:wasm": "node scripts/build-wasm.mjs --force",
     "desktop": "tauri dev",
     "desktop:build": "tauri build",
+    "tauri": "tauri",
     "service": "npm run build && cargo run --release -p jackbird-service --locked"
   },
   "dependencies": {

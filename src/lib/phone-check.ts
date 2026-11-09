@@ -61,4 +61,31 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
   }
   console.log(`JACKBIRD-CHECK ${JSON.stringify(report)}`);
   await fetch(config.report, { method: "POST", body: JSON.stringify(report) }).catch(() => undefined);
+  await measureBackground(config).catch((error: unknown) => console.log(`JACKBIRD-BACKGROUND failed: ${error}`));
+}
+
+/**
+ * Background playback (E6-D1 c): plays a minute of silence and notes, every second, how far it got
+ * and whether the page is hidden, while the check sends the app to the background and back
+ * (scripts/phone-check.mjs); then posts the samples. Where the position moved on while the page was
+ * hidden, playback went on in the background.
+ */
+async function measureBackground(config: PhoneCheck): Promise<void> {
+  const { openServiceFolder } = await import("./sources/service");
+  const source = await openServiceFolder(config.folder);
+  const long = (await source.walk()).find((entry) => entry.path.endsWith("silence-60s.flac"));
+  if (!long) return;
+  const audio = new Audio();
+  audio.muted = true;
+  audio.src = (await source.openMedia(long.path)).url;
+  await audio.play();
+  const samples: { at: number; position: number; hidden: boolean; paused: boolean }[] = [];
+  const started = Date.now();
+  await fetch(`${config.report}?phase=playing`, { method: "POST", body: "{}" }).catch(() => undefined);
+  while (Date.now() - started < 30_000) {
+    samples.push({ at: Date.now() - started, position: audio.currentTime, hidden: document.hidden, paused: audio.paused });
+    await wait(1000);
+  }
+  audio.pause();
+  await fetch(`${config.report}?phase=background`, { method: "POST", body: JSON.stringify({ samples }) }).catch(() => undefined);
 }

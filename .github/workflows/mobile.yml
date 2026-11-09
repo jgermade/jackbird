@@ -113,7 +113,9 @@ jobs:
       # Built for the simulator with Xcode itself, unsigned: its build phase compiles the Rust side
       # (`tauri ios xcode-script`).
       - name: The app for iOS's simulator, made for the check
+        shell: bash
         run: |
+          set -euo pipefail
           npx tauri ios init --ci
           xcodebuild -project src-tauri/gen/apple/jackbird.xcodeproj -scheme jackbird_iOS \
             -sdk iphonesimulator -configuration debug -arch arm64 -derivedDataPath build/ios \
