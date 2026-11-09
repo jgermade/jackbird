@@ -44,7 +44,7 @@ jobs:
       - run: cargo test -p jackbird-audio --features device --locked
 
   loopback:
-    name: Bit-perfect through ALSA's loopback (Linux)
+    name: Through ALSA itself (Linux)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -53,14 +53,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: ALSA, and its loopback card
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev alsa-utils "linux-modules-extra-$(uname -r)"
-          sudo modprobe snd-aloop
-          sudo chmod a+rw /dev/snd/*
-          cat /proc/asound/cards
-          aplay -l
+      - name: ALSA
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev alsa-utils
 
       # The shared path first, with no card at all: ALSA's default device written to a file.
       - name: A 24/96 FLAC through ALSA's default device, written to a file
@@ -72,7 +66,23 @@ jobs:
           HOME="$home" JACKBIRD_AUDIO_ALSA_FILE="$RUNNER_TEMP/alsa-out.raw" \
             cargo test -p jackbird-audio --features device --test loopback --locked -- --nocapture
 
+      # The loopback card is a kernel module the runner's kernel may not carry (Azure's kernels
+      # have no linux-modules-extra package): the check runs where it can be loaded, and says so
+      # where it cannot.
+      - name: ALSA's loopback card
+        id: aloop
+        run: |
+          if sudo modprobe snd-aloop 2>/dev/null || { sudo apt-get install -y "linux-modules-extra-$(uname -r)" && sudo modprobe snd-aloop; }; then
+            sudo chmod a+rw /dev/snd/*
+            cat /proc/asound/cards
+            aplay -l
+            echo "loaded=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::snd-aloop cannot be loaded on this runner's kernel ($(uname -r)): the loopback check did not run"
+          fi
+
       - name: A 24/96 FLAC played exclusively and recorded back
+        if: steps.aloop.outputs.loaded == '1'
         env:
           JACKBIRD_AUDIO_LOOPBACK: "1"
         run: cargo test -p jackbird-audio --features device --test loopback --locked -- --nocapture
