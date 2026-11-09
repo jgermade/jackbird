@@ -34,7 +34,7 @@ gantt
 | S4 The online route | an outbound SSH connection to an online server, forwarding the service's port (a reverse tunnel, as intergate does), kept up by the service and set up from the interface | the service is reached from outside home through an online server, with nothing opened at home |
 
 S1 and S2 are done (2026-11-08); S3 is next: its plan (record, 2026-11-09 10:45, amended at 11:20 and
-11:50 with the owner's answers) awaits two last points. Its
+11:46 with the owner's answers) awaits two last points. Its
 starting point, from the owner's answers (record, 14:14 to 15:01): sign-in has no passwords, one-time
 codes by email (SMTP set up from the interface) to sign up and sign in, and passkeys to sign in
 without the code; the first owner claims the instance with a one-time code on the server's console
