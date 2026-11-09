@@ -48,8 +48,8 @@ fn a_24_96_flac_through_alsa_s_loopback_is_bit_perfect() {
             format,
             move |data: &cpal::Data, _: &cpal::InputCallbackInfo| {
                 let mut into = into.lock().unwrap();
-                into.extend(data.bytes().chunks_exact(4).map(|word| {
-                    let value = i32::from_ne_bytes(word.try_into().unwrap());
+                into.extend(data.bytes().as_chunks::<4>().0.iter().map(|word| {
+                    let value = i32::from_ne_bytes(*word);
                     if format == SampleFormat::I32 { value >> 8 } else { value }
                 }));
             },

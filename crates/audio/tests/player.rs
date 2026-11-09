@@ -97,8 +97,10 @@ fn a_24_96_flac_reaches_the_device_bit_for_bit() {
     assert_eq!(*bytes, device_bytes(&samples, 24, DeviceSample::I24));
     // The same samples as FLAC's own PCM, once the 24 bits are taken out of their 32.
     let back: Vec<i32> = bytes
-        .chunks_exact(4)
-        .map(|word| i32::from_ne_bytes(word.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|word| i32::from_ne_bytes(*word))
         .collect();
     assert_eq!(pcm_bytes(&back, 24), pcm_bytes(&samples, 24));
 }
@@ -167,8 +169,10 @@ fn a_floating_point_device_carries_24_bits_exactly() {
     let capture = capture.lock().unwrap();
     let back: Vec<i32> = capture.opens[0]
         .2
-        .chunks_exact(4)
-        .map(|word| (f32::from_ne_bytes(word.try_into().unwrap()) * (1u32 << 23) as f32) as i32)
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|word| (f32::from_ne_bytes(*word) * (1u32 << 23) as f32) as i32)
         .collect();
     assert_eq!(back, samples);
 }
