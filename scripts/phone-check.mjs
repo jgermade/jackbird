@@ -25,10 +25,20 @@ if (!["android", "ios"].includes(platform) || !app || !music) {
   console.error("usage: PHONE_MUSIC=<folder> node scripts/phone-check.mjs android|ios <app>");
   process.exit(2);
 }
-// Every command has two minutes: a phone that does not answer fails the check, never hangs it.
+// Every command has five minutes (a simulator's first launch after booting is slow): a phone that
+// does not answer fails the check, never hangs it.
 const run = (program, args) => {
   console.log(`phone-check: ${program} ${args.join(" ")}`);
-  execFileSync(program, args, { stdio: "inherit", timeout: 120_000 });
+  execFileSync(program, args, { stdio: "inherit", timeout: 300_000 });
+};
+/** Once more if it fails the first time (a launch the system was not ready for). */
+const runTwice = (program, args) => {
+  try {
+    run(program, args);
+  } catch (error) {
+    console.log(`phone-check: ${program} ${args.join(" ")} failed (${error.message}); once more`);
+    run(program, args);
+  }
 };
 const read = (program, args) => execFileSync(program, args, { encoding: "utf8", timeout: 120_000 });
 
@@ -117,9 +127,11 @@ if (platform === "android") {
   if (!phone) throw new Error("no iPhone simulator");
   console.log(`phone-check: ${phone.name}`);
   if (phone.state !== "Booted") run("xcrun", ["simctl", "boot", phone.udid]);
+  // Booted is not ready: wait for the system to have started.
+  run("xcrun", ["simctl", "bootstatus", phone.udid, "-b"]);
   startLog();
   run("xcrun", ["simctl", "install", phone.udid, app]);
-  run("xcrun", ["simctl", "launch", phone.udid, bundle]);
+  runTwice("xcrun", ["simctl", "launch", phone.udid, bundle]);
 }
 
 const report = await within(reported, 240_000);
