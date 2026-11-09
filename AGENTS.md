@@ -36,7 +36,7 @@ by design: open folders (roots) and the paths under them (none leads out, links 
 tags, checksums and saves on files, streamed, never holding the audio in memory; the desktop app
 wraps it in commands, and the service (`crates/service`) in HTTP, both speaking `crates/api`'s
 JSON. `crates/store` (F1) is the other crate that touches it: the family library, its blobs and
-its catalogue (SQLite) in a folder of its own, on `crates/core`. The tag crates depend on nothing but
+its catalogue (SQLite) in a folder of its own, on `crates/core`. `crates/audio` (E5) reads files too, to play them: the desktop app's native output (`symphonia` decoding, `cpal` and each system's exclusive path behind its `device` feature, which needs ALSA's headers on Linux); without that feature it builds with no system library, and its tests play to a capture output. The tag crates depend on nothing but
 each other (`crates/core` adds `sha1` and `sha2`); a dependency in `[dev-dependencies]` is for
 tests only. `crates/tags-wasm` is the web app's WebAssembly module, built by
 `scripts/build-wasm.mjs` (not committed); its exports' `#[unsafe(no_mangle)]` is the only unsafe
