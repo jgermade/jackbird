@@ -6,6 +6,7 @@
 //!
 //! The interface's side is `src/lib/sources/desktop.ts`.
 
+#[cfg(desktop)]
 mod audio;
 mod media;
 mod service;
@@ -18,6 +19,7 @@ use jackbird_core::{Error, Root};
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
+#[cfg(desktop)]
 use tauri_plugin_dialog::DialogExt;
 
 /// The open roots, by their path, as the interface names them.
@@ -72,15 +74,24 @@ fn register(app: &AppHandle, path: &str) -> Answer<Opened> {
     Ok(opened)
 }
 
+/// A folder chosen in the system's dialog; `None` when the person cancels. Phones have no folder
+/// dialog (E6's spike weighs their own ways to files, Android's SAF and iOS's bookmarks).
+async fn pick(app: AppHandle) -> Answer<Option<tauri_plugin_dialog::FilePath>> {
+    #[cfg(desktop)]
+    return tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
+        .await
+        .map_err(|error| failure("io", error.to_string()));
+    #[cfg(mobile)]
+    {
+        let _ = app;
+        Err(failure("unsupported", "a phone has no folder dialog"))
+    }
+}
+
 /// Asks for a folder in the system's dialog and opens it; `None` when the person cancels.
 #[tauri::command]
 async fn pick_folder(app: AppHandle) -> Answer<Option<Opened>> {
-    let picked = {
-        let app = app.clone();
-        tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
-            .await
-            .map_err(|error| failure("io", error.to_string()))?
-    };
+    let picked = pick(app.clone()).await?;
     let Some(picked) = picked else {
         return Ok(None);
     };
@@ -265,18 +276,11 @@ fn check_report(app: AppHandle, report: String) {
     app.exit(0);
 }
 
-/// Starts the app.
-pub fn run() {
-    let media = if cfg!(target_os = "linux") {
-        Media::Server(media::MediaServer::start().expect("the local media server could not start"))
-    } else {
-        Media::Asset
-    };
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .manage(Roots::default())
-        .manage(media)
-        .invoke_handler(tauri::generate_handler![
+/// The commands of the desktop app and of a phone's (E6's spike): the same, but for the native
+/// output (E5), which phones do not build.
+macro_rules! commands {
+    ($($extra:path),*) => {
+        tauri::generate_handler![
             pick_folder,
             open_root,
             close_root,
@@ -299,25 +303,52 @@ pub fn run() {
             service::service_uninstall,
             service::service_update,
             service::service_start,
-            service::choose_folder,
-            audio::audio_devices,
-            audio::audio_configure,
-            audio::audio_load,
-            audio::audio_next,
-            audio::audio_play,
-            audio::audio_pause,
-            audio::audio_seek,
-            audio::audio_stop,
-            audio::audio_status,
-            audio::audio_spectrum
-        ])
+            service::choose_folder
+            $(, $extra)*
+        ]
+    };
+}
+
+/// Starts the app (on a phone, from its own entry point).
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let media = if cfg!(target_os = "linux") {
+        Media::Server(media::MediaServer::start().expect("the local media server could not start"))
+    } else {
+        Media::Asset
+    };
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .manage(Roots::default())
+        .manage(media);
+    #[cfg(desktop)]
+    let builder = builder.invoke_handler(commands![
+        audio::audio_devices,
+        audio::audio_configure,
+        audio::audio_load,
+        audio::audio_next,
+        audio::audio_play,
+        audio::audio_pause,
+        audio::audio_seek,
+        audio::audio_stop,
+        audio::audio_status,
+        audio::audio_spectrum
+    ]);
+    #[cfg(mobile)]
+    let builder = builder.invoke_handler(commands![]);
+    builder
         .setup(|app| {
-            app.manage(audio::Audio::start(app.handle().clone()));
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("jackbird")
-                .inner_size(1280.0, 800.0)
-                .min_inner_size(360.0, 480.0)
-                .build()?;
+            #[cfg(desktop)]
+            {
+                app.manage(audio::Audio::start(app.handle().clone()));
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("jackbird")
+                    .inner_size(1280.0, 800.0)
+                    .min_inner_size(360.0, 480.0)
+                    .build()?;
+            }
+            #[cfg(mobile)]
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into())).build()?;
             Ok(())
         })
         .run(tauri::generate_context!())

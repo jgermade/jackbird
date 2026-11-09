@@ -19,7 +19,8 @@
   const { languageName, t } = await import("../lib/i18n")
   const { LANGUAGES, preferences, setLanguage, setTheme } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
-  const { isDesktop } = await import("../lib/platform")
+  const { isDesktop, isPhone } = await import("../lib/platform")
+  const { forgetInstance, instance } = await import("../lib/instance")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
   const { account, addPasskey, can, endSession, loadMine, passkeysHere, removePasskey, renameMe, signOut } = await import("../lib/account")
   const { openPeople } = await import("../lib/people")
@@ -146,7 +147,16 @@
         </Field>
         <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
       </section>
-      <section :if="isDesktop" class="pref service">
+      <section :if="isPhone" class="pref service">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("instance.eyebrow") }}</h3>
+          <p class="state">{{ t("instance.now", { address: instance.address }) }}</p>
+        </div>
+        <div class="keys">
+          <Key variant="ghost" @click="forgetInstance()">{{ t("instance.change") }}</Key>
+        </div>
+      </section>
+      <section :if="isDesktop && !isPhone" class="pref service">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("service.title") }}</h3>
           <p>{{ t("service.about") }}</p>

@@ -10,7 +10,7 @@ import "../theme/default/base.css";
 import { startAccount } from "./lib/account";
 import { loadFavourites, startMine } from "./lib/mine";
 import { keepPlaybackSaved, restorePlayback } from "./lib/player";
-import { isDesktop } from "./lib/platform";
+import { isDesktop, isPhone } from "./lib/platform";
 import { keepSessionSaved, restoreSession } from "./lib/session";
 import { startVerifier } from "./lib/verifier";
 import App from "./views/app.html";
@@ -29,6 +29,10 @@ void startAccount()
     keepPlaybackSaved();
   });
 // The desktop app's unattended check (desktop.yml), only when the app is started for it.
-if (isDesktop) {
+if (isDesktop && !isPhone) {
   void import("./lib/sources/check").then((check) => check.runCheckIfAsked());
+}
+// A phone's (mobile.yml), only in a build made for it.
+if (isPhone) {
+  void import("./lib/phone-check").then((check) => check.runPhoneCheckIfBuilt());
 }

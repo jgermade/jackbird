@@ -5,11 +5,16 @@
 
 import type { RootSource } from "../../types";
 import { t } from "../i18n";
-import { isDesktop, isService } from "../platform";
+import { isDesktop, isPhone, isService } from "../platform";
 import { pickBrowserSource, restoreBrowserSource } from "./browser";
 
 /** Asks for a folder to open: the browser's picker, the system's dialog, or the service's. Null when the person cancels. */
 export async function pickSource(): Promise<RootSource | null> {
+  // A phone has no folder dialog: the instance's own folder chooser, as on the web (E6's spike).
+  if (isPhone && (await (await import("../desktop-service")).desktopUsesService())) {
+    const path = await (await import("../folders")).chooseMachineFolder();
+    return path === null ? null : (await import("./service")).openServiceFolder(path);
+  }
   if (isDesktop) {
     if (await (await import("../desktop-service")).desktopUsesService()) {
       // The app is the installed service's interface (S2): the system's dialog, the service opens it.

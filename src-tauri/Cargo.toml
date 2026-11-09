@@ -16,7 +16,6 @@ tauri-build = { version = "=2.7.4", features = [] }
 
 [dependencies]
 jackbird-api = { path = "../crates/api" }
-jackbird-audio = { path = "../crates/audio", features = ["device"] }
 jackbird-core = { path = "../crates/core" }
 tauri = { version = "=2.12.5", features = ["protocol-asset"] }
 tauri-plugin-dialog = "=2.8.4"
@@ -25,3 +24,7 @@ serde_json = "=1.0.145"
 
 [lints]
 workspace = true
+
+# The native output (E5) is the desktop app's: phones (E6) do not build it.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+jackbird-audio = { path = "../crates/audio", features = ["device"] }

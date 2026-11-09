@@ -10,13 +10,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { describeFormat, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo, type OutputKind } from "../helpers/output";
 import { t } from "./i18n";
 import type { Sounding } from "./native-audio";
-import { isDesktop } from "./platform";
+import { isDesktop, isPhone } from "./platform";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 
 export const output = $reactive({
-  /** Only the desktop app has the native player. */
-  available: isDesktop,
-  kind: (isDesktop ? parseOutputKind(readStored(STORAGE_KEYS.output)) : "embedded") as OutputKind,
+  /** Only the desktop app has the native player (not a phone's). */
+  available: isDesktop && !isPhone,
+  kind: (isDesktop && !isPhone ? parseOutputKind(readStored(STORAGE_KEYS.output)) : "embedded") as OutputKind,
   /** The device's id; null: the system's default. */
   device: readStored(STORAGE_KEYS.outputDevice) || null,
   devices: [] as DeviceInfo[],
