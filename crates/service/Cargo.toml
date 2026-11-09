@@ -30,6 +30,7 @@ webauthn-rs = { version = "=0.5.5", features = ["danger-allow-state-serialisatio
 openssl = { version = "=0.10.82", features = ["vendored"] }
 if-addrs = "=0.15.0"
 jackbird-store = { path = "../store" }
+serde_urlencoded = "=0.7.1"
 tokio-util = { version = "=0.7.20", features = ["io"] }
 futures-util = { version = "=0.3.34", default-features = false }
 

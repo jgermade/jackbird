@@ -28,6 +28,7 @@ pub mod config;
 pub mod install;
 mod library_api;
 pub mod mail;
+mod opensubsonic;
 mod passkeys;
 pub mod people;
 mod people_api;
@@ -608,7 +609,9 @@ async fn guard(State(service): State<Arc<Service>>, mut request: Request, next: 
         return refuse("a request from another origin");
     }
     let changes = !matches!(*request.method(), Method::GET | Method::HEAD | Method::OPTIONS);
-    if changes && origin.is_none() && !headers.contains_key(header::AUTHORIZATION) {
+    // OpenSubsonic's apps post forms signed by their key (E6's spike): no page, no header.
+    let subsonic = request.uri().path().starts_with("/rest/");
+    if changes && origin.is_none() && !headers.contains_key(header::AUTHORIZATION) && !subsonic {
         return refuse("a request that changes something must come from the service's own page");
     }
     request.extensions_mut().insert(Client { ip, secure });
@@ -690,6 +693,7 @@ pub fn router(service: Arc<Service>) -> Router {
         .merge(of(&service, Role::Owner, owner));
     Router::new()
         .nest("/api", api)
+        .merge(opensubsonic::routes())
         .fallback(get(web))
         // `.meta/` holds the covers as data URLs: larger than axum's default 2 MB.
         .layer(DefaultBodyLimit::max(512 << 20))

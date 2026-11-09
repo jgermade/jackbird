@@ -38,8 +38,14 @@ export const account = $reactive({
   busy: false,
   error: "",
   sessions: [] as SessionInfo[],
-  passkeys: [] as PasskeyInfo[]
+  passkeys: [] as PasskeyInfo[],
+  /** Keys for other apps (OpenSubsonic, E6's spike), and the one just made, shown once. */
+  keys: [] as AppKey[],
+  newKey: ""
 });
+
+/** A key another app signs in with. */
+export type AppKey = { id: number; name: string; created: number; used: number | null };
 
 /** Whether the person may do what `role` may: always, with no service behind the page. */
 export function can(role: Role): boolean {
@@ -185,6 +191,7 @@ export async function loadMine(): Promise<void> {
     account.sessions = mine.sessions;
     account.passkeys = mine.passkeys;
   }
+  account.keys = await serviceJson<AppKey[]>("me/keys").catch(() => []);
 }
 
 /** Changes one's own name. */
@@ -223,6 +230,19 @@ export async function renamePasskey(id: number, name: string): Promise<void> {
 }
 
 /** Removes one of one's passkeys. */
+/** Makes a key for another app (an OpenSubsonic app on a phone); it is shown once. */
+export async function addKey(name: string): Promise<void> {
+  const made = await busy(() => serviceJson<{ secret: string }>("me/keys", post({ name })));
+  if (made) account.newKey = made.secret;
+  await loadMine();
+}
+
+export async function removeKey(id: number): Promise<void> {
+  await busy(() => serviceJson("me/keys/remove", post({ id })));
+  account.newKey = "";
+  await loadMine();
+}
+
 export async function removePasskey(id: number): Promise<void> {
   await busy(() => serviceJson("me/passkeys/remove", post({ id })));
   await loadMine();

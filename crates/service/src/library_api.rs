@@ -192,7 +192,7 @@ fn range_of(headers: &HeaderMap, len: u64) -> Option<(u64, u64)> {
 }
 
 /// A song as it leaves: its head, then its blob, streamed; a range when one is asked for.
-async fn send(out: Outgoing, headers: &HeaderMap, download: bool) -> Answer<Response> {
+pub(crate) async fn send(out: Outgoing, headers: &HeaderMap, download: bool) -> Answer<Response> {
     let len = out.len();
     let wanted = headers.contains_key(header::RANGE);
     let (start, end) = match range_of(headers, len) {

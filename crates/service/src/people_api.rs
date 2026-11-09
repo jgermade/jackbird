@@ -330,6 +330,36 @@ async fn end_session(State(service): Shared, Extension(person): Extension<Person
     StatusCode::NO_CONTENT
 }
 
+// Keys for other apps (OpenSubsonic's `apiKey`, E6's spike): made, listed and removed by their
+// person; the key itself is shown once.
+
+async fn my_keys(State(service): Shared, Extension(person): Extension<Person>) -> Answer<Json<Value>> {
+    let keys = service.store.keys_of(person.id).map_err(refused)?;
+    Ok(Json(json!(keys)))
+}
+
+#[derive(Deserialize)]
+struct NewKey {
+    name: String,
+}
+
+async fn add_key(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<NewKey>,
+) -> Answer<Json<Value>> {
+    if body.name.trim().is_empty() {
+        return Err(ApiError::new(StatusCode::BAD_REQUEST, "name", "a key needs a name"));
+    }
+    let (made, key) = service.store.add_key(person.id, &body.name).map_err(refused)?;
+    Ok(Json(json!({ "key": made, "secret": key })))
+}
+
+async fn remove_key(State(service): Shared, Extension(person): Extension<Person>, Json(body): Json<Id>) -> StatusCode {
+    service.store.remove_key(person.id, body.id);
+    StatusCode::NO_CONTENT
+}
+
 async fn media_token(State(service): Shared, Extension(person): Extension<Person>) -> Json<Value> {
     let grant = MediaGrant { person: person.id };
     Json(json!({ "t": service.signer.sign("media", &grant, MEDIA_SECONDS) }))
@@ -369,6 +399,8 @@ pub fn own() -> Router<Arc<Service>> {
         .route("/me", get(me).post(rename_me))
         .route("/me/sessions/end", post(end_session))
         .route("/media/token", get(media_token))
+        .route("/me/keys", get(my_keys).post(add_key))
+        .route("/me/keys/remove", post(remove_key))
 }
 
 // ---------------------------------------------------------------------------------------------

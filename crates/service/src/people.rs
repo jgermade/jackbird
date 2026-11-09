@@ -131,6 +131,19 @@ pub struct Passkey {
     pub credential: String,
 }
 
+/// A key another app signs in with (OpenSubsonic's `apiKey`, E6's spike), as "My account" lists it.
+#[derive(Clone, Debug, Serialize)]
+pub struct ApiKey {
+    /// Its id.
+    pub id: i64,
+    /// Its name (the app it is for).
+    pub name: String,
+    /// When it was made.
+    pub created: i64,
+    /// When it was last used, if it was.
+    pub used: Option<i64>,
+}
+
 /// A change to the folders, with who made it.
 #[derive(Clone, Debug, Serialize)]
 pub struct Change {
@@ -231,6 +244,14 @@ create table if not exists log (
   action text not null,
   root text not null,
   path text not null
+);
+create table if not exists api_keys (
+  id integer primary key,
+  person integer not null references people(id) on delete cascade,
+  name text not null,
+  key blob not null unique,
+  created integer not null,
+  used integer
 );
 create table if not exists secrets (
   name text primary key,
@@ -615,6 +636,75 @@ impl Store {
         let _ = self
             .db()
             .execute("delete from passkeys where id = ?1 and person = ?2", [id, person]);
+    }
+
+    /// Makes a key for another app (OpenSubsonic, E6's spike); it is returned once and kept only as
+    /// a digest. Keys do not expire: they are removed.
+    pub fn add_key(&self, person: i64, name: &str) -> Result<(ApiKey, String), Refusal> {
+        use base64::Engine;
+        let key = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random::<24>());
+        let at = now();
+        let name: String = name.trim().chars().take(80).collect();
+        let db = self.db();
+        db.execute(
+            "insert into api_keys (person, name, key, created) values (?1, ?2, ?3, ?4)",
+            params![person, name, digest(&key), at],
+        )?;
+        let id = db.last_insert_rowid();
+        Ok((
+            ApiKey {
+                id,
+                name,
+                created: at,
+                used: None,
+            },
+            key,
+        ))
+    }
+
+    /// A person's keys for other apps.
+    pub fn keys_of(&self, person: i64) -> Result<Vec<ApiKey>, Refusal> {
+        let db = self.db();
+        let mut query = db.prepare("select id, name, created, used from api_keys where person = ?1 order by id")?;
+        let keys = query
+            .query_map([person], |row| {
+                Ok(ApiKey {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    created: row.get(2)?,
+                    used: row.get(3)?,
+                })
+            })?
+            .collect::<Result<_, _>>()?;
+        Ok(keys)
+    }
+
+    /// The person a key is for; using it is recorded (at most once a minute).
+    pub fn person_by_key(&self, key: &str) -> Option<Person> {
+        let at = now();
+        let (id, person, used): (i64, i64, Option<i64>) = self
+            .db()
+            .query_row(
+                "select id, person, used from api_keys where key = ?1",
+                [digest(key)],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .ok()
+            .flatten()?;
+        if used.is_none_or(|used| at - used > 60) {
+            let _ = self
+                .db()
+                .execute("update api_keys set used = ?1 where id = ?2", params![at, id]);
+        }
+        self.person(person)
+    }
+
+    /// Removes one of a person's keys.
+    pub fn remove_key(&self, person: i64, id: i64) {
+        let _ = self
+            .db()
+            .execute("delete from api_keys where id = ?1 and person = ?2", [id, person]);
     }
 
     /// Logs a change to the folders.

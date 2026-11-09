@@ -22,7 +22,7 @@
   const { isDesktop, isPhone } = await import("../lib/platform")
   const { forgetInstance, instance } = await import("../lib/instance")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
-  const { account, addPasskey, can, endSession, loadMine, passkeysHere, removePasskey, renameMe, signOut } = await import("../lib/account")
+  const { account, addKey, addPasskey, can, endSession, loadMine, passkeysHere, removeKey, removePasskey, renameMe, signOut } = await import("../lib/account")
   const { openPeople } = await import("../lib/people")
   const { describeAgent } = await import("../helpers/agent")
   const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
@@ -43,6 +43,11 @@
   }
   let myName: string = ""
   let passkeyName: string = ""
+  let keyName: string = ""
+  const newKey = async () => {
+    await addKey(keyName.trim())
+    keyName = ""
+  }
   const role = (name: string): string => t(`role.${name}` as "role.owner")
   const newPasskey = async () => {
     await addPasskey(passkeyName.trim())
@@ -117,6 +122,24 @@
               <Key size="sm" variant="ghost" :disabled="account.busy" @click="endSession(session.id)">{{ t("account.endSession") }}</Key>
             </li>
           </ul>
+        </div>
+        <div class="sub">
+          <h4 class="mm-legend">{{ t("account.keys") }}</h4>
+          <p class="hint">{{ t("account.keysHint") }}</p>
+          <p :if="account.keys.length === 0" class="hint">{{ t("account.keysNone") }}</p>
+          <ul :else class="items">
+            <li :each="key in account.keys" :key="key.id">
+              <span class="label">{{ key.name }}<small :if="key.used"> · {{ t("account.sessionSeen", { date: when(key.used ?? 0) }) }}</small></span>
+              <Key size="sm" variant="ghost" :disabled="account.busy" @click="removeKey(key.id)">{{ t("account.remove") }}</Key>
+            </li>
+          </ul>
+          <p :if="account.newKey" class="state secret">{{ t("account.newKey", { key: account.newKey }) }}</p>
+          <div class="row">
+            <Field :label="t('account.keyName')" control="key-name">
+              <TextInput id="key-name" :model="keyName" @input="keyName = $event.detail" />
+            </Field>
+            <Key size="sm" :disabled="account.busy || !keyName.trim()" @click="newKey()">{{ t("account.addKey") }}</Key>
+          </div>
         </div>
         <div :if="importing.available" class="sub">
           <div class="row own">
@@ -201,6 +224,7 @@
   .prefs > * { min-width: 0; }
   .account .state { color: var(--mm-fg); }
   .sub h4 { margin: 0; }
+  .secret { overflow-wrap: anywhere; user-select: all; }
   .own { justify-content: space-between; align-items: center; }
   .row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--mm-space-2); }
   .items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-1); margin: 0; padding: 0; list-style: none; font-size: var(--mm-text-sm); }
