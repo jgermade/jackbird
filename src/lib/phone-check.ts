@@ -26,6 +26,8 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Plays a URL a few seconds, muted; how far it got. */
 async function play(url: string): Promise<{ played: number; error?: string }> {
   const audio = new Audio();
+  // As the player's element: asked for with CORS, the instance answers the app's origin.
+  audio.crossOrigin = "anonymous";
   audio.muted = true;
   audio.src = url;
   try {
@@ -95,6 +97,8 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   const long = (await source.walk()).find((entry) => entry.path.endsWith("silence-60s.flac"));
   if (!long) return;
   const audio = new Audio();
+  // As the player's element: asked for with CORS, the instance answers the app's origin.
+  audio.crossOrigin = "anonymous";
   audio.muted = true;
   audio.src = (await source.openMedia(long.path)).url;
   await audio.play();
