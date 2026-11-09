@@ -24,6 +24,7 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum } = await import("../lib/player")
+  const { soundingBadge, soundingText } = await import("../lib/output")
   const { closeRoot, openFolder, selectRoot } = await import("../lib/roots")
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
@@ -92,6 +93,7 @@
                 <span class="visually-hidden">{{ stateLabel }}</span>
                 <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
               </span>
+              <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
               <Counter>{{ formatTime(playback.position) }}</Counter>
             </div>
             <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
@@ -160,6 +162,18 @@
   /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
   .pane-pick { grid-area: controls; display: none; justify-self: end; }
 
+  /* What reaches the device in the native output (E5): "24/96 bit-perfect", before the time. */
+  .route {
+    flex: none;
+    margin-left: auto;
+    padding-right: var(--mm-space-2);
+    font-family: var(--mm-font-label);
+    font-size: var(--mm-text-xs);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    opacity: .8;
+  }
   /* The display's one text row: the state glyph, then the title, which ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .state {

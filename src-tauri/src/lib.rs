@@ -6,6 +6,7 @@
 //!
 //! The interface's side is `src/lib/sources/desktop.ts`.
 
+mod audio;
 mod media;
 mod service;
 
@@ -21,7 +22,7 @@ use tauri_plugin_dialog::DialogExt;
 
 /// The open roots, by their path, as the interface names them.
 #[derive(Default)]
-struct Roots(Mutex<HashMap<String, Root>>);
+pub(crate) struct Roots(Mutex<HashMap<String, Root>>);
 
 /// Where media is played from on this system.
 enum Media {
@@ -33,7 +34,7 @@ enum Media {
 
 type Answer<T> = Result<T, Failure>;
 
-fn root_of(roots: &State<'_, Roots>, root: &str) -> Answer<Root> {
+pub(crate) fn root_of(roots: &State<'_, Roots>, root: &str) -> Answer<Root> {
     roots
         .0
         .lock()
@@ -298,9 +299,20 @@ pub fn run() {
             service::service_uninstall,
             service::service_update,
             service::service_start,
-            service::choose_folder
+            service::choose_folder,
+            audio::audio_devices,
+            audio::audio_configure,
+            audio::audio_load,
+            audio::audio_next,
+            audio::audio_play,
+            audio::audio_pause,
+            audio::audio_seek,
+            audio::audio_stop,
+            audio::audio_status,
+            audio::audio_spectrum
         ])
         .setup(|app| {
+            app.manage(audio::Audio::start(app.handle().clone()));
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("jackbird")
                 .inner_size(1280.0, 800.0)

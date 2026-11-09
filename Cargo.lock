@@ -1998,6 +1998,7 @@ name = "jackbird"
 version = "0.1.0"
 dependencies = [
  "jackbird-api",
+ "jackbird-audio",
  "jackbird-core",
  "serde",
  "serde_json",

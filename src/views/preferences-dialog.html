@@ -26,12 +26,15 @@
   const { describeAgent } = await import("../helpers/agent")
   const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
   const { importing } = await import("../lib/importing")
+  const { loadDevices, output, setOutputDevice, setOutputKind, soundingText } = await import("../lib/output")
+  const { devicesFor } = await import("../helpers/output")
 
   // On Windows, starting with the system runs the service as the person: Windows asks for their password.
   const onWindows = /Windows/.test(navigator.userAgent)
   let password: string = ""
   const opened = (open: boolean) => {
     if (open && isDesktop) void refreshServiceStatus()
+    if (open && output.available) void loadDevices()
     if (open && account.active && account.me) {
       myName = account.me.name
       void loadMine()
@@ -56,6 +59,13 @@
     if (!status?.installed) return t("service.none")
     return status.running ? t("service.running", { way: way(), address: `http://localhost:${status.port}` }) : t("service.stopped", { way: way() })
   }
+
+  const kinds = () => (["shared", "exclusive", "embedded"] as const).map((kind) => ({ value: kind, label: t(`output.${kind}`) }))
+  const deviceOptions = () => [
+    { value: "", label: t("output.defaultDevice") },
+    ...devicesFor(output.kind, output.devices).map((device) => ({ value: device.id, label: device.name }))
+  ]
+  const pickKind = (kind: string) => setOutputKind(kind === "exclusive" || kind === "embedded" ? kind : "shared")
 
   $: isDark = preferences.theme === "dark"
   const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
@@ -122,6 +132,20 @@
           <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
         </div>
       </section>
+      <section :if="output.available" class="pref output">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("output.title") }}</h3>
+          <p>{{ t("output.about") }}</p>
+          <p :if="soundingText()" class="state">{{ soundingText() }}</p>
+        </div>
+        <Field :label="t('output.kind')" control="output-kind" :hint="t('output.kindHint')">
+          <Select id="output-kind" :model="output.kind" :options="kinds()" @change="pickKind($event.detail)" />
+        </Field>
+        <Field :if="output.kind !== 'embedded'" :label="t('output.device')" control="output-device">
+          <Select id="output-device" :model="output.device ?? ''" :options="deviceOptions()" @change="setOutputDevice($event.detail || null)" />
+        </Field>
+        <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
+      </section>
       <section :if="isDesktop" class="pref service">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("service.title") }}</h3>
@@ -160,7 +184,8 @@
   .text { display: grid; gap: var(--mm-space-1); }
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
-  .service { display: grid; gap: var(--mm-space-3); }
+  .service, .output { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
+  .output .state { color: var(--mm-fg); }
   .service .state { color: var(--mm-fg); }
   .account, .sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
   .prefs > * { min-width: 0; }

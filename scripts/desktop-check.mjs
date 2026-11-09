@@ -2,7 +2,8 @@
 // The desktop app's unattended check (E4-D8): copies the tag fixtures to a
 // new folder, starts the built app on it (JACKBIRD_CHECK_FOLDER), and checks
 // its report (src/lib/sources/check.ts): every track found and read, a title
-// saved and read back with the audio kept, an MP3 and a FLAC played. Run by
+// saved and read back with the audio kept, an MP3 and a FLAC played, and a 24/96
+// FLAC through the native player (E5). Run by
 // desktop.yml on Linux (under xvfb-run), macOS and Windows:
 //
 //   node scripts/desktop-check.mjs target/release/jackbird
@@ -20,6 +21,9 @@ const folder = mkdtempSync(join(tmpdir(), "jackbird-check-"));
 const fixtures = resolve("fixtures/tags");
 const audio = readdirSync(fixtures).filter((name) => /\.(mp3|flac)$/i.test(name));
 for (const name of audio) cpSync(join(fixtures, name), join(folder, name));
+// A 24/96 FLAC for the native player (E5).
+cpSync(resolve("fixtures/audio/flac-24-96.flac"), join(folder, "hires-24-96.flac"));
+audio.push("hires-24-96.flac");
 const reportPath = join(folder, "report.json");
 
 /** Runs the app once with these variables; its report. */
@@ -50,6 +54,11 @@ for (const extension of [".mp3", ".flac"]) {
   const played = report.played?.[extension];
   if (!played || played.error || !(played.played > 0)) problems.push(`${extension} did not play: ${JSON.stringify(played)}`);
 }
+// The native player (E5): it played the 24/96 FLAC, or said why not (a runner may have no sound card).
+const native = report.native;
+if (!native) problems.push("the native player was not tried");
+else if (!native.failed && !(native.started && (native.position > 0 || native.ended))) problems.push(`the native player neither played nor said why: ${JSON.stringify(native)}`);
+else if (process.env.JACKBIRD_CHECK_NATIVE === "required" && native.failed) problems.push(`the native player did not play: ${native.failed}`);
 const shown = (holding) => (holding ?? []).find((root) => root.path === folder);
 // With the service installed (S2), the app is its interface: its roots are the service's.
 const kind = process.env.JACKBIRD_CHECK_KIND ?? "desktop";

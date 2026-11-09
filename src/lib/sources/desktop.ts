@@ -67,7 +67,8 @@ function desktopSource(root: string, name: string): RootSource {
           const now = await call<VFSStat | null>("stat", { root, path });
           return now?.size !== before?.size || now?.mtime !== before?.mtime;
         },
-        release: () => undefined
+        release: () => undefined,
+        native: { root, path }
       };
     },
     close: () => void invoke("close_root", { root }).catch(() => undefined)

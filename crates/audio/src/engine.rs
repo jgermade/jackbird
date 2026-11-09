@@ -203,10 +203,12 @@ impl Engine {
             0
         };
         song.exhausted = false;
+        let key = song.key.clone();
         let reuse = !reopen && self.output.is_some() && self.pipe().is_some_and(|pipe| pipe.format() == format);
-        if reuse && let Some(pipe) = self.pipe() {
+        let opening = if reuse && let Some(pipe) = self.pipe() {
             pipe.restart(song.serial, from);
             pipe.set_paused(!play);
+            None
         } else {
             self.close();
             let pipe = Arc::new(Pipe::new(
@@ -218,24 +220,28 @@ impl Engine {
                 },
             ));
             pipe.set_paused(!play);
-            let mut output = (self.outputs)(&self.settings);
-            match output.open(format, Arc::clone(&pipe)) {
-                Ok(route) => {
-                    self.route = Some(route);
-                    self.output = Some(output);
-                    self.set_pipe(Some(pipe));
-                }
-                Err(message) => {
-                    (self.events)(Event::Failed { key: song.key, message });
-                    self.stop();
-                    return;
-                }
-            }
-        }
+            self.set_pipe(Some(Arc::clone(&pipe)));
+            Some(pipe)
+        };
         self.previous = None;
         self.decoding = Some(song);
         self.playing = play;
         self.ended = false;
+        // Decoded ahead before the device asks: it starts with the song, not with silence.
+        self.feed();
+        if let Some(pipe) = opening {
+            let mut output = (self.outputs)(&self.settings);
+            match output.open(format, pipe) {
+                Ok(route) => {
+                    self.route = Some(route);
+                    self.output = Some(output);
+                }
+                Err(message) => {
+                    (self.events)(Event::Failed { key, message });
+                    self.stop();
+                }
+            }
+        }
     }
 
     fn stop(&mut self) {

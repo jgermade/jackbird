@@ -155,6 +155,8 @@ export type MediaHandle = {
   changed: () => Promise<boolean>;
   /** Gives the URL back; the media is no use after it. */
   release: () => void;
+  /** In the desktop app, the file by its root and path, for the native player (E5). */
+  native?: { root: string; path: string };
 };
 
 /**

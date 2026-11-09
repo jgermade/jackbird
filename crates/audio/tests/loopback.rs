@@ -100,3 +100,60 @@ fn a_24_96_flac_through_alsa_s_loopback_is_bit_perfect() {
     assert!(recorded.len() >= from_card + song.len(), "the whole song was recorded");
     assert_eq!(&recorded[from_card..from_card + song.len()], song, "sample for sample");
 }
+
+/// The shared path through ALSA itself (`cpal`, the `default` device), with no sound card: CI
+/// points `default` at ALSA's `file` plugin (`.asoundrc`), which writes what it is given to
+/// `JACKBIRD_AUDIO_ALSA_FILE`. What it wrote is the file's PCM, sample for sample.
+#[test]
+fn a_24_96_flac_through_alsa_s_default_device_reaches_it_bit_for_bit() {
+    let Some(written) = std::env::var_os("JACKBIRD_AUDIO_ALSA_FILE") else {
+        eprintln!("skipped: JACKBIRD_AUDIO_ALSA_FILE is not set");
+        return;
+    };
+    let _ = std::fs::remove_file(&written);
+    let (sender, events) = channel();
+    let player = Player::new(
+        Box::new(|settings: &Settings| Box::new(DeviceOutput::new(settings)) as Box<dyn jackbird_audio::Output>),
+        Settings::default(),
+        move |event| {
+            let _ = sender.send(event);
+        },
+    );
+    player.load(&fixture("flac-24-96.flac"), "one", 0.0, true);
+    let mut route = None;
+    loop {
+        match events.recv_timeout(Duration::from_secs(10)).expect("an event") {
+            Event::Started { route: started, .. } => route = Some(started),
+            Event::Ended { .. } => break,
+            Event::Failed { message, .. } => panic!("{message}"),
+        }
+    }
+    drop(player);
+    let route = route.expect("it started");
+    eprintln!("route: {route:?}");
+    assert_eq!(route.rate, 96000);
+    assert_eq!(route.fidelity, Fidelity::Mixer);
+    let bytes = std::fs::read(&written).expect("ALSA wrote the file");
+    let width = route.sample.bytes();
+    let recorded: Vec<i32> = bytes
+        .chunks_exact(width)
+        .map(|word| match route.sample {
+            jackbird_audio::DeviceSample::I16 => i32::from(i16::from_le_bytes([word[0], word[1]])) << 8,
+            jackbird_audio::DeviceSample::I32 => i32::from_le_bytes(word.try_into().unwrap()) >> 8,
+            jackbird_audio::DeviceSample::F32 => {
+                (f32::from_le_bytes(word.try_into().unwrap()) * (1 << 23) as f32) as i32
+            }
+            _ => i32::from_le_bytes(word.try_into().unwrap()),
+        })
+        .collect();
+    let (_, samples) = decode_all("flac-24-96.flac");
+    let first = |samples: &[i32]| samples.iter().position(|sample| *sample != 0).unwrap() / 2 * 2;
+    let (from_file, from_device) = (first(&samples), first(&recorded));
+    let song = &samples[from_file..];
+    assert!(recorded.len() >= from_device + song.len(), "the whole song was written");
+    assert_eq!(
+        &recorded[from_device..from_device + song.len()],
+        song,
+        "sample for sample"
+    );
+}

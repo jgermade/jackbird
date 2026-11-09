@@ -123,7 +123,10 @@ function serviceSource(root: string, name: string): RootSource {
           const now = await vfs.stat(path);
           return now?.size !== before?.size || now?.mtime !== before?.mtime;
         },
-        release: () => undefined
+        release: () => undefined,
+        // The desktop app and its own service (S2) are on the same machine: its native player (E5)
+        // opens the file by its path.
+        native: usesToken() ? { root, path } : undefined
       };
     },
     close: () => void api("roots/close", post({ root })).catch(() => undefined)
