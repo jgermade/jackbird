@@ -172,6 +172,23 @@ and sends it as a bearer; its media URLs carry a short-lived media token. The in
 `src/lib/account.ts` (who is in, the sign-in dialog, Account) and `src/lib/people.ts` (People and
 sign-in); `can(role)` hides what a role may not do.
 
+### The family library (F1)
+
+`crates/store` keeps the service's own library in a folder (the person's data folder by
+default): `blobs/ab/cd/<sha256>.<mp3|flac>`, each song the file as it was imported, whole and never
+changed, named by the SHA-256 of its audio region (`jackbird_core::examine`, one pass); `covers/`,
+the family's covers by their SHA-256; `files/`, the interface's small files; `catalogue.db`
+(SQLite): the songs (their place in the library, their file's own tags, the family's layer and its
+version) and the suggestions (other tags brought with the same audio). A save writes the family's
+layer field by field (a value equal to the file's leaves the file's), tried first on the song's
+head so the engine refuses what it would refuse for a file. A song leaves as
+`jackbird_tags::write_head` of its head with the family's layer, then its blob from the end of its
+own tags (`Outgoing`), streamed with byte ranges (`crates/service/src/library_api.rs`). To the
+interface it is a root (`library` in `src/lib/sources/service.ts`, kept as `@library`): walk,
+list, stat, inspect, save; renames and removals change the catalogue, not the blobs. Imports from a
+folder of the machine run in the background (owners); uploads (editors) are streamed to `tmp/`
+and moved in.
+
 The desktop app carries the service's binary beside its own and installs it from its
 Preferences (S2, `src-tauri/src/service.rs` running `jackbird-service install` and its kin;
 `crates/service/src/install.rs` knows each system): at logon, or with the system through the

@@ -105,6 +105,23 @@ The switch that makes people prove who they are: a one-time **code** sent by ema
 A person with sign-in on whose address is not confirmed yet: kept, with their role, but unable to
 sign in until they type the code sent to it.
 
+## The family library (F1)
+
+### Library
+The service's own store of songs, shared by its people, shown as a root (`Library`). Not a folder
+to browse: a store (`crates/store`).
+
+### Blob
+A song as it was imported, whole and never changed, named by the SHA-256 of its audio region.
+The same audio is kept once.
+
+### Layer
+A song's tags at one level: the **file's** (as imported) and the **family's** (what editors set).
+What everyone sees is the family's over the file's; the song leaves with them.
+
+### Suggestion
+Other tags brought with audio the library already has, kept beside the song until F3.
+
 ## Theming
 
 ### Theme

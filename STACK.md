@@ -83,6 +83,8 @@ This document describes the technical stack and codebase architecture implemente
   uses `go-webauthn`), on OpenSSL built from source by Cargo (`openssl` 0.10.82, `vendored`);
   signed tokens with `hmac` 0.13 and `sha2` 0.11; the home network's addresses with `if-addrs`
   0.15. The tests' passkeys come from an authenticator of their own on `p256` 0.14.
+- **The family library** (F1, `crates/store`): SQLite (`rusqlite`) for its catalogue, SHA-256
+  (`sha2`) for its names; the service streams songs out with `tokio-util`'s `ReaderStream`.
 
 ### Build Tools & Tooling
 - **Bundler & Dev Server**: Vite (`^5.4.8`), with two entries: the app (`index.html`) and the

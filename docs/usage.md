@@ -52,6 +52,18 @@ you are signed in. Without a screen, `jackbird-service setup` on the machine doe
 the console, and is the way back in for an owner whose address changed. Only an owner turns
 sign-in off again; people keep their addresses and become profiles.
 
+**The family library.** The service keeps a library of its own, shown to everyone as the
+**Library** tab. **Add music** puts songs in it: editors and up upload songs or a whole folder
+from their own device, and owners can also import a folder of the machine the service runs on.
+Each song is kept once, however many times it is brought, and the files you pick are never
+changed. Editing a song's tags changes what everyone sees, not the stored file: the song leaves
+with the family's tags when it is played or downloaded (**Info**, **Download**). When someone
+brings a song the library already has, with other tags, those are kept beside it and shown in its
+**Info**. The library lives in your data folder (`~/.local/share/jackbird/library` on Linux,
+`~/Library/Application Support/jackbird/library` on macOS, `%LOCALAPPDATA%\jackbird\library` on
+Windows), or wherever `service.json`'s `library` says: back that folder up and the whole library
+is in it.
+
 **Reaching it from elsewhere.** With sign-in on, an owner can let the home network reach it
 (**Sign-in**, **Home network**); over plain HTTP, codes and sessions travel unencrypted there and
 passkeys are not available. For HTTPS, and to reach it from outside home, put a proxy in front
