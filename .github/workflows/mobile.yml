@@ -85,6 +85,10 @@ jobs:
           # app down with it (it depends on its fonts provider).
           target: default
           disable-animations: true
+          # The host-side GPU emulation (SwiftShader) took the whole emulator down once the app drew its
+          # interface: the guest draws in software instead, with more memory.
+          emulator-options: -no-window -gpu guest -no-snapshot -noaudio -no-boot-anim
+          ram-size: 4096M
           script: mkdir -p /tmp/jackbird-phone-shots && node scripts/phone-check.mjs android "$(find src-tauri/gen/android -name '*.apk' | grep -i debug | head -1)"
 
       - uses: actions/upload-artifact@v6
