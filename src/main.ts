@@ -8,6 +8,7 @@ import "../theme/default/tokens.css";
 import "../theme/default/content.css";
 import "../theme/default/base.css";
 import { startAccount } from "./lib/account";
+import { loadFavourites, startMine } from "./lib/mine";
 import { keepPlaybackSaved, restorePlayback } from "./lib/player";
 import { isDesktop } from "./lib/platform";
 import { keepSessionSaved, restoreSession } from "./lib/session";
@@ -20,8 +21,10 @@ startVerifier();
 // The folders come back once someone is in (the service's people, S3); the
 // music once its root has: restoring it saves nothing over it.
 void startAccount()
+  .then(() => startMine())
   .then(() => restoreSession())
   .then(() => {
+    void loadFavourites();
     restorePlayback();
     keepPlaybackSaved();
   });

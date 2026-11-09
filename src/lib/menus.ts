@@ -7,6 +7,7 @@
 import type { WizardTreeRow } from "../types";
 import { can } from "./account";
 import { openSelectionFor } from "./editor";
+import { isFavourite, toggleFavourite } from "./mine";
 import { t, tn } from "./i18n";
 import { moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
 import { showInLibrary } from "./roots";
@@ -18,9 +19,13 @@ export type MenuItem = { id: string; label: string; danger?: boolean; rule?: boo
 
 /** The items that change the folders: only for editors and up (S3); a listener's menus leave them out. */
 const CHANGES = new Set(["playlist", "edit", "rename", "remove", "delete", "up", "down", "out"]);
+/** In the family library, anyone edits their own version and keeps their own playlists (F3). */
+const LIBRARY_CHANGES = new Set(["rename", "remove"]);
 
 function allowed(items: MenuItem[]): MenuItem[] {
-  return can("editor") ? items : items.filter((item) => !CHANGES.has(item.id));
+  if (can("editor")) return items;
+  const changes = activeRoot.value.data?.source.kind === "library" ? LIBRARY_CHANGES : CHANGES;
+  return items.filter((item) => !changes.has(item.id));
 }
 
 /** Where a track's menu is: the tree, or the album sheet (which adds "Show in library"). */
@@ -38,6 +43,12 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
   ];
   if (place === "sheet") {
     items.push({ id: "show", label: t("menu.showInLibrary") });
+  }
+  // The family library: one's favourites (F3).
+  const root = activeRoot.value.data;
+  const track = root?.source.kind === "library" ? root.tracks.find((one) => one.id === trackId) : undefined;
+  if (track) {
+    items.push({ id: "favourite", label: isFavourite(track.relativePath) ? t("menu.unfavourite") : t("menu.favourite") });
   }
   items.push(
     { id: "edit", label: t("menu.edit"), rule: true },
@@ -59,6 +70,11 @@ function askPlaylist(trackIds: string[], label: string): void {
 /** Does what a track's menu item says. */
 export function onTrackMenu(trackId: string, choice: string): void {
   switch (choice) {
+    case "favourite": {
+      const track = activeRoot.value.data?.tracks.find((one) => one.id === trackId);
+      if (track) void toggleFavourite(track.relativePath);
+      break;
+    }
     case "next":
     case "queue":
       queueTracks(menuTargets(trackId), choice === "next" ? "next" : "end");

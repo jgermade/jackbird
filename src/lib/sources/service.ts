@@ -170,8 +170,8 @@ export async function librarySource(): Promise<RootSource | null> {
     saved: LIBRARY,
     walk: () => json("library/walk"),
     inspect: (path, known) => json<Inspection>("library/inspect", post({ path, known: known ?? null })),
-    save: (path: string, previous: TrackMetadata, metadata: TrackMetadata) =>
-      json<Inspection>("library/save", post({ path, previous, metadata })),
+    save: (path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine") =>
+      json<Inspection>("library/save", post({ path, previous, metadata, scope: scope ?? "family" })),
     async openMedia(path): Promise<MediaHandle> {
       const before = await vfs.stat(path);
       const grant = usesToken() ? `&t=${encodeURIComponent(await mediaToken())}` : "";
@@ -199,6 +199,31 @@ export type LibrarySuggestion = { fields: { title: string; artist: string; album
 
 export const librarySuggestions = (path: string): Promise<LibrarySuggestion[]> =>
   json<LibrarySuggestion[]>(`library/suggestions?${inLibrary(path)}`);
+
+// ─── Each person's own (F3) ──────────────────────────────────────────────────
+
+/** What a song's tags are made of: the file's, what the family's layer sets, what one's own sets. */
+export type LayerJson = Partial<Record<"title" | "artist" | "album" | "year" | "genre" | "track", string>> & { cover?: { kind: string } };
+export type SongLayers = {
+  file: LibrarySuggestion["fields"];
+  family: LayerJson;
+  mine: LayerJson;
+  suggestions: (LibrarySuggestion & { id: number })[];
+  favourite: boolean;
+};
+
+export const songLayers = (path: string): Promise<SongLayers> => json<SongLayers>(`library/layers?${inLibrary(path)}`);
+export const forgetMine = (path: string): Promise<void> => json("library/mine/forget", post({ path }));
+export const setFavourite = (path: string, on: boolean): Promise<void> => json("library/favourite", post({ path, on }));
+export const notePlayed = (path: string): Promise<void> => json("library/played", post({ path }));
+export const clearHistory = (): Promise<void> => json("library/history/clear", post());
+export const applySuggestion = (path: string, id: number): Promise<Inspection> => json<Inspection>("library/suggestions/apply", post({ path, id }));
+export const readLibraryText = async (path: string): Promise<string> =>
+  new TextDecoder().decode(await (await api(`library/read?${inLibrary(path)}`)).arrayBuffer());
+
+/** A person's settings, kept with them on the service. */
+export type MySettings = { theme: "light" | "dark" | null; language: string | null; mine: boolean };
+export const saveMySettings = (change: Partial<MySettings>): Promise<MySettings> => json<MySettings>("me/settings", post(change));
 
 /** What importing did. */
 export type ImportReport = { added: number; existing: number; suggested: number; unreadable: [string, string][] };

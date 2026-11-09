@@ -173,8 +173,8 @@ export type RootSource = {
   walk(): Promise<WalkedFile[]>;
   /** One file's checksums, size and date; its tags too, unless its full checksum is still `known`. */
   inspect(path: string, known?: string): Promise<Inspection>;
-  /** Writes `metadata` over the tags the library held (`previous`); the file as it is after. */
-  save(path: string, previous: TrackMetadata, metadata: TrackMetadata): Promise<Inspection>;
+  /** Writes `metadata` over the tags the library held (`previous`); the file as it is after. In the family library (F3), for everyone (`family`) or for oneself (`mine`). */
+  save(path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine"): Promise<Inspection>;
   /** Opens a track's file for playing, without reading it into memory. */
   openMedia(path: string): Promise<MediaHandle>;
   /** The root was closed: on the desktop, nothing under it can be reached any more. */

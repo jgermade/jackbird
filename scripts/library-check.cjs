@@ -150,6 +150,7 @@ async function report(page) {
     await editor.getByRole("button", { name: "More for Before" }).first().click();
     await editor.getByRole("menuitem", { name: "Edit tags…" }).first().click();
     await editor.getByLabel("Title", { exact: true }).fill("Retitled by Luis");
+    await editor.screenshot({ path: path.join(home, "edit.png") });
     await editor.getByRole("button", { name: "Save changes" }).click();
     await editor.getByText("Retitled by Luis").first().waitFor({ timeout: 15000 });
     console.log("editor retitled a song");
@@ -175,6 +176,41 @@ async function report(page) {
     }, await link.getAttribute("href"));
     console.log("listener played it (", served.join(" "), ") and downloaded", carried[0], "bytes carrying the title:", carried[1]);
     if (!carried[1]) fail("the download does not carry the family's title");
+
+    // ── F3: the listener's own title; the editor still sees the family's.
+    await listener.keyboard.press("Escape");
+    await listener.getByRole("button", { name: "More for Retitled by Luis" }).first().click();
+    await listener.getByRole("menuitem", { name: "Edit tags…" }).first().click();
+    await listener.getByText("Saved for you only").waitFor();
+    await listener.getByLabel("Title", { exact: true }).fill("The kids' title");
+    await listener.screenshot({ path: path.join(home, "edit-own.png") });
+    await listener.getByRole("button", { name: "Save changes" }).click();
+    await listener.getByText("The kids' title").first().waitFor({ timeout: 15000 });
+    await editor.reload();
+    await editor.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
+    if ((await editor.getByText("The kids' title").count()) > 0) fail("the editor sees the listener's own title");
+    console.log("listener titled the song for themselves; the editor still sees the family's");
+
+    // Their favourite and their play, in their own playlists.
+    await listener.getByRole("button", { name: "More for The kids' title" }).first().click();
+    await listener.getByRole("menuitem", { name: "Add to favourites" }).click();
+    await listener.getByText("The kids' title", { exact: true }).first().click();
+    await wait(2500);
+    const own = await listener.evaluate(async () => {
+      const read = async (path) => (await fetch(`/api/library/read?path=${encodeURIComponent(path)}`)).text();
+      return [await read("My playlists/Favourites.m3u"), await read("My playlists/Recently played.m3u")];
+    });
+    console.log("listener's favourites and plays:", JSON.stringify(own));
+    if (!own[0].includes("flac-full.flac") && !own[0].includes(".mp3")) fail("no favourite");
+    if (own[1].trim() === "#EXTM3U") fail("no play counted");
+    const theirs = await editor.evaluate(async () => (await fetch("/api/library/read?path=My%20playlists%2FFavourites.m3u")).text());
+    if (theirs.trim() !== "#EXTM3U") fail("the editor sees the listener's favourites");
+
+    // The switch: the family's version.
+    await listener.getByRole("button", { name: "Open preferences" }).first().click();
+    await Promise.all([listener.waitForEvent("load"), listener.getByRole("switch", { name: "Your version" }).or(listener.getByLabel("Your version")).first().click()]);
+    await listener.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
+    console.log("listener switched to the family's version");
 
     // ── The files on the machine were never written.
     for (const name of ["mp3-v24-padded.mp3", "flac-full.flac"]) {

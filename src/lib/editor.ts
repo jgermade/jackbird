@@ -27,8 +27,15 @@ import { activeRoot, selectUnlessChosen, selectedTracks } from "./workspace";
  */
 export const editor = $reactive({
   form: emptyMetadata() as EditableMetadata,
-  confirmed: [] as string[]
+  confirmed: [] as string[],
+  /** In the family library (F3): saved for everyone (editors and up) or only for oneself. */
+  scope: "family" as "family" | "mine"
 });
+
+/** Whether the active root is the family library, where anyone edits their own version (F3). */
+function inLibrary(): boolean {
+  return activeRoot.value.data?.source.kind === "library";
+}
 
 /**
  * Opens the selection's dialog on `tab`, the form filled with the values its
@@ -42,8 +49,9 @@ export function openSelection(tab: SelectionTab = "edit"): void {
   editor.form = computeCommonMetadata(tracks);
   editor.confirmed = [];
   library.errorMessage = null;
-  // A listener sees the files' info only (S3).
-  ui.selectionTab = can("editor") ? tab : "info";
+  // A listener sees the files' info only (S3); in the family library they edit their own version (F3).
+  editor.scope = can("editor") ? "family" : "mine";
+  ui.selectionTab = can("editor") || (inLibrary() && tab === "edit") ? tab : "info";
   ui.selectionOpen = true;
 }
 
@@ -116,7 +124,7 @@ export async function saveEdits(): Promise<void> {
     for (const track of tracks) {
       const metadata = mergeDraft(track.metadata, draft, varied, confirmed);
       try {
-        const written = await root.source.save(track.relativePath, track.metadata, metadata);
+        const written = await root.source.save(track.relativePath, track.metadata, metadata, $toRaw(editor).scope);
         const { fullChecksum, audioChecksum } = written;
         const nowIso = new Date().toISOString();
         // The date the disk gave the file, which the next load compares with:

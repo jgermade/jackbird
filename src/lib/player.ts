@@ -18,9 +18,11 @@ import {
   restoreQueue,
   type QueuePosition
 } from "../helpers/queue";
+import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
 import { spectrumBands } from "../helpers/spectrum";
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
+import { played } from "./mine";
 import { t } from "./i18n";
 import { library } from "./library";
 import { Opaque } from "./opaque";
@@ -143,6 +145,8 @@ if (audio) {
 // the file it opened, and the date the library gave it then.
 let loadedKey: string | null = null;
 let loaded: { rootId: string; relativePath: string; lastModified?: number } | null = null;
+/** The load whose play was counted (F3). */
+let countedFor: { rootId: string; relativePath: string; lastModified?: number } | null = null;
 let media: MediaHandle | null = null;
 
 // After a reload: the track to come back to, where in it, and whether it was
@@ -362,6 +366,11 @@ if (audio) {
   });
   audio.addEventListener("timeupdate", () => {
     playback.position = audio.currentTime;
+    // A play of the family library's counts once (F3).
+    if (loaded && countedFor !== loaded && countsAsPlayed(audio.currentTime, audio.duration)) {
+      countedFor = loaded;
+      played(loaded.rootId, loaded.relativePath);
+    }
   });
   audio.addEventListener("durationchange", () => {
     playback.duration = Number.isFinite(audio.duration) ? audio.duration : 0;

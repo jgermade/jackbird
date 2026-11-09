@@ -26,6 +26,13 @@
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { loadSongExtras, songExtras } = await import("../lib/importing")
+  const { applySuggestion, backToFamily, loadLayers, mine } = await import("../lib/mine")
+  // In the family library (F3): saved for everyone (editors) or only for oneself.
+  const scopes = () => [
+    { value: "family", label: t("editor.forEveryone") },
+    { value: "mine", label: t("editor.forMe") }
+  ]
+  const ownFields = (): string[] => Object.keys(mine.layers?.mine ?? {})
   const { library } = await import("../lib/library")
   const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
@@ -69,7 +76,7 @@
     { id: "edit", label: t("actions.edit"), tone: "edit" },
     { id: "rename", label: t("selection.tab.rename"), tone: "edit" },
     { id: "danger", label: t("selection.tab.danger"), tone: "danger" }
-  ].filter((tab) => tab.id === "info" || can("editor"))
+  ].filter((tab) => tab.id === "info" || can("editor") || (tab.id === "edit" && inLibrary()))
   const heading = (): string => {
     const one = single()
     return one ? one.metadata.title || one.name : tn("selection.count", tracks().length)
@@ -129,6 +136,7 @@
   // A song of the family library (F1): its download, and the other tags brought with it.
   const inLibrary = (): boolean => activeRoot.value.data?.source.kind === "library"
   $: loadSongExtras(ui.selectionOpen && ui.selectionTab === "info" && inLibrary() && single() ? single().relativePath : null)
+  $: loadLayers(ui.selectionOpen && ui.selectionTab === "info" && inLibrary() && single() ? single().relativePath : null)
   const renameCount = (): number => plans().filter((plan) => plan.status === "ok").length
   const rename = async () => {
     if (await renameSelected()) closeSelection()
@@ -216,10 +224,17 @@
         </dl>
         <div :if="inLibrary() && songExtras.download" class="library-extras">
           <a class="download" :href="songExtras.download" download>{{ t("info.download") }}</a>
-          <div :if="songExtras.suggestions.length > 0" class="suggestions">
+          <div :if="ownFields().length > 0" class="own">
+            <p>{{ t("info.ownVersion", { fields: ownFields().join(", ") }) }}</p>
+            <Key size="sm" variant="ghost" @click="backToFamily(single().relativePath)">{{ t("info.backToFamily") }}</Key>
+          </div>
+          <div :if="(mine.layers?.suggestions.length ?? 0) > 0" class="suggestions">
             <h4 class="mm-legend">{{ t("info.suggestions") }}</h4>
             <ul>
-              <li :each="suggestion in songExtras.suggestions" :key="suggestion.at">{{ suggestion.fields.title }} · {{ suggestion.fields.artist }} · {{ suggestion.fields.album }} <small>{{ t("info.suggestedBy", { name: suggestion.by }) }}</small></li>
+              <li :each="suggestion in mine.layers?.suggestions ?? []" :key="suggestion.id">
+                {{ suggestion.fields.title }} · {{ suggestion.fields.artist }} · {{ suggestion.fields.album }} <small>{{ t("info.suggestedBy", { name: suggestion.by }) }}</small>
+                <Key :if="can('editor')" size="sm" variant="ghost" @click="applySuggestion(single().relativePath, suggestion.id)">{{ t("info.applyToEveryone") }}</Key>
+              </li>
             </ul>
           </div>
         </div>
@@ -276,6 +291,8 @@
 
     <template :slot.foot>
       <span :if="ui.selectionTab === 'edit'" class="keys">
+        <span :if="inLibrary() && can('editor')" class="scope"><Select id="save-scope" :model="editor.scope" :options="scopes()" @change="editor.scope = $event.detail" /></span>
+        <span :elseif="inLibrary()" class="scope-note">{{ t("editor.forMeOnly") }}</span>
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
         <Key variant="primary" :disabled="library.saving || tracks().length === 0" @click="saveEdits()">{{ library.saving ? t("editor.saving") : t("editor.save") }}</Key>
       </span>
@@ -378,6 +395,11 @@
     .grid { grid-template-columns: minmax(0, 1fr); }
     .info-facts div { grid-template-columns: minmax(0, 1fr); gap: 0; }
   }
+  .scope { min-width: 10rem; }
+  .scope-note { align-self: center; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .own { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-2); }
+  .own p { margin: 0; font-size: var(--mm-text-sm); color: var(--mm-fg-muted); }
+  .suggestions li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-2); }
   .library-extras { display: grid; gap: var(--mm-space-2); grid-column: 1 / -1; }
   .download { justify-self: start; color: var(--mm-accent); font-size: var(--mm-text-sm); }
   .suggestions h4 { margin: 0; }

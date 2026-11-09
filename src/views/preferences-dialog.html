@@ -24,6 +24,8 @@
   const { account, addPasskey, can, endSession, loadMine, passkeysHere, removePasskey, renameMe, signOut } = await import("../lib/account")
   const { openPeople } = await import("../lib/people")
   const { describeAgent } = await import("../helpers/agent")
+  const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
+  const { importing } = await import("../lib/importing")
 
   // On Windows, starting with the system runs the service as the person: Windows asks for their password.
   const onWindows = /Windows/.test(navigator.userAgent)
@@ -105,6 +107,16 @@
             </li>
           </ul>
         </div>
+        <div :if="importing.available" class="sub">
+          <div class="row own">
+            <div class="text">
+              <h4 class="mm-legend">{{ t("account.ownVersion") }}</h4>
+              <p class="hint">{{ t("account.ownVersionHint") }}</p>
+            </div>
+            <SlideSwitch :label="t('account.ownVersion')" :off-legend="t('account.familyVersion')" :on-legend="t('account.mineVersion')" :model="mine.ownVersion" @change="showOwnVersion($event.detail)" />
+          </div>
+          <Key size="sm" variant="ghost" @click="clearHistory()">{{ t("account.clearHistory") }}</Key>
+        </div>
         <div class="keys">
           <Key :if="can('admin')" variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
           <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
@@ -154,6 +166,7 @@
   .prefs > * { min-width: 0; }
   .account .state { color: var(--mm-fg); }
   .sub h4 { margin: 0; }
+  .own { justify-content: space-between; align-items: center; }
   .row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--mm-space-2); }
   .items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-1); margin: 0; padding: 0; list-style: none; font-size: var(--mm-text-sm); }
   .items li { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-2); }
