@@ -120,7 +120,12 @@ A song's tags at one level: the **file's** (as imported) and the **family's** (w
 What everyone sees is the family's over the file's; the song leaves with them.
 
 ### Suggestion
-Other tags brought with audio the library already has, kept beside the song until F3.
+Other tags brought with audio the library already has, kept beside the song for editors to apply
+for everyone; since F3 they are also the importer's own layer.
+
+### Own version
+A person's layer of a song, over the family's: what they set **only for me**. **My playlists** is
+their own folder of the library: their playlists, **Favourites** and **Recently played**.
 
 ## Theming
 

@@ -64,6 +64,17 @@ brings a song the library already has, with other tags, those are kept beside it
 Windows), or wherever `service.json`'s `library` says: back that folder up and the whole library
 is in it.
 
+**Your own, in the library.** Each person has their own there: **Add to favourites** in a
+song's menu; what you play (a song counts once half of it, or four minutes, has played); your own
+playlists. They are the library's **My playlists** folder, yours alone, with **Favourites** and
+**Recently played** made from what you did. Editing a song's tags in the library, an editor
+chooses **For everyone** or **Only for me**; anyone else saves for themselves only. What you set
+for yourself is what you see, play and download; the song's **Info** says which fields are yours,
+with **Back to the family's version**. In **Preferences**, **Account**, **Your version** switches
+between yours and the family's, and **Clear what I played** empties your history. A song you bring
+that the library already has, with other tags, shows you your tags, and editors see them as a
+suggestion they can **Apply for everyone**. Your theme and language follow you to every device.
+
 **Reaching it from elsewhere.** With sign-in on, an owner can let the home network reach it
 (**Sign-in**, **Home network**); over plain HTTP, codes and sessions travel unencrypted there and
 passkeys are not available. For HTTPS, and to reach it from outside home, put a proxy in front

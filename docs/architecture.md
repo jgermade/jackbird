@@ -189,6 +189,20 @@ list, stat, inspect, save; renames and removals change the catalogue, not the bl
 folder of the machine run in the background (owners); uploads (editors) are streamed to `tmp/`
 and moved in.
 
+### Each person's own (F3)
+
+`crates/store/src/own.rs`: each person's layer of a song (`own_layers`), favourites, plays, and
+their own small files (`own_files`), in the library's catalogue by person id. A `Viewer` (the
+person, and whether they see their own version, a setting kept with them in `jackbird.db`) is what
+the service passes to walk, list, stat, read, inspect and the songs' way out: they see their layer
+over the family's over the file's, and the full checksum carries both layers' versions, so the
+interface reads the tags again when either changes. `Scope` says which layer a save writes (the
+family's: editors and up; one's own: anyone). The folder **My playlists** is each person's: their
+playlists, and two made from what they did, `Favourites.m3u` (written, it sets their favourites)
+and `Recently played.m3u` (deleted, it clears their history), so the playlists' own code needs
+nothing new. The web's side is `src/lib/mine.ts`; a play is counted by `src/lib/player.ts`
+(`helpers/plays.ts`).
+
 The desktop app carries the service's binary beside its own and installs it from its
 Preferences (S2, `src-tauri/src/service.rs` running `jackbird-service install` and its kin;
 `crates/service/src/install.rs` knows each system): at logon, or with the system through the
