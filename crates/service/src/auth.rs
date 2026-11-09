@@ -206,3 +206,20 @@ impl Codes {
         Checked::Wrong
     }
 }
+
+/// Ids that may be used once, until they expire: each passkey ceremony's challenge is answered
+/// once.
+#[derive(Default)]
+pub struct Once {
+    used: Mutex<HashMap<String, i64>>,
+}
+
+impl Once {
+    /// Whether `id` was not used before; it is used now, until `expires`.
+    pub fn first(&self, id: &str, expires: i64) -> bool {
+        let mut used = self.used.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let at = now();
+        used.retain(|_, until| *until >= at);
+        used.insert(id.to_owned(), expires).is_none()
+    }
+}

@@ -27,6 +27,7 @@ pub mod auth;
 pub mod config;
 pub mod install;
 pub mod mail;
+mod passkeys;
 pub mod people;
 mod people_api;
 
@@ -47,7 +48,7 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 
 use crate::access::{Client, require};
-use crate::auth::{Codes, Signer};
+use crate::auth::{Codes, Once, Signer};
 use crate::config::Config;
 use crate::people::{Person, Role, Store};
 
@@ -69,6 +70,7 @@ pub struct Service {
     pub store: Store,
     pub(crate) signer: Signer,
     pub(crate) codes: Codes,
+    pub(crate) ceremonies: Once,
     /// The console's key (`config::console_key_path`): `Authorization: Console <key>` acts as an
     /// owner, for `jackbird-service setup` and `signin off`.
     pub(crate) console_key: String,
@@ -113,6 +115,7 @@ impl Service {
             store,
             signer,
             codes: Codes::default(),
+            ceremonies: Once::default(),
             console_key,
             network,
             mailer,
@@ -620,7 +623,8 @@ pub fn router(service: Arc<Service>) -> Router {
         .route("/stat", get(stat))
         .route("/inspect", post(inspect))
         .route("/media", get(media))
-        .merge(people_api::own());
+        .merge(people_api::own())
+        .merge(passkeys::own());
     let editor = Router::new()
         .route("/write", post(write))
         .route("/delete", post(delete))
@@ -635,6 +639,7 @@ pub fn router(service: Arc<Service>) -> Router {
     let api = Router::new()
         .route("/info", get(info))
         .merge(people_api::open())
+        .merge(passkeys::open())
         .merge(of(&service, Role::Listener, listener))
         .merge(of(&service, Role::Editor, editor))
         .merge(of(&service, Role::Admin, people_api::admins()))

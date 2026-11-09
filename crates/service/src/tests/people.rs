@@ -10,7 +10,7 @@ use crate::people::{Role, Store};
 
 /// The emails sent, kept instead of sent.
 #[derive(Clone, Default)]
-struct Outbox(Arc<Mutex<Vec<(String, String, String)>>>);
+pub(super) struct Outbox(Arc<Mutex<Vec<(String, String, String)>>>);
 
 impl mail::Mailer for Outbox {
     fn send<'a>(
@@ -50,7 +50,7 @@ fn smtp() -> Smtp {
 }
 
 /// A service with SMTP set up and an outbox, open, with its first person (the owner).
-fn instance() -> (Arc<Service>, Router, Outbox) {
+pub(super) fn instance() -> (Arc<Service>, Router, Outbox) {
     let outbox = Outbox::default();
     let settings = Config {
         smtp: Some(smtp()),
@@ -61,13 +61,13 @@ fn instance() -> (Arc<Service>, Router, Outbox) {
     (service, app, outbox)
 }
 
-fn cookie_of(headers: &HeaderMap) -> String {
+pub(super) fn cookie_of(headers: &HeaderMap) -> String {
     let set = headers.get(header::SET_COOKIE).unwrap().to_str().unwrap();
     set.split(';').next().unwrap().to_owned()
 }
 
 /// Turns sign-in on as the owner, confirming `email`; the owner's cookie.
-async fn turn_signin_on(app: &Router, outbox: &Outbox, email: &str) -> String {
+pub(super) async fn turn_signin_on(app: &Router, outbox: &Outbox, email: &str) -> String {
     let (status, body) = call(Method::POST, "/api/setup/email")
         .json(json!({ "email": email }))
         .value(app)
@@ -82,7 +82,7 @@ async fn turn_signin_on(app: &Router, outbox: &Outbox, email: &str) -> String {
 }
 
 /// Signs in by code; the cookie.
-async fn sign_in(app: &Router, outbox: &Outbox, email: &str) -> String {
+pub(super) async fn sign_in(app: &Router, outbox: &Outbox, email: &str) -> String {
     let (status, body) = call(Method::POST, "/api/auth/code")
         .json(json!({ "email": email, "lang": "es" }))
         .value(app)
@@ -358,7 +358,7 @@ async fn codes_answer_the_same_for_unknown_addresses_burn_after_five_tries_and_a
 }
 
 /// The roles' cookies on an instance with sign-in on: owner, admin, editor, listener.
-async fn family() -> (Arc<Service>, Router, Outbox, [String; 4]) {
+pub(super) async fn family() -> (Arc<Service>, Router, Outbox, [String; 4]) {
     let (service, app, outbox) = instance();
     let owner = turn_signin_on(&app, &outbox, "owner@example.com").await;
     let mut cookies = vec![owner.clone()];

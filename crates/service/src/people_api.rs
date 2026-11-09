@@ -23,7 +23,7 @@ use crate::{Answer, ApiError, Service};
 
 type Shared = State<Arc<Service>>;
 
-fn refused(refusal: Refusal) -> ApiError {
+pub(crate) fn refused(refusal: Refusal) -> ApiError {
     match refusal {
         Refusal::Taken => ApiError::new(StatusCode::CONFLICT, "taken", "that address is already someone's"),
         Refusal::LastOwner => ApiError::new(StatusCode::CONFLICT, "last-owner", "there must always be an owner"),
@@ -60,7 +60,7 @@ fn site(service: &Service) -> String {
 
 /// An answer that also signs in: the session's cookie, and its token when asked for (the
 /// desktop app, which keeps it and sends it as a bearer).
-fn signed_in(
+pub(crate) fn signed_in(
     service: &Service,
     person: &Person,
     client: &Client,
@@ -295,7 +295,7 @@ struct Name {
     name: String,
 }
 
-fn valid_name(name: &str) -> Answer<String> {
+pub(crate) fn valid_name(name: &str) -> Answer<String> {
     let name: String = name.trim().chars().take(64).collect();
     if name.is_empty() {
         return Err(ApiError::new(
