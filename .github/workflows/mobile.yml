@@ -80,6 +80,13 @@ jobs:
           npx tauri android build --debug --apk --target x86_64
           find src-tauri/gen/android -name "*.apk"
 
+      # Gradle's and Kotlin's daemons outlive the build and hold gigabytes the emulator needs.
+      - name: The build's daemons stopped
+        run: |
+          (cd src-tauri/gen/android && ./gradlew --stop) || true
+          pkill -f KotlinCompileDaemon || true
+          free -m
+
       - name: The check, in the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -94,6 +101,12 @@ jobs:
           emulator-options: -no-window -gpu guest -no-snapshot -noaudio -no-boot-anim
           ram-size: 4096M
           script: mkdir -p /tmp/jackbird-phone-shots && node scripts/phone-check.mjs android "$(find src-tauri/gen/android -name '*.apk' | grep -i debug | head -1)"
+
+      - name: What the machine says, when the emulator went away
+        if: failure()
+        run: |
+          free -m
+          sudo dmesg | tail -40 || true
 
       - uses: actions/upload-artifact@v6
         if: always()
