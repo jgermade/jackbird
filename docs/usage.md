@@ -30,6 +30,60 @@ and plays on. A reload stops the sound for a moment, since a page cannot play th
 reload; and if the browser does not let the page start sound by itself, the track waits, paused at
 its place, and your first click or key anywhere resumes it.
 
+## People and sign-in (the service)
+
+When jackbird is served by its service (installed from the desktop app, or `jackbird-service` on
+a machine), it starts open, for one person: you, its **owner**, on that machine only.
+
+**Several people.** In **Preferences**, **People and sign-in…** adds people with a name and a
+role. While sign-in is off they are profiles: opening jackbird asks *Who's listening?*, and
+picking a name is enough. Roles decide what jackbird offers: a **listener** plays; an **editor**
+also edits tags and covers, renames files and keeps playlists; an **admin** also adds editors and
+listeners, sets up email and reads the log of changes; an **owner** also opens folders and decides
+how jackbird is reached. With sign-in off, anyone at the machine can pick any profile.
+
+**Sign-in.** Set up email first (**People and sign-in…**, **Sign-in**: your SMTP server, then
+**Send a test**). An owner then gives their own address and types back the code sent there:
+sign-in is on. Nobody's role changes; the others are disabled until an owner or an admin gives
+them an address, where an invitation is sent, and they sign in with the code sent there. Only
+people added this way can sign in. Once in, **Preferences**, **Account** adds a **passkey** to sign
+in without a code (on the instance's own address, over HTTPS or on `localhost`), and shows where
+you are signed in. Without a screen, `jackbird-service setup` on the machine does the same from
+the console, and is the way back in for an owner whose address changed. Only an owner turns
+sign-in off again; people keep their addresses and become profiles.
+
+**Reaching it from elsewhere.** With sign-in on, an owner can let the home network reach it
+(**Sign-in**, **Home network**); over plain HTTP, codes and sessions travel unencrypted there and
+passkeys are not available. For HTTPS, and to reach it from outside home, put a proxy in front
+and set **The instance's address** to the address it serves (passkeys belong to that address).
+With Caddy:
+
+```caddy
+music.example.com {
+  reverse_proxy 127.0.0.1:4646
+}
+```
+
+With nginx (and a certificate of your own):
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name music.example.com;
+  # ssl_certificate …; ssl_certificate_key …;
+  location / {
+    proxy_pass http://127.0.0.1:4646;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+jackbird believes the proxy's `X-Forwarded-*` headers only from the machine itself; a proxy on
+another machine is listed in `service.json`'s `proxies`. While sign-in is off, a request through a
+proxy is refused.
+
 ## The library
 
 The left panel lists the active root's folders and tracks. A click on a folder's triangle or

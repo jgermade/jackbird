@@ -129,11 +129,48 @@ Access API. The page finds it by asking `/api/info` (`src/lib/platform.ts`); its
 `src/lib/sources/service.ts`, and a folder is chosen in a dialog of the machine's folders
 (`src/views/folder-dialog.html`). The JSON is `crates/api`'s, the same the desktop app speaks.
 
-Until sign-in comes (S3) it is open, so it keeps to the machine: it listens on the loopback
-address only; every request must name it by its own address and port (`Host`), which keeps out a
-page that points its own name at 127.0.0.1; a request from another site is refused
-(`Sec-Fetch-Site`, `Origin`), and one that changes anything must come from its own page. Its
-configuration keeps its port (4646) and its open folders, which it reopens when it starts.
+Open (sign-in off, as every installation starts), it keeps to the machine: it listens on the
+loopback address only and refuses any other peer and any request a proxy forwarded; every request
+must name it by its own address and port (`Host`), which keeps out a page that points its own name
+at 127.0.0.1; a request from another site is refused (`Sec-Fetch-Site`, `Origin`), and one that
+changes anything must come from its own page. Its configuration keeps its port (4646), its open
+folders (reopened when it starts) and, since S3, how people reach it.
+
+### People and sign-in (S3)
+
+The service keeps its people in `jackbird.db` (SQLite, beside its configuration, readable by its
+person alone): people (a name, an email, a role), sessions (kept as hashes), passkeys, and the log
+of changes to the folders (`crates/service/src/people.rs`). Every installation starts with one
+person, its owner, and two independent switches:
+
+- **Several people**: with sign-in off they are profiles, picked in the browser ("Who's
+  listening?"); roles decide what the interface offers and what the service accepts, but anyone
+  at the machine can pick any profile.
+- **Sign-in**: only an owner turns it on, by confirming their own address with a code sent there
+  (from Preferences, or `jackbird-service setup` on the console). No role changes; everyone else is
+  disabled until an owner or admin gives them an address and they sign in with the code sent
+  there (sign-up is by invitation only). Turning it off again (an owner's) makes them profiles
+  again and ends every session.
+
+Roles (`access.rs`, checked on every route): **listeners** read and play; **editors** also change
+the folders (tags, covers, renames, playlists); **admins** also add people up to editor, read the
+log and set up email; **owners** also open and close folders, browse the machine's folders, set
+the address and the network, turn sign-in on and off, and make other owners and admins (one owner
+always remains). Codes (`auth.rs`) follow intergate's rules: six digits, ten minutes, bound to the
+attempt that asked, five tries, five per address in 15 minutes and 20 per IP address in an hour,
+and the same answer for an unknown address. Passkeys (`passkeys.rs`) are `webauthn-rs`'s:
+discoverable, with user verification, on the instance's address (its host is the RP ID), a signed
+ceremony answered once, a sign count going back refused. Email goes out by SMTP (`mail.rs`,
+`lettre`).
+
+With sign-in on, any `Host` is answered (behind a proxy, on the home network), since without a
+session nothing but signing in is; the home network is an owner's switch, which listens on each
+of the machine's addresses; `X-Forwarded-For` and `X-Forwarded-Proto` are believed only from the
+listed proxies (loopback by default), and over HTTPS the session cookie is `__Host-`, `Secure`,
+`HttpOnly`, `SameSite=Strict`. The desktop app, whose page is another origin, keeps a session token
+and sends it as a bearer; its media URLs carry a short-lived media token. The interface's side is
+`src/lib/account.ts` (who is in, the sign-in dialog, Account) and `src/lib/people.ts` (People and
+sign-in); `can(role)` hides what a role may not do.
 
 The desktop app carries the service's binary beside its own and installs it from its
 Preferences (S2, `src-tauri/src/service.rs` running `jackbird-service install` and its kin;

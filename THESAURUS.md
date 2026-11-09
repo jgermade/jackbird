@@ -81,6 +81,30 @@ A single cached entry inside a `MetaSnapshot`: `checksum`, `metadata`, and `upda
 
 ---
 
+## People (the service, S3)
+
+### Person
+Someone with a place in an instance of jackbird's service: a name, a role, and, for sign-in, an
+email. Every instance starts with one, its owner. Kept in `jackbird.db` (`crates/service/src/people.rs`).
+
+### Profile
+A person while sign-in is off: picked in the browser ("Who's listening?"), with no code or
+passkey. Its role decides what is offered, not what is protected.
+
+### Role
+What a person may do, each including the ones before it: **listener** (plays), **editor**
+(changes the folders), **admin** (adds editors and listeners, email, the log), **owner** (the
+folders, the address, the network, sign-in, other owners and admins).
+
+### Sign-in
+The switch that makes people prove who they are: a one-time **code** sent by email, or a
+**passkey**. Only an owner turns it on (by confirming their own address) or off. Sign-up is by
+**invitation**: an owner or admin gives someone an address.
+
+### Disabled
+A person with sign-in on whose address is not confirmed yet: kept, with their role, but unable to
+sign in until they type the code sent to it.
+
 ## Theming
 
 ### Theme
