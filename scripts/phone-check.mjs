@@ -8,13 +8,13 @@
 //   node scripts/phone-check.mjs android path/to/app.apk
 //   node scripts/phone-check.mjs ios path/to/jackbird.app
 //
-// The phone reaches the service at localhost:4646 and the receiver at localhost:4700: on Android
-// through `adb reverse`, on iOS's simulator directly (it shares the machine's network).
+// iOS's simulator shares this machine's network: it reaches the service at localhost:4646 and the
+// receiver at localhost:4700. Android's emulator reaches them at 10.0.2.2 (4647, a proxy, and 4700).
 // PHONE_MUSIC is the folder the build names. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E6).
 
 import { execFileSync, spawn } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, request as forward } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -77,6 +77,23 @@ createServer((request, response) => {
 const reported = phase("report");
 const within = (promise, ms) => Promise.race([promise, new Promise((done) => setTimeout(() => done(null), ms))]);
 
+// Android's emulator reaches this machine at 10.0.2.2 (not through `adb reverse`, which did not keep
+// the emulator alive through the app's first requests): the service there through a proxy that asks it
+// by its own name (an open instance answers only to it), the receiver directly.
+if (platform === "android") {
+  createServer((incoming, outgoing) => {
+    const upstream = forward(
+      { host: "127.0.0.1", port: 4646, method: incoming.method, path: incoming.url, headers: { ...incoming.headers, host: "localhost:4646" } },
+      (answer) => {
+        outgoing.writeHead(answer.statusCode ?? 502, answer.headers);
+        answer.pipe(outgoing);
+      }
+    );
+    upstream.on("error", () => outgoing.writeHead(502).end());
+    incoming.pipe(upstream);
+  }).listen(4647);
+}
+
 const bundle = "es.germade.jackbird";
 // The phone's own log, kept from the start, shown when the check fails: the page's console is there
 // (Android: Tauri/Console in logcat; iOS: the app's process in the simulator's log).
@@ -114,8 +131,6 @@ const showLog = () => {
 };
 if (platform === "android") {
   startLog();
-  run("adb", ["reverse", "tcp:4646", "tcp:4646"]);
-  run("adb", ["reverse", "tcp:4700", "tcp:4700"]);
   run("adb", ["install", "-r", app]);
   run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
 } else {

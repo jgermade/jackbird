@@ -32,6 +32,10 @@ jobs:
     name: Android, in the emulator
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    env:
+      # The emulator reaches this machine at 10.0.2.2 (scripts/phone-check.mjs).
+      VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://10.0.2.2:4647","folder":"/tmp/jackbird-phone-music","report":"http://10.0.2.2:4700/report"}'
+
     steps:
       - uses: actions/checkout@v6
 
