@@ -284,7 +284,7 @@ impl Library {
     pub fn favourites(&self, person: i64) -> Result<Vec<String>, Error> {
         let db = self.db();
         let mut query = db
-            .prepare("select songs.path from favourites join songs on songs.id = favourites.song where person = ?1 order by at, songs.path")
+            .prepare("select songs.path from favourites join songs on songs.id = favourites.song where person = ?1 and songs.trashed is null order by at, songs.path")
             .map_err(store_error)?;
         let paths = query
             .query_map([person], |row| row.get(0))
@@ -331,7 +331,7 @@ impl Library {
         let mut query = db
             .prepare(
                 "select songs.path, max(plays.at) as last from plays join songs on songs.id = plays.song
-                 where person = ?1 group by plays.song order by last desc, plays.song limit ?2",
+                 where person = ?1 and songs.trashed is null group by plays.song order by last desc, plays.song limit ?2",
             )
             .map_err(store_error)?;
         let plays = query

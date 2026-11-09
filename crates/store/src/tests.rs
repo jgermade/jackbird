@@ -340,7 +340,7 @@ fn the_library_is_a_root() {
         library.rename("Music/Full.flac", "Music/mp3-v24-padded.mp3"),
         Err(Error::Outside(_))
     ));
-    // Deleting takes songs out of the catalogue; importing the file again brings it back.
+    // Deleting moves songs to the trash; importing the file again brings it back.
     library.delete("Music/Second disc").unwrap();
     assert!(library.song("Music/Second disc/flac-no-padding.flac").is_none());
     let back = library
@@ -352,7 +352,11 @@ fn the_library_is_a_root() {
             false,
         )
         .unwrap();
-    assert_eq!(back, Imported::Added("Again/flac-no-padding.flac".into()));
+    // In the trash since F4: brought again, it comes back where it was.
+    assert_eq!(
+        back,
+        Imported::Existing("Music/Second disc/flac-no-padding.flac".into())
+    );
     assert!(matches!(library.delete("Music/nothing.mp3"), Err(Error::NotFound(_))));
 }
 
@@ -392,3 +396,4 @@ fn an_upload_is_moved_in() {
 }
 
 mod own;
+mod safety;

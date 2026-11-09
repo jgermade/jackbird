@@ -31,10 +31,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 mod own;
+mod safety;
 #[cfg(test)]
 mod tests;
 
 pub use own::{FAVOURITES, Layers, OWN, RECENT, Scope, Viewer, is_own};
+pub use safety::{Exported, Saved, Stale, TrashedSong, keep_backups};
 
 /// The formats the library keeps.
 pub const AUDIO: [&str; 2] = ["mp3", "flac"];
@@ -390,6 +392,10 @@ impl Library {
             .map_err(store_error)?;
         // F3: who brought a suggestion (added to F1's table).
         let _ = db.execute_batch("alter table suggestions add column person integer");
+        // F4: the trash, and who last changed the family's layer.
+        for column in ["trashed integer", "trashed_by text", "changed_by text"] {
+            let _ = db.execute_batch(&format!("alter table songs add column {column}"));
+        }
         Ok(Library {
             dir: dir.to_owned(),
             files,
@@ -428,7 +434,9 @@ impl Library {
     /// Every song, by path.
     pub fn songs(&self) -> Result<Vec<Song>, Error> {
         let db = self.db();
-        let mut query = db.prepare(&format!("{SONG} order by path")).map_err(store_error)?;
+        let mut query = db
+            .prepare(&format!("{SONG} where trashed is null order by path"))
+            .map_err(store_error)?;
         let songs = query
             .query_map([], song_of)
             .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
@@ -439,7 +447,7 @@ impl Library {
     /// The song at a path.
     pub fn song(&self, path: &str) -> Option<Song> {
         self.db()
-            .query_row(&format!("{SONG} where path = ?1"), [path], song_of)
+            .query_row(&format!("{SONG} where path = ?1 and trashed is null"), [path], song_of)
             .optional()
             .ok()
             .flatten()
@@ -457,15 +465,24 @@ impl Library {
         self.song(path).ok_or_else(|| Error::NotFound(path.to_owned()))
     }
 
+    /// Whether a song has this path, in the trash or not.
+    fn path_taken(&self, path: &str) -> bool {
+        self.db()
+            .query_row("select count(*) > 0 from songs where path = ?1", [path], |row| {
+                row.get(0)
+            })
+            .unwrap_or(true)
+    }
+
     /// A free path like `wanted`: itself, or with ` (2)`, ` (3)`… before its extension.
     fn free_path(&self, wanted: &str) -> String {
-        if self.song(wanted).is_none() {
+        if !self.path_taken(wanted) {
             return wanted.to_owned();
         }
         let (stem, extension) = wanted.rsplit_once('.').unwrap_or((wanted, ""));
         (2..)
             .map(|n| format!("{stem} ({n}).{extension}"))
-            .find(|path| self.song(path).is_none())
+            .find(|path| !self.path_taken(path))
             .unwrap_or_default()
     }
 
@@ -511,6 +528,13 @@ impl Library {
             if take {
                 let _ = fs::remove_file(source);
             }
+            // In the trash (F4): brought again, it comes back.
+            self.db()
+                .execute(
+                    "update songs set trashed = null, trashed_by = null where id = ?1",
+                    [song.id],
+                )
+                .map_err(store_error)?;
             if song.file == fields {
                 return Ok(Imported::Existing(song.path));
             }
@@ -743,15 +767,20 @@ impl Library {
         self.files.mkdir(&clean(relative)?)
     }
 
-    /// Takes a song, or a folder of songs, out of the catalogue (their blobs stay); or deletes a
-    /// small file.
+    /// Moves a song, or a folder of songs, to the trash (F4); or deletes a small file.
     pub fn delete(&self, relative: &str) -> Result<(), Error> {
+        self.delete_by(relative, "")
+    }
+
+    /// The same, saying who.
+    pub fn delete_by(&self, relative: &str, by: &str) -> Result<(), Error> {
         let path = clean(relative)?;
         let taken = self
             .db()
             .execute(
-                "delete from songs where path = ?1 or substr(path, 1, length(?1) + 1) = ?1 || '/'",
-                [&path],
+                "update songs set trashed = ?2, trashed_by = ?3
+                 where trashed is null and (path = ?1 or substr(path, 1, length(?1) + 1) = ?1 || '/')",
+                params![path, now() as i64, by],
             )
             .map_err(store_error)?;
         match self.files.delete(&path) {
@@ -763,7 +792,7 @@ impl Library {
     /// Moves a song, or a folder of songs, in the catalogue; or renames a small file.
     pub fn rename(&self, from: &str, to: &str) -> Result<(), Error> {
         let (from, to) = (clean(from)?, clean(to)?);
-        if self.song(&to).is_some() {
+        if self.path_taken(&to) {
             return Err(Error::Outside(format!("{to}: a song is there already")));
         }
         let at = now() as i64;
@@ -771,7 +800,7 @@ impl Library {
             .db()
             .execute(
                 "update songs set path = ?2 || substr(path, length(?1) + 1), changed = ?3
-                 where path = ?1 or substr(path, 1, length(?1) + 1) = ?1 || '/'",
+                 where trashed is null and (path = ?1 or substr(path, 1, length(?1) + 1) = ?1 || '/')",
                 params![from, to, at],
             )
             .map_err(store_error)?;
@@ -788,8 +817,6 @@ impl Library {
             .and_then(|tags| tags.cover))
     }
 
-    /// The cover everyone sees: the file's, or, when the family's layer touches it, the one its
-    /// song leaves with (removing the cover shown can show the file's next picture).
     /// The cover a song leaves with under `layer`: the file's when the layer does not touch it,
     /// the layer's own, or, when it removes the cover shown, what is read from the song as it
     /// leaves (a file with more pictures shows its next one).
