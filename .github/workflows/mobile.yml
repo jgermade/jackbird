@@ -81,7 +81,9 @@ jobs:
         with:
           api-level: 34
           arch: x86_64
-          target: google_apis
+          # AOSP without Google's services: on the google_apis image, a dying Play Services process takes the
+          # app down with it (it depends on its fonts provider).
+          target: default
           disable-animations: true
           script: mkdir -p /tmp/jackbird-phone-shots && node scripts/phone-check.mjs android "$(find src-tauri/gen/android -name '*.apk' | grep -i debug | head -1)"
 
