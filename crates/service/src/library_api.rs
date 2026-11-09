@@ -14,7 +14,7 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use jackbird_api::{EntryJson, InspectionJson, Metadata, StatJson, edit_for};
 use jackbird_core::Error;
-use jackbird_store::{Imported, Library, Outgoing, Report, Scope, Viewer, is_own};
+use jackbird_store::{Imported, Library, Outgoing, Report, Saved, Scope, Viewer, is_own};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::io::AsyncReadExt;
@@ -314,21 +314,42 @@ pub fn listeners() -> Router<Arc<Service>> {
 // ---------------------------------------------------------------------------------------------
 // Editors: saves, the library's places, small files, uploads.
 
+#[derive(Deserialize)]
+struct WriteAt {
+    #[serde(default)]
+    path: String,
+    /// The size and date the writer read (F4): a file changed since is not written over.
+    size: Option<u64>,
+    mtime: Option<u64>,
+}
+
+/// A change refused because what it was made on changed since (F4).
+fn stale(message: String, extra: Value) -> Response {
+    let mut body = json!({ "code": "stale", "message": message });
+    if let (Some(body), Some(extra)) = (body.as_object_mut(), extra.as_object()) {
+        body.extend(extra.clone());
+    }
+    (StatusCode::CONFLICT, Json(body)).into_response()
+}
+
 async fn write(
     State(service): Shared,
     Extension(person): Extension<Person>,
-    Query(at): Query<At>,
+    Query(at): Query<WriteAt>,
     body: axum::body::Bytes,
-) -> Answer<StatusCode> {
+) -> Answer<Response> {
     may_write(&person, &at.path)?;
     let library = library(&service)?;
     let path = at.path.clone();
     let seen = viewer(&person);
-    blocking(move || library.write_as(&path, &body, seen)).await?;
+    let expected = at.size.zip(at.mtime);
+    if !blocking(move || library.write_checked(&path, &body, seen, expected)).await? {
+        return Ok(stale(format!("{} changed since it was read", at.path), Value::Null));
+    }
     if !at.path.starts_with(".meta/") && !is_own(at.path.trim_matches('/')) {
         service.store.log(&person.name, "write", "Library", &at.path);
     }
-    Ok(StatusCode::NO_CONTENT)
+    Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 async fn delete(
@@ -340,9 +361,18 @@ async fn delete(
     let library = library(&service)?;
     let path = at.path.clone();
     let seen = viewer(&person);
-    blocking(move || library.delete_as(&path, seen)).await?;
+    let by = person.name.clone();
+    blocking(move || {
+        if is_own(path.trim_matches('/')) {
+            library.delete_as(&path, seen)
+        } else {
+            // To the trash (F4).
+            library.delete_by(&path, &by)
+        }
+    })
+    .await?;
     if !is_own(at.path.trim_matches('/')) {
-        service.store.log(&person.name, "delete", "Library", &at.path);
+        service.store.log(&person.name, "trash", "Library", &at.path);
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -389,13 +419,16 @@ struct Save {
     /// `family` (editors and up; the default) or `mine` (anyone).
     #[serde(default)]
     scope: Option<String>,
+    /// The full checksum the saver read (F4): a song changed since is not saved over.
+    #[serde(default)]
+    expected: Option<String>,
 }
 
 async fn save(
     State(service): Shared,
     Extension(person): Extension<Person>,
     Json(body): Json<Save>,
-) -> Answer<Json<InspectionJson>> {
+) -> Answer<Response> {
     let scope = match body.scope.as_deref() {
         Some("mine") => Scope::Mine(person.id),
         _ if person.role >= Role::Editor => Scope::Family,
@@ -410,11 +443,27 @@ async fn save(
     let library = library(&service)?;
     let edit = edit_for(&body.previous, body.metadata);
     let path = body.path.clone();
-    let found = blocking(move || library.save_as(&path, &edit, scope)).await?;
-    if scope == Scope::Family {
-        service.store.log(&person.name, "save", "Library", &body.path);
+    let (seen, expected, by) = (viewer(&person), body.expected.clone(), person.name.clone());
+    let saved = blocking(move || library.save_checked(&path, &edit, scope, seen, expected.as_deref(), &by)).await?;
+    match saved {
+        Saved::Done(found) => {
+            if scope == Scope::Family {
+                service.store.log(&person.name, "save", "Library", &body.path);
+            }
+            Ok(Json(InspectionJson::from(found)).into_response())
+        }
+        Saved::Stale(stale_save) => {
+            let who = if stale_save.by.is_empty() {
+                "you, elsewhere".to_owned()
+            } else {
+                stale_save.by.clone()
+            };
+            Ok(stale(
+                format!("{} was changed by {who} since you opened it", body.path),
+                json!({ "by": stale_save.by, "current": InspectionJson::from(stale_save.current) }),
+            ))
+        }
     }
-    Ok(Json(found.into()))
 }
 
 /// What one upload did.

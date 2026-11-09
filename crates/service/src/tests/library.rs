@@ -429,3 +429,166 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
         StatusCode::FORBIDDEN
     );
 }
+
+/// F4: stale saves and writes, the trash, snapshots, the scrub and the export, through the router.
+#[tokio::test]
+async fn edits_on_old_versions_are_refused_and_the_library_is_kept_safe() {
+    let dir = scratch();
+    let library = jackbird_store::Library::open(&dir).unwrap();
+    let (_, app, _, [owner, admin, editor, listener]) = family_with(Some(library)).await;
+    let folder = two_songs();
+    call(Method::POST, "/api/library/import")
+        .header("cookie", &owner)
+        .json(json!({ "path": folder.display().to_string(), "name": "Music" }))
+        .on(&app)
+        .await;
+    for _ in 0..100 {
+        let state = call(Method::GET, "/api/library/import")
+            .header("cookie", &owner)
+            .value(&app)
+            .await
+            .1;
+        if state["running"] == false {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let path = "Music/flac-full.flac";
+    let (_, read) = call(Method::POST, "/api/library/inspect")
+        .header("cookie", &editor)
+        .json(json!({ "path": path }))
+        .value(&app)
+        .await;
+    let save = |title: &str, expected: &Value| {
+        let mut metadata = read["metadata"].clone();
+        metadata["title"] = json!(title);
+        json!({ "path": path, "previous": read["metadata"], "metadata": metadata, "expected": expected })
+    };
+    // The owner saves first; the editor's save, made on what they read before, is refused.
+    let (status, _) = call(Method::POST, "/api/library/save")
+        .header("cookie", &owner)
+        .json(save("The owner's", &read["fullChecksum"]))
+        .value(&app)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, refused) = call(Method::POST, "/api/library/save")
+        .header("cookie", &editor)
+        .json(save("The editor's", &read["fullChecksum"]))
+        .value(&app)
+        .await;
+    assert_eq!(
+        (status, refused["code"].as_str()),
+        (StatusCode::CONFLICT, Some("stale"))
+    );
+    assert_eq!(refused["by"], "Owner");
+    assert_eq!(refused["current"]["metadata"]["title"], "The owner's");
+    assert!(refused["message"].as_str().unwrap().contains("Owner"));
+
+    // A shared playlist changed since it was read is not written over.
+    let write = |cookie: &str, query: String, text: &'static str| {
+        let mut request = call(Method::POST, format!("/api/library/write?{query}")).header("cookie", cookie);
+        request.body = Body::from(text);
+        request
+    };
+    let list = "path=Music%2FShared.m3u";
+    assert_eq!(
+        write(&editor, list.into(), "#EXTM3U\n").on(&app).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, stat) = call(Method::GET, format!("/api/library/stat?{list}"))
+        .header("cookie", &editor)
+        .value(&app)
+        .await;
+    let read_at = format!("{list}&size={}&mtime={}", stat["size"], stat["mtime"]);
+    assert_eq!(
+        write(&admin, read_at.clone(), "#EXTM3U\n../a.mp3\n").on(&app).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let (status, body) = write(&editor, read_at, "#EXTM3U\n../b.mp3\n../c.mp3\n")
+        .value(&app)
+        .await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::CONFLICT, Some("stale")));
+
+    // Deleted into the trash: admins restore it, listeners and editors may not.
+    assert_eq!(
+        call(Method::POST, format!("/api/library/delete?path={}", enc(path)))
+            .header("cookie", &editor)
+            .on(&app)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    for cookie in [&listener, &editor] {
+        assert_eq!(
+            call(Method::GET, "/api/library/trash")
+                .header("cookie", cookie)
+                .on(&app)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+    }
+    let (_, trash) = call(Method::GET, "/api/library/trash")
+        .header("cookie", &admin)
+        .value(&app)
+        .await;
+    assert_eq!(
+        (trash[0]["path"].as_str(), trash[0]["by"].as_str()),
+        (Some(path), Some("editor"))
+    );
+    let (status, restored) = call(Method::POST, "/api/library/trash/restore")
+        .header("cookie", &admin)
+        .json(json!({ "id": trash[0]["id"] }))
+        .value(&app)
+        .await;
+    assert_eq!((status, restored["path"].as_str()), (StatusCode::OK, Some(path)));
+    let (_, trash) = call(Method::GET, "/api/library/trash")
+        .header("cookie", &admin)
+        .value(&app)
+        .await;
+    assert!(trash.as_array().unwrap().is_empty());
+
+    // Snapshots, the scrub and the export are owners'.
+    for cookie in [&admin, &editor] {
+        assert_eq!(
+            call(Method::POST, "/api/library/backups/snapshot")
+                .header("cookie", cookie)
+                .on(&app)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+    }
+    let (status, backups) = call(Method::POST, "/api/library/backups/snapshot")
+        .header("cookie", &owner)
+        .value(&app)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{backups}");
+    let snapshot = dir.join("backups").join(backups["snapshots"][0].as_str().unwrap());
+    assert!(snapshot.join("catalogue.db").exists() && snapshot.join("jackbird.db").exists());
+    call(Method::POST, "/api/library/backups/scrub")
+        .header("cookie", &owner)
+        .on(&app)
+        .await;
+    let to = scratch();
+    call(Method::POST, "/api/library/export")
+        .header("cookie", &owner)
+        .json(json!({ "path": to.display().to_string() }))
+        .on(&app)
+        .await;
+    let mut state = Value::Null;
+    for _ in 0..200 {
+        state = call(Method::GET, "/api/library/backups")
+            .header("cookie", &owner)
+            .value(&app)
+            .await
+            .1;
+        if state["export"]["running"] == false && state["scrub"]["running"] == false && !state["scrub"]["at"].is_null()
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(state["export"]["result"]["written"], 2, "{state}");
+    assert_eq!(state["scrub"]["result"], json!([]), "{state}");
+}

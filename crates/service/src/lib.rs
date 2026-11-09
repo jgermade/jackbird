@@ -31,6 +31,7 @@ pub mod mail;
 mod passkeys;
 pub mod people;
 mod people_api;
+pub mod safety_api;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -84,6 +85,10 @@ pub struct Service {
     pub(crate) library: Option<Arc<jackbird_store::Library>>,
     /// The import from a folder of the machine under way, or the last one.
     pub(crate) importing: std::sync::Mutex<library_api::ImportState>,
+    /// The export under way, or the last one (F4).
+    pub(crate) exporting: std::sync::Mutex<safety_api::JobState>,
+    /// The scrub under way, or the last one (F4).
+    pub(crate) scrubbing: std::sync::Mutex<safety_api::JobState>,
 }
 
 impl Service {
@@ -137,6 +142,8 @@ impl Service {
             mailer,
             library: library.map(Arc::new),
             importing: std::sync::Mutex::new(library_api::ImportState::default()),
+            exporting: std::sync::Mutex::new(safety_api::JobState::default()),
+            scrubbing: std::sync::Mutex::new(safety_api::JobState::default()),
         })
     }
 
@@ -667,6 +674,8 @@ pub fn router(service: Arc<Service>) -> Router {
         .merge(of(&service, Role::Listener, listener))
         .merge(of(&service, Role::Editor, editor))
         .merge(of(&service, Role::Admin, people_api::admins()))
+        .merge(of(&service, Role::Admin, safety_api::admins()))
+        .merge(of(&service, Role::Owner, safety_api::owners()))
         .merge(of(&service, Role::Owner, owner));
     Router::new()
         .nest("/api", api)

@@ -242,6 +242,8 @@ async fn run_server(
     if let Err(error) = config::write_private(&config::console_key_path(&path), service.console_key().as_bytes()) {
         eprintln!("jackbird-service: the console's key cannot be written: {error}");
     }
+    // F4: the night's snapshot, the trash's expiry, the weekly scrub.
+    jackbird_service::safety_api::spawn_timers(std::sync::Arc::clone(&service));
     let mut network = service.network.subscribe();
     let app = jackbird_service::router(service).into_make_service_with_connect_info::<SocketAddr>();
     let v4 = tokio::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)))

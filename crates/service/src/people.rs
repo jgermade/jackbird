@@ -402,6 +402,14 @@ impl Store {
         Ok(())
     }
 
+    /// Copies the database, whole and consistent, to `to` (SQLite's `VACUUM INTO`; F4).
+    pub fn vacuum_into(&self, to: &Path) -> Result<(), Refusal> {
+        let _ = std::fs::remove_file(to);
+        let target = to.display().to_string().replace('\'', "''");
+        self.db().execute_batch(&format!("vacuum into '{target}'"))?;
+        Ok(())
+    }
+
     /// Keeps a person's settings.
     pub fn set_settings(&self, id: i64, settings: &Settings) -> Result<(), Refusal> {
         self.db().execute(

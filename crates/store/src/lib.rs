@@ -36,7 +36,7 @@ mod safety;
 mod tests;
 
 pub use own::{FAVOURITES, Layers, OWN, RECENT, Scope, Viewer, is_own};
-pub use safety::{Exported, Saved, Stale, TrashedSong, keep_backups};
+pub use safety::{Exported, Saved, Stale, TrashedSong, keep_backups, today};
 
 /// The formats the library keeps.
 pub const AUDIO: [&str; 2] = ["mp3", "flac"];
