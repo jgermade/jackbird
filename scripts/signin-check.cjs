@@ -103,7 +103,7 @@ async function openPreferences(page) {
     page.on("pageerror", (error) => console.log("pageerror:", error.message));
     await page.goto(base);
     await page.getByRole("button", { name: "Open library" }).first().click();
-    await page.getByRole("button", { name: "Music" }).click();
+    await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
     await page.getByText("Before").first().waitFor({ timeout: 30000 });
     console.log("owner: the folder is open");

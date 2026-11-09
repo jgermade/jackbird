@@ -65,7 +65,7 @@ const fail = (why) => {
 
     // Open the folder through the service's dialog: home, then Music.
     await page.getByRole("button", { name: "Open library" }).first().click();
-    await page.getByRole("button", { name: "Music" }).click();
+    await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
     await page.getByText("Before").first().waitFor({ timeout: 30000 });
     const tracks = await page.evaluate(() => document.body.innerText.match(/(\d+) tracks/)?.[1]);

@@ -8,6 +8,7 @@
 import { $toRaw } from "jq79";
 import { sameSession, sessionOf, type Session } from "../helpers/session";
 import { account } from "./account";
+import { importing } from "./importing";
 import { library } from "./library";
 import { loadRootSession, saveRootSession } from "./rootSessionStore";
 import { hydrateRoot } from "./roots";
@@ -56,10 +57,14 @@ export async function restoreSession(): Promise<void> {
       }
     }
 
+    importing.available = $toRaw(library).roots.some((root) => root.source.kind === "library");
+
     if (session.activeRootId && reopened.includes(session.activeRootId)) {
       library.activeRootId = session.activeRootId;
     } else if (reopened.length > 0) {
-      library.activeRootId = reopened[0];
+      // The first with songs (an empty library should not hide a folder that has them).
+      const roots = $toRaw(library).roots;
+      library.activeRootId = reopened.find((id) => (roots.find((root) => root.id === id)?.tracks.length ?? 0) > 0) ?? reopened[0];
     }
   } catch {
     // Nothing to reopen: start clean.

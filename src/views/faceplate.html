@@ -20,6 +20,7 @@
   const { formatTime } = await import("../helpers/format")
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
+  const { importing, openImport } = await import("../lib/importing")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum } = await import("../lib/player")
@@ -118,6 +119,7 @@
           <span class="folder-text">{{ folderText }}</span>
         </Key>
       </span>
+      <Key :if="importing.available && can('editor')" size="sm" variant="ghost" popup="dialog" :label="t('import.open')" @click="openImport()">{{ t("import.open") }}</Key>
     </template>
     <template :slot.aside>
       <span :if="selectedCount() > 0" class="selection">

@@ -130,6 +130,90 @@ function serviceSource(root: string, name: string): RootSource {
   };
 }
 
+// ─── The family library (F1) ─────────────────────────────────────────────────
+
+/** What the session keeps for the library: it is the service's own, not a path. */
+export const LIBRARY = "@library";
+
+const inLibrary = (path = ""): string => `path=${encodeURIComponent(path)}`;
+
+/** The family library as a root: songs by their places in it, small files beside them. */
+function libraryVfs(name: string): VFSAdapter {
+  return {
+    name,
+    list: (path) => json<VFSListEntry[]>(`library/list?${inLibrary(path)}`),
+    read: async (path) => new Uint8Array(await (await api(`library/read?${inLibrary(path)}`)).arrayBuffer()),
+    write: async (path, data) => {
+      await api(`library/write?${inLibrary(path)}`, { method: "POST", body: data as Uint8Array<ArrayBuffer> });
+    },
+    delete: async (path) => {
+      await api(`library/delete?${inLibrary(path)}`, post());
+    },
+    rename: async (from, to) => {
+      await api("library/rename", post({ from, to }));
+    },
+    stat: (path) => json<VFSStat | null>(`library/stat?${inLibrary(path)}`),
+    mkdir: async (path) => {
+      await api(`library/mkdir?${inLibrary(path)}`, post());
+    }
+  };
+}
+
+/** The family library, when the service has one; null otherwise. */
+export async function librarySource(): Promise<RootSource | null> {
+  const info = await json<{ name: string }>("library").catch(() => null);
+  if (!info) return null;
+  const vfs = libraryVfs(info.name);
+  return {
+    kind: "library",
+    vfs,
+    saved: LIBRARY,
+    walk: () => json("library/walk"),
+    inspect: (path, known) => json<Inspection>("library/inspect", post({ path, known: known ?? null })),
+    save: (path: string, previous: TrackMetadata, metadata: TrackMetadata) =>
+      json<Inspection>("library/save", post({ path, previous, metadata })),
+    async openMedia(path): Promise<MediaHandle> {
+      const before = await vfs.stat(path);
+      const grant = usesToken() ? `&t=${encodeURIComponent(await mediaToken())}` : "";
+      return {
+        url: `${base}/api/library/media?${inLibrary(path)}${grant}`,
+        changed: async () => {
+          const now = await vfs.stat(path);
+          return now?.size !== before?.size || now?.mtime !== before?.mtime;
+        },
+        release: () => undefined
+      };
+    },
+    close: () => undefined
+  };
+}
+
+/** Where a song of the library is downloaded, with the family's tags. */
+export async function libraryDownloadUrl(path: string): Promise<string> {
+  const grant = usesToken() ? `&t=${encodeURIComponent(await mediaToken())}` : "";
+  return `${base}/api/library/download?${inLibrary(path)}${grant}`;
+}
+
+/** Other tags brought with a song's audio (until F3 makes them someone's own). */
+export type LibrarySuggestion = { fields: { title: string; artist: string; album: string; year: string; genre: string; track: string }; by: string; at: number };
+
+export const librarySuggestions = (path: string): Promise<LibrarySuggestion[]> =>
+  json<LibrarySuggestion[]>(`library/suggestions?${inLibrary(path)}`);
+
+/** What importing did. */
+export type ImportReport = { added: number; existing: number; suggested: number; unreadable: [string, string][] };
+export type ImportState = { running: boolean; name: string; done: number; total: number; report: ImportReport | null; error: string | null };
+
+/** Starts importing a folder of the service's machine (owners). */
+export const importFolder = (path: string): Promise<ImportState> => json<ImportState>("library/import", post({ path }));
+
+/** The import under way, or the last one. */
+export const importState = (): Promise<ImportState> => json<ImportState>("library/import");
+
+/** One file uploaded to the library as `path`; what became of it. */
+export const uploadToLibrary = (path: string, file: Blob): Promise<{ result: "added" | "existing" | "suggested" | "unreadable"; path?: string; why?: string }> =>
+  json(`library/upload?${inLibrary(path)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file });
+
 /** The desktop app's media token and when it is to be renewed (the service's lasts 12 hours). */
 let mediaGrant: { t: string; until: number } | null = null;
 
@@ -151,6 +235,7 @@ export async function openServiceFolder(path: string): Promise<RootSource> {
 
 /** Reopens a folder the session kept: as it is if the service has it open, else opened again (an owner's); null when it is gone. */
 export async function restoreServiceSource(path: string): Promise<RootSource | null> {
+  if (path === LIBRARY) return librarySource();
   const open = await json<Opened[]>("roots").catch(() => [] as Opened[]);
   const found = open.find((opened) => opened.path === path);
   return found ? serviceSource(found.path, found.name) : openServiceFolder(path).catch(() => null);
@@ -158,8 +243,9 @@ export async function restoreServiceSource(path: string): Promise<RootSource | n
 
 /** The folders the service has open (an owner opened them), as sources: what someone who may not open folders sees (S3). */
 export async function serviceRoots(): Promise<RootSource[]> {
+  const library = await librarySource();
   const open = await json<Opened[]>("roots");
-  return open.map((opened) => serviceSource(opened.path, opened.name));
+  return [...(library ? [library] : []), ...open.map((opened) => serviceSource(opened.path, opened.name))];
 }
 
 /** One folder of the service's machine, for the dialog: its subfolders and its parent. */

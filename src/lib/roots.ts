@@ -325,6 +325,11 @@ export function selectRoot(rootId: string): void {
   void resyncRootIfNeeded(rootId);
 }
 
+/** Reads a root again if its files changed (songs added to the library, say). */
+export function refreshRoot(rootId: string): Promise<void> {
+  return resyncRootIfNeeded(rootId);
+}
+
 async function resyncRootIfNeeded(rootId: string): Promise<void> {
   const root = $toRaw(library).roots.find((item) => item.id === rootId);
   if (!root || root.loadingMetadata) {
