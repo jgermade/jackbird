@@ -1950,6 +1950,7 @@ dependencies = [
  "jackbird-tags",
  "serde_json",
  "sha1",
+ "sha2 0.11.1",
 ]
 
 [[package]]
@@ -1984,6 +1985,18 @@ dependencies = [
  "tower-http 0.7.1",
  "webauthn-rs",
  "windows-service",
+]
+
+[[package]]
+name = "jackbird-store"
+version = "0.1.0"
+dependencies = [
+ "jackbird-core",
+ "jackbird-tags",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
 ]
 
 [[package]]

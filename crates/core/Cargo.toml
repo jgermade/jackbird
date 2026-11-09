@@ -10,6 +10,8 @@ publish.workspace = true
 jackbird-tags = { path = "../tags" }
 # The full and audio checksums (SHA-1, as `.meta/` holds them), streamed from disk.
 sha1 = { version = "=0.10.6", default-features = false }
+# The library's names for songs (F1): the SHA-256 of their audio region.
+sha2 = { version = "=0.11.1", default-features = false }
 
 [lints]
 workspace = true
