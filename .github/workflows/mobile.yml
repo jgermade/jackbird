@@ -120,7 +120,7 @@ jobs:
           set -euo pipefail
           npx tauri ios init --ci
           npx tauri ios build --debug --target aarch64-sim --ci || { npx tauri ios build --help; exit 1; }
-          find src-tauri/gen/apple build -name "*.app" -type d 2>/dev/null | head
+          find src-tauri/gen/apple -name "*.app" -type d | head
 
       - name: The check, in the simulator
-        run: node scripts/phone-check.mjs ios "$(find src-tauri/gen/apple build -name 'jackbird.app' -type d 2>/dev/null | grep -i sim | head -1)"
+        run: node scripts/phone-check.mjs ios "$(find src-tauri/gen/apple -name 'jackbird.app' -type d | grep -i sim | head -1)"
