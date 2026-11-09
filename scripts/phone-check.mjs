@@ -13,7 +13,7 @@
 // PHONE_MUSIC is the folder the build names. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E6).
 
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readdirSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -25,8 +25,12 @@ if (!["android", "ios"].includes(platform) || !app || !music) {
   console.error("usage: PHONE_MUSIC=<folder> node scripts/phone-check.mjs android|ios <app>");
   process.exit(2);
 }
-const run = (program, args) => execFileSync(program, args, { stdio: "inherit" });
-const read = (program, args) => execFileSync(program, args, { encoding: "utf8" });
+// Every command has two minutes: a phone that does not answer fails the check, never hangs it.
+const run = (program, args) => {
+  console.log(`phone-check: ${program} ${args.join(" ")}`);
+  execFileSync(program, args, { stdio: "inherit", timeout: 120_000 });
+};
+const read = (program, args) => execFileSync(program, args, { encoding: "utf8", timeout: 120_000 });
 
 mkdirSync(music, { recursive: true });
 for (const name of readdirSync("fixtures/audio").filter((name) => /\.(flac|mp3)$/.test(name))) {
@@ -63,7 +67,28 @@ const reported = phase("report");
 const within = (promise, ms) => Promise.race([promise, new Promise((done) => setTimeout(() => done(null), ms))]);
 
 const bundle = "es.germade.jackbird";
+// The phone's own log, kept from the start, shown when the check fails: the page's console is there
+// (Android: Tauri/Console in logcat; iOS: the app's process in the simulator's log).
+const logPath = join(home, "phone.log");
+const logFile = openSync(logPath, "w");
+let logger = null;
+const startLog = () => {
+  logger =
+    platform === "android"
+      ? spawn("adb", ["logcat", "-v", "brief"], { stdio: ["ignore", logFile, logFile] })
+      : spawn("xcrun", ["simctl", "spawn", "booted", "log", "stream", "--style", "compact", "--predicate", 'process == "jackbird"'], {
+          stdio: ["ignore", logFile, logFile]
+        });
+};
+const showLog = () => {
+  logger?.kill();
+  const lines = readFileSync(logPath, "utf8").split("\n");
+  const wanted = lines.filter((line) => /jackbird|Tauri|chromium|Console|WebView|FATAL|AndroidRuntime|JACKBIRD/i.test(line));
+  console.log(`phone-check: the phone's log (${wanted.length} of ${lines.length} lines):`);
+  console.log(wanted.slice(-300).join("\n"));
+};
 if (platform === "android") {
+  startLog();
   run("adb", ["reverse", "tcp:4646", "tcp:4646"]);
   run("adb", ["reverse", "tcp:4700", "tcp:4700"]);
   run("adb", ["install", "-r", app]);
@@ -77,19 +102,14 @@ if (platform === "android") {
   if (!phone) throw new Error("no iPhone simulator");
   console.log(`phone-check: ${phone.name}`);
   if (phone.state !== "Booted") run("xcrun", ["simctl", "boot", phone.udid]);
+  startLog();
   run("xcrun", ["simctl", "install", phone.udid, app]);
   run("xcrun", ["simctl", "launch", phone.udid, bundle]);
 }
 
 const report = await within(reported, 240_000);
 if (!report) {
-  if (platform === "android") {
-    try {
-      console.log(read("adb", ["logcat", "-d", "-t", "400"]).split("\n").filter((line) => /jackbird|Tauri|chromium|Console/i.test(line)).join("\n"));
-    } catch {
-      // No log to show.
-    }
-  }
+  showLog();
   console.error("phone-check: no report in 4 minutes");
   server.kill();
   process.exit(1);
@@ -124,8 +144,10 @@ if (report.me?.role !== "owner") problems.push(`not in as the owner: ${JSON.stri
 if (!(report.tracks >= 3)) problems.push(`tracks: ${report.tracks}`);
 if (!report.played || report.played.error || !(report.played.played > 0)) problems.push(`the FLAC did not play: ${JSON.stringify(report.played)}`);
 if (problems.length > 0) {
+  showLog();
   console.error(`phone-check: ${problems.join("; ")}`);
   process.exit(1);
 }
+logger?.kill();
 console.log("phone-check: ok");
 process.exit(0);

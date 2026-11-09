@@ -30,6 +30,7 @@ jobs:
   android:
     name: Android, in the emulator
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
 
@@ -86,6 +87,7 @@ jobs:
   ios:
     name: iOS, in the simulator
     runs-on: macos-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
 
@@ -110,17 +112,15 @@ jobs:
           npm run build
           cargo build --release -p jackbird-service --locked
 
-      # Built for the simulator with Xcode itself, unsigned: its build phase compiles the Rust side
-      # (`tauri ios xcode-script`).
+      # Built for the simulator by Tauri's own command (Xcode's build phase asks it for the Rust side
+      # while it runs), debug and unsigned; the help is printed when it fails, to see its options.
       - name: The app for iOS's simulator, made for the check
         shell: bash
         run: |
           set -euo pipefail
           npx tauri ios init --ci
-          xcodebuild -project src-tauri/gen/apple/jackbird.xcodeproj -scheme jackbird_iOS \
-            -sdk iphonesimulator -configuration debug -arch arm64 -derivedDataPath build/ios \
-            CODE_SIGNING_ALLOWED=NO build | tail -40
-          find build/ios -name "*.app" -maxdepth 5
+          npx tauri ios build --debug --target aarch64-sim --ci || { npx tauri ios build --help; exit 1; }
+          find src-tauri/gen/apple build -name "*.app" -type d 2>/dev/null | head
 
       - name: The check, in the simulator
-        run: node scripts/phone-check.mjs ios "$(find build/ios -name 'jackbird.app' -type d | head -1)"
+        run: node scripts/phone-check.mjs ios "$(find src-tauri/gen/apple build -name 'jackbird.app' -type d 2>/dev/null | grep -i sim | head -1)"
