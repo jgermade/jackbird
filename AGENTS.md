@@ -35,7 +35,8 @@ splice: the tags to put in place of the old ones); the audio never passes throug
 by design: open folders (roots) and the paths under them (none leads out, links included), and
 tags, checksums and saves on files, streamed, never holding the audio in memory; the desktop app
 wraps it in commands, and the service (`crates/service`) in HTTP, both speaking `crates/api`'s
-JSON. The tag crates depend on nothing but
+JSON. `crates/store` (F1) is the other crate that touches it: the family library, its blobs and
+its catalogue (SQLite) in a folder of its own, on `crates/core`. The tag crates depend on nothing but
 each other (`crates/core` adds `sha1` and `sha2`); a dependency in `[dev-dependencies]` is for
 tests only. `crates/tags-wasm` is the web app's WebAssembly module, built by
 `scripts/build-wasm.mjs` (not committed); its exports' `#[unsafe(no_mangle)]` is the only unsafe
