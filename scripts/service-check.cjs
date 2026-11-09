@@ -34,7 +34,15 @@ const base = `http://localhost:${port}/`;
 
 function start() {
   const service = spawn(binary, ["--port", String(port)], {
-    env: { ...process.env, HOME: home, USERPROFILE: home, JACKBIRD_SERVICE_CONFIG: config },
+    env: {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      // The family library (F1) in this home too, not the machine's own data folder.
+      XDG_DATA_HOME: path.join(home, "data"),
+      LOCALAPPDATA: path.join(home, "data"),
+      JACKBIRD_SERVICE_CONFIG: config
+    },
     stdio: ["ignore", "inherit", "inherit"]
   });
   return service;
@@ -64,7 +72,7 @@ const fail = (why) => {
     await page.goto(base);
 
     // Open the folder through the service's dialog: home, then Music.
-    await page.getByRole("button", { name: "Open library" }).first().click();
+    await page.getByRole("button", { name: /^(Open library|Add a folder)$/ }).first().click();
     await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
     await page.getByText("Before").first().waitFor({ timeout: 30000 });

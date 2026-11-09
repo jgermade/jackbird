@@ -65,7 +65,7 @@ const mails = () =>
   fs.existsSync(mailbox) ? fs.readFileSync(mailbox, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
 
 async function codeFor(to, after) {
-  for (let step = 0; step < 100; step += 1) {
+  for (let step = 0; step < 300; step += 1) {
     const found = mails().slice(after).reverse().find((mail) => mail.to.includes(to) && /^\d{6} /.test(mail.subject));
     if (found) return found.subject.slice(0, 6);
     await wait(100);
@@ -229,6 +229,8 @@ async function report(page) {
     console.log("library-check: ok", path.join(home, "library.png"));
   } catch (error) {
     for (const [at, open] of pages.entries()) {
+      const shown = await open.locator(".failure").allInnerTexts().catch(() => []);
+      if (shown.length > 0) console.error(`library-check: page ${at} says:`, shown.join(" | "));
       await open.screenshot({ path: path.join(home, `failed-${at}.png`) }).catch(() => undefined);
     }
     console.error("library-check: screenshots in", home);

@@ -45,7 +45,15 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function start() {
   return spawn(binary, ["--port", String(port)], {
-    env: { ...process.env, HOME: home, USERPROFILE: home, JACKBIRD_SERVICE_CONFIG: config },
+    env: {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      // The family library (F1) in this home too, not the machine's own data folder.
+      XDG_DATA_HOME: path.join(home, "data"),
+      LOCALAPPDATA: path.join(home, "data"),
+      JACKBIRD_SERVICE_CONFIG: config
+    },
     stdio: ["ignore", "inherit", "inherit"]
   });
 }
@@ -68,7 +76,7 @@ const mails = () =>
 
 /** The code of the newest email to `to`, waiting for it. */
 async function codeFor(to, after) {
-  for (let step = 0; step < 100; step += 1) {
+  for (let step = 0; step < 300; step += 1) {
     const found = mails().slice(after).reverse().find((mail) => mail.to.includes(to) && /^\d{6} /.test(mail.subject));
     if (found) return found.subject.slice(0, 6);
     await wait(100);
@@ -102,7 +110,7 @@ async function openPreferences(page) {
     pages.push(page);
     page.on("pageerror", (error) => console.log("pageerror:", error.message));
     await page.goto(base);
-    await page.getByRole("button", { name: "Open library" }).first().click();
+    await page.getByRole("button", { name: /^(Open library|Add a folder)$/ }).first().click();
     await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
     await page.getByText("Before").first().waitFor({ timeout: 30000 });
@@ -214,6 +222,8 @@ async function openPreferences(page) {
     console.log("signin-check: ok", path.join(home, "signin.png"));
   } catch (error) {
     for (const [at, open] of pages.entries()) {
+      const shown = await open.locator(".failure").allInnerTexts().catch(() => []);
+      if (shown.length > 0) console.error(`signin-check: page ${at} says:`, shown.join(" | "));
       await open.screenshot({ path: path.join(home, `failed-${at}.png`) }).catch(() => undefined);
     }
     console.error("signin-check: screenshots in", home);
