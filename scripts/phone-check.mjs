@@ -13,7 +13,7 @@
 // PHONE_MUSIC is the folder the build names. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E6).
 
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -57,6 +57,7 @@ createServer((request, response) => {
   request.on("data", (chunk) => (body += chunk));
   request.on("end", () => {
     response.writeHead(204, { "access-control-allow-origin": "*" }).end();
+    console.log(`phone-check: <- ${request.method} ${request.url} ${body.slice(0, 400)}`);
     if (request.method !== "POST") return;
     const name = new URL(request.url, "http://localhost").searchParams.get("phase") ?? "report";
     phase(name);
@@ -80,7 +81,18 @@ const startLog = () => {
           stdio: ["ignore", logFile, logFile]
         });
 };
+const shot = join(process.env.PHONE_SHOTS ?? home, `${platform}.png`);
+const screenshot = () => {
+  try {
+    if (platform === "android") writeFileSync(shot, execFileSync("adb", ["exec-out", "screencap", "-p"], { timeout: 30_000, maxBuffer: 1 << 26 }));
+    else execFileSync("xcrun", ["simctl", "io", "booted", "screenshot", shot], { timeout: 30_000 });
+    console.log(`phone-check: screenshot at ${shot}`);
+  } catch (error) {
+    console.log(`phone-check: no screenshot (${error})`);
+  }
+};
 const showLog = () => {
+  screenshot();
   logger?.kill();
   const lines = readFileSync(logPath, "utf8").split("\n");
   const wanted = lines.filter((line) => /jackbird|Tauri|chromium|Console|WebView|FATAL|AndroidRuntime|JACKBIRD/i.test(line));
@@ -148,6 +160,7 @@ if (problems.length > 0) {
   console.error(`phone-check: ${problems.join("; ")}`);
   process.exit(1);
 }
+screenshot();
 logger?.kill();
 console.log("phone-check: ok");
 process.exit(0);

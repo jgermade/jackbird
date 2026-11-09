@@ -39,22 +39,41 @@ async function play(url: string): Promise<{ played: number; error?: string }> {
   }
 }
 
+/** Tells the check's receiver how far the page got (each step, and any error), so a check that
+ * hangs says where. */
+function beacon(config: PhoneCheck, step: string, detail: unknown = null): void {
+  console.log(`JACKBIRD-STEP ${step} ${JSON.stringify(detail)}`);
+  void fetch(`${config.report}?phase=step`, { method: "POST", body: JSON.stringify({ step, detail }) }).catch(() => undefined);
+}
+
 export async function runPhoneCheckIfBuilt(): Promise<void> {
   const config = phoneCheck();
   if (!config) return;
+  beacon(config, "started", { href: location.href, userAgent: navigator.userAgent });
+  window.addEventListener("error", (event) => beacon(config, "error", String(event.message)));
+  window.addEventListener("unhandledrejection", (event) => beacon(config, "rejection", String(event.reason)));
   const report: Record<string, unknown> = { userAgent: navigator.userAgent, drawn: Boolean(document.querySelector("#app")?.children.length) };
   try {
+    const info = await fetch(`${config.address}/api/info`).then(
+      (response) => response.status,
+      (error: unknown) => String(error)
+    );
+    beacon(config, "info", info);
     const { account } = await import("./account");
     for (let step = 0; step < 200 && !account.me; step += 1) await wait(100);
     report.me = account.me ? { name: account.me.name, role: account.me.role } : null;
+    beacon(config, "account", { me: report.me, error: account.error, needed: account.needed });
     const { openServiceFolder } = await import("./sources/service");
     const source = await openServiceFolder(config.folder);
+    beacon(config, "folder");
     const tracks = (await source.walk()).filter((entry) => isAudioFile(entry.path));
     report.tracks = tracks.length;
+    beacon(config, "walked", tracks.length);
     const flac = tracks.find((track) => track.path.toLowerCase().endsWith(".flac"));
     if (flac) {
       const media = await source.openMedia(flac.path);
       report.played = { path: flac.path, ...(await play(media.url)) };
+      beacon(config, "played", report.played);
     }
   } catch (error) {
     report.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);

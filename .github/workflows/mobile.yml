@@ -24,6 +24,7 @@ permissions:
 
 env:
   PHONE_MUSIC: /tmp/jackbird-phone-music
+  PHONE_SHOTS: /tmp/jackbird-phone-shots
   VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://localhost:4646","folder":"/tmp/jackbird-phone-music","report":"http://localhost:4700/report"}'
 
 jobs:
@@ -82,7 +83,14 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: node scripts/phone-check.mjs android "$(find src-tauri/gen/android -name '*.apk' | grep -i debug | head -1)"
+          script: mkdir -p /tmp/jackbird-phone-shots && node scripts/phone-check.mjs android "$(find src-tauri/gen/android -name '*.apk' | grep -i debug | head -1)"
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phone-android
+          path: /tmp/jackbird-phone-shots
+          if-no-files-found: ignore
 
   ios:
     name: iOS, in the simulator
@@ -123,4 +131,13 @@ jobs:
           find src-tauri/gen/apple -name "*.app" -type d | head
 
       - name: The check, in the simulator
-        run: node scripts/phone-check.mjs ios "$(find src-tauri/gen/apple -name 'jackbird.app' -type d | grep -i sim | head -1)"
+        run: |
+          mkdir -p /tmp/jackbird-phone-shots
+          node scripts/phone-check.mjs ios "$(find src-tauri/gen/apple -name 'jackbird.app' -type d | grep -i sim | head -1)"
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: phone-ios
+          path: /tmp/jackbird-phone-shots
+          if-no-files-found: ignore
