@@ -34,8 +34,8 @@ gantt
 | S4 The online route | an outbound SSH connection to an online server, forwarding the service's port (a reverse tunnel, as intergate does), kept up by the service and set up from the interface | the service is reached from outside home through an online server, with nothing opened at home |
 
 S1 and S2 are done (2026-11-08), and S3 (2026-11-09; the plan at 10:45 as amended up to 11:57,
-the walkthrough after it). S4, the online route, is next, its plan to be drafted and approved
-first.
+the walkthrough after it). S4, the online route, is next: its plan (record, 2026-11-09, after S3's
+walkthrough) awaits the owner's approval.
 
 Decided separately: system users (the service as root, record 14:57), the content-addressed store
 and the metadata layers (F1), what the desktop app does when the service is installed but stopped.
