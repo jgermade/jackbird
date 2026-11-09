@@ -386,8 +386,10 @@ async fn invite(service: &Service, by: &Person, email: &str, lang: &str) -> bool
 async fn add_person(
     State(service): Shared,
     Extension(actor): Extension<Person>,
+    Extension(client): Extension<Client>,
+    headers: HeaderMap,
     Json(body): Json<NewPerson>,
-) -> Answer<Json<Value>> {
+) -> Answer<Response> {
     let role = role_of(&body.role)?;
     if !may_manage(&actor, role) {
         return Err(not_allowed());
@@ -419,7 +421,23 @@ async fn add_person(
         Some(email) => invite(&service, &actor, email, lang_or_english(&body.lang)).await,
         None => false,
     };
-    Ok(Json(json!({ "person": shown(&service, &person), "invited": invited })))
+    let mut answer = json!({ "person": shown(&service, &person), "invited": invited });
+    // The one person of an open instance had no session (they were everyone): with a second
+    // person, they keep being themselves through one, made now (its token for the desktop app).
+    if session_token(&headers).is_none() && !from_console(&service, &headers) {
+        let agent = headers
+            .get(header::USER_AGENT)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("");
+        let session = service.store.start_session(actor.id, agent).map_err(refused)?;
+        answer["token"] = json!(session);
+        return Ok((
+            [(header::SET_COOKIE, session_cookie(&session, client.secure))],
+            Json(answer),
+        )
+            .into_response());
+    }
+    Ok(Json(answer).into_response())
 }
 
 #[derive(Deserialize)]

@@ -3,8 +3,11 @@
   // interface language, each language named in itself; in the desktop app,
   // the service (S2): its state, and Install (at logon, or with the system),
   // Start, Update and Uninstall. A view over lib/preferences.ts and
-  // lib/desktop-service.ts. See RECORD/2026-11-03.deck-design-system.WIP.md
-  // (steps 6 and 7) and RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S2).
+  // lib/desktop-service.ts. With the service's people (S3), the account: who
+  // is in, their name, their passkeys and sessions (with sign-in on), signing
+  // out or switching profile, and, for admins and owners, "People and
+  // sign-in". See RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7)
+  // and RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S2, S3).
 
   const Field = await import("../../theme/default/components/field.html")
   const Modal = await import("../../theme/default/components/modal.html")
@@ -18,12 +21,31 @@
   const { ui } = await import("../lib/ui")
   const { isDesktop } = await import("../lib/platform")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
+  const { account, addPasskey, can, endSession, loadMine, passkeysHere, removePasskey, renameMe, signOut } = await import("../lib/account")
+  const { openPeople } = await import("../lib/people")
+  const { describeAgent } = await import("../helpers/agent")
 
   // On Windows, starting with the system runs the service as the person: Windows asks for their password.
   const onWindows = /Windows/.test(navigator.userAgent)
   let password: string = ""
   const opened = (open: boolean) => {
     if (open && isDesktop) void refreshServiceStatus()
+    if (open && account.active && account.me) {
+      myName = account.me.name
+      void loadMine()
+    }
+  }
+  let myName: string = ""
+  let passkeyName: string = ""
+  const role = (name: string): string => t(`role.${name}` as "role.owner")
+  const newPasskey = async () => {
+    await addPasskey(passkeyName.trim())
+    passkeyName = ""
+  }
+  const when = (seconds: number): string => new Date(seconds * 1000).toLocaleString(preferences.language)
+  const people = () => {
+    ui.preferencesOpen = false
+    void openPeople(account.me?.role === "owner")
   }
   $: opened(ui.preferencesOpen)
   const way = (): string => (serviceState.status?.installed === "system" ? t("service.waySystem") : t("service.wayLogon"))
@@ -46,6 +68,47 @@
           <p>{{ isDark ? t("preferences.darkOn") : t("preferences.lightOn") }}</p>
         </div>
         <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
+      </section>
+      <section :if="account.active && account.me" class="pref account">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("account.title") }}</h3>
+          <p class="state">{{ t("account.as", { name: account.me?.name ?? "", role: role(account.me?.role ?? "listener") }) }}<span :if="account.me?.email"> · {{ account.me?.email }}</span></p>
+        </div>
+        <p :if="account.error" class="failure">{{ account.error }}</p>
+        <div class="row">
+          <Field :label="t('account.name')" control="account-name">
+            <TextInput id="account-name" :model="myName" @input="myName = $event.detail" />
+          </Field>
+          <Key size="sm" :disabled="account.busy || !myName.trim() || myName.trim() === account.me?.name" @click="renameMe(myName.trim())">{{ t("account.saveName") }}</Key>
+        </div>
+        <div :if="account.signin" class="sub">
+          <h4 class="mm-legend">{{ t("account.passkeys") }}</h4>
+          <p :if="account.passkeys.length === 0" class="hint">{{ t("account.passkeysNone") }}</p>
+          <ul :else class="items">
+            <li :each="passkey in account.passkeys" :key="passkey.id">
+              <span class="label">{{ passkey.name }}</span>
+              <Key size="sm" variant="ghost" :disabled="account.busy" @click="removePasskey(passkey.id)">{{ t("account.remove") }}</Key>
+            </li>
+          </ul>
+          <div :if="passkeysHere()" class="row">
+            <Field :label="t('account.passkeyName')" control="passkey-name">
+              <TextInput id="passkey-name" :model="passkeyName" @input="passkeyName = $event.detail" />
+            </Field>
+            <Key size="sm" :disabled="account.busy" @click="newPasskey()">{{ t("account.addPasskey") }}</Key>
+          </div>
+          <p :else class="hint">{{ t("account.passkeySecure") }}</p>
+          <h4 class="mm-legend">{{ t("account.sessions") }}</h4>
+          <ul class="items">
+            <li :each="session in account.sessions" :key="session.id">
+              <span class="label" :title="session.agent">{{ describeAgent(session.agent, t("account.on")) || "—" }}<small> · {{ t("account.sessionSeen", { date: when(session.seen) }) }}</small></span>
+              <Key size="sm" variant="ghost" :disabled="account.busy" @click="endSession(session.id)">{{ t("account.endSession") }}</Key>
+            </li>
+          </ul>
+        </div>
+        <div class="keys">
+          <Key :if="can('admin')" variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
+          <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
+        </div>
       </section>
       <section :if="isDesktop" class="pref service">
         <div class="text">
@@ -87,6 +150,15 @@
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
   .service { display: grid; gap: var(--mm-space-3); }
   .service .state { color: var(--mm-fg); }
+  .account, .sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
+  .prefs > * { min-width: 0; }
+  .account .state { color: var(--mm-fg); }
+  .sub h4 { margin: 0; }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--mm-space-2); }
+  .items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-1); margin: 0; padding: 0; list-style: none; font-size: var(--mm-text-sm); }
+  .items li { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-2); }
+  .items .label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .items small { color: var(--mm-fg-subtle); }
   .install { display: grid; gap: var(--mm-space-2); justify-items: start; }
   .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }

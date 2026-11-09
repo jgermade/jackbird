@@ -7,6 +7,7 @@
 
 import { $toRaw } from "jq79";
 import { sameSession, sessionOf, type Session } from "../helpers/session";
+import { account } from "./account";
 import { library } from "./library";
 import { loadRootSession, saveRootSession } from "./rootSessionStore";
 import { hydrateRoot } from "./roots";
@@ -15,13 +16,15 @@ import { restoreSource } from "./sources";
 /**
  * Reopens the roots saved last time that still have permission, in their
  * order, then makes the saved active one active again (else the first
- * reopened). A session that cannot be read leaves a clean start. Restoring is
- * over when it returns.
+ * reopened), and, through the service, the folders it has open that the
+ * session did not keep. A session that cannot be read leaves a clean start.
+ * Restoring is over when it returns.
  */
 export async function restoreSession(): Promise<void> {
   try {
     const session = await loadRootSession();
     const reopened: string[] = [];
+    const paths = new Set<string>();
 
     for (const saved of session.roots) {
       const source = await restoreSource(saved.handle).catch(() => null);
@@ -38,6 +41,19 @@ export async function restoreSession(): Promise<void> {
         view: saved.view ?? "files"
       });
       reopened.push(saved.id);
+      if (typeof saved.handle === "string") paths.add(saved.handle);
+    }
+
+    // With the service's people (S3), the folders it has open that this session did not keep: an
+    // owner opened them for everyone.
+    if (account.active) {
+      const { serviceRoots } = await import("./sources/service");
+      for (const source of await serviceRoots().catch(() => [])) {
+        if (typeof source.saved === "string" && !paths.has(source.saved)) {
+          await hydrateRoot(source, { setActive: false });
+          reopened.push($toRaw(library).roots.at(-1)?.id ?? "");
+        }
+      }
     }
 
     if (session.activeRootId && reopened.includes(session.activeRootId)) {

@@ -378,7 +378,10 @@ async fn write(
     let root = service.root(&at.root)?;
     let path = at.path.clone();
     blocking(move || root.write(&path, &body)).await?;
-    service.store.log(&person.name, "write", &at.root, &at.path);
+    // `.meta/` is the interface's own cache of the folder, not a change to the catalogue.
+    if !at.path.starts_with(".meta/") {
+        service.store.log(&person.name, "write", &at.root, &at.path);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

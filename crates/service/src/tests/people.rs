@@ -112,11 +112,23 @@ async fn an_instance_starts_with_its_owner_and_no_sign_in() {
 #[tokio::test]
 async fn several_people_without_sign_in_pick_a_profile() {
     let (service, app, _) = instance();
-    let (status, added) = call(Method::POST, "/api/people")
+    let (status, headers, body) = call(Method::POST, "/api/people")
         .json(json!({ "name": "Kids", "role": "listener" }))
-        .value(&app)
+        .on(&app)
         .await;
-    assert_eq!(status, StatusCode::OK, "{added}");
+    assert_eq!(status, StatusCode::OK);
+    let added: Value = serde_json::from_slice(&body).unwrap();
+    // The one who added the second person keeps being themselves, by a session made now.
+    let first = cookie_of(&headers);
+    assert!(added["token"].is_string());
+    assert_eq!(
+        call(Method::GET, "/api/folders")
+            .header("cookie", &first)
+            .on(&app)
+            .await
+            .0,
+        StatusCode::OK
+    );
     // Two people now: who is listening must be said first.
     let (status, body) = call(Method::GET, "/api/roots").value(&app).await;
     assert_eq!(

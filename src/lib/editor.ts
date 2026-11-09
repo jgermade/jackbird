@@ -9,6 +9,7 @@
 import { $reactive, $toRaw } from "jq79";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "../helpers/metadata";
 import type { EditableMetadata, MetaRecord, Track } from "../types";
+import { can } from "./account";
 import { t, tn, type MessageKey } from "./i18n";
 import { en } from "./locales/en";
 import { TagError } from "./tags";
@@ -41,7 +42,8 @@ export function openSelection(tab: SelectionTab = "edit"): void {
   editor.form = computeCommonMetadata(tracks);
   editor.confirmed = [];
   library.errorMessage = null;
-  ui.selectionTab = tab;
+  // A listener sees the files' info only (S3).
+  ui.selectionTab = can("editor") ? tab : "info";
   ui.selectionOpen = true;
 }
 

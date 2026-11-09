@@ -5,6 +5,7 @@
 // W8's plan for the playlists' items).
 
 import type { WizardTreeRow } from "../types";
+import { can } from "./account";
 import { openSelectionFor } from "./editor";
 import { t, tn } from "./i18n";
 import { moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
@@ -14,6 +15,13 @@ import { activeRoot, folderTracks, goToGroup, menuTargetCount, menuTargets, play
 
 /** An item of a menu, as the theme's `Menu` takes it. */
 export type MenuItem = { id: string; label: string; danger?: boolean; rule?: boolean };
+
+/** The items that change the folders: only for editors and up (S3); a listener's menus leave them out. */
+const CHANGES = new Set(["playlist", "edit", "rename", "remove", "delete", "up", "down", "out"]);
+
+function allowed(items: MenuItem[]): MenuItem[] {
+  return can("editor") ? items : items.filter((item) => !CHANGES.has(item.id));
+}
 
 /** Where a track's menu is: the tree, or the album sheet (which adds "Show in library"). */
 export type TrackMenuPlace = "tree" | "sheet";
@@ -37,7 +45,7 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
     { id: "rename", label: tn("menu.rename", count) },
     { id: "remove", label: tn("menu.remove", count), danger: true, rule: true }
   );
-  return items;
+  return allowed(items);
 }
 
 /** Asks which playlist to add tracks of the active root to. */
@@ -103,7 +111,7 @@ export function folderMenu(playlist = false): MenuItem[] {
   if (playlist) {
     items.push({ id: "delete", label: t("menu.deletePlaylist"), danger: true, rule: true });
   }
-  return items;
+  return allowed(items);
 }
 
 /** Does what a folder's menu item says. */
@@ -150,7 +158,7 @@ function entryCount(row: WizardTreeRow): number {
 /** A tree row's menu: a track's, a folder's or group's, a playlist's, or a playlist entry's (found or missing). */
 export function rowMenu(row: WizardTreeRow): MenuItem[] {
   if (row.kind === "album") {
-    return folderMenu(!!row.playlist);
+    return allowed(folderMenu(!!row.playlist));
   }
   const entry = row.playlist !== undefined && row.playlistIndex !== undefined ? entryItems(row, entryCount(row)) : [];
   if (!row.trackId) {
@@ -158,11 +166,11 @@ export function rowMenu(row: WizardTreeRow): MenuItem[] {
   }
   const items = trackMenu(row.trackId, "tree");
   if (entry.length === 0) {
-    return items;
+    return allowed(items);
   }
   // The entry's own items go before the track's danger zone.
   const danger = items.findIndex((item) => item.danger);
-  return [...items.slice(0, danger), ...entry, ...items.slice(danger)];
+  return allowed([...items.slice(0, danger), ...entry, ...items.slice(danger)]);
 }
 
 /** Does what a tree row's menu item says. */
