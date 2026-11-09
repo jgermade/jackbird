@@ -66,6 +66,37 @@ pub struct Person {
     /// Its WebAuthn user handle (random, never shown).
     #[serde(skip)]
     pub handle: Vec<u8>,
+    /// What follows it from device to device (F3).
+    #[serde(skip)]
+    pub settings: Settings,
+}
+
+/// A person's settings, kept with them on the service (F3): applied wherever they sign in.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+pub struct Settings {
+    /// `light` or `dark`, once chosen.
+    #[serde(default)]
+    pub theme: Option<String>,
+    /// The interface's language, once chosen.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Whether they see their own version of the library's songs (else the family's).
+    #[serde(default = "yes")]
+    pub mine: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            theme: None,
+            language: None,
+            mine: true,
+        }
+    }
 }
 
 /// One of a person's sessions, as "My account" lists them.
@@ -216,10 +247,11 @@ fn person_of(row: &rusqlite::Row<'_>) -> rusqlite::Result<Person> {
         confirmed: row.get(3)?,
         role: Role::parse(&role).unwrap_or(Role::Listener),
         handle: row.get(5)?,
+        settings: serde_json::from_str(&row.get::<_, String>(6)?).unwrap_or_default(),
     })
 }
 
-const PERSON: &str = "select id, name, email, confirmed, role, handle from people";
+const PERSON: &str = "select id, name, email, confirmed, role, handle, settings from people";
 
 impl Store {
     /// Opens the database at `path`, making it and its first person (the owner) if it is new.
@@ -251,6 +283,8 @@ impl Store {
         db.execute_batch("pragma foreign_keys = on; pragma journal_mode = wal;")
             .and_then(|()| db.execute_batch(SCHEMA))
             .map_err(|error| error.to_string())?;
+        // F3: settings that follow a person (added to S3's table).
+        let _ = db.execute_batch("alter table people add column settings text not null default '{}'");
         let store = Store { db: Mutex::new(db) };
         if store.people().map_err(|error| format!("{error:?}"))?.is_empty() {
             store
@@ -364,6 +398,15 @@ impl Store {
         self.db().execute(
             "update people set email = ?1, confirmed = 0 where id = ?2",
             params![email, id],
+        )?;
+        Ok(())
+    }
+
+    /// Keeps a person's settings.
+    pub fn set_settings(&self, id: i64, settings: &Settings) -> Result<(), Refusal> {
+        self.db().execute(
+            "update people set settings = ?1 where id = ?2",
+            params![serde_json::to_string(settings).unwrap_or_default(), id],
         )?;
         Ok(())
     }

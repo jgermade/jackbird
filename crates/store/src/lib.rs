@@ -30,8 +30,11 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod own;
 #[cfg(test)]
 mod tests;
+
+pub use own::{FAVOURITES, Layers, OWN, RECENT, Scope, Viewer, is_own};
 
 /// The formats the library keeps.
 pub const AUDIO: [&str; 2] = ["mp3", "flac"];
@@ -146,6 +149,19 @@ impl Layer {
         *self == Layer::default()
     }
 
+    /// This layer over another: its fields and cover where it sets them, the other's elsewhere.
+    pub fn on(&self, under: &Layer) -> Layer {
+        Layer {
+            title: self.title.clone().or_else(|| under.title.clone()),
+            artist: self.artist.clone().or_else(|| under.artist.clone()),
+            album: self.album.clone().or_else(|| under.album.clone()),
+            year: self.year.clone().or_else(|| under.year.clone()),
+            genre: self.genre.clone().or_else(|| under.genre.clone()),
+            track: self.track.clone().or_else(|| under.track.clone()),
+            cover: self.cover.clone().or_else(|| under.cover.clone()),
+        }
+    }
+
     /// The fields everyone sees: this layer's over the file's.
     pub fn over(&self, file: &FieldsJson) -> FieldsJson {
         let pick = |own: &Option<String>, under: &String| own.clone().unwrap_or_else(|| under.clone());
@@ -195,6 +211,8 @@ impl Song {
 /// Other tags someone brought with the same audio (kept until F3 makes them their layer).
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Suggestion {
+    /// Its id.
+    pub id: i64,
     /// The fields they brought.
     pub fields: FieldsJson,
     /// Who brought them.
@@ -368,7 +386,10 @@ impl Library {
         let db = Connection::open(dir.join("catalogue.db")).map_err(store_error)?;
         db.execute_batch("pragma foreign_keys = on; pragma journal_mode = wal;")
             .and_then(|()| db.execute_batch(SCHEMA))
+            .and_then(|()| db.execute_batch(own::SCHEMA))
             .map_err(store_error)?;
+        // F3: who brought a suggestion (added to F1's table).
+        let _ = db.execute_batch("alter table suggestions add column person integer");
         Ok(Library {
             dir: dir.to_owned(),
             files,
@@ -452,8 +473,16 @@ impl Library {
     // Importing.
 
     /// Imports one file as `wanted` (a library path): copied in, or moved when `take` (an
-    /// upload in `tmp/`). Never changes `source` otherwise.
-    pub fn import_file(&self, source: &Path, wanted: &str, by: &str, take: bool) -> Result<Imported, Error> {
+    /// upload in `tmp/`). Never changes `source` otherwise. The same audio with other tags is a
+    /// suggestion, and becomes the layer of `person` (the importer), when there is one (F3).
+    pub fn import_file(
+        &self,
+        source: &Path,
+        wanted: &str,
+        by: &str,
+        person: Option<i64>,
+        take: bool,
+    ) -> Result<Imported, Error> {
         let wanted = clean(wanted)?;
         if !is_audio(&wanted) {
             return Ok(Imported::Unreadable("not an MP3 or FLAC file".into()));
@@ -496,15 +525,19 @@ impl Library {
             if !known {
                 self.db()
                     .execute(
-                        "insert into suggestions (song, fields, by, at) values (?1, ?2, ?3, ?4)",
+                        "insert into suggestions (song, fields, by, at, person) values (?1, ?2, ?3, ?4, ?5)",
                         params![
                             song.id,
                             serde_json::to_string(&fields).unwrap_or_default(),
                             by,
-                            now() as i64
+                            now() as i64,
+                            person
                         ],
                     )
                     .map_err(store_error)?;
+            }
+            if let Some(person) = person {
+                self.take_as_own(person, &song, &fields)?;
             }
             return Ok(Imported::Suggested(song.path));
         }
@@ -555,6 +588,7 @@ impl Library {
         folder: &Path,
         name: &str,
         by: &str,
+        person: Option<i64>,
         mut progress: impl FnMut(usize, usize),
     ) -> Result<Report, Error> {
         let root = Root::open(folder)?;
@@ -566,6 +600,7 @@ impl Library {
                 &root.resolve(&entry.path)?,
                 &format!("{name}/{}", entry.path),
                 by,
+                person,
                 false,
             )?;
             report.count(&entry.path, &imported);
@@ -579,12 +614,13 @@ impl Library {
         let song = self.song_or_not_found(path)?;
         let db = self.db();
         let mut query = db
-            .prepare("select fields, by, at from suggestions where song = ?1 order by id")
+            .prepare("select fields, by, at, id from suggestions where song = ?1 order by id")
             .map_err(store_error)?;
         let found = query
             .query_map([song.id], |row| {
                 let fields: String = row.get(0)?;
                 Ok(Suggestion {
+                    id: row.get(3)?,
                     fields: serde_json::from_str(&fields).unwrap_or_default(),
                     by: row.get(1)?,
                     at: row.get::<_, i64>(2)? as u64,
@@ -754,15 +790,18 @@ impl Library {
 
     /// The cover everyone sees: the file's, or, when the family's layer touches it, the one its
     /// song leaves with (removing the cover shown can show the file's next picture).
-    fn cover(&self, song: &Song) -> Result<Option<Cover>, Error> {
-        match &song.family.cover {
+    /// The cover a song leaves with under `layer`: the file's when the layer does not touch it,
+    /// the layer's own, or, when it removes the cover shown, what is read from the song as it
+    /// leaves (a file with more pictures shows its next one).
+    fn cover_under(&self, song: &Song, layer: &Layer) -> Result<Option<Cover>, Error> {
+        match &layer.cover {
             None => self.file_cover(song),
             Some(CoverLayer::Set { hash, mime }) => Ok(Some(Cover {
                 data: fs::read(self.cover_path(hash)).map_err(|error| Error::Io(error.to_string()))?,
                 mime: mime.clone(),
             })),
             Some(CoverLayer::Remove) => {
-                let out = self.outgoing(&song.path)?;
+                let out = self.outgoing_under(song, layer)?;
                 let tail = out.read(out.len().saturating_sub(jackbird_tags::TAIL_LEN as u64), out.len())?;
                 let mut want = out.head.len() as u64 + jackbird_tags::FIRST_HEAD as u64;
                 loop {
@@ -801,16 +840,22 @@ impl Library {
         })
     }
 
-    /// A song as the interface inspects it: its tags as everyone sees them (unless `known` is its
-    /// full checksum, which changes with its layer), and its checksums: the blob's name, and that
-    /// with the layer's version.
+    /// A song as the interface inspects it, as everyone sees it (the family's version).
     pub fn inspect(&self, relative: &str, known: Option<&str>) -> Result<Inspection, Error> {
+        self.inspect_as(relative, known, Viewer::default())
+    }
+
+    /// A song as `viewer` sees it: its tags (unless `known` is its full checksum, which changes
+    /// with the layers they see), and its checksums: the blob's name, and that with the layers'
+    /// versions.
+    pub fn inspect_as(&self, relative: &str, known: Option<&str>, viewer: Viewer) -> Result<Inspection, Error> {
         let song = self.song_or_not_found(&clean(relative)?)?;
-        let full_checksum = format!("{}-{}", song.blob, song.version);
+        let (layer, version) = self.seen(&song, viewer);
+        let full_checksum = format!("{}-{version}", song.blob);
         let tags = if known == Some(full_checksum.as_str()) {
             None
         } else {
-            Some((Fields::from(&song.fields()), self.cover(&song)?))
+            Some((Fields::from(&layer.over(&song.file)), self.cover_under(&song, &layer)?))
         };
         Ok(Inspection {
             stat: Library::stat_of(&song),
@@ -820,27 +865,43 @@ impl Library {
         })
     }
 
-    /// Saves an edit into a song's family layer: a field set to the file's own value, or a cover
-    /// that is the file's, leaves the file's. The edit is tried on the song's head first, so what
-    /// the engine refuses for a file it refuses here. No file is written.
+    /// Saves an edit into a song's family layer (see [`Library::save_as`]).
     pub fn save(&self, relative: &str, edit: &Edit) -> Result<Inspection, Error> {
+        self.save_as(relative, edit, Scope::Family)
+    }
+
+    /// Saves an edit into a layer: the family's (over the file's) or a person's own (over the
+    /// family's version). A field set to the value under it, or a cover that is the one under it,
+    /// leaves what is under it. The edit is tried on the song's head first, so what the engine
+    /// refuses for a file it refuses here. No file is written. The song as the saver sees it.
+    pub fn save_as(&self, relative: &str, edit: &Edit, scope: Scope) -> Result<Inspection, Error> {
         let song = self.song_or_not_found(&clean(relative)?)?;
-        let mut layer = song.family.clone();
-        let set = |own: &mut Option<String>, new: &Option<String>, file: &String| {
+        let (mut layer, under, under_cover) = match scope {
+            Scope::Family => (song.family.clone(), song.file.clone(), self.file_cover(&song)?),
+            Scope::Mine(person) => (
+                self.own_layer(person, song.id)
+                    .map(|(layer, _)| layer)
+                    .unwrap_or_default(),
+                song.fields(),
+                self.cover_under(&song, &song.family)?,
+            ),
+        };
+        let before = layer.clone();
+        let set = |own: &mut Option<String>, new: &Option<String>, under: &String| {
             if let Some(value) = new {
-                *own = (value != file).then(|| value.clone());
+                *own = (value != under).then(|| value.clone());
             }
         };
-        set(&mut layer.title, &edit.title, &song.file.title);
-        set(&mut layer.artist, &edit.artist, &song.file.artist);
-        set(&mut layer.album, &edit.album, &song.file.album);
-        set(&mut layer.year, &edit.year, &song.file.year);
-        set(&mut layer.genre, &edit.genre, &song.file.genre);
-        set(&mut layer.track, &edit.track, &song.file.track);
+        set(&mut layer.title, &edit.title, &under.title);
+        set(&mut layer.artist, &edit.artist, &under.artist);
+        set(&mut layer.album, &edit.album, &under.album);
+        set(&mut layer.year, &edit.year, &under.year);
+        set(&mut layer.genre, &edit.genre, &under.genre);
+        set(&mut layer.track, &edit.track, &under.track);
         match &edit.cover {
             CoverEdit::Keep => {}
             CoverEdit::Set(cover) => {
-                if self.file_cover(&song)?.as_ref() == Some(cover) {
+                if under_cover.as_ref() == Some(cover) {
                     layer.cover = None;
                 } else {
                     let hash = hex(&Sha256::digest(&cover.data));
@@ -855,31 +916,55 @@ impl Library {
                 }
             }
             CoverEdit::Remove => {
-                layer.cover = self.file_cover(&song)?.map(|_| CoverLayer::Remove);
+                layer.cover = under_cover.map(|_| CoverLayer::Remove);
             }
         }
-        if layer != song.family {
+        let viewer = match scope {
+            Scope::Family => Viewer::default(),
+            Scope::Mine(person) => Viewer::mine(person),
+        };
+        if layer != before {
+            let tried = match scope {
+                Scope::Family => layer.clone(),
+                Scope::Mine(_) => layer.on(&song.family),
+            };
             let (file_layout, head) = head_of(&self.blob_path(&song.blob, &song.format))?;
-            jackbird_tags::write_head(&head, &file_layout, &self.edit_of(&layer)?)?;
-            self.db()
-                .execute(
-                    "update songs set family = ?1, version = version + 1, changed = ?2 where id = ?3",
-                    params![serde_json::to_string(&layer).unwrap_or_default(), now() as i64, song.id],
-                )
-                .map_err(store_error)?;
+            jackbird_tags::write_head(&head, &file_layout, &self.edit_of(&tried)?)?;
+            match scope {
+                Scope::Family => {
+                    self.db()
+                        .execute(
+                            "update songs set family = ?1, version = version + 1, changed = ?2 where id = ?3",
+                            params![serde_json::to_string(&layer).unwrap_or_default(), now() as i64, song.id],
+                        )
+                        .map_err(store_error)?;
+                }
+                Scope::Mine(person) => self.put_own_layer(person, song.id, &layer)?,
+            }
         }
-        self.inspect(&song.path, None)
+        self.inspect_as(&song.path, None, viewer)
     }
 
-    /// A song as it leaves: its head with the family's layer written in, then its blob.
+    /// A song as it leaves, with the family's version.
     pub fn outgoing(&self, relative: &str) -> Result<Outgoing, Error> {
+        self.outgoing_as(relative, Viewer::default())
+    }
+
+    /// A song as it leaves for `viewer`: its head with the layers they see written in, then its
+    /// blob.
+    pub fn outgoing_as(&self, relative: &str, viewer: Viewer) -> Result<Outgoing, Error> {
         let song = self.song_or_not_found(&clean(relative)?)?;
+        let (layer, _) = self.seen(&song, viewer);
+        self.outgoing_under(&song, &layer)
+    }
+
+    fn outgoing_under(&self, song: &Song, layer: &Layer) -> Result<Outgoing, Error> {
         let blob = self.blob_path(&song.blob, &song.format);
         let (layout, head) = head_of(&blob)?;
-        let (head, from) = if song.family.is_empty() {
+        let (head, from) = if layer.is_empty() {
             (head[..layout.tags_end as usize].to_vec(), layout.tags_end)
         } else {
-            let splice = jackbird_tags::write_head(&head, &layout, &self.edit_of(&song.family)?)?;
+            let splice = jackbird_tags::write_head(&head, &layout, &self.edit_of(layer)?)?;
             (splice.with, splice.replace.end)
         };
         Ok(Outgoing {

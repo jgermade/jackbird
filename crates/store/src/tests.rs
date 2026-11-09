@@ -10,7 +10,7 @@ use jackbird_tags::{Cover, CoverEdit, Edit, FIRST_HEAD, Layout, TAIL_LEN};
 
 use super::*;
 
-fn scratch() -> PathBuf {
+pub(super) fn scratch() -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let path = std::env::temp_dir().join(format!(
         "jackbird-store-{}-{}",
@@ -22,7 +22,7 @@ fn scratch() -> PathBuf {
     path
 }
 
-fn fixtures() -> PathBuf {
+pub(super) fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tags")
 }
 
@@ -35,7 +35,7 @@ fn distinct(name: &str, to: &std::path::Path, n: usize) {
 }
 
 /// A folder of the machine with four songs of different audio, one in a subfolder.
-fn music() -> PathBuf {
+pub(super) fn music() -> PathBuf {
     let folder = scratch();
     fs::create_dir_all(folder.join("Disc 2")).unwrap();
     for name in ["mp3-v24-padded.mp3", "flac-full.flac"] {
@@ -48,7 +48,7 @@ fn music() -> PathBuf {
 }
 
 /// A file's tags and audio region, read whole.
-fn read_back(bytes: &[u8]) -> (jackbird_tags::Tags, Vec<u8>) {
+pub(super) fn read_back(bytes: &[u8]) -> (jackbird_tags::Tags, Vec<u8>) {
     let tail = &bytes[bytes.len().saturating_sub(TAIL_LEN)..];
     let head = &bytes[..bytes.len().min(FIRST_HEAD.max(bytes.len()))];
     let Layout::Known(layout) = jackbird_tags::layout(head, tail, bytes.len() as u64).unwrap() else {
@@ -61,7 +61,7 @@ fn read_back(bytes: &[u8]) -> (jackbird_tags::Tags, Vec<u8>) {
     )
 }
 
-fn whole(out: &Outgoing) -> Vec<u8> {
+pub(super) fn whole(out: &Outgoing) -> Vec<u8> {
     out.read(0, out.len()).unwrap()
 }
 
@@ -71,7 +71,7 @@ fn a_folder_is_imported_and_the_same_audio_is_not_stored_twice() {
     let folder = music();
     let mut steps = Vec::new();
     let report = library
-        .import_folder(&folder, "Music", "Owner", |done, total| steps.push((done, total)))
+        .import_folder(&folder, "Music", "Owner", None, |done, total| steps.push((done, total)))
         .unwrap();
     assert_eq!(report.added, 4);
     assert_eq!(steps.last(), Some(&(4, 4)));
@@ -82,7 +82,9 @@ fn a_folder_is_imported_and_the_same_audio_is_not_stored_twice() {
     );
     assert!(!paths.iter().any(|path| path.ends_with(".txt")));
     // The same folder again: nothing new.
-    let again = library.import_folder(&folder, "Music", "Owner", |_, _| {}).unwrap();
+    let again = library
+        .import_folder(&folder, "Music", "Owner", None, |_, _| {})
+        .unwrap();
     assert_eq!((again.added, again.existing), (0, 4));
     // The same audio with another title: a suggestion beside the song, no new song or blob.
     let other = scratch();
@@ -98,7 +100,7 @@ fn a_folder_is_imported_and_the_same_audio_is_not_stored_twice() {
     )
     .unwrap();
     let imported = library
-        .import_file(&other.join("copy.mp3"), "Elsewhere/copy.mp3", "Luis", false)
+        .import_file(&other.join("copy.mp3"), "Elsewhere/copy.mp3", "Luis", None, false)
         .unwrap();
     assert_eq!(imported, Imported::Suggested("Music/mp3-v24-padded.mp3".into()));
     let suggestions = library.suggestions("Music/mp3-v24-padded.mp3").unwrap();
@@ -109,7 +111,7 @@ fn a_folder_is_imported_and_the_same_audio_is_not_stored_twice() {
     );
     // Brought again: one suggestion still.
     library
-        .import_file(&other.join("copy.mp3"), "Elsewhere/copy.mp3", "Luis", false)
+        .import_file(&other.join("copy.mp3"), "Elsewhere/copy.mp3", "Luis", None, false)
         .unwrap();
     assert_eq!(library.suggestions("Music/mp3-v24-padded.mp3").unwrap().len(), 1);
     assert_eq!(library.songs().unwrap().len(), 4);
@@ -120,12 +122,12 @@ fn a_folder_is_imported_and_the_same_audio_is_not_stored_twice() {
     );
     // Not a song: reported.
     let unreadable = library
-        .import_file(&folder.join("notes.txt"), "Music/notes.mp3", "Owner", false)
+        .import_file(&folder.join("notes.txt"), "Music/notes.mp3", "Owner", None, false)
         .unwrap();
     assert!(matches!(unreadable, Imported::Unreadable(_)), "{unreadable:?}");
     assert!(matches!(
         library
-            .import_file(&folder.join("notes.txt"), "Music/notes.txt", "Owner", false)
+            .import_file(&folder.join("notes.txt"), "Music/notes.txt", "Owner", None, false)
             .unwrap(),
         Imported::Unreadable(_)
     ));
@@ -136,7 +138,9 @@ fn a_blob_is_the_file_whole_named_by_its_audio() {
     let dir = scratch();
     let library = Library::open(&dir).unwrap();
     let folder = music();
-    library.import_folder(&folder, "Music", "Owner", |_, _| {}).unwrap();
+    library
+        .import_folder(&folder, "Music", "Owner", None, |_, _| {})
+        .unwrap();
     let song = library.song("Music/flac-full.flac").unwrap();
     let examined = examine(&folder.join("flac-full.flac")).unwrap();
     assert_eq!(song.blob, examined.audio_sha256);
@@ -159,7 +163,9 @@ fn a_blob_is_the_file_whole_named_by_its_audio() {
 fn edits_go_to_the_family_layer_and_leave_with_the_song() {
     let library = Library::open(&scratch()).unwrap();
     let folder = music();
-    library.import_folder(&folder, "Music", "Owner", |_, _| {}).unwrap();
+    library
+        .import_folder(&folder, "Music", "Owner", None, |_, _| {})
+        .unwrap();
     for path in [
         "Music/mp3-v24-padded.mp3",
         "Music/flac-full.flac",
@@ -255,7 +261,9 @@ fn edits_go_to_the_family_layer_and_leave_with_the_song() {
 #[test]
 fn ranges_cross_the_head_and_the_blob() {
     let library = Library::open(&scratch()).unwrap();
-    library.import_folder(&music(), "Music", "Owner", |_, _| {}).unwrap();
+    library
+        .import_folder(&music(), "Music", "Owner", None, |_, _| {})
+        .unwrap();
     library
         .save(
             "Music/flac-full.flac",
@@ -288,7 +296,9 @@ fn ranges_cross_the_head_and_the_blob() {
 fn the_library_is_a_root() {
     let library = Library::open(&scratch()).unwrap();
     let folder = music();
-    library.import_folder(&folder, "Music", "Owner", |_, _| {}).unwrap();
+    library
+        .import_folder(&folder, "Music", "Owner", None, |_, _| {})
+        .unwrap();
     // Small files beside the songs.
     library.write(".meta/mp3-manager.json", b"{}").unwrap();
     library.write("Music/mix.m3u", b"#EXTM3U\n").unwrap();
@@ -338,6 +348,7 @@ fn the_library_is_a_root() {
             &folder.join("Disc 2/flac-no-padding.flac"),
             "Again/flac-no-padding.flac",
             "Owner",
+            None,
             false,
         )
         .unwrap();
@@ -352,7 +363,7 @@ fn an_upload_is_moved_in() {
     fs::copy(fixtures().join("mp3-v23-utf16.mp3"), &upload).unwrap();
     assert_eq!(
         library
-            .import_file(&upload, "Uploads/Luis/song.mp3", "Luis", true)
+            .import_file(&upload, "Uploads/Luis/song.mp3", "Luis", None, true)
             .unwrap(),
         Imported::Added("Uploads/Luis/song.mp3".into())
     );
@@ -362,7 +373,7 @@ fn an_upload_is_moved_in() {
     fs::copy(fixtures().join("mp3-v23-utf16.mp3"), &upload).unwrap();
     assert_eq!(
         library
-            .import_file(&upload, "Uploads/Luis/song.mp3", "Luis", true)
+            .import_file(&upload, "Uploads/Luis/song.mp3", "Luis", None, true)
             .unwrap(),
         Imported::Existing("Uploads/Luis/song.mp3".into())
     );
@@ -372,10 +383,12 @@ fn an_upload_is_moved_in() {
     distinct("mp3-v23-utf16.mp3", &upload, 64);
     assert_eq!(
         library
-            .import_file(&upload, "Uploads/Luis/song.mp3", "Luis", true)
+            .import_file(&upload, "Uploads/Luis/song.mp3", "Luis", None, true)
             .unwrap(),
         Imported::Added("Uploads/Luis/song (2).mp3".into())
     );
     assert!(matches!(clean("/abs"), Err(Error::Outside(_))));
     assert_eq!(clean("a//b/./c").unwrap(), "a/b/c");
 }
+
+mod own;

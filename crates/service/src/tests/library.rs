@@ -95,6 +95,7 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
         .unwrap()
         .iter()
         .map(|entry| entry["path"].as_str().unwrap())
+        .filter(|path| jackbird_store::is_audio(path))
         .collect();
     assert_eq!(
         paths,
@@ -240,5 +241,191 @@ async fn without_a_library_its_routes_say_so() {
     assert_eq!(
         (status, body["code"].as_str()),
         (StatusCode::NOT_FOUND, Some("no-library"))
+    );
+}
+
+/// F3: each person's own, through the router.
+#[tokio::test]
+async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
+    let library = jackbird_store::Library::open(&scratch()).unwrap();
+    let (_, app, _, [owner, _, editor, listener]) = family_with(Some(library)).await;
+    let folder = two_songs();
+    call(Method::POST, "/api/library/import")
+        .header("cookie", &owner)
+        .json(json!({ "path": folder.display().to_string(), "name": "Music" }))
+        .on(&app)
+        .await;
+    for _ in 0..100 {
+        let state = call(Method::GET, "/api/library/import")
+            .header("cookie", &owner)
+            .value(&app)
+            .await
+            .1;
+        if state["running"] == false {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let path = "Music/flac-full.flac";
+    let inspect = |cookie: &str| {
+        call(Method::POST, "/api/library/inspect")
+            .header("cookie", cookie)
+            .json(json!({ "path": path }))
+    };
+    let title_for = |value: Value| value["metadata"]["title"].as_str().unwrap_or_default().to_owned();
+    let before = inspect(&editor).value(&app).await.1;
+    let retitled = |title: &str, scope: &str| {
+        let mut metadata = before["metadata"].clone();
+        metadata["title"] = json!(title);
+        json!({ "path": path, "previous": before["metadata"], "metadata": metadata, "scope": scope })
+    };
+    // The editor saves for everyone; the listener, for themselves only.
+    let (status, _) = call(Method::POST, "/api/library/save")
+        .header("cookie", &editor)
+        .json(retitled("The family's", "family"))
+        .value(&app)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        call(Method::POST, "/api/library/save")
+            .header("cookie", &listener)
+            .json(retitled("Not allowed", "family"))
+            .on(&app)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    let (status, saved) = call(Method::POST, "/api/library/save")
+        .header("cookie", &listener)
+        .json(retitled("The kids' own", "mine"))
+        .value(&app)
+        .await;
+    assert_eq!((status, title_for(saved)), (StatusCode::OK, "The kids' own".to_owned()));
+    // Two people, the same song, two titles; the family's untouched.
+    assert_eq!(title_for(inspect(&listener).value(&app).await.1), "The kids' own");
+    assert_eq!(title_for(inspect(&editor).value(&app).await.1), "The family's");
+    assert_eq!(title_for(inspect(&owner).value(&app).await.1), "The family's");
+    let (_, layers) = call(Method::GET, format!("/api/library/layers?path={}", enc(path)))
+        .header("cookie", &listener)
+        .value(&app)
+        .await;
+    assert_eq!(layers["mine"]["title"], "The kids' own");
+    assert_eq!(layers["family"]["title"], "The family's");
+    // The switch: the family's version; and back.
+    let (_, settings) = call(Method::POST, "/api/me/settings")
+        .header("cookie", &listener)
+        .json(json!({ "mine": false, "theme": "dark", "language": "es" }))
+        .value(&app)
+        .await;
+    assert_eq!(
+        (settings["mine"].as_bool(), settings["theme"].as_str()),
+        (Some(false), Some("dark"))
+    );
+    assert_eq!(title_for(inspect(&listener).value(&app).await.1), "The family's");
+    let (_, me) = call(Method::GET, "/api/me")
+        .header("cookie", &listener)
+        .value(&app)
+        .await;
+    assert_eq!(me["settings"]["language"], "es");
+    call(Method::POST, "/api/me/settings")
+        .header("cookie", &listener)
+        .json(json!({ "mine": true }))
+        .on(&app)
+        .await;
+    assert_eq!(title_for(inspect(&listener).value(&app).await.1), "The kids' own");
+    // Downloads as each sees it.
+    let (_, _, theirs) = call(Method::GET, format!("/api/library/download?path={}", enc(path)))
+        .header("cookie", &listener)
+        .on(&app)
+        .await;
+    assert_eq!(tags_of(&theirs).fields.title, "The kids' own");
+    call(Method::POST, "/api/library/mine/forget")
+        .header("cookie", &listener)
+        .json(json!({ "path": path }))
+        .on(&app)
+        .await;
+    assert_eq!(title_for(inspect(&listener).value(&app).await.1), "The family's");
+
+    // Favourites and plays, the listener's own; their playlists in their own folder.
+    assert_eq!(
+        call(Method::POST, "/api/library/favourite")
+            .header("cookie", &listener)
+            .json(json!({ "path": path, "on": true }))
+            .on(&app)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    call(Method::POST, "/api/library/played")
+        .header("cookie", &listener)
+        .json(json!({ "path": path }))
+        .on(&app)
+        .await;
+    let read = |cookie: &str, file: &str| {
+        call(Method::GET, format!("/api/library/read?path={}", enc(file))).header("cookie", cookie)
+    };
+    let (_, _, favourites) = read(&listener, "My playlists/Favourites.m3u").on(&app).await;
+    assert_eq!(
+        String::from_utf8(favourites).unwrap(),
+        "#EXTM3U\n../Music/flac-full.flac\n"
+    );
+    let (_, _, recent) = read(&listener, "My playlists/Recently played.m3u").on(&app).await;
+    assert!(String::from_utf8(recent).unwrap().contains("flac-full.flac"));
+    let (_, _, editors) = read(&editor, "My playlists/Favourites.m3u").on(&app).await;
+    assert_eq!(String::from_utf8(editors).unwrap(), "#EXTM3U\n");
+    let write = |cookie: &str, file: &str| {
+        let mut request = call(Method::POST, format!("/api/library/write?path={}", enc(file))).header("cookie", cookie);
+        request.body = Body::from("#EXTM3U\n../Music/mp3-v24-padded.mp3\n");
+        request
+    };
+    assert_eq!(
+        write(&listener, "My playlists/Road.m3u").on(&app).await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        write(&listener, "Music/Shared.m3u").on(&app).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        write(&editor, "Music/Shared.m3u").on(&app).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let walked = |cookie: &str| call(Method::GET, "/api/library/walk").header("cookie", cookie);
+    let theirs: Vec<String> = walked(&listener)
+        .value(&app)
+        .await
+        .1
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["path"].as_str().unwrap().to_owned())
+        .collect();
+    assert!(theirs.contains(&"My playlists/Road.m3u".to_owned()) && theirs.contains(&"Music/Shared.m3u".to_owned()));
+    let editors: Vec<String> = walked(&editor)
+        .value(&app)
+        .await
+        .1
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["path"].as_str().unwrap().to_owned())
+        .collect();
+    assert!(!editors.contains(&"My playlists/Road.m3u".to_owned()));
+    // Their history, cleared.
+    call(Method::POST, "/api/library/history/clear")
+        .header("cookie", &listener)
+        .on(&app)
+        .await;
+    let (_, _, recent) = read(&listener, "My playlists/Recently played.m3u").on(&app).await;
+    assert_eq!(String::from_utf8(recent).unwrap(), "#EXTM3U\n");
+    // Suggestions are applied by editors only.
+    assert_eq!(
+        call(Method::POST, "/api/library/suggestions/apply")
+            .header("cookie", &listener)
+            .json(json!({ "path": path, "id": 1 }))
+            .on(&app)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
     );
 }

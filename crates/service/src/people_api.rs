@@ -285,6 +285,7 @@ async fn me(State(service): Shared, Extension(person): Extension<Person>) -> Ans
     let passkeys = service.store.passkeys_of(person.id).map_err(refused)?;
     Ok(Json(json!({
         "me": shown(&service, &person),
+        "settings": person.settings,
         "sessions": sessions,
         "passkeys": passkeys,
     })))
@@ -334,9 +335,37 @@ async fn media_token(State(service): Shared, Extension(person): Extension<Person
     Json(json!({ "t": service.signer.sign("media", &grant, MEDIA_SECONDS) }))
 }
 
+#[derive(Deserialize)]
+struct MySettings {
+    theme: Option<String>,
+    language: Option<String>,
+    mine: Option<bool>,
+}
+
+/// Changes one's settings (F3): what is not given stays.
+async fn set_my_settings(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<MySettings>,
+) -> Answer<Json<crate::people::Settings>> {
+    let mut settings = person.settings.clone();
+    if let Some(theme) = body.theme.filter(|theme| matches!(theme.as_str(), "light" | "dark")) {
+        settings.theme = Some(theme);
+    }
+    if let Some(language) = body.language.filter(|language| language.len() <= 8) {
+        settings.language = Some(language);
+    }
+    if let Some(mine) = body.mine {
+        settings.mine = mine;
+    }
+    service.store.set_settings(person.id, &settings).map_err(refused)?;
+    Ok(Json(settings))
+}
+
 /// Routes of everyone with a place in the instance (listeners and up).
 pub fn own() -> Router<Arc<Service>> {
     Router::new()
+        .route("/me/settings", post(set_my_settings))
         .route("/me", get(me).post(rename_me))
         .route("/me/sessions/end", post(end_session))
         .route("/media/token", get(media_token))

@@ -14,12 +14,12 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use jackbird_api::{EntryJson, InspectionJson, Metadata, StatJson, edit_for};
 use jackbird_core::Error;
-use jackbird_store::{Imported, Library, Outgoing, Report};
+use jackbird_store::{Imported, Library, Outgoing, Report, Scope, Viewer, is_own};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::io::AsyncReadExt;
 
-use crate::people::Person;
+use crate::people::{Person, Role};
 use crate::{Answer, ApiError, Service, blocking};
 
 type Shared = State<Arc<Service>>;
@@ -29,6 +29,24 @@ fn library(service: &Service) -> Answer<Arc<Library>> {
         .library
         .clone()
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "no-library", "this service has no library"))
+}
+
+/// How a person sees the library: their own version, unless they chose the family's (F3).
+fn viewer(person: &Person) -> Viewer {
+    Viewer::of(person.id, person.settings.mine)
+}
+
+/// Writing outside one's own folder is an editor's.
+fn may_write(person: &Person, path: &str) -> Answer<()> {
+    if person.role >= Role::Editor || is_own(path.trim_matches('/')) {
+        Ok(())
+    } else {
+        Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "role",
+            "this needs the role editor or more",
+        ))
+    }
 }
 
 #[derive(Deserialize)]
@@ -43,27 +61,35 @@ async fn info(State(service): Shared) -> Answer<Json<Value>> {
     Ok(Json(json!({ "name": "Library", "songs": songs })))
 }
 
-async fn walk(State(service): Shared) -> Answer<Json<Vec<EntryJson>>> {
+async fn walk(State(service): Shared, Extension(person): Extension<Person>) -> Answer<Json<Vec<EntryJson>>> {
     let library = library(&service)?;
-    let entries = blocking(move || library.walk()).await?;
+    let entries = blocking(move || library.walk_as(viewer(&person))).await?;
     Ok(Json(entries.into_iter().map(Into::into).collect()))
 }
 
-async fn list(State(service): Shared, Query(at): Query<At>) -> Answer<Json<Vec<EntryJson>>> {
+async fn list(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<Json<Vec<EntryJson>>> {
     let library = library(&service)?;
-    let entries = blocking(move || library.list(&at.path)).await?;
+    let entries = blocking(move || library.list_as(&at.path, viewer(&person))).await?;
     Ok(Json(entries.into_iter().map(Into::into).collect()))
 }
 
-async fn read(State(service): Shared, Query(at): Query<At>) -> Answer<Response> {
+async fn read(State(service): Shared, Extension(person): Extension<Person>, Query(at): Query<At>) -> Answer<Response> {
     let library = library(&service)?;
-    let bytes = blocking(move || library.read(&at.path)).await?;
+    let bytes = blocking(move || library.read_as(&at.path, viewer(&person))).await?;
     Ok(([(header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response())
 }
 
-async fn stat(State(service): Shared, Query(at): Query<At>) -> Answer<Json<Option<StatJson>>> {
+async fn stat(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<Json<Option<StatJson>>> {
     let library = library(&service)?;
-    let stat = blocking(move || library.stat(&at.path)).await?;
+    let stat = blocking(move || library.stat_as(&at.path, viewer(&person))).await?;
     Ok(Json(stat.map(Into::into)))
 }
 
@@ -73,9 +99,13 @@ struct Inspect {
     known: Option<String>,
 }
 
-async fn inspect(State(service): Shared, Json(body): Json<Inspect>) -> Answer<Json<InspectionJson>> {
+async fn inspect(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<Inspect>,
+) -> Answer<Json<InspectionJson>> {
     let library = library(&service)?;
-    let found = blocking(move || library.inspect(&body.path, body.known.as_deref())).await?;
+    let found = blocking(move || library.inspect_as(&body.path, body.known.as_deref(), viewer(&person))).await?;
     Ok(Json(found.into()))
 }
 
@@ -83,6 +113,64 @@ async fn suggestions(State(service): Shared, Query(at): Query<At>) -> Answer<Jso
     let library = library(&service)?;
     let found = blocking(move || library.suggestions(&at.path)).await?;
     Ok(Json(json!(found)))
+}
+
+/// What a song's tags are made of, for its Info (F3).
+async fn layers(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<Json<Value>> {
+    let library = library(&service)?;
+    let found = blocking(move || library.layers(&at.path, Some(person.id))).await?;
+    Ok(Json(json!(found)))
+}
+
+#[derive(Deserialize)]
+struct Path {
+    path: String,
+}
+
+async fn forget_mine(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<Path>,
+) -> Answer<StatusCode> {
+    let library = library(&service)?;
+    blocking(move || library.forget_mine(&body.path, person.id)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+struct Favourite {
+    path: String,
+    on: bool,
+}
+
+async fn favourite(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<Favourite>,
+) -> Answer<StatusCode> {
+    let library = library(&service)?;
+    blocking(move || library.set_favourite(person.id, &body.path, body.on)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn played(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<Path>,
+) -> Answer<StatusCode> {
+    let library = library(&service)?;
+    blocking(move || library.played(person.id, &body.path)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn clear_history(State(service): Shared, Extension(person): Extension<Person>) -> Answer<StatusCode> {
+    let library = library(&service)?;
+    blocking(move || library.clear_history(person.id)).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// The one range a request asks for (`bytes=a-b`, `bytes=a-`, `bytes=-n`), within `len`.
@@ -176,15 +264,25 @@ async fn send(out: Outgoing, headers: &HeaderMap, download: bool) -> Answer<Resp
     Ok(response)
 }
 
-async fn media(State(service): Shared, Query(at): Query<At>, request: Request) -> Answer<Response> {
+async fn media(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+    request: Request,
+) -> Answer<Response> {
     let library = library(&service)?;
-    let out = blocking(move || library.outgoing(&at.path)).await?;
+    let out = blocking(move || library.outgoing_as(&at.path, viewer(&person))).await?;
     send(out, request.headers(), false).await
 }
 
-async fn download(State(service): Shared, Query(at): Query<At>, request: Request) -> Answer<Response> {
+async fn download(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+    request: Request,
+) -> Answer<Response> {
     let library = library(&service)?;
-    let out = blocking(move || library.outgoing(&at.path)).await?;
+    let out = blocking(move || library.outgoing_as(&at.path, viewer(&person))).await?;
     send(out, request.headers(), true).await
 }
 
@@ -201,6 +299,16 @@ pub fn listeners() -> Router<Arc<Service>> {
         .route("/library/media", get(media))
         .route("/library/download", get(download))
         .route("/library/import", get(import_state))
+        .route("/library/layers", get(layers))
+        .route("/library/mine/forget", post(forget_mine))
+        .route("/library/favourite", post(favourite))
+        .route("/library/played", post(played))
+        .route("/library/history/clear", post(clear_history))
+        // Anyone writes in their own folder and saves their own layer; the rest is checked inside.
+        .route("/library/write", post(write))
+        .route("/library/delete", post(delete))
+        .route("/library/rename", post(rename))
+        .route("/library/save", post(save))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -212,10 +320,12 @@ async fn write(
     Query(at): Query<At>,
     body: axum::body::Bytes,
 ) -> Answer<StatusCode> {
+    may_write(&person, &at.path)?;
     let library = library(&service)?;
     let path = at.path.clone();
-    blocking(move || library.write(&path, &body)).await?;
-    if !at.path.starts_with(".meta/") {
+    let seen = viewer(&person);
+    blocking(move || library.write_as(&path, &body, seen)).await?;
+    if !at.path.starts_with(".meta/") && !is_own(at.path.trim_matches('/')) {
         service.store.log(&person.name, "write", "Library", &at.path);
     }
     Ok(StatusCode::NO_CONTENT)
@@ -226,10 +336,14 @@ async fn delete(
     Extension(person): Extension<Person>,
     Query(at): Query<At>,
 ) -> Answer<StatusCode> {
+    may_write(&person, &at.path)?;
     let library = library(&service)?;
     let path = at.path.clone();
-    blocking(move || library.delete(&path)).await?;
-    service.store.log(&person.name, "delete", "Library", &at.path);
+    let seen = viewer(&person);
+    blocking(move || library.delete_as(&path, seen)).await?;
+    if !is_own(at.path.trim_matches('/')) {
+        service.store.log(&person.name, "delete", "Library", &at.path);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -250,15 +364,20 @@ async fn rename(
     Extension(person): Extension<Person>,
     Json(body): Json<Rename>,
 ) -> Answer<StatusCode> {
+    may_write(&person, &body.from)?;
+    may_write(&person, &body.to)?;
     let library = library(&service)?;
     let (from, to) = (body.from.clone(), body.to.clone());
-    blocking(move || library.rename(&from, &to)).await?;
-    service.store.log(
-        &person.name,
-        "rename",
-        "Library",
-        &format!("{} → {}", body.from, body.to),
-    );
+    let seen = viewer(&person);
+    blocking(move || library.rename_as(&from, &to, seen)).await?;
+    if !is_own(body.from.trim_matches('/')) {
+        service.store.log(
+            &person.name,
+            "rename",
+            "Library",
+            &format!("{} → {}", body.from, body.to),
+        );
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -267,6 +386,9 @@ struct Save {
     path: String,
     previous: Metadata,
     metadata: Metadata,
+    /// `family` (editors and up; the default) or `mine` (anyone).
+    #[serde(default)]
+    scope: Option<String>,
 }
 
 async fn save(
@@ -274,11 +396,24 @@ async fn save(
     Extension(person): Extension<Person>,
     Json(body): Json<Save>,
 ) -> Answer<Json<InspectionJson>> {
+    let scope = match body.scope.as_deref() {
+        Some("mine") => Scope::Mine(person.id),
+        _ if person.role >= Role::Editor => Scope::Family,
+        _ => {
+            return Err(ApiError::new(
+                StatusCode::FORBIDDEN,
+                "role",
+                "only editors save for everyone; save for yourself",
+            ));
+        }
+    };
     let library = library(&service)?;
     let edit = edit_for(&body.previous, body.metadata);
     let path = body.path.clone();
-    let found = blocking(move || library.save(&path, &edit)).await?;
-    service.store.log(&person.name, "save", "Library", &body.path);
+    let found = blocking(move || library.save_as(&path, &edit, scope)).await?;
+    if scope == Scope::Family {
+        service.store.log(&person.name, "save", "Library", &body.path);
+    }
     Ok(Json(found.into()))
 }
 
@@ -316,9 +451,9 @@ async fn upload(
         let _ = tokio::fs::remove_file(&temporary).await;
         return Err(Error::Io(format!("the upload: {error}")).into());
     }
-    let (path, by) = (at.path.clone(), person.name.clone());
+    let (path, by, id) = (at.path.clone(), person.name.clone(), person.id);
     let source = temporary.clone();
-    let imported = blocking(move || library.import_file(&source, &path, &by, true)).await;
+    let imported = blocking(move || library.import_file(&source, &path, &by, Some(id), true)).await;
     let _ = tokio::fs::remove_file(&temporary).await;
     let imported = imported?;
     if let Imported::Added(path) = &imported {
@@ -327,15 +462,31 @@ async fn upload(
     Ok(Json(imported_json(&imported)))
 }
 
+#[derive(Deserialize)]
+struct Apply {
+    path: String,
+    id: i64,
+}
+
+/// Applies a suggestion to the family's version (editors, F3).
+async fn apply_suggestion(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<Apply>,
+) -> Answer<Json<InspectionJson>> {
+    let library = library(&service)?;
+    let path = body.path.clone();
+    let found = blocking(move || library.apply_suggestion(&path, body.id)).await?;
+    service.store.log(&person.name, "save", "Library", &body.path);
+    Ok(Json(found.into()))
+}
+
 /// Routes of editors and up.
 pub fn editors() -> Router<Arc<Service>> {
     Router::new()
-        .route("/library/write", post(write))
-        .route("/library/delete", post(delete))
         .route("/library/mkdir", post(mkdir))
-        .route("/library/rename", post(rename))
-        .route("/library/save", post(save))
         .route("/library/upload", post(upload))
+        .route("/library/suggestions/apply", post(apply_suggestion))
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -405,6 +556,7 @@ async fn import_folder(
     }
     let worker = Arc::clone(&service);
     let by = person.name.clone();
+    let id = person.id;
     tokio::task::spawn_blocking(move || {
         let progress = |done, total| {
             let mut state = worker
@@ -414,7 +566,7 @@ async fn import_folder(
             state.done = done;
             state.total = total;
         };
-        let result = library.import_folder(&folder, &name, &by, progress);
+        let result = library.import_folder(&folder, &name, &by, Some(id), progress);
         if let Ok(report) = &result {
             worker.store.log(
                 &by,
