@@ -75,6 +75,32 @@ between yours and the family's, and **Clear what I played** empties your history
 that the library already has, with other tags, shows you your tags, and editors see them as a
 suggestion they can **Apply for everyone**. Your theme and language follow you to every device.
 
+**Keeping the library safe.** When two people edit the same song, the second save is refused
+and the song's tags as they are now are shown, to apply yours again: nothing is saved over
+someone else's change without anyone knowing (shared playlists work the same way). Deleting
+songs from the library moves them to the **Trash** (**People and sign-in…**), where admins and
+owners restore them; after 30 days they go for good. Every night after 03:00 (UTC) the service
+keeps a copy of its databases in the library's `backups/` folder (7 daily, 4 weekly, 12 monthly),
+and once a week it checks every song's file against its name, so a failing disk shows up in
+**Backups** and the log. Owners can take a copy or run the check from **Backups**, and **Export**
+the whole library to a folder as `Artist/Album/NN - Title`, with the family's tags.
+
+**A copy away from home, with [restic](https://restic.net).** Everything the library is lives in
+its folder (Backups shows where). Copy it, encrypted, to a USB disk or a storage service:
+
+```sh
+export RESTIC_REPOSITORY=/media/usb/jackbird-restic   # or b2:bucket:jackbird, sftp:…
+export RESTIC_PASSWORD_FILE=~/.config/jackbird/restic-password
+restic init                                           # once
+restic backup ~/.local/share/jackbird/library         # every day, from cron or a timer
+restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+```
+
+To bring it back: stop the service (`jackbird-service stop`), `restic restore latest --target /`,
+and start it again. If the catalogue itself is what went wrong, put the newest
+`backups/<date>/catalogue.db` in place of `catalogue.db` (and `jackbird.db` beside the
+configuration) while the service is stopped.
+
 **Reaching it from elsewhere.** With sign-in on, an owner can let the home network reach it
 (**Sign-in**, **Home network**); over plain HTTP, codes and sessions travel unencrypted there and
 passkeys are not available. For HTTPS, and to reach it from outside home, put a proxy in front

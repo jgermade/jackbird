@@ -127,6 +127,15 @@ for everyone; since F3 they are also the importer's own layer.
 A person's layer of a song, over the family's: what they set **only for me**. **My playlists** is
 their own folder of the library: their playlists, **Favourites** and **Recently played**.
 
+### Trash
+Where deleted songs of the library wait for 30 days before they and their blobs go.
+
+### Snapshot
+A night's copy of the library's databases, in its `backups/` folder.
+
+### Scrub
+The weekly check of every blob against its name (the SHA-256 of its audio).
+
 ## Theming
 
 ### Theme

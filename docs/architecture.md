@@ -203,6 +203,20 @@ and `Recently played.m3u` (deleted, it clears their history), so the playlists' 
 nothing new. The web's side is `src/lib/mine.ts`; a play is counted by `src/lib/player.ts`
 (`helpers/plays.ts`).
 
+### Safety (F4)
+
+`crates/store/src/safety.rs` and `crates/service/src/safety_api.rs`. A save carries the full
+checksum its person read (`save_checked`, with their `Viewer`); when it is no longer the song's,
+nothing is written and the service answers `409 stale` with who changed it and the song as it is
+now, which the editor shows. Shared small files are written with the size and date read
+(`write_checked`). Deleting songs sets `trashed` on them: every list leaves them out, their places
+stay theirs, importing their audio again brings them back; admins and owners restore or empty the
+trash, and after 30 days `expire_trash` deletes them and their blobs. Snapshots are SQLite's
+`VACUUM INTO` of `catalogue.db` and `jackbird.db` into `backups/<yyyy-mm-dd>/`, rotated by
+`keep_backups`; the scrub hashes every blob's audio again; the export writes the family's version
+as a plain tree. A timer every ten minutes takes the night's snapshot after 03:00 UTC, expires the
+trash once a day and scrubs when the last scrub is a week old.
+
 The desktop app carries the service's binary beside its own and installs it from its
 Preferences (S2, `src-tauri/src/service.rs` running `jackbird-service install` and its kin;
 `crates/service/src/install.rs` knows each system): at logon, or with the system through the

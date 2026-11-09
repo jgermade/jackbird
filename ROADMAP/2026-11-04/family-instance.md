@@ -10,7 +10,7 @@ outside home by whatever route the owner picks (a private network, a reverse pro
 Since 2026-11-08 the service ([../2026-11-08/service.md](../2026-11-08/service.md)) comes first:
 it is this instance's backend, over local folders, installed from the desktop app (S1, S2), with
 sign-in and people (S3, which takes over F2's sign-in, passkeys and roles) and the online route
-(S4, postponed). F1's store and F3 are done (2026-11-09); F4 and F5 follow, F4 next.
+(S4, postponed). F1's store, F3 and F4 are done (2026-11-09); F5 (packaging) is next.
 
 Dates are estimates, from the day E4 is planned to end; each step ends with its "done when" met and
 a walkthrough in the record. F0 is a spike that decides the rest.
@@ -24,7 +24,7 @@ gantt
     F1 The server and its store                    :done, f1, 2026-11-09, 1d
     F2 Modes, people, roles, passkeys (S3)         :done, f2, 2026-11-09, 1d
     F3 Each person's own data and metadata         :done, f3, 2026-11-09, 1d
-    F4 Concurrent edits, backups                   :f4, after f3, 5d
+    F4 Concurrent edits, backups                   :done, f4, 2026-11-09, 1d
   section Ship
     F5 Packaging: Docker image, binaries           :f5, after f4, 4d
 ```
@@ -35,7 +35,7 @@ gantt
 | F1 Server (**done**, 2026-11-09; in `jackbird-service`, with `crates/store`; CI on the three systems, the owner's run by hand pending) | `crates/server` (axum, SQLite, `crates/tags` native): import from a folder into the content-addressed store (audio and covers, deduplicated), the metadata layers (file, family), the HTTP API mirroring `VFSAdapter` with server-side tag operations and ranged reads, tags written on the fly for downloads and exports; it serves the web build; the app and the web use it as a source through one `HttpAdapter` | a family library imports, plays in the web and the app, and a tag edit by one person shows for another |
 | F2 People (**done** as S3, 2026-11-09: invitations by email rather than a link; see the service's roadmap) | the instance's mode, open or with sign-in, for one person or several (record, 21:35), with open instances kept to the machine and private networks unless forced; owners, admins, editors and listeners (record, 21:32); profiles in open mode; invitations by one-time link; passkeys on the instance's own address (record, 21:40); sessions; the log of changes to the shared catalogue; moving an open instance to sign-in without losing anyone's data | the four combinations run; with sign-in, four people with the four roles can each do what the role allows and nothing more |
 | F3 Their own (**done**, 2026-11-09; favourites and history as playlists of one's own folder; CI on the three systems, the owner's run by hand pending) | favourites, playlists, history and settings per person; their own metadata layer, with the switch between the family's version and theirs; an import with other tags becoming the importer's layer and a suggestion for editors | two people see the same song with different titles, and the family's version is untouched |
-| F4 Safety | each write carries the version it read, and a stale one is refused and shown; nightly SQLite snapshots with rotation; the trash (30 days) before blobs go; the weekly scrub; restic to a second place, documented; the plain-folder export | an edit made against an old version is refused, and a restore from the off-site copy brings back the library |
+| F4 Safety (**done** here, 2026-11-09; snapshots after 03:00 UTC; restic checked in CI on Linux; CI on macOS and Windows and the owner's run by hand pending) | each write carries the version it read, and a stale one is refused and shown; nightly SQLite snapshots with rotation; the trash (30 days) before blobs go; the weekly scrub; restic to a second place, documented; the plain-folder export | an edit made against an old version is refused, and a restore from the off-site copy brings back the library |
 | F5 Ship | a Docker image and binaries for Linux (x64, arm64, for a NAS or a Raspberry Pi) and macOS, built in GitHub Actions; a compose file with the server and restic; the routes from outside home documented, none bundled | an instance installs from the docs on a clean machine and is reached at its address |
 
 Decided separately: the OpenSubsonic API (the owner looks into it; F1's API leaves room for it), the
