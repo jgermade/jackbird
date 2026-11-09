@@ -1,0 +1,29 @@
+{
+  "flac-24-96.flac": {
+    "rate": 96000,
+    "channels": 2,
+    "bits": 24,
+    "frames": 24000,
+    "md5": "90b06c5e9d8b8e517e41d38562b574d0"
+  },
+  "flac-24-96-b.flac": {
+    "rate": 96000,
+    "channels": 2,
+    "bits": 24,
+    "frames": 19200,
+    "md5": "fa2cc80e2df3c05e7ef7c8063086ea53"
+  },
+  "flac-16-44.flac": {
+    "rate": 44100,
+    "channels": 2,
+    "bits": 16,
+    "frames": 11025,
+    "md5": "9563372c6e3b8a2ad74ae1e562f38eea"
+  },
+  "mp3-44.mp3": {
+    "rate": 44100,
+    "channels": 2,
+    "bits": null,
+    "frames": 11025
+  }
+}
