@@ -8,6 +8,10 @@
 //
 //   node scripts/service-check.cjs target/release/jackbird-service [extra audio files…]
 //
+// Against a service already running (its container, F5): JACKBIRD_CHECK_URL is its address,
+// JACKBIRD_CHECK_MUSIC the folder it shows as Music (filled here), and JACKBIRD_CHECK_RESTART the
+// shell command that restarts it (`docker compose restart jackbird`).
+//
 // Needs Playwright with its Chromium (`npm i --no-save playwright` and
 // `npx playwright install chromium` where it is not installed). See
 // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S1).
@@ -22,17 +26,22 @@ const binary = path.resolve(process.argv[2] ?? "target/release/jackbird-service"
 const extra = process.argv.slice(3);
 const port = 4646 + Math.floor(Math.random() * 1000);
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "jackbird-service-check-"));
-const music = path.join(home, "Music");
-fs.mkdirSync(music);
+const external = process.env.JACKBIRD_CHECK_URL;
+const music = process.env.JACKBIRD_CHECK_MUSIC ?? path.join(home, "Music");
+fs.mkdirSync(music, { recursive: true });
 const fixtures = path.resolve("fixtures/tags");
 for (const name of fs.readdirSync(fixtures).filter((name) => /\.(mp3|flac)$/i.test(name))) {
   fs.copyFileSync(path.join(fixtures, name), path.join(music, name));
 }
 for (const file of extra) fs.copyFileSync(file, path.join(music, path.basename(file)));
 const config = path.join(home, "service.json");
-const base = `http://localhost:${port}/`;
+const base = external ? external.replace(/\/?$/, "/") : `http://localhost:${port}/`;
+
+/** A service already running: started and stopped by JACKBIRD_CHECK_RESTART. */
+const outside = { kill: () => undefined, on: (_event, done) => done() };
 
 function start() {
+  if (external) return outside;
   const service = spawn(binary, ["--port", String(port)], {
     env: {
       ...process.env,
@@ -121,6 +130,9 @@ const fail = (why) => {
     // Restart the service; reload: the session reopens the folder through it.
     service.kill();
     await new Promise((resolve) => service.on("exit", resolve));
+    if (external && process.env.JACKBIRD_CHECK_RESTART) {
+      require("node:child_process").execSync(process.env.JACKBIRD_CHECK_RESTART, { stdio: "inherit" });
+    }
     service = start();
     await ready();
     await page.reload();

@@ -217,6 +217,17 @@ trash, and after 30 days `expire_trash` deletes them and their blobs. Snapshots 
 as a plain tree. A timer every ten minutes takes the night's snapshot after 03:00 UTC, expires the
 trash once a day and scrubs when the last scrub is a week old.
 
+### In a container (F5)
+
+`deploy/Dockerfile` puts the release's static binary (musl) in Alpine with CA certificates; it
+listens on every address of the container (`JACKBIRD_LISTEN=0.0.0.0`), keeps `/config` and the
+library (`JACKBIRD_LIBRARY=/library`) in volumes, and, open, answers only the networks named by
+`JACKBIRD_MACHINE`: `gateway`, the container's default gateway, which is the host behind the port
+`deploy/compose.yaml` publishes on its loopback. A loopback name with any port is its own `Host`
+there, since the port published is not known inside. `ship.yml` builds the static binaries on
+native x64 and arm64 runners and the image from them; `release.yml` pushes it to
+`ghcr.io/jgermade/jackbird`.
+
 The desktop app carries the service's binary beside its own and installs it from its
 Preferences (S2, `src-tauri/src/service.rs` running `jackbird-service install` and its kin;
 `crates/service/src/install.rs` knows each system): at logon, or with the system through the

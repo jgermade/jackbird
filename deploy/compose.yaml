@@ -1,0 +1,57 @@
+# jackbird's service with Docker Compose (F5): the service, and restic copying the library away
+# from home once a day. See docs/install.md.
+#
+#   cp .env.example .env   # then edit it
+#   docker compose up -d
+#   docker compose exec jackbird jackbird-service setup   # email, and sign-in on
+#
+# The port is published on this machine's loopback only: open (sign-in off), jackbird is this
+# machine's alone. To reach it from elsewhere, turn sign-in on and put a proxy with HTTPS in front
+# (Caddy, below), or publish it on the home network.
+services:
+  jackbird:
+    image: ${JACKBIRD_IMAGE:-ghcr.io/jgermade/jackbird:latest}
+    restart: unless-stopped
+    # The user it runs as: the owner of the folders below (`id -u`:`id -g`).
+    user: "${JACKBIRD_USER:-1000:1000}"
+    ports:
+      - "${JACKBIRD_PUBLISH:-127.0.0.1:4646}:4646"
+    volumes:
+      - ${JACKBIRD_CONFIG:-./config}:/config
+      - ${JACKBIRD_LIBRARY:-./library}:/library
+      # Music to import from (Add music, Import a folder of this machine); read only.
+      - ${MUSIC:-./music}:/home/jackbird/Music:${MUSIC_MODE:-ro}
+
+  # A copy of the library away from home, once a day (F4's restic, with its official image).
+  restic:
+    image: restic/restic:0.17.3
+    restart: unless-stopped
+    profiles: ["backup"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        [ -n "$$RESTIC_PASSWORD" ] || { echo "set RESTIC_PASSWORD in .env"; exit 1; }
+        restic snapshots >/dev/null 2>&1 || restic init
+        while true; do
+          restic backup /library --exclude /library/tmp
+          restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+          sleep 86400
+        done
+    environment:
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-/repository}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:-}
+      # For a storage service: B2_ACCOUNT_ID, B2_ACCOUNT_KEY, AWS_ACCESS_KEY_ID… as restic reads them.
+      B2_ACCOUNT_ID: ${B2_ACCOUNT_ID:-}
+      B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY:-}
+    volumes:
+      - ${JACKBIRD_LIBRARY:-./library}:/library:ro
+      - ${RESTIC_LOCAL:-./restic}:/repository
+
+  # HTTPS in front, at your own address (uncomment, and set JACKBIRD_ADDRESS in .env; turn sign-in
+  # on first). Caddy gets the certificate itself.
+  # caddy:
+  #   image: caddy:2
+  #   restart: unless-stopped
+  #   ports: ["80:80", "443:443"]
+  #   command: caddy reverse-proxy --from ${JACKBIRD_ADDRESS} --to jackbird:4646
+  #   volumes: ["./caddy:/data"]

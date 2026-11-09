@@ -455,3 +455,61 @@ async fn the_desktop_apps_page_is_answered_with_cors_for_itself_alone() {
 mod library;
 mod passkeys;
 mod people;
+
+/// F5: in a container, the networks the host reaches it from count as the machine.
+#[tokio::test]
+async fn an_open_instance_in_a_container_answers_the_host_and_no_one_else() {
+    let settings = config::Config {
+        machine: vec!["172.17.0.1".into(), "10.88.0.0/16".into(), "nonsense".into()],
+        ..config::Config::default()
+    };
+    let app = router(Service::new(settings, None, crate::people::Store::memory()));
+    for (peer, answered) in [
+        ("172.17.0.1:5000", true),
+        ("10.88.4.2:5000", true),
+        ("172.17.0.2:5000", false),
+        ("192.168.1.20:5000", false),
+        ("127.0.0.1:5000", true),
+    ] {
+        let status = call(Method::GET, "/api/info").from(peer).on(&app).await.0;
+        assert_eq!(status == StatusCode::OK, answered, "{peer}: {status}");
+    }
+    // The port the host published is not known in a container: a loopback name with any port; a
+    // name of another site (rebinding) is still refused.
+    for (host, answered) in [
+        ("127.0.0.1:8080", true),
+        ("localhost:4747", true),
+        ("evil.example:4646", false),
+    ] {
+        let status = call(Method::GET, "/api/info")
+            .header("host", host)
+            .header("origin", "")
+            .from("172.17.0.1:5000")
+            .on(&app)
+            .await
+            .0;
+        assert_eq!(status == StatusCode::OK, answered, "{host}: {status}");
+    }
+}
+
+#[test]
+fn networks_are_read_and_matched() {
+    use config::{in_network, parse_network};
+    let ip = |text: &str| text.parse::<std::net::IpAddr>().unwrap();
+    assert_eq!(parse_network("10.0.0.0/8"), Some((ip("10.0.0.0"), 8)));
+    assert_eq!(parse_network(" 172.17.0.1 "), Some((ip("172.17.0.1"), 32)));
+    assert_eq!(parse_network("fd00::/8"), Some((ip("fd00::"), 8)));
+    assert_eq!(parse_network("10.0.0.0/33"), None);
+    assert_eq!(parse_network("gateway"), None);
+    assert!(in_network(ip("10.1.2.3"), (ip("10.0.0.0"), 8)));
+    assert!(!in_network(ip("11.1.2.3"), (ip("10.0.0.0"), 8)));
+    assert!(in_network(ip("::ffff:10.1.2.3"), (ip("10.0.0.0"), 8)));
+    assert!(in_network(ip("fd12::1"), (ip("fd00::"), 8)));
+    assert!(!in_network(ip("fd12::1"), (ip("10.0.0.0"), 8)));
+    assert!(in_network(ip("8.8.8.8"), (ip("0.0.0.0"), 0)));
+    // In a Linux container, the default gateway is read from /proc/net/route.
+    if std::path::Path::new("/proc/net/route").exists() {
+        let _ = config::default_gateway();
+        assert!(!config::machine_networks(&["gateway".into(), "1.2.3.4".into()]).is_empty());
+    }
+}

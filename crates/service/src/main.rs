@@ -193,7 +193,14 @@ fn main() {
 fn serve(args: &[String]) {
     let flags = flags(args);
     let path = flag(&flags, "--config").map_or_else(config::default_path, PathBuf::from);
-    let config = Config::load(&path).unwrap_or_else(|error| fail("the configuration cannot be read", error));
+    let mut config = Config::load(&path).unwrap_or_else(|error| fail("the configuration cannot be read", error));
+    // In a container (F5): the library's folder, and the networks that count as this machine.
+    if let Some(library) = std::env::var("JACKBIRD_LIBRARY").ok().filter(|value| !value.is_empty()) {
+        config.library = library;
+    }
+    if let Some(machine) = std::env::var("JACKBIRD_MACHINE").ok().filter(|value| !value.is_empty()) {
+        config.machine = machine.split(',').map(|network| network.trim().to_owned()).collect();
+    }
     let port = flag(&flags, "--port").map_or(config.port, |value| value.parse().unwrap_or_else(|_| usage()));
     let runtime = tokio::runtime::Runtime::new().unwrap_or_else(|error| fail("start", error));
     runtime.block_on(async {
@@ -246,23 +253,32 @@ async fn run_server(
     jackbird_service::safety_api::spawn_timers(std::sync::Arc::clone(&service));
     let mut network = service.network.subscribe();
     let app = jackbird_service::router(service).into_make_service_with_connect_info::<SocketAddr>();
-    let v4 = tokio::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)))
+    // In a container (F5), `JACKBIRD_LISTEN=0.0.0.0`: every address, the host reaching it through
+    // the published port; open, only the networks of `JACKBIRD_MACHINE` count as this machine.
+    let listen: std::net::IpAddr = std::env::var("JACKBIRD_LISTEN")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(std::net::IpAddr::from([127, 0, 0, 1]));
+    let everywhere = listen.is_unspecified();
+    let v4 = tokio::net::TcpListener::bind(SocketAddr::new(listen, port))
         .await
         .unwrap_or_else(|error| {
             fail(
-                &format!("127.0.0.1:{port} is not free"),
+                &format!("{listen}:{port} is not free"),
                 format!("{error}; set another port with --port"),
             )
         });
     // ::1 too where the machine has it, since browsers may try it first for `localhost`.
-    if let Ok(v6) = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], port))).await {
+    if !everywhere
+        && let Ok(v6) = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], port))).await
+    {
         let app = app.clone();
         tokio::spawn(async move { axum::serve(v6, app).await });
     }
     // The home network: each of the machine's own addresses (not 0.0.0.0, which the loopback's
     // port is in the way of on Linux), looked at again every 30 s for new ones, while it is
     // wanted; all dropped when sign-in or the network goes off.
-    {
+    if !everywhere {
         let app = app.clone();
         tokio::spawn(async move {
             let mut serving: std::collections::HashMap<std::net::IpAddr, tokio::task::JoinHandle<()>> =

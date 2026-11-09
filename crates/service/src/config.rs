@@ -57,6 +57,10 @@ pub struct Config {
     /// The family library's folder (F1); empty: [`default_library`].
     #[serde(default)]
     pub library: String,
+    /// Networks that count as this machine for an open instance (F5): in a container, the one
+    /// the host reaches it from. `gateway` is the container's default gateway (the host).
+    #[serde(default)]
+    pub machine: Vec<String>,
 }
 
 fn default_port() -> u16 {
@@ -78,6 +82,7 @@ impl Default for Config {
             proxies: default_proxies(),
             smtp: None,
             library: String::new(),
+            machine: Vec::new(),
         }
     }
 }
@@ -182,4 +187,67 @@ pub fn path_in(home: &Path) -> PathBuf {
         home.join(".config")
     };
     base.join("jackbird").join("service.json")
+}
+
+/// A network, as `address/bits` (`172.17.0.1/32`, `10.0.0.0/8`), or an address alone.
+pub fn parse_network(text: &str) -> Option<(std::net::IpAddr, u8)> {
+    let (address, bits) = text.trim().split_once('/').unwrap_or((text.trim(), ""));
+    let address: std::net::IpAddr = address.parse().ok()?;
+    let most = if address.is_ipv4() { 32 } else { 128 };
+    let bits = if bits.is_empty() { most } else { bits.parse().ok()? };
+    (bits <= most).then_some((address, bits))
+}
+
+/// Whether `ip` is in a network.
+pub fn in_network(ip: std::net::IpAddr, (network, bits): (std::net::IpAddr, u8)) -> bool {
+    let ip = match ip {
+        std::net::IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(ip, std::net::IpAddr::V4),
+        v4 => v4,
+    };
+    match (ip, network) {
+        (std::net::IpAddr::V4(ip), std::net::IpAddr::V4(network)) => {
+            let mask = if bits == 0 {
+                0
+            } else {
+                u32::MAX << (32 - u32::from(bits))
+            };
+            u32::from(ip) & mask == u32::from(network) & mask
+        }
+        (std::net::IpAddr::V6(ip), std::net::IpAddr::V6(network)) => {
+            let mask = if bits == 0 {
+                0
+            } else {
+                u128::MAX << (128 - u32::from(bits))
+            };
+            u128::from(ip) & mask == u128::from(network) & mask
+        }
+        _ => false,
+    }
+}
+
+/// The machine's default gateway, read from `/proc/net/route` (Linux; in a container, the host).
+pub fn default_gateway() -> Option<std::net::IpAddr> {
+    let routes = std::fs::read_to_string("/proc/net/route").ok()?;
+    routes.lines().skip(1).find_map(|line| {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        (fields.get(1) == Some(&"00000000"))
+            .then(|| u32::from_str_radix(fields.get(2)?, 16).ok())
+            .flatten()
+            .map(|gateway| std::net::IpAddr::V4(std::net::Ipv4Addr::from(gateway.swap_bytes())))
+    })
+}
+
+/// The networks that count as this machine: `gateway` resolved, the rest parsed; unreadable ones
+/// left out.
+pub fn machine_networks(names: &[String]) -> Vec<(std::net::IpAddr, u8)> {
+    names
+        .iter()
+        .filter_map(|name| {
+            if name.trim() == "gateway" {
+                default_gateway().map(|ip| (ip, 32))
+            } else {
+                parse_network(name)
+            }
+        })
+        .collect()
 }

@@ -81,6 +81,8 @@ pub struct Service {
     pub network: tokio::sync::watch::Sender<bool>,
     /// Sends email (SMTP; a fake one in tests).
     pub(crate) mailer: Box<dyn mail::Mailer>,
+    /// Networks that count as this machine for an open instance (F5).
+    pub(crate) machine: Vec<(std::net::IpAddr, u8)>,
     /// The family library (F1), when it could be opened.
     pub(crate) library: Option<Arc<jackbird_store::Library>>,
     /// The import from a folder of the machine under way, or the last one.
@@ -128,6 +130,7 @@ impl Service {
             base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(people::random::<32>())
         };
         let (network, _) = tokio::sync::watch::channel(settings.signin && settings.network);
+        let machine = config::machine_networks(&settings.machine);
         Arc::new(Service {
             roots: RwLock::new(open),
             port: settings.port,
@@ -140,6 +143,7 @@ impl Service {
             console_key,
             network,
             mailer,
+            machine,
             library: library.map(Arc::new),
             importing: std::sync::Mutex::new(library_api::ImportState::default()),
             exporting: std::sync::Mutex::new(safety_api::JobState::default()),
@@ -563,10 +567,17 @@ async fn guard(State(service): State<Arc<Service>>, mut request: Request, next: 
     let host = text(header::HOST).unwrap_or_default();
     let hosts = own_hosts(service.port);
     if !settings.signin {
-        if !loopback(peer) || forwarded {
+        // In a container (F5), the networks the host reaches it from count as the machine.
+        let machine = loopback(peer) || service.machine.iter().any(|network| config::in_network(peer, *network));
+        if !machine || forwarded {
             return refuse("this service answers only on this machine until sign-in is turned on");
         }
-        if !hosts.contains(&host) {
+        // In a container the port published on the host is not known: a loopback name with any
+        // port (the name is what keeps a rebinding page out).
+        let loopback_name = host.rsplit_once(':').is_some_and(|(name, port)| {
+            matches!(name, "localhost" | "127.0.0.1" | "[::1]") && port.parse::<u16>().is_ok()
+        });
+        if !hosts.contains(&host) && !(loopback_name && !service.machine.is_empty()) {
             return refuse("this service answers only on this machine, by its own address");
         }
     } else if host.is_empty() {
