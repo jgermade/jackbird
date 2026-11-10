@@ -202,9 +202,11 @@ if (background?.samples) {
   const after = back < 0 ? samples[samples.length - 1] : samples[back];
   const away = first < 0 ? 0 : (after.at - before.at) / 1000;
   const played = first < 0 ? 0 : after.played - before.played;
-  // The queue's changes of song made while the page was hidden, and how many of them started.
+  // The queue's changes of song made while the page was hidden, and how many of them started (each
+  // with its steps: the next URL's arrival, play() settling).
   const changes = background.changes ?? [];
   const hiddenChanges = changes.filter((change) => change.hidden);
+  for (const change of changes) console.log(`phone-check: change of song ${JSON.stringify(change)}`);
   report.background = {
     muted: background.muted,
     changesWhileHidden: hiddenChanges.length,

@@ -99,7 +99,7 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
  * a new media URL asked of the instance and played, again and again. Every second it notes how far
  * the queue got and whether the page is hidden, and each change of song, while the check sends the
  * app to the background and back (scripts/phone-check.mjs). The page says when it is hidden (a phone
- * may take long to put another app in front), and stops three seconds after it is shown again, or
+ * may take long to put another app in front), and stops ten seconds after it is shown again, or
  * after 240 s; then posts what it saw. A change made while hidden is what a queue needs.
  */
 async function measureBackground(config: PhoneCheck): Promise<void> {
@@ -128,22 +128,30 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
     await audio.play();
   }
   const started = Date.now();
-  // The songs played to their end, and each change: when, whether hidden, and whether the next
-  // one started.
+  // The songs played to their end, and each change of song, step by step: when it ended (and
+  // whether hidden), when the instance gave the next one's URL, when play() settled, and how.
   let done = 0;
-  const changes: { at: number; hidden: boolean; started: boolean; error?: string }[] = [];
+  type Change = { at: number; hidden: boolean; url?: number; played?: number; started?: boolean; error?: string };
+  const changes: Change[] = [];
+  const now = () => Date.now() - started;
   audio.addEventListener("ended", () => {
     done += 1;
-    const at = Date.now() - started;
-    const hidden = document.hidden;
+    const change: Change = { at: now(), hidden: document.hidden };
+    changes.push(change);
     void source
       .openMedia(song.path)
       .then(async (media) => {
+        change.url = now();
         audio.src = media.url;
         await audio.play();
-        changes.push({ at, hidden, started: true });
+        change.played = now();
+        change.started = true;
       })
-      .catch((error: unknown) => changes.push({ at, hidden, started: false, error: String(error) }));
+      .catch((error: unknown) => {
+        change.played = now();
+        change.started = false;
+        change.error = String(error);
+      });
   });
   const post = (phase: string, body: unknown) =>
     fetch(`${config.report}?phase=${phase}`, { method: "POST", body: JSON.stringify(body) }).catch(() => undefined);
@@ -155,10 +163,10 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   const samples: { at: number; played: number; hidden: boolean; paused: boolean }[] = [];
   let shownAgain: number | null = null;
   await post("playing", { muted, mediaSession });
-  while (Date.now() - started < 240_000 && (shownAgain === null || Date.now() - shownAgain < 3000)) {
+  while (Date.now() - started < 240_000 && (shownAgain === null || Date.now() - shownAgain < 10_000)) {
     // How far the queue got: the songs ended, and the current one's position.
     const played = done * (audio.duration || 20) + audio.currentTime;
-    samples.push({ at: Date.now() - started, played, hidden: document.hidden, paused: audio.paused });
+    samples.push({ at: now(), played, hidden: document.hidden, paused: audio.paused });
     if (wasHidden && !document.hidden) shownAgain ??= Date.now();
     await wait(1000);
   }
