@@ -159,14 +159,34 @@ if (!report) {
 
 // Background playback, measured (not required): once the silence plays (with sound), the app goes
 // to the background (the home screen; on iOS, Settings in front of it, which can take the simulator
-// most of a minute); fifteen seconds after the page says it is hidden, the app comes back.
+// most of a minute); two minutes after the page says it is hidden, the app comes back. Meanwhile, on
+// Android, what the system says of the app: its process's state (a frozen app plays nothing) and
+// whether it has a media session (the notification's and the lock screen's controls).
+const androidSays = (when) => {
+  for (const [what, args] of [
+    ["the process", ["shell", "dumpsys", "activity", "processes", bundle]],
+    ["the media sessions", ["shell", "dumpsys", "media_session"]]
+  ]) {
+    try {
+      const lines = read("adb", args).split("\n");
+      const wanted = lines.filter((line) => line.includes(bundle) || /procState|frozen|state=|active=|Sessions Stack/i.test(line));
+      console.log(`phone-check: ${when}, ${what}:\n${wanted.slice(0, 25).join("\n")}`);
+    } catch (error) {
+      console.log(`phone-check: ${when}, ${what}: ${error.message}`);
+    }
+  }
+};
 let background = null;
 if (await within(phase("playing"), 60_000)) {
   await new Promise((done) => setTimeout(done, 3000));
   if (platform === "android") run("adb", ["shell", "input", "keyevent", "KEYCODE_HOME"]);
   else run("xcrun", ["simctl", "launch", "booted", "com.apple.Preferences"]);
-  if (await within(phase("hidden"), 90_000)) await new Promise((done) => setTimeout(done, 15_000));
-  else console.log("phone-check: the page never said it was hidden");
+  if (await within(phase("hidden"), 90_000)) {
+    for (let step = 1; step <= 4; step += 1) {
+      await new Promise((done) => setTimeout(done, 30_000));
+      if (platform === "android") androidSays(`${step * 30} s away`);
+    }
+  } else console.log("phone-check: the page never said it was hidden");
   if (platform === "android") run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
   else run("xcrun", ["simctl", "launch", "booted", bundle]);
   background = await within(phase("background"), 120_000);
@@ -184,13 +204,14 @@ if (background?.samples) {
   const played = first < 0 ? 0 : after.played - before.played;
   report.background = {
     muted: background.muted,
+    mediaSession: background.mediaSession,
     hiddenSamples: samples.filter((sample) => sample.hidden).length,
     awaySeconds: Math.round(away * 10) / 10,
     playedWhileAway: Math.round(played * 10) / 10,
     samples
   };
   console.log(
-    `phone-check: ${background.muted ? "muted" : "with sound"}, away ${away.toFixed(1)} s, played ${played.toFixed(1)} s meanwhile`
+    `phone-check: ${background.muted ? "muted" : "with sound"}, navigator.mediaSession ${background.mediaSession ? "present" : "absent"}, away ${away.toFixed(1)} s, played ${played.toFixed(1)} s meanwhile`
   );
 } else {
   report.background = null;

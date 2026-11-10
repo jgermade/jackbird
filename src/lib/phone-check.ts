@@ -98,7 +98,7 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
  * pause a muted element when hidden; muted only if the webview refuses), and notes every second how
  * much it has played and whether the page is hidden, while the check sends the app to the background
  * and back (scripts/phone-check.mjs). The page says when it is hidden (a phone may take long to put
- * another app in front), and stops three seconds after it is shown again, or after 150 s; then posts
+ * another app in front), and stops three seconds after it is shown again, or after 240 s; then posts
  * the samples. Where it played on while the page was hidden, playback went on in the background.
  */
 async function measureBackground(config: PhoneCheck): Promise<void> {
@@ -111,6 +111,14 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   audio.crossOrigin = "anonymous";
   audio.loop = true;
   audio.src = (await source.openMedia(long.path)).url;
+  // The lock screen's and the notification's controls, if the webview gives the page the system's
+  // media session (scripts/phone-check.mjs looks for it on Android).
+  const mediaSession = "mediaSession" in navigator;
+  if (mediaSession) {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: "jackbird check", artist: "jackbird", album: "E6" });
+    navigator.mediaSession.setActionHandler("pause", () => audio.pause());
+    navigator.mediaSession.setActionHandler("play", () => void audio.play());
+  }
   let muted = false;
   try {
     await audio.play();
@@ -132,8 +140,8 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   const samples: { at: number; played: number; hidden: boolean; paused: boolean }[] = [];
   const started = Date.now();
   let shownAgain: number | null = null;
-  await post("playing", { muted });
-  while (Date.now() - started < 150_000 && (shownAgain === null || Date.now() - shownAgain < 3000)) {
+  await post("playing", { muted, mediaSession });
+  while (Date.now() - started < 240_000 && (shownAgain === null || Date.now() - shownAgain < 3000)) {
     const now = audio.currentTime;
     played += now >= last ? now - last : now + (audio.duration || 0) - last;
     last = now;
@@ -142,5 +150,5 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
     await wait(1000);
   }
   audio.pause();
-  await post("background", { muted, samples });
+  await post("background", { muted, mediaSession, samples });
 }
