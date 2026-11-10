@@ -92,8 +92,8 @@ jobs:
         env:
           QEMU_AUDIO_DRV: none
         with:
-          # API 34's emulator went away under the app on GitHub's runners (2026-11-09); 33 is tried.
-          api-level: 33
+          # API 34's and 33's emulators went away under the app on GitHub's runners (2026-11-09); 35 is tried.
+          api-level: 35
           arch: x86_64
           # AOSP without Google's services: on the google_apis image, a dying Play Services process takes the
           # app down with it (it depends on its fonts provider).
