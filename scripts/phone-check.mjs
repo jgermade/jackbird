@@ -82,14 +82,23 @@ const within = (promise, ms) => Promise.race([promise, new Promise((done) => set
 // by its own name (an open instance answers only to it), the receiver directly.
 if (platform === "android") {
   createServer((incoming, outgoing) => {
+    // Each request is logged with its answer and how long it took (E6's queue in the background: does
+    // the page's request reach the service?).
+    const asked = Date.now();
+    const what = `${incoming.method} ${incoming.url.replace(/([?&]t=)[^&]+/, "$1…")}`;
+    console.log(`phone-check: proxy <- ${what}`);
     const upstream = forward(
       { host: "127.0.0.1", port: 4646, method: incoming.method, path: incoming.url, headers: { ...incoming.headers, host: "localhost:4646" } },
       (answer) => {
+        console.log(`phone-check: proxy -> ${what} ${answer.statusCode} in ${Date.now() - asked} ms`);
         outgoing.writeHead(answer.statusCode ?? 502, answer.headers);
         answer.pipe(outgoing);
       }
     );
-    upstream.on("error", () => outgoing.writeHead(502).end());
+    upstream.on("error", (error) => {
+      console.log(`phone-check: proxy -> ${what} failed: ${error.message}`);
+      outgoing.writeHead(502).end();
+    });
     incoming.pipe(upstream);
   }).listen(4647);
 }
@@ -178,7 +187,8 @@ const androidSays = (when) => {
 };
 let background = null;
 if (await within(phase("playing"), 60_000)) {
-  await new Promise((done) => setTimeout(done, 3000));
+  // Past the first change of song (20 s), to see one in the foreground too.
+  await new Promise((done) => setTimeout(done, 25_000));
   if (platform === "android") run("adb", ["shell", "input", "keyevent", "KEYCODE_HOME"]);
   else run("xcrun", ["simctl", "launch", "booted", "com.apple.Preferences"]);
   if (await within(phase("hidden"), 90_000)) {
