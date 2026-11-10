@@ -94,29 +94,82 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
 }
 
 /**
- * Background playback (E6-D1 c): plays a minute of silence and notes, every second, how far it got
- * and whether the page is hidden, while the check sends the app to the background and back
- * (scripts/phone-check.mjs); then posts the samples. Where the position moved on while the page was
- * hidden, playback went on in the background.
+ * Background playback (E6-D1 c), as a queue plays: twenty seconds of silence with sound (both
+ * webviews pause a muted element when hidden; muted only if the webview refuses), and when it ends,
+ * a new media URL asked of the instance and played, again and again. Every second it notes how far
+ * the queue got and whether the page is hidden, and each change of song, while the check sends the
+ * app to the background and back (scripts/phone-check.mjs). The page says when it is hidden (a phone
+ * may take long to put another app in front), and stops ten seconds after it is shown again, or
+ * after 240 s; then posts what it saw. A change made while hidden is what a queue needs.
  */
 async function measureBackground(config: PhoneCheck): Promise<void> {
   const { openServiceFolder } = await import("./sources/service");
   const source = await openServiceFolder(config.folder);
-  const long = (await source.walk()).find((entry) => entry.path.endsWith("silence-60s.flac"));
-  if (!long) return;
+  const song = (await source.walk()).find((entry) => entry.path.endsWith("silence-20s.flac"));
+  if (!song) return;
   const audio = new Audio();
   // As the player's element: asked for with CORS, the instance answers the app's origin.
   audio.crossOrigin = "anonymous";
-  audio.muted = true;
-  audio.src = (await source.openMedia(long.path)).url;
-  await audio.play();
-  const samples: { at: number; position: number; hidden: boolean; paused: boolean }[] = [];
+  audio.src = (await source.openMedia(song.path)).url;
+  // The lock screen's and the notification's controls, if the webview gives the page the system's
+  // media session (scripts/phone-check.mjs looks for it on Android).
+  const mediaSession = "mediaSession" in navigator;
+  if (mediaSession) {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: "jackbird check", artist: "jackbird", album: "E6" });
+    navigator.mediaSession.setActionHandler("pause", () => audio.pause());
+    navigator.mediaSession.setActionHandler("play", () => void audio.play());
+  }
+  let muted = false;
+  try {
+    await audio.play();
+  } catch {
+    muted = true;
+    audio.muted = true;
+    await audio.play();
+  }
   const started = Date.now();
-  await fetch(`${config.report}?phase=playing`, { method: "POST", body: "{}" }).catch(() => undefined);
-  while (Date.now() - started < 30_000) {
-    samples.push({ at: Date.now() - started, position: audio.currentTime, hidden: document.hidden, paused: audio.paused });
+  // The songs played to their end, and each change of song, step by step: when it ended (and
+  // whether hidden), when the instance gave the next one's URL, when play() settled, and how.
+  let done = 0;
+  type Change = { at: number; hidden: boolean; url?: number; played?: number; started?: boolean; error?: string };
+  const changes: Change[] = [];
+  const now = () => Date.now() - started;
+  audio.addEventListener("ended", () => {
+    done += 1;
+    const change: Change = { at: now(), hidden: document.hidden };
+    changes.push(change);
+    void source
+      .openMedia(song.path)
+      .then(async (media) => {
+        change.url = now();
+        audio.src = media.url;
+        await audio.play();
+        change.played = now();
+        change.started = true;
+      })
+      .catch((error: unknown) => {
+        change.played = now();
+        change.started = false;
+        change.error = String(error);
+      });
+  });
+  const post = (phase: string, body: unknown) =>
+    fetch(`${config.report}?phase=${phase}`, { method: "POST", body: JSON.stringify(body) }).catch(() => undefined);
+  let wasHidden = false;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !wasHidden) void post("hidden", {});
+    wasHidden ||= document.hidden;
+  });
+  const samples: { at: number; played: number; hidden: boolean; paused: boolean }[] = [];
+  let shownAgain: number | null = null;
+  await post("playing", { muted, mediaSession });
+  while (Date.now() - started < 240_000 && (shownAgain === null || Date.now() - shownAgain < 10_000)) {
+    // How far the queue got: the songs ended, and the current one's position.
+    const played = done * (audio.duration || 20) + audio.currentTime;
+    samples.push({ at: now(), played, hidden: document.hidden, paused: audio.paused });
+    if (wasHidden && !document.hidden) shownAgain ??= Date.now();
     await wait(1000);
   }
   audio.pause();
-  await fetch(`${config.report}?phase=background`, { method: "POST", body: JSON.stringify({ samples }) }).catch(() => undefined);
+  await post("background", { muted, mediaSession, samples, changes });
 }

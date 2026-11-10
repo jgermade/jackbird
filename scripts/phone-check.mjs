@@ -82,14 +82,23 @@ const within = (promise, ms) => Promise.race([promise, new Promise((done) => set
 // by its own name (an open instance answers only to it), the receiver directly.
 if (platform === "android") {
   createServer((incoming, outgoing) => {
+    // Each request is logged with its answer and how long it took (E6's queue in the background: does
+    // the page's request reach the service?).
+    const asked = Date.now();
+    const what = `${incoming.method} ${incoming.url.replace(/([?&]t=)[^&]+/, "$1…")}`;
+    console.log(`phone-check: proxy <- ${what}`);
     const upstream = forward(
       { host: "127.0.0.1", port: 4646, method: incoming.method, path: incoming.url, headers: { ...incoming.headers, host: "localhost:4646" } },
       (answer) => {
+        console.log(`phone-check: proxy -> ${what} ${answer.statusCode} in ${Date.now() - asked} ms`);
         outgoing.writeHead(answer.statusCode ?? 502, answer.headers);
         answer.pipe(outgoing);
       }
     );
-    upstream.on("error", () => outgoing.writeHead(502).end());
+    upstream.on("error", (error) => {
+      console.log(`phone-check: proxy -> ${what} failed: ${error.message}`);
+      outgoing.writeHead(502).end();
+    });
     incoming.pipe(upstream);
   }).listen(4647);
 }
@@ -157,24 +166,72 @@ if (!report) {
   process.exit(1);
 }
 
-// Background playback, measured (not required): once the minute of silence plays, the app goes to
-// the background for ten seconds (the home screen; on iOS, Settings in front of it), then comes back.
+// Background playback, measured (not required): once the queue of silences plays (with sound), the app goes
+// to the background (the home screen; on iOS, Settings in front of it, which can take the simulator
+// most of a minute); two minutes after the page says it is hidden, the app comes back. Meanwhile, on
+// Android, what the system says of the app: its process's state (a frozen app plays nothing) and
+// whether it has a media session (the notification's and the lock screen's controls).
+const androidSays = (when) => {
+  for (const [what, args] of [
+    ["the process", ["shell", "dumpsys", "activity", "processes", bundle]],
+    ["the media sessions", ["shell", "dumpsys", "media_session"]]
+  ]) {
+    try {
+      const lines = read("adb", args).split("\n");
+      const wanted = lines.filter((line) => line.includes(bundle) || /procState|frozen|state=|active=|Sessions Stack/i.test(line));
+      console.log(`phone-check: ${when}, ${what}:\n${wanted.slice(0, 25).join("\n")}`);
+    } catch (error) {
+      console.log(`phone-check: ${when}, ${what}: ${error.message}`);
+    }
+  }
+};
 let background = null;
 if (await within(phase("playing"), 60_000)) {
-  await new Promise((done) => setTimeout(done, 4000));
+  // Past the first change of song (20 s), to see one in the foreground too.
+  await new Promise((done) => setTimeout(done, 25_000));
   if (platform === "android") run("adb", ["shell", "input", "keyevent", "KEYCODE_HOME"]);
   else run("xcrun", ["simctl", "launch", "booted", "com.apple.Preferences"]);
-  await new Promise((done) => setTimeout(done, 10_000));
+  if (await within(phase("hidden"), 90_000)) {
+    for (let step = 1; step <= 4; step += 1) {
+      await new Promise((done) => setTimeout(done, 30_000));
+      if (platform === "android") androidSays(`${step * 30} s away`);
+    }
+  } else console.log("phone-check: the page never said it was hidden");
   if (platform === "android") run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
   else run("xcrun", ["simctl", "launch", "booted", bundle]);
-  background = await within(phase("background"), 60_000);
+  background = await within(phase("background"), 120_000);
 }
 server.kill();
 if (background?.samples) {
-  const hidden = background.samples.filter((sample) => sample.hidden);
-  const moved = hidden.length > 1 ? hidden[hidden.length - 1].position - hidden[0].position : 0;
-  report.background = { hiddenSeconds: hidden.length, movedWhileHidden: Math.round(moved * 10) / 10, samples: background.samples };
-  console.log(`phone-check: in the background ${hidden.length} s, the position moved ${moved.toFixed(1)} s`);
+  // From the last sample shown before the page was hidden to the first shown after it: how long it
+  // was away, and how much played meanwhile (the page's timers may be held back while hidden).
+  const samples = background.samples;
+  const first = samples.findIndex((sample) => sample.hidden);
+  const back = first < 0 ? -1 : samples.findIndex((sample, index) => index > first && !sample.hidden);
+  const before = samples[Math.max(first - 1, 0)];
+  const after = back < 0 ? samples[samples.length - 1] : samples[back];
+  const away = first < 0 ? 0 : (after.at - before.at) / 1000;
+  const played = first < 0 ? 0 : after.played - before.played;
+  // The queue's changes of song made while the page was hidden, and how many of them started (each
+  // with its steps: the next URL's arrival, play() settling).
+  const changes = background.changes ?? [];
+  const hiddenChanges = changes.filter((change) => change.hidden);
+  for (const change of changes) console.log(`phone-check: change of song ${JSON.stringify(change)}`);
+  report.background = {
+    muted: background.muted,
+    changesWhileHidden: hiddenChanges.length,
+    startedWhileHidden: hiddenChanges.filter((change) => change.started).length,
+    changes,
+    mediaSession: background.mediaSession,
+    hiddenSamples: samples.filter((sample) => sample.hidden).length,
+    awaySeconds: Math.round(away * 10) / 10,
+    playedWhileAway: Math.round(played * 10) / 10,
+    samples
+  };
+  console.log(
+    `phone-check: ${background.muted ? "muted" : "with sound"}, navigator.mediaSession ${background.mediaSession ? "present" : "absent"}, away ${away.toFixed(1)} s, played ${played.toFixed(1)} s meanwhile; ` +
+      `${hiddenChanges.filter((change) => change.started).length} of ${hiddenChanges.length} changes of song made while hidden started`
+  );
 } else {
   report.background = null;
   console.log("phone-check: no background measurement");

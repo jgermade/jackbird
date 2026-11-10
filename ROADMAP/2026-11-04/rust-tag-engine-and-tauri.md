@@ -19,7 +19,11 @@ unattended check on macOS, Windows and Linux). Next: the service
 ([../2026-11-08/service.md](../2026-11-08/service.md), S1 to S4; S1 and S2 done on 2026-11-08),
 then the rest of the family instance ([family-instance.md](family-instance.md)), E5 and E6. The
 family instance is done (F1 to F5, 2026-11-09), and so is E5 (2026-11-09, record from 19:37):
-the desktop app plays through Rust, native and shared by default. Next: E6's spike.
+the desktop app plays through Rust, native and shared by default. E6's spike is done too
+(2026-11-10, record from 2026-11-09 21:24 to the closing extension of 2026-11-10 12:37): the app runs on
+Android and iOS as a client of an instance; a queue cannot go on in the background from the page,
+so playback on the phones must be native. Next: E6b, the Player-first phone app with native
+playback, **proposed in the record's closing extension and waiting for the owner's approval**.
 Left to the owner by hand on real machines: E4's bundles (a folder chosen, heard, edited, the app
 restarted).
 
@@ -39,7 +43,8 @@ gantt
     E4 Tauri v2 desktop app                    :done, e4, after e2b, 10d
     E5 Native audio output (hi-fi, optional)   :done, e5, after e4, 10d
   section Mobile
-    E6 Tauri v2 mobile (spike, then Player)    :e6, after e5, 10d
+    E6 Tauri v2 mobile spike                   :done, e6, after e5, 2d
+    E6b Phone app: native playback, offline    :e6b, after e6, 10d
 ```
 
 | Step | Scope | Done when |
@@ -51,7 +56,8 @@ gantt
 | E2b By ranges (**done**, 2026-11-08) | the engine takes a file's head and tail (`layout`, `read_head`) and returns a splice (`write_head`); the module never gets the audio; the web app checks a saved file's audio region before giving it back; `AGENTS.md`'s rule of the crates says so | the module's memory after reading and saving a 150 MB file is about the size of its tags; every fixture gives the same bytes by both paths |
 | E4 Tauri desktop (**done**, 2026-11-08; checked in CI on the three systems, the owner's run by hand pending) | `src-tauri/`: the same UI in the webview; a native `VFSAdapter` over Tauri commands and the folder dialog; tags and checksums run natively, on paths (no whole files over the IPC); the session keeps paths; playback streams from disk; release builds for macOS, Windows and Linux in GitHub Actions | the desktop app opens a folder, plays, edits and reopens it after a restart on all three systems |
 | E5 Native output (**done**, 2026-11-09; native shared by default, exclusive and embedded to choose; gapless; CI on the three systems, bit for bit through ALSA's default device on Linux; the exclusive paths and the owner's run on macOS with the DAC pending) | optional: decoding and output in Rust, with exclusive / bit-perfect modes where the system offers them; the analyser fed from Rust; `<audio>` stays as the fallback | a 24/96 FLAC plays bit-perfect on at least one system, checked with a loopback or the device's own sample-rate display |
-| E6 Mobile | a spike on file access (Android SAF, iOS security-scoped bookmarks), then a Player-first app | decided by the spike, recorded before any build |
+| E6 Mobile spike (**done**, 2026-11-10; CI in Android's emulator and iOS's simulator) | the web app in the phones' webviews as a client of an instance; background playback and the lock screen; local files (SAF, security-scoped bookmarks) weighed; OpenSubsonic checked with an outside client (py-opensonic) | decided by the spike, recorded before any build: our own app as a client, **native playback** on each phone, OpenSubsonic kept, local files later |
+| E6b Phone app (**proposed**, waiting for the owner's approval) | a native player per phone (Android: Media3 in a `MediaSessionService`; iOS: `AVQueuePlayer` with now playing and remote commands) that plays the queue the page hands it; the played counts kept while the page is suspended; offline songs kept on the phone; the APK and the IPA on the release | on a real phone of each and in CI: a queue from the instance plays on with the screen off, its controls on the lock screen, a kept album plays without a connection, the counts reach the instance |
 
 Deferred, decided separately: `.meta` v2 (covers out of the snapshot; SHA-256), the axum daemon and
 the SQLite index, wiring the vfs-sync mesh, the rename to Musikmatch, scanning in a Web Worker.

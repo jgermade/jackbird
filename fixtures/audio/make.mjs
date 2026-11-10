@@ -46,9 +46,10 @@ for (const file of files) {
   }
   cases[file.name] = entry;
 }
-// A minute of silence at 8 kHz (a few KB): long enough for a phone's check to send the app to the
-// background while it plays (E6's spike). Not in cases.json: nothing compares its samples.
-run("-f", "lavfi", "-i", "anullsrc=r=8000:cl=mono", "-t", "60", "-c:a", "flac", ...bitexact, join(here, "silence-60s.flac"));
+// Twenty seconds of silence at 8 kHz (a few KB): a phone's check plays it again and again as a queue
+// would, the next one asked for when the last ends, while the app is in the background (E6's
+// spike). Not in cases.json: nothing compares its samples.
+run("-f", "lavfi", "-i", "anullsrc=r=8000:cl=mono", "-t", "20", "-c:a", "flac", ...bitexact, join(here, "silence-20s.flac"));
 
 writeFileSync(join(here, "cases.json"), `${JSON.stringify(cases, null, 2)}\n`);
 console.log(cases);
