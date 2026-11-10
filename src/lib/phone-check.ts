@@ -94,11 +94,12 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
 }
 
 /**
- * Background playback (E6-D1 c): plays a minute of silence with sound (both webviews pause a muted
- * element when hidden; muted only if the webview refuses) and notes, every second, how far it got
- * and whether the page is hidden, while the check sends the app to the background and back
- * (scripts/phone-check.mjs); then posts the samples. Where the position moved on while the page was
- * hidden, playback went on in the background.
+ * Background playback (E6-D1 c): plays a minute of silence on a loop, with sound (both webviews
+ * pause a muted element when hidden; muted only if the webview refuses), and notes every second how
+ * much it has played and whether the page is hidden, while the check sends the app to the background
+ * and back (scripts/phone-check.mjs). The page says when it is hidden (a phone may take long to put
+ * another app in front), and stops three seconds after it is shown again, or after 150 s; then posts
+ * the samples. Where it played on while the page was hidden, playback went on in the background.
  */
 async function measureBackground(config: PhoneCheck): Promise<void> {
   const { openServiceFolder } = await import("./sources/service");
@@ -108,6 +109,7 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   const audio = new Audio();
   // As the player's element: asked for with CORS, the instance answers the app's origin.
   audio.crossOrigin = "anonymous";
+  audio.loop = true;
   audio.src = (await source.openMedia(long.path)).url;
   let muted = false;
   try {
@@ -117,13 +119,28 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
     audio.muted = true;
     await audio.play();
   }
-  const samples: { at: number; position: number; hidden: boolean; paused: boolean }[] = [];
+  const post = (phase: string, body: unknown) =>
+    fetch(`${config.report}?phase=${phase}`, { method: "POST", body: JSON.stringify(body) }).catch(() => undefined);
+  let wasHidden = false;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !wasHidden) void post("hidden", {});
+    wasHidden ||= document.hidden;
+  });
+  // How much has played, across the loop's restarts.
+  let played = 0;
+  let last = audio.currentTime;
+  const samples: { at: number; played: number; hidden: boolean; paused: boolean }[] = [];
   const started = Date.now();
-  await fetch(`${config.report}?phase=playing`, { method: "POST", body: JSON.stringify({ muted }) }).catch(() => undefined);
-  while (Date.now() - started < 45_000) {
-    samples.push({ at: Date.now() - started, position: audio.currentTime, hidden: document.hidden, paused: audio.paused });
+  let shownAgain: number | null = null;
+  await post("playing", { muted });
+  while (Date.now() - started < 150_000 && (shownAgain === null || Date.now() - shownAgain < 3000)) {
+    const now = audio.currentTime;
+    played += now >= last ? now - last : now + (audio.duration || 0) - last;
+    last = now;
+    samples.push({ at: Date.now() - started, played, hidden: document.hidden, paused: audio.paused });
+    if (wasHidden && !document.hidden) shownAgain ??= Date.now();
     await wait(1000);
   }
   audio.pause();
-  await fetch(`${config.report}?phase=background`, { method: "POST", body: JSON.stringify({ muted, samples }) }).catch(() => undefined);
+  await post("background", { muted, samples });
 }

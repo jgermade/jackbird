@@ -157,31 +157,40 @@ if (!report) {
   process.exit(1);
 }
 
-// Background playback, measured (not required): once the minute of silence plays (with sound), the
-// app goes to the background for fifteen seconds (the home screen; on iOS, Settings in front of it),
-// then comes back.
+// Background playback, measured (not required): once the silence plays (with sound), the app goes
+// to the background (the home screen; on iOS, Settings in front of it, which can take the simulator
+// most of a minute); fifteen seconds after the page says it is hidden, the app comes back.
 let background = null;
 if (await within(phase("playing"), 60_000)) {
-  await new Promise((done) => setTimeout(done, 4000));
+  await new Promise((done) => setTimeout(done, 3000));
   if (platform === "android") run("adb", ["shell", "input", "keyevent", "KEYCODE_HOME"]);
   else run("xcrun", ["simctl", "launch", "booted", "com.apple.Preferences"]);
-  await new Promise((done) => setTimeout(done, 15_000));
+  if (await within(phase("hidden"), 90_000)) await new Promise((done) => setTimeout(done, 15_000));
+  else console.log("phone-check: the page never said it was hidden");
   if (platform === "android") run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
   else run("xcrun", ["simctl", "launch", "booted", bundle]);
-  background = await within(phase("background"), 60_000);
+  background = await within(phase("background"), 120_000);
 }
 server.kill();
 if (background?.samples) {
-  const hidden = background.samples.filter((sample) => sample.hidden);
-  const moved = hidden.length > 1 ? hidden[hidden.length - 1].position - hidden[0].position : 0;
+  // From the last sample shown before the page was hidden to the first shown after it: how long it
+  // was away, and how much played meanwhile (the page's timers may be held back while hidden).
+  const samples = background.samples;
+  const first = samples.findIndex((sample) => sample.hidden);
+  const back = first < 0 ? -1 : samples.findIndex((sample, index) => index > first && !sample.hidden);
+  const before = samples[Math.max(first - 1, 0)];
+  const after = back < 0 ? samples[samples.length - 1] : samples[back];
+  const away = first < 0 ? 0 : (after.at - before.at) / 1000;
+  const played = first < 0 ? 0 : after.played - before.played;
   report.background = {
     muted: background.muted,
-    hiddenSeconds: hidden.length,
-    movedWhileHidden: Math.round(moved * 10) / 10,
-    samples: background.samples
+    hiddenSamples: samples.filter((sample) => sample.hidden).length,
+    awaySeconds: Math.round(away * 10) / 10,
+    playedWhileAway: Math.round(played * 10) / 10,
+    samples
   };
   console.log(
-    `phone-check: ${background.muted ? "muted" : "with sound"}, in the background ${hidden.length} s, the position moved ${moved.toFixed(1)} s`
+    `phone-check: ${background.muted ? "muted" : "with sound"}, away ${away.toFixed(1)} s, played ${played.toFixed(1)} s meanwhile`
   );
 } else {
   report.background = null;
