@@ -46,10 +46,10 @@ for (const file of files) {
   }
   cases[file.name] = entry;
 }
-// Five minutes of silence at 8 kHz (a few dozen KB): longer than a phone's check keeps the app in the
-// background while it plays (E6's spike), so it never has to loop there (a loop needs the page, which
-// iOS may suspend). Not in cases.json: nothing compares its samples.
-run("-f", "lavfi", "-i", "anullsrc=r=8000:cl=mono", "-t", "300", "-c:a", "flac", ...bitexact, join(here, "silence-300s.flac"));
+// Twenty seconds of silence at 8 kHz (a few KB): a phone's check plays it again and again as a queue
+// would, the next one asked for when the last ends, while the app is in the background (E6's
+// spike). Not in cases.json: nothing compares its samples.
+run("-f", "lavfi", "-i", "anullsrc=r=8000:cl=mono", "-t", "20", "-c:a", "flac", ...bitexact, join(here, "silence-20s.flac"));
 
 writeFileSync(join(here, "cases.json"), `${JSON.stringify(cases, null, 2)}\n`);
 console.log(cases);

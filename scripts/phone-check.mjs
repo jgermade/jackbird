@@ -157,7 +157,7 @@ if (!report) {
   process.exit(1);
 }
 
-// Background playback, measured (not required): once the silence plays (with sound), the app goes
+// Background playback, measured (not required): once the queue of silences plays (with sound), the app goes
 // to the background (the home screen; on iOS, Settings in front of it, which can take the simulator
 // most of a minute); two minutes after the page says it is hidden, the app comes back. Meanwhile, on
 // Android, what the system says of the app: its process's state (a frozen app plays nothing) and
@@ -202,8 +202,14 @@ if (background?.samples) {
   const after = back < 0 ? samples[samples.length - 1] : samples[back];
   const away = first < 0 ? 0 : (after.at - before.at) / 1000;
   const played = first < 0 ? 0 : after.played - before.played;
+  // The queue's changes of song made while the page was hidden, and how many of them started.
+  const changes = background.changes ?? [];
+  const hiddenChanges = changes.filter((change) => change.hidden);
   report.background = {
     muted: background.muted,
+    changesWhileHidden: hiddenChanges.length,
+    startedWhileHidden: hiddenChanges.filter((change) => change.started).length,
+    changes,
     mediaSession: background.mediaSession,
     hiddenSamples: samples.filter((sample) => sample.hidden).length,
     awaySeconds: Math.round(away * 10) / 10,
@@ -211,7 +217,8 @@ if (background?.samples) {
     samples
   };
   console.log(
-    `phone-check: ${background.muted ? "muted" : "with sound"}, navigator.mediaSession ${background.mediaSession ? "present" : "absent"}, away ${away.toFixed(1)} s, played ${played.toFixed(1)} s meanwhile`
+    `phone-check: ${background.muted ? "muted" : "with sound"}, navigator.mediaSession ${background.mediaSession ? "present" : "absent"}, away ${away.toFixed(1)} s, played ${played.toFixed(1)} s meanwhile; ` +
+      `${hiddenChanges.filter((change) => change.started).length} of ${hiddenChanges.length} changes of song made while hidden started`
   );
 } else {
   report.background = null;
