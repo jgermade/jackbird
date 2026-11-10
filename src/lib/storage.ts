@@ -5,7 +5,10 @@
 export const STORAGE_KEYS = {
   theme: "mp3-manager.theme",
   language: "mp3-manager.language",
-  renamePattern: "mp3-manager.renamePattern"
+  renamePattern: "mp3-manager.renamePattern",
+  output: "mp3-manager.output",
+  outputDevice: "mp3-manager.outputDevice",
+  instance: "mp3-manager.instance"
 } as const;
 
 /**

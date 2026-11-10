@@ -6,6 +6,7 @@ import type { VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $toRaw } from "jq79";
 import { emptySnapshot, parseMetaSnapshot, serializeMetaSnapshot } from "../helpers/snapshot";
 import type { MetaSnapshot } from "../types";
+import { can } from "./account";
 import { library } from "./library";
 
 /** Renaming it needs a migration: it sits in every folder a user has opened. */
@@ -19,6 +20,8 @@ export async function readMetaSnapshot(vfs: VFSAdapter): Promise<MetaSnapshot> {
 }
 
 export async function writeMetaSnapshot(vfs: VFSAdapter, snapshot: MetaSnapshot): Promise<void> {
+  // A listener may not write the folder (S3): the snapshot is not kept, and the folder is read again next time.
+  if (!can("editor")) return;
   await vfs.write(META_FILE_PATH, new TextEncoder().encode(serializeMetaSnapshot(snapshot)));
 }
 

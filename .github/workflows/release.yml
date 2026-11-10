@@ -1,5 +1,6 @@
 # Bumps the version, builds the new tag (build.yml), the desktop app's bundles (desktop.yml) and
-# the service's binaries (service.yml), publishes a GitHub release with the build attached as
+# the service's binaries (service.yml; static Linux ones and macOS x64 from ship.yml, which also pushes
+# the Docker image to ghcr.io), publishes a GitHub release with the build attached as
 # <repo>-vX.Y.Z.zip and the bundles and binaries beside it, and, if the `deploy` box is ticked,
 # deploys it (deploy.yml).
 #
@@ -89,9 +90,21 @@ jobs:
     with:
       ref: ${{ needs.version.outputs.tag }}
 
+  ship:
+    name: Ship (static binaries, the image)
+    needs: version
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/ship.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+      publish: true
+      version: ${{ needs.version.outputs.tag }}
+
   release:
     name: Publish release
-    needs: [version, build, desktop, service]
+    needs: [version, build, desktop, service, ship]
     runs-on: ubuntu-latest
     permissions:
       contents: write

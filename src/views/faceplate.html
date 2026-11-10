@@ -19,9 +19,12 @@
 
   const { formatTime } = await import("../helpers/format")
   const { t, tn } = await import("../lib/i18n")
+  const { can } = await import("../lib/account")
+  const { importing, openImport } = await import("../lib/importing")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum } = await import("../lib/player")
+  const { soundingBadge, soundingText } = await import("../lib/output")
   const { closeRoot, openFolder, selectRoot } = await import("../lib/roots")
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
@@ -90,6 +93,7 @@
                 <span class="visually-hidden">{{ stateLabel }}</span>
                 <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
               </span>
+              <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
               <Counter>{{ formatTime(playback.position) }}</Counter>
             </div>
             <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
@@ -106,17 +110,18 @@
   </div>
 
   <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
-        :add-label="folderLabel" :add-disabled="library.loading" @add="openFolder()"
+        :add-label="folderLabel" :add-disabled="library.loading || !can('owner')" @add="openFolder()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
       <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
-      <span class="open-folder" :class.has-roots="hasRoots">
+      <span :if="can('owner')" class="open-folder" :class.has-roots="hasRoots">
         <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openFolder()">
           <Reel :if="library.loading" :size="12" speed="fast" />
           <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
           <span class="folder-text">{{ folderText }}</span>
         </Key>
       </span>
+      <Key :if="importing.available && can('editor')" size="sm" variant="ghost" popup="dialog" :label="t('import.open')" @click="openImport()">{{ t("import.open") }}</Key>
     </template>
     <template :slot.aside>
       <span :if="selectedCount() > 0" class="selection">
@@ -157,6 +162,18 @@
   /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
   .pane-pick { grid-area: controls; display: none; justify-self: end; }
 
+  /* What reaches the device in the native output (E5): "24/96 bit-perfect", before the time. */
+  .route {
+    flex: none;
+    margin-left: auto;
+    padding-right: var(--mm-space-2);
+    font-family: var(--mm-font-label);
+    font-size: var(--mm-text-xs);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    opacity: .8;
+  }
   /* The display's one text row: the state glyph, then the title, which ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .state {

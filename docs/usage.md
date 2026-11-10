@@ -30,6 +30,109 @@ and plays on. A reload stops the sound for a moment, since a page cannot play th
 reload; and if the browser does not let the page start sound by itself, the track waits, paused at
 its place, and your first click or key anywhere resumes it.
 
+## People and sign-in (the service)
+
+When jackbird is served by its service (installed from the desktop app, or `jackbird-service` on
+a machine), it starts open, for one person: you, its **owner**, on that machine only.
+
+**Several people.** In **Preferences**, **People and sign-in…** adds people with a name and a
+role. While sign-in is off they are profiles: opening jackbird asks *Who's listening?*, and
+picking a name is enough. Roles decide what jackbird offers: a **listener** plays; an **editor**
+also edits tags and covers, renames files and keeps playlists; an **admin** also adds editors and
+listeners, sets up email and reads the log of changes; an **owner** also opens folders and decides
+how jackbird is reached. With sign-in off, anyone at the machine can pick any profile.
+
+**Sign-in.** Set up email first (**People and sign-in…**, **Sign-in**: your SMTP server, then
+**Send a test**). An owner then gives their own address and types back the code sent there:
+sign-in is on. Nobody's role changes; the others are disabled until an owner or an admin gives
+them an address, where an invitation is sent, and they sign in with the code sent there. Only
+people added this way can sign in. Once in, **Preferences**, **Account** adds a **passkey** to sign
+in without a code (on the instance's own address, over HTTPS or on `localhost`), and shows where
+you are signed in. Without a screen, `jackbird-service setup` on the machine does the same from
+the console, and is the way back in for an owner whose address changed. Only an owner turns
+sign-in off again; people keep their addresses and become profiles.
+
+**The family library.** The service keeps a library of its own, shown to everyone as the
+**Library** tab. **Add music** puts songs in it: editors and up upload songs or a whole folder
+from their own device, and owners can also import a folder of the machine the service runs on.
+Each song is kept once, however many times it is brought, and the files you pick are never
+changed. Editing a song's tags changes what everyone sees, not the stored file: the song leaves
+with the family's tags when it is played or downloaded (**Info**, **Download**). When someone
+brings a song the library already has, with other tags, those are kept beside it and shown in its
+**Info**. The library lives in your data folder (`~/.local/share/jackbird/library` on Linux,
+`~/Library/Application Support/jackbird/library` on macOS, `%LOCALAPPDATA%\jackbird\library` on
+Windows), or wherever `service.json`'s `library` says: back that folder up and the whole library
+is in it.
+
+**Your own, in the library.** Each person has their own there: **Add to favourites** in a
+song's menu; what you play (a song counts once half of it, or four minutes, has played); your own
+playlists. They are the library's **My playlists** folder, yours alone, with **Favourites** and
+**Recently played** made from what you did. Editing a song's tags in the library, an editor
+chooses **For everyone** or **Only for me**; anyone else saves for themselves only. What you set
+for yourself is what you see, play and download; the song's **Info** says which fields are yours,
+with **Back to the family's version**. In **Preferences**, **Account**, **Your version** switches
+between yours and the family's, and **Clear what I played** empties your history. A song you bring
+that the library already has, with other tags, shows you your tags, and editors see them as a
+suggestion they can **Apply for everyone**. Your theme and language follow you to every device.
+
+**Keeping the library safe.** When two people edit the same song, the second save is refused
+and the song's tags as they are now are shown, to apply yours again: nothing is saved over
+someone else's change without anyone knowing (shared playlists work the same way). Deleting
+songs from the library moves them to the **Trash** (**People and sign-in…**), where admins and
+owners restore them; after 30 days they go for good. Every night after 03:00 (UTC) the service
+keeps a copy of its databases in the library's `backups/` folder (7 daily, 4 weekly, 12 monthly),
+and once a week it checks every song's file against its name, so a failing disk shows up in
+**Backups** and the log. Owners can take a copy or run the check from **Backups**, and **Export**
+the whole library to a folder as `Artist/Album/NN - Title`, with the family's tags.
+
+**A copy away from home, with [restic](https://restic.net).** Everything the library is lives in
+its folder (Backups shows where). Copy it, encrypted, to a USB disk or a storage service:
+
+```sh
+export RESTIC_REPOSITORY=/media/usb/jackbird-restic   # or b2:bucket:jackbird, sftp:…
+export RESTIC_PASSWORD_FILE=~/.config/jackbird/restic-password
+restic init                                           # once
+restic backup ~/.local/share/jackbird/library         # every day, from cron or a timer
+restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+```
+
+To bring it back: stop the service (`jackbird-service stop`), `restic restore latest --target /`,
+and start it again. If the catalogue itself is what went wrong, put the newest
+`backups/<date>/catalogue.db` in place of `catalogue.db` (and `jackbird.db` beside the
+configuration) while the service is stopped.
+
+**Reaching it from elsewhere.** With sign-in on, an owner can let the home network reach it
+(**Sign-in**, **Home network**); over plain HTTP, codes and sessions travel unencrypted there and
+passkeys are not available. For HTTPS, and to reach it from outside home, put a proxy in front
+and set **The instance's address** to the address it serves (passkeys belong to that address).
+With Caddy:
+
+```caddy
+music.example.com {
+  reverse_proxy 127.0.0.1:4646
+}
+```
+
+With nginx (and a certificate of your own):
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name music.example.com;
+  # ssl_certificate …; ssl_certificate_key …;
+  location / {
+    proxy_pass http://127.0.0.1:4646;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+jackbird believes the proxy's `X-Forwarded-*` headers only from the machine itself; a proxy on
+another machine is listed in `service.json`'s `proxies`. While sign-in is off, a request through a
+proxy is refused.
+
 ## The library
 
 The left panel lists the active root's folders and tracks. A click on a folder's triangle or

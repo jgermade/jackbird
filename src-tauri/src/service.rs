@@ -215,10 +215,7 @@ pub async fn service_start() -> Answer<Value> {
 /// Chooses a folder in the system's dialog, only its path (the service opens it).
 #[tauri::command]
 pub async fn choose_folder(app: tauri::AppHandle) -> Answer<Option<String>> {
-    use tauri_plugin_dialog::DialogExt;
-    let picked = tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
-        .await
-        .map_err(|error| failure("io", error.to_string()))?;
+    let picked = crate::pick(app).await?;
     picked
         .map(|path| path.into_path().map(|path| path.display().to_string()))
         .transpose()

@@ -9,6 +9,7 @@ use std::path::Path;
 
 use jackbird_tags::{Cover, Edit, FIRST_HEAD, FileLayout, Layout, Refusal, TAIL_LEN, Tags};
 use sha1::{Digest, Sha1};
+use sha2::{Digest as _, Sha256};
 
 use crate::root::{Error, Root, Stat, beside, io};
 
@@ -77,6 +78,72 @@ fn hashes(file: &mut File, audio: &Range<u64>, shown: &str) -> Result<(String, S
         at += read as u64;
     }
     Ok((hex(&full.finalize()), hex(&region.finalize())))
+}
+
+/// A file as the library's import examines it (F1): its layout and head, its size and date, the
+/// SHA-1s the interface knows, the SHA-256 of its audio region (the library's name for it), and
+/// its tags; read in one pass, the audio never held whole.
+#[derive(Clone, Debug)]
+pub struct Examined {
+    /// Where its tags end and its audio is.
+    pub layout: FileLayout,
+    /// Its first bytes, at least up to the end of its tags.
+    pub head: Vec<u8>,
+    /// Its size and date.
+    pub stat: Stat,
+    /// The SHA-1 of the whole file, in hex.
+    pub full_sha1: String,
+    /// The SHA-1 of its audio region, in hex.
+    pub audio_sha1: String,
+    /// The SHA-256 of its audio region, in hex.
+    pub audio_sha256: String,
+    /// Its tags; a file the engine cannot read reads as untagged.
+    pub tags: (jackbird_tags::Fields, Option<Cover>),
+}
+
+/// Examines a file anywhere (the library's import reads folders it does not open as roots).
+pub fn examine(path: &Path) -> Result<Examined, Error> {
+    let shown = path.display().to_string();
+    let mut file = File::open(path).map_err(io(&shown))?;
+    let metadata = file.metadata().map_err(io(&shown))?;
+    let (layout, head) = layout_of(&mut file, metadata.len(), &shown)?;
+    let (mut full, mut region, mut named) = (Sha1::new(), Sha1::new(), <Sha256 as sha2::Digest>::new());
+    let mut buffer = vec![0; CHUNK];
+    let mut at = 0u64;
+    file.seek(SeekFrom::Start(0)).map_err(io(&shown))?;
+    loop {
+        let read = file.read(&mut buffer).map_err(io(&shown))?;
+        if read == 0 {
+            break;
+        }
+        let chunk = &buffer[..read];
+        full.update(chunk);
+        let (start, end) = (layout.audio.start.max(at), layout.audio.end.min(at + read as u64));
+        if start < end {
+            let audio = &chunk[(start - at) as usize..(end - at) as usize];
+            region.update(audio);
+            named.update(audio);
+        }
+        at += read as u64;
+    }
+    let tags = found(&head, &layout);
+    Ok(Examined {
+        layout,
+        head,
+        stat: Stat::of(&metadata),
+        full_sha1: hex(&full.finalize()),
+        audio_sha1: hex(&region.finalize()),
+        audio_sha256: hex(&named.finalize()),
+        tags,
+    })
+}
+
+/// A file's layout and its first bytes, up to the end of its tags at least.
+pub fn head_of(path: &Path) -> Result<(FileLayout, Vec<u8>), Error> {
+    let shown = path.display().to_string();
+    let mut file = File::open(path).map_err(io(&shown))?;
+    let len = file.metadata().map_err(io(&shown))?.len();
+    layout_of(&mut file, len, &shown)
 }
 
 fn hex(bytes: &[u8]) -> String {

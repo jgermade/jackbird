@@ -18,9 +18,13 @@ import {
   restoreQueue,
   type QueuePosition
 } from "../helpers/queue";
+import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
 import { spectrumBands } from "../helpers/spectrum";
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
+import { NativeAudio, type Sounding } from "./native-audio";
+import { output } from "./output";
+import { played } from "./mine";
 import { t } from "./i18n";
 import { library } from "./library";
 import { Opaque } from "./opaque";
@@ -131,18 +135,27 @@ export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
   );
 });
 
-const audio: HTMLAudioElement | null = typeof Audio === "function" ? new Audio() : null;
+const embedded: HTMLAudioElement | null = typeof Audio === "function" ? new Audio() : null;
 // The analyser reads the element only when its media is not cross-origin, as it is from the
 // desktop app's asset protocol on Windows and its local server on Linux (E4-D5): asked for with
 // CORS, those allow it; a blob: URL in the browser is same-origin anyway.
-if (audio) {
-  audio.crossOrigin = "anonymous";
+if (embedded) {
+  embedded.crossOrigin = "anonymous";
 }
+// The desktop app's native player (E5), shaped like the element; it plays the desktop's own
+// folders' tracks unless the embedded output is chosen.
+const native: NativeAudio | null = output.available && embedded ? new NativeAudio() : null;
+/** The element that plays the loaded track: the embedded one or the native one. */
+let audio: HTMLAudioElement | NativeAudio | null = embedded;
+/** The next track, as handed to the native player to follow without a gap. */
+let upcoming: { key: string; rootId: string; relativePath: string; lastModified?: number; media: MediaHandle } | null = null;
 
 // Bookkeeping, not state: which track the element holds, where its file is,
 // the file it opened, and the date the library gave it then.
 let loadedKey: string | null = null;
 let loaded: { rootId: string; relativePath: string; lastModified?: number } | null = null;
+/** The load whose play was counted (F3). */
+let countedFor: { rootId: string; relativePath: string; lastModified?: number } | null = null;
 let media: MediaHandle | null = null;
 
 // After a reload: the track to come back to, where in it, and whether it was
@@ -213,6 +226,10 @@ function routeThroughAnalyser(element: HTMLAudioElement): void {
  * where the browser has no Web Audio.
  */
 export function readSpectrum(bands: number): number[] | null {
+  if (native && audio === native) {
+    const heard = native.spectrum();
+    return heard ? spectrumBands(heard.bins, bands, heard.rate) : null;
+  }
   if (!analyser || !bins || !context) {
     return null;
   }
@@ -258,7 +275,7 @@ async function refresh(force = false): Promise<void> {
     const position = audio.currentTime;
     const playing = !audio.paused;
     media = next;
-    audio.src = next.url;
+    setSource(next, key);
     audio.currentTime = position;
     opened.release();
     if (playing) {
@@ -271,6 +288,51 @@ async function refresh(force = false): Promise<void> {
   } finally {
     refreshing = false;
   }
+}
+
+/**
+ * Gives the loaded track's media to the element that is to play it: the native player for a
+ * desktop folder's track (unless the embedded output is chosen), else the embedded element.
+ */
+function setSource(opened: MediaHandle, key: string): void {
+  const target = native && opened.native && output.kind !== "embedded" ? native : embedded;
+  if (!target) return;
+  if (audio !== target && audio) {
+    const was = audio;
+    audio = target;
+    was.pause();
+    was.removeAttribute("src");
+  }
+  audio = target;
+  if (target === native && opened.native) {
+    native.open({ ...opened.native, key });
+  } else if (embedded) {
+    embedded.src = opened.url;
+  }
+  output.sounding = null;
+}
+
+/**
+ * Tells the native player the track after the loaded one, so it follows without a gap: only
+ * when the native player plays and the next track is a file it can open too.
+ */
+async function sendNext(): Promise<void> {
+  if (!native) return;
+  const { queue, index } = $toRaw(playback);
+  const item = queue?.items[index + 1];
+  const root = item ? $toRaw(library).roots.find((one) => one.id === item.rootId) : undefined;
+  const track = item ? root?.tracks.find((one) => one.id === item.trackId) : undefined;
+  if (audio !== native || !item || !root || !track) {
+    upcoming = null;
+    native.setNext(null);
+    return;
+  }
+  const key = keyOf(item);
+  if (upcoming?.key === key) return;
+  const media = await root.source.openMedia(track.relativePath).catch(() => null);
+  if (!media?.native || audio !== native) return;
+  upcoming = { key, rootId: item.rootId, relativePath: track.relativePath, lastModified: track.lastModified, media };
+  native.setNext({ ...media.native, key });
 }
 
 /** Loads and plays the current track, unless it is the one already loaded. */
@@ -314,7 +376,8 @@ async function load(current: NowPlaying | null): Promise<void> {
       return;
     }
     media = opened;
-    audio.src = opened.url;
+    setSource(opened, current.key);
+    void sendNext();
     const resume = resumeAt?.key === key ? resumeAt : null;
     resumeAt = null;
     if (resume) {
@@ -326,7 +389,7 @@ async function load(current: NowPlaying | null): Promise<void> {
           await audio.play();
         } catch (error) {
           if (!(error instanceof DOMException && error.name === "NotAllowedError")) throw error;
-          resumeOnFirstInteraction(audio);
+          if (embedded && audio === embedded) resumeOnFirstInteraction(embedded);
         }
       }
       return;
@@ -348,23 +411,34 @@ async function load(current: NowPlaying | null): Promise<void> {
   }
 }
 
-if (audio) {
-  audio.addEventListener("play", () => {
-    routeThroughAnalyser(audio);
+/** The element's events, heard only while it is the one playing the loaded track. */
+function wire(element: HTMLAudioElement | NativeAudio): void {
+  element.addEventListener("play", () => {
+    if (element !== audio) return;
+    if (element === embedded) routeThroughAnalyser(embedded);
     playback.playing = true;
   });
-  audio.addEventListener("pause", () => {
+  element.addEventListener("pause", () => {
+    if (element !== audio) return;
     playback.playing = false;
   });
-  audio.addEventListener("ended", () => {
+  element.addEventListener("ended", () => {
+    if (element !== audio) return;
     playback.playing = false;
     next();
   });
-  audio.addEventListener("timeupdate", () => {
-    playback.position = audio.currentTime;
+  element.addEventListener("timeupdate", () => {
+    if (element !== audio) return;
+    playback.position = element.currentTime;
+    // A play of the family library's counts once (F3).
+    if (loaded && countedFor !== loaded && countsAsPlayed(element.currentTime, element.duration)) {
+      countedFor = loaded;
+      played(loaded.rootId, loaded.relativePath);
+    }
   });
-  audio.addEventListener("durationchange", () => {
-    playback.duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+  element.addEventListener("durationchange", () => {
+    if (element !== audio) return;
+    playback.duration = Number.isFinite(element.duration) ? element.duration : 0;
   });
   // Waiting for data for two seconds while it should play: the file may have
   // been rewritten by another program, which nothing here has noticed yet.
@@ -373,17 +447,80 @@ if (audio) {
     if (stalled) clearTimeout(stalled);
     stalled = null;
   };
-  audio.addEventListener("waiting", () => {
+  element.addEventListener("waiting", () => {
+    if (element !== audio) return;
     settle();
     stalled = setTimeout(() => {
       stalled = null;
-      if (!audio.paused && audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+      if (!element.paused && element.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
         void refresh();
       }
     }, 2000);
   });
   for (const type of ["playing", "canplay", "pause", "emptied"] as const) {
-    audio.addEventListener(type, settle);
+    element.addEventListener(type, settle);
+  }
+}
+
+/** The native player's own events: what sounds, the next track started by itself, and a track it cannot play. */
+function wireNative(element: NativeAudio): void {
+  element.addEventListener("started", (event) => {
+    if (element === audio) output.sounding = (event as CustomEvent<Sounding>).detail;
+  });
+  // The next track began without a gap: it is the loaded one now, and the queue moves on to it.
+  element.addEventListener("advance", (event) => {
+    const key = (event as CustomEvent<string>).detail;
+    const { queue, index } = $toRaw(playback);
+    const at = queue ? queue.items.findIndex((item, place) => place > index && keyOf(item) === key) : -1;
+    if (element !== audio || !upcoming || upcoming.key !== key || at < 0) return;
+    const next = upcoming;
+    upcoming = null;
+    release();
+    media = next.media;
+    loadedKey = key;
+    loaded = { rootId: next.rootId, relativePath: next.relativePath, lastModified: next.lastModified };
+    playback.position = 0;
+    playback.index = at;
+    void sendNext();
+  });
+  // The native player could not play it (its format, the device): the embedded output takes over, where it was.
+  element.addEventListener("fallback", (event) => {
+    const { key, message } = (event as CustomEvent<{ key: string; message: string }>).detail;
+    if (element !== audio || key !== loadedKey || !media || !embedded) return;
+    const position = element.currentTime;
+    const play = !element.paused;
+    audio = embedded;
+    element.removeAttribute("src");
+    output.sounding = null;
+    output.fallback = message;
+    embedded.src = media.url;
+    if (position > 0) embedded.currentTime = position;
+    if (play) {
+      void embedded.play().catch((error: unknown) => {
+        if (!interrupted(error)) playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
+      });
+    }
+  });
+}
+
+/**
+ * Plays the loaded track again in the output now chosen, from where it was and playing if it
+ * was (the person switched between the embedded and the native output).
+ */
+function switchOutput(): void {
+  const current = $toRaw(nowPlaying).value;
+  const target = native && output.kind !== "embedded" ? native : embedded;
+  if (!audio || !current || !loadedKey || audio === target) return;
+  resumeAt = { key: loadedKey, position: audio.currentTime, play: !audio.paused };
+  loadedKey = null;
+  void load(current);
+}
+
+if (embedded) {
+  wire(embedded);
+  if (native) {
+    wire(native);
+    wireNative(native);
   }
   // Once per change of the queue: its queue and index are written one after
   // the other, and in between the old index can point at another track of the
@@ -401,6 +538,19 @@ if (audio) {
     },
     { immediate: true }
   );
+  if (native) {
+    output.$on("kind", switchOutput);
+    // The queue changed around the loaded track: the native player's next one may have too.
+    let nextQueued = false;
+    playback.$on("queue", () => {
+      if (nextQueued) return;
+      nextQueued = true;
+      queueMicrotask(() => {
+        nextQueued = false;
+        void sendNext();
+      });
+    });
+  }
 }
 
 /**
@@ -596,11 +746,13 @@ export function keepPlaybackSaved(): void {
     void playback.playing;
     savePlayback();
   });
-  audio?.addEventListener("timeupdate", () => {
-    if (Date.now() - last > 1000) {
-      last = Date.now();
-      savePlayback();
-    }
-  });
+  for (const element of [embedded, native]) {
+    element?.addEventListener("timeupdate", () => {
+      if (element === audio && Date.now() - last > 1000) {
+        last = Date.now();
+        savePlayback();
+      }
+    });
+  }
   window.addEventListener("pagehide", savePlayback);
 }

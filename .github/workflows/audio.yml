@@ -1,0 +1,88 @@
+# The native output (E5, RECORD/2026-08-11.musikmatch-rust-migration.WIP.md, 2026-11-09): crates/audio
+# with its devices on the three systems (lints, and the tests: the files' PCM bit for bit through the
+# player, gapless, seeking, the spectrum), and on Linux the bit-perfect check through a real ALSA
+# device: ALSA's default device written to a file (the shared path), and ALSA's loopback card
+# (snd-aloop), played exclusively at 24/96 and recorded from its other end, compared sample for sample.
+name: audio
+
+on:
+  push:
+    paths:
+      - "crates/audio/**"
+      - "fixtures/audio/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/audio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crate:
+    name: crates/audio on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: ALSA's headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - run: cargo clippy -p jackbird-audio --features device --all-targets --locked -- -D warnings
+
+      - run: cargo test -p jackbird-audio --features device --locked
+
+  loopback:
+    name: Through ALSA itself (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: ALSA
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev alsa-utils
+
+      # The shared path first, with no card at all: ALSA's default device written to a file.
+      - name: A 24/96 FLAC through ALSA's default device, written to a file
+        run: |
+          home="$RUNNER_TEMP/alsa-home"; mkdir -p "$home"
+          printf 'pcm.!default {\n  type file\n  slave.pcm "null"\n  file "%s"\n  format "raw"\n}\n' "$RUNNER_TEMP/alsa-out.raw" > "$home/.asoundrc"
+          # ALSA reads ~/.asoundrc: HOME moves, cargo and rustup stay where they are.
+          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+          HOME="$home" JACKBIRD_AUDIO_ALSA_FILE="$RUNNER_TEMP/alsa-out.raw" \
+            cargo test -p jackbird-audio --features device --test loopback --locked -- --nocapture
+
+      # The loopback card is a kernel module the runner's kernel may not carry (Azure's kernels
+      # have no linux-modules-extra package): the check runs where it can be loaded, and says so
+      # where it cannot.
+      - name: ALSA's loopback card
+        id: aloop
+        run: |
+          if sudo modprobe snd-aloop 2>/dev/null || { sudo apt-get install -y "linux-modules-extra-$(uname -r)" && sudo modprobe snd-aloop; }; then
+            sudo chmod a+rw /dev/snd/*
+            cat /proc/asound/cards
+            aplay -l
+            echo "loaded=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::snd-aloop cannot be loaded on this runner's kernel ($(uname -r)): the loopback check did not run"
+          fi
+
+      - name: A 24/96 FLAC played exclusively and recorded back
+        if: steps.aloop.outputs.loaded == '1'
+        env:
+          JACKBIRD_AUDIO_LOOPBACK: "1"
+        run: cargo test -p jackbird-audio --features device --test loopback --locked -- --nocapture

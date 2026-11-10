@@ -1,0 +1,102 @@
+<script :setup lang="ts">
+  // Getting in (S3), when the service asks for it: on an open instance with
+  // several people, the profiles to pick; with sign-in on, an address and
+  // the code sent there, or a passkey. It cannot be closed: the library
+  // waits behind it. A view over lib/account.ts. See
+  // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-09, 10:45 to 11:57).
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+
+  const { t } = await import("../lib/i18n")
+  const { account, askCode, checkCode, otherAddress, passkeySignIn, passkeysHere, pickProfile } = await import("../lib/account")
+
+  let email: string = ""
+  let code: string = ""
+  const picking = (): boolean => !account.signin && Boolean(account.profiles)
+  const title = (): string => (picking() ? t("account.whoTitle") : t("account.signInTitle"))
+  const role = (name: string): string => t(`role.${name}` as "role.owner")
+  const submit = (event: Event) => {
+    event.preventDefault()
+    if (account.step === "email") void askCode(email.trim())
+    else void checkCode(code.trim())
+  }
+  const again = () => {
+    code = ""
+    otherAddress()
+  }
+</script>
+
+<div class="signin-dialog">
+  <Modal :open="account.needed" :eyebrow="t('account.eyebrow')" :title="title()" size="sm" :close-label="t('people.close')" @close="">
+    <div :if="picking()" class="profiles">
+      <p class="hint">{{ t("account.whoHint") }}</p>
+      <ul class="list">
+        <li :each="profile in account.profiles ?? []" :key="profile.id">
+          <button type="button" class="choice" :disabled="account.busy" @click="pickProfile(profile.id)">
+            <span class="name">{{ profile.name }}</span>
+            <span class="meta">{{ role(profile.role) }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <form :else class="form" @submit="submit($event)">
+      <Field :if="account.step === 'email'" :label="t('account.email')" control="signin-email" :hint="t('account.invitedOnly')">
+        <TextInput id="signin-email" type="email" autocomplete="username webauthn" describedby="signin-email-note" :model="email" @input="email = $event.detail" />
+      </Field>
+      <div :if="account.step === 'code'" class="code">
+        <p class="hint">{{ t("account.codeSent", { email: account.email }) }}</p>
+        <Field :label="t('account.code')" control="signin-code">
+          <TextInput id="signin-code" numeric inputmode="numeric" autocomplete="one-time-code" :model="code" @input="code = $event.detail" />
+        </Field>
+      </div>
+      <p :if="account.error" class="failure">{{ account.error }}</p>
+      <div class="keys">
+        <Key :if="account.step === 'email'" type="submit" variant="primary" :disabled="account.busy || !email.includes('@')">{{ t("account.sendCode") }}</Key>
+        <Key :if="account.step === 'code'" type="submit" variant="primary" :disabled="account.busy || code.trim().length < 6">{{ t("account.signIn") }}</Key>
+        <Key :if="account.step === 'code'" variant="ghost" :disabled="account.busy" @click="again()">{{ t("account.otherAddress") }}</Key>
+        <Key :if="account.step === 'email' && passkeysHere()" variant="secondary" :disabled="account.busy" @click="passkeySignIn()">{{ t("account.withPasskey") }}</Key>
+      </div>
+    </form>
+  </Modal>
+</div>
+
+<style scoped>
+  .signin-dialog { display: contents; }
+  .profiles, .form, .code { display: grid; gap: var(--mm-space-3); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+  .list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    list-style: none;
+  }
+  .list li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .choice {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mm-space-3);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    font: inherit;
+    font-size: var(--mm-text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  @media (hover: hover) { .choice:hover:not(:disabled) { background: var(--mm-hover); } }
+  .choice:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .choice:disabled { opacity: .45; cursor: default; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { flex: none; color: var(--mm-fg-subtle); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+</style>

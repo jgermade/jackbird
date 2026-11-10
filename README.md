@@ -55,7 +55,9 @@ opened. On Linux it needs WebKitGTK (see [Development](docs/development.md)).
 
 And as a service: `make service` builds `jackbird-service`, one binary with the web inside, and
 starts it on <http://localhost:4646>. Its page opens folders of the machine it runs on, in any
-browser. For now it is open and answers only on that machine; signing in comes later. The
+browser, and keeps a family library with people, roles and sign-in by email and passkeys. To
+install it on a home server, a NAS or a Raspberry Pi (Docker, or a binary), see
+[Installing the service](docs/install.md). The
 desktop app carries it and installs it from its Preferences, to start when you log in (no
 administrator rights) or with the system (administrator rights once); while it is installed, the
 app is its interface. On Linux this needs systemd.
@@ -63,6 +65,7 @@ app is its interface. On Linux this needs systemd.
 ## Documentation
 
 - [Using jackbird](docs/usage.md)
+- [Installing the service](docs/install.md)
 - [Architecture](docs/architecture.md)
 - [Development](docs/development.md)
 - [Releases and deployment](docs/releases.md)

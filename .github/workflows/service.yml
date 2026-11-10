@@ -1,9 +1,14 @@
 # jackbird's service (crates/service, S1): its tests, then its binary on Linux, macOS and Windows
 # with the web build embedded, and the unattended check on each (scripts/service-check.cjs: the
 # service started on a copy of the fixtures, its page driven in Chromium: a folder opened through
-# its dialog, a title saved, tracks played, the service restarted and the folder back). The
-# binaries are uploaded; release.yml calls it with the new tag and attaches them.
-# See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S1).
+# its dialog, a title saved, tracks played, the service restarted and the folder back), and
+# sign-in's (scripts/signin-check.cjs, S3: email set up with a local SMTP sink, sign-in turned on
+# by the owner's code, an editor and a listener invited, a code and a passkey, each role's limits,
+# the log, sessions kept across a restart), and the family library's (scripts/library-check.cjs,
+# F1, F3, F4: an owner's import, an editor's upload and retitle, a listener's playback and download,
+# their own versions, a stale save refused, the trash, and on Linux the library backed up with restic,
+# wiped and restored). The binaries are uploaded; release.yml calls it with
+# the new tag and attaches them. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S1, S3, F1).
 name: service
 
 on:
@@ -12,6 +17,9 @@ on:
       - "crates/**"
       - "src/**"
       - "scripts/service-check.cjs"
+      - "scripts/signin-check.cjs"
+      - "scripts/library-check.cjs"
+      - "scripts/smtp-sink.mjs"
       - "Cargo.toml"
       - "Cargo.lock"
       - "package.json"
@@ -22,6 +30,9 @@ on:
       - "crates/**"
       - "src/**"
       - "scripts/service-check.cjs"
+      - "scripts/signin-check.cjs"
+      - "scripts/library-check.cjs"
+      - "scripts/smtp-sink.mjs"
       - "Cargo.toml"
       - "Cargo.lock"
       - "package.json"
@@ -67,7 +78,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
 
       - name: The service's tests
-        run: cargo test -p jackbird-service -p jackbird-api -p jackbird-core --locked
+        run: cargo test -p jackbird-service -p jackbird-store -p jackbird-api -p jackbird-core --locked
 
       # The web build first: the release binary embeds it.
       - run: npm run build
@@ -80,10 +91,10 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright@1.63.0
           npx playwright install --with-deps chromium
 
-      - name: A long FLAC to play (Linux)
+      - name: A long FLAC to play, and restic for the library's copy away from home (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg restic
           ffmpeg -v error -f lavfi -i "sine=frequency=440:duration=20" -c:a flac \
             -metadata TITLE="Blue Tone" -metadata ARTIST="Test Artist" "$RUNNER_TEMP/cd.flac"
           echo "LONG=$RUNNER_TEMP/cd.flac" >> "$GITHUB_ENV"
@@ -91,6 +102,14 @@ jobs:
       - name: The unattended check
         shell: bash
         run: node scripts/service-check.cjs target/release/jackbird-service${{ runner.os == 'Windows' && '.exe' || '' }} $LONG
+
+      - name: Sign-in and people's check
+        shell: bash
+        run: node scripts/signin-check.cjs target/release/jackbird-service${{ runner.os == 'Windows' && '.exe' || '' }}
+
+      - name: The family library's check
+        shell: bash
+        run: node scripts/library-check.cjs target/release/jackbird-service${{ runner.os == 'Windows' && '.exe' || '' }}
 
       - name: Name the binary for its system
         shell: bash

@@ -5,6 +5,12 @@
 
 export const isDesktop: boolean = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/**
+ * Whether the app runs on a phone (Tauri's Android or iOS build, E6's spike): then it is a client
+ * of a family instance, by its address, and has no folders, service or native output of its own.
+ */
+export const isPhone: boolean = isDesktop && typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+
 let served: Promise<boolean> | null = null;
 
 /**

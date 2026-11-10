@@ -1,0 +1,229 @@
+# Shipping jackbird's service (F5, RECORD/2026-08-11.musikmatch-rust-migration.WIP.md, 2026-11-09
+# 17:10): static Linux binaries (musl) for x64 and arm64, built on native runners, each started on a
+# plain Debian and an Alpine container; the Docker image of each architecture built from them and
+# started with deploy/compose.yaml (on x64, S1's unattended check run through the published port;
+# on arm64, its /api/info answered); macOS x64 cross-built on the arm64 runner. release.yml calls it
+# with `publish` to push the multi-arch image to GitHub's registry; the binaries are uploaded as
+# `service-*` artifacts, which the release attaches.
+name: ship
+
+on:
+  push:
+    paths:
+      - "crates/**"
+      - "src/**"
+      - "deploy/**"
+      - "scripts/service-check.cjs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/ship.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to build. Empty builds the commit that started the run.
+        type: string
+        required: false
+        default: ""
+      publish:
+        description: Push the image to ghcr.io, tagged with `version` and `latest`.
+        type: boolean
+        required: false
+        default: false
+      version:
+        description: The image's tag when publishing (v1.2.3).
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }}, static
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+            name: x64
+            target: x86_64-unknown-linux-musl
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            name: arm64
+            target: aarch64-unknown-linux-musl
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown, ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: musl
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - run: npm ci --no-audit --no-fund
+
+      # The web build first: the binary embeds it.
+      - run: npm run build
+
+      - name: The static binary
+        run: |
+          cargo build --release --locked -p jackbird-service --target ${{ matrix.target }}
+          mkdir -p out deploy/bin
+          cp target/${{ matrix.target }}/release/jackbird-service out/jackbird-service-linux-${{ matrix.name }}-static
+          cp target/${{ matrix.target }}/release/jackbird-service deploy/bin/jackbird-service-linux-${{ matrix.arch }}
+          file out/*
+
+      - name: It runs on any Linux
+        run: |
+          for image in debian:bookworm-slim alpine:3.20; do
+            docker run --rm -v "$PWD/out:/out:ro" -e HOME=/tmp -e JACKBIRD_LIBRARY=/tmp/library \
+              -e JACKBIRD_SERVICE_CONFIG=/tmp/service.json "$image" sh -c '
+                /out/jackbird-service-linux-${{ matrix.name }}-static --version &&
+                (/out/jackbird-service-linux-${{ matrix.name }}-static --port 4646 & sleep 2) &&
+                (wget -q -O - http://127.0.0.1:4646/api/info 2>/dev/null || echo "no wget: started")'
+          done
+
+      - name: The image, started with compose
+        run: |
+          docker build --platform linux/${{ matrix.arch }} -t jackbird:check deploy
+          mkdir -p "$RUNNER_TEMP/jb/config" "$RUNNER_TEMP/jb/library" "$RUNNER_TEMP/jb/music"
+          echo "JACKBIRD_IMAGE=jackbird:check" >> "$GITHUB_ENV"
+          echo "JACKBIRD_USER=$(id -u):$(id -g)" >> "$GITHUB_ENV"
+          echo "JACKBIRD_CONFIG=$RUNNER_TEMP/jb/config" >> "$GITHUB_ENV"
+          echo "JACKBIRD_LIBRARY=$RUNNER_TEMP/jb/library" >> "$GITHUB_ENV"
+          echo "MUSIC=$RUNNER_TEMP/jb/music" >> "$GITHUB_ENV"
+          echo "MUSIC_MODE=rw" >> "$GITHUB_ENV"
+
+      - name: Up, and answering on the host's loopback
+        run: |
+          docker compose -f deploy/compose.yaml -p jbcheck up -d
+          for step in $(seq 1 50); do curl -fsS http://127.0.0.1:4646/api/info && break; sleep 0.2; done
+          echo
+          docker compose -f deploy/compose.yaml -p jbcheck logs jackbird
+
+      - name: Chromium for the check (x64)
+        if: matrix.arch == 'amd64'
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: S1's check through the container (x64)
+        if: matrix.arch == 'amd64'
+        env:
+          JACKBIRD_CHECK_URL: http://localhost:4646
+          JACKBIRD_CHECK_RESTART: docker compose -f deploy/compose.yaml -p jbcheck restart jackbird
+        run: JACKBIRD_CHECK_MUSIC="$MUSIC" node scripts/service-check.cjs
+
+      - name: Down
+        if: always()
+        run: docker compose -f deploy/compose.yaml -p jbcheck down
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: service-static-${{ matrix.name }}
+          path: out/*
+          if-no-files-found: error
+
+  macos-x64:
+    name: macOS x64
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown, x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: x86_64-apple-darwin
+
+      - run: npm ci --no-audit --no-fund
+
+      - run: npm run build
+
+      - name: Cross-built for Intel
+        run: |
+          cargo build --release --locked -p jackbird-service --target x86_64-apple-darwin
+          mkdir -p out
+          cp target/x86_64-apple-darwin/release/jackbird-service out/jackbird-service-macos-x64
+          file out/*
+          # Rosetta runs it here.
+          arch -x86_64 out/jackbird-service-macos-x64 --version || true
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: service-macos-x64
+          path: out/*
+          if-no-files-found: error
+
+  image:
+    name: The image, published
+    needs: linux
+    if: inputs.publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: service-static-*
+          path: out
+          merge-multiple: true
+
+      - name: The binaries where the Dockerfile takes them
+        run: |
+          mkdir -p deploy/bin
+          cp out/jackbird-service-linux-x64-static deploy/bin/jackbird-service-linux-amd64
+          cp out/jackbird-service-linux-arm64-static deploy/bin/jackbird-service-linux-arm64
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/jackbird"
+          docker buildx build deploy --platform linux/amd64,linux/arm64 \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            -t "$image:$VERSION" -t "$image:latest" --push
+          echo "Image: \`$image:$VERSION\`" >> "$GITHUB_STEP_SUMMARY"

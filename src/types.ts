@@ -155,6 +155,8 @@ export type MediaHandle = {
   changed: () => Promise<boolean>;
   /** Gives the URL back; the media is no use after it. */
   release: () => void;
+  /** In the desktop app, the file by its root and path, for the native player (E5). */
+  native?: { root: string; path: string };
 };
 
 /**
@@ -164,7 +166,7 @@ export type MediaHandle = {
  * the IPC). See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4-D1, E4-D2).
  */
 export type RootSource = {
-  readonly kind: "browser" | "desktop" | "service";
+  readonly kind: "browser" | "desktop" | "service" | "library";
   /** The small-file adapter: `.meta/`, playlists, renames, deletes. */
   readonly vfs: VFSAdapter;
   /** What the session keeps to reopen it: a directory handle, or a path. */
@@ -173,8 +175,8 @@ export type RootSource = {
   walk(): Promise<WalkedFile[]>;
   /** One file's checksums, size and date; its tags too, unless its full checksum is still `known`. */
   inspect(path: string, known?: string): Promise<Inspection>;
-  /** Writes `metadata` over the tags the library held (`previous`); the file as it is after. */
-  save(path: string, previous: TrackMetadata, metadata: TrackMetadata): Promise<Inspection>;
+  /** Writes `metadata` over the tags the library held (`previous`); the file as it is after. In the family library (F3), for everyone (`family`) or for oneself (`mine`), refused (`stale`, F4) when it changed since its full checksum was `expected`. */
+  save(path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine", expected?: string): Promise<Inspection>;
   /** Opens a track's file for playing, without reading it into memory. */
   openMedia(path: string): Promise<MediaHandle>;
   /** The root was closed: on the desktop, nothing under it can be reached any more. */

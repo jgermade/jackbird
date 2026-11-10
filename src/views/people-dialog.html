@@ -1,0 +1,358 @@
+<script :setup lang="ts">
+  // People and sign-in (S3), for owners and admins, in three tabs: the
+  // people (with sign-in off, profiles; with it on, invited by email), their
+  // roles as the person may give them; sign-in: email (SMTP) and, for owners,
+  // the instance's address, the home network, and turning sign-in on (by a
+  // code to their own address) and off; and the log of changes. A view over
+  // lib/people.ts; the service decides. See
+  // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-09, 10:45 to 11:57).
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const Select = await import("../../theme/default/components/select.html")
+  const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
+  const Tabs = await import("../../theme/default/components/tabs.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+
+  const { t } = await import("../lib/i18n")
+  const { preferences } = await import("../lib/preferences")
+  const { account } = await import("../lib/account")
+  const { assignable, canManage } = await import("../helpers/roles")
+  const {
+    addPerson, cancelSetup, confirmSetupCode, emptyTrash, exportLibrary, loadBackups, loadLog, loadTrash, people, removePerson,
+    restoreSong, saveSettings, saveSmtp, sendSetupCode, signinOff, startScrub, takeSnapshot, testSmtp, updatePerson
+  } = await import("../lib/people")
+
+  type Role = "listener" | "editor" | "admin" | "owner"
+  const owner = (): boolean => account.me?.role === "owner"
+  const role = (name: string): string => t(`role.${name}` as "role.owner")
+  const action = (name: string): string => t(`log.action.${name}` as "log.action.save")
+  const when = (seconds: number): string => new Date(seconds * 1000).toLocaleString(preferences.language)
+  const tabs = () => [
+    { id: "people", label: t("people.tabPeople") },
+    { id: "signin", label: t("people.tabSignin") },
+    { id: "log", label: t("people.tabLog") },
+    ...(importing.available ? [{ id: "trash", label: t("people.tabTrash") }] : []),
+    ...(importing.available && owner() ? [{ id: "backups", label: t("people.tabBackups") }] : [])
+  ]
+  const choose = (tab: "people" | "signin" | "log" | "trash" | "backups") => {
+    people.tab = tab
+    if (tab === "log") void loadLog()
+    if (tab === "trash") void loadTrash()
+    if (tab === "backups") void loadBackups()
+  }
+  // The library's safety (F4).
+  const { importing } = await import("../lib/importing")
+  const { chooseMachineFolder } = await import("../lib/folders")
+  const exportTo = async () => {
+    const path = await chooseMachineFolder()
+    if (path !== null) await exportLibrary(path)
+  }
+  const scrubText = (): string => {
+    const scrub = people.backups?.scrub
+    if (!scrub) return ""
+    if (scrub.running) return t("backups.scrubbing", { done: scrub.done, total: scrub.total })
+    if (!scrub.at) return t("backups.neverScrubbed")
+    const bad = (scrub.result as unknown[] | null)?.length ?? 0
+    return bad === 0 ? t("backups.scrubOk", { date: when(scrub.at / 1000) }) : t("backups.scrubBad", { count: bad, date: when(scrub.at / 1000) })
+  }
+  const exportText = (): string => {
+    const job = people.backups?.export
+    if (!job || (!job.running && !job.at)) return ""
+    if (job.running) return t("backups.exporting", { done: job.done, total: job.total })
+    if (job.error) return job.error
+    const result = job.result as { written: number; failed: unknown[] } | null
+    return t("backups.exported", { written: result?.written ?? 0, failed: result?.failed.length ?? 0 })
+  }
+
+  // The person being changed (an id), or someone new (0), and the form's fields.
+  let editing: number | null = null
+  let name: string = ""
+  let email: string = ""
+  let chosenRole: Role = "listener"
+  const edit = (id: number) => {
+    const person = people.list.find((one) => one.id === id)
+    editing = id
+    name = person?.name ?? ""
+    email = person?.email ?? ""
+    chosenRole = (person?.role ?? "listener") as Role
+  }
+  const editable = (): boolean => {
+    const person = people.list.find((one) => one.id === editing)
+    return editing === 0 || Boolean(person && canManage(account.me?.role, person.role))
+  }
+  const roles = () => {
+    const mine = assignable(account.me?.role)
+    const current = people.list.find((one) => one.id === editing)?.role
+    const all = current && !mine.includes(current) ? [current, ...mine] : mine
+    return all.map((value) => ({ value, label: role(value) }))
+  }
+  const status = (person: { enabled: boolean; email: string | null; confirmed: boolean }): string => {
+    if (!person.enabled) return t("people.disabled")
+    if (person.email && !person.confirmed) return t("people.unconfirmed")
+    return person.email ?? ""
+  }
+  const save = async (event: Event) => {
+    event.preventDefault()
+    if (editing === 0) {
+      if (await addPerson(name.trim(), email.trim(), chosenRole, t("people.invited"))) editing = null
+    } else if (editing !== null) {
+      const person = people.list.find((one) => one.id === editing)
+      await updatePerson(
+        editing,
+        {
+          name: name.trim(),
+          ...(email.trim() !== (person?.email ?? "") ? { email: email.trim() } : {}),
+          ...(chosenRole !== person?.role ? { role: chosenRole } : {})
+        },
+        t("people.invited")
+      )
+    }
+  }
+  const remove = async () => {
+    if (editing !== null && editing !== 0) {
+      await removePerson(editing)
+      editing = null
+    }
+  }
+
+  // Email (SMTP).
+  let host: string = ""
+  let port: string = "587"
+  let security: string = "starttls"
+  let username: string = ""
+  let password: string = ""
+  let from: string = ""
+  let testTo: string = ""
+  const loaded = (smtp: typeof people.smtp) => {
+    if (!smtp) return
+    host = smtp.host
+    port = String(smtp.port)
+    security = smtp.security
+    username = smtp.username
+    from = smtp.from
+  }
+  $: loaded(people.smtp)
+  const securities = [
+    { value: "starttls", label: "STARTTLS" },
+    { value: "tls", label: "TLS" },
+    { value: "none", label: "—" }
+  ]
+  const saveEmail = () => void saveSmtp({ host, port: Number(port) || 0, security, username, password, from }, t("smtp.saved"))
+
+  // The instance (owners).
+  let address: string = ""
+  const settingsLoaded = (settings: typeof people.settings) => {
+    if (settings) address = settings.address
+  }
+  $: settingsLoaded(people.settings)
+  let ownEmail: string = ""
+  let setupCode: string = ""
+</script>
+
+<div class="people-dialog">
+  <Modal :open="people.open" :eyebrow="t('people.eyebrow')" :title="t('people.title')" size="md" :close-label="t('people.close')" @close="people.open = false">
+    <template :slot.nav>
+      <Tabs plain :label="t('people.tabs')" :items="tabs()" :model="people.tab" @change="choose($event.detail)" />
+    </template>
+
+    <p :if="people.error" class="failure">{{ people.error }}</p>
+    <p :if="people.notice" class="notice">{{ people.notice }}</p>
+
+    <section :if="people.tab === 'people'" class="tab">
+      <p class="hint">{{ account.signin ? t("people.emailHint") : t("people.profilesHint") }}</p>
+      <ul class="list">
+        <li :each="person in people.list" :key="person.id">
+          <button type="button" class="choice" :aria-pressed="editing === person.id" @click="edit(person.id)">
+            <span class="name">{{ person.name }}<span :if="person.id === account.me?.id" class="you"> · {{ t("people.you") }}</span></span>
+            <span class="meta">{{ role(person.role) }}</span>
+            <span class="status" :class="{ off: !person.enabled }">{{ status(person) }}</span>
+          </button>
+        </li>
+      </ul>
+      <Key :if="editing === null" variant="secondary" @click="edit(0)">{{ t("people.addTitle") }}</Key>
+      <form :if="editing !== null" class="form" @submit="save($event)">
+        <Field :label="t('people.name')" control="person-name">
+          <TextInput id="person-name" :model="name" :disabled="!editable()" @input="name = $event.detail" />
+        </Field>
+        <Field :label="t('people.email')" control="person-email">
+          <TextInput id="person-email" type="email" :model="email" :disabled="!editable()" @input="email = $event.detail" />
+        </Field>
+        <Field :label="t('people.role')" control="person-role">
+          <Select id="person-role" :model="chosenRole" :options="roles()" @change="chosenRole = $event.detail" />
+        </Field>
+        <div class="keys">
+          <Key type="submit" variant="primary" :disabled="people.busy || !editable() || !name.trim()">{{ editing === 0 ? t("people.add") : t("people.save") }}</Key>
+          <Key :if="editing !== 0" variant="danger" :disabled="people.busy || !editable()" @click="remove()">{{ t("people.remove") }}</Key>
+          <Key variant="ghost" @click="editing = null">{{ t("signin.cancel") }}</Key>
+        </div>
+      </form>
+    </section>
+
+    <section :if="people.tab === 'signin'" class="tab">
+      <p class="state">{{ account.signin ? t("signin.on") : t("signin.off") }}</p>
+
+      <h3 class="mm-legend is-ink">{{ t("smtp.title") }}</h3>
+      <div class="grid">
+        <Field :label="t('smtp.host')" control="smtp-host">
+          <TextInput id="smtp-host" :model="host" @input="host = $event.detail" />
+        </Field>
+        <Field :label="t('smtp.security')" control="smtp-security">
+          <Select id="smtp-security" :model="security" :options="securities" @change="security = $event.detail" />
+        </Field>
+        <Field :label="t('smtp.port')" control="smtp-port">
+          <TextInput id="smtp-port" numeric inputmode="numeric" :model="port" @input="port = $event.detail" />
+        </Field>
+        <Field :label="t('smtp.username')" control="smtp-username">
+          <TextInput id="smtp-username" autocomplete="off" :model="username" @input="username = $event.detail" />
+        </Field>
+        <Field :label="t('smtp.password')" control="smtp-password" :hint="people.smtp?.password ? t('smtp.passwordKept') : ''">
+          <TextInput id="smtp-password" type="password" autocomplete="new-password" :model="password" @input="password = $event.detail" />
+        </Field>
+        <Field :label="t('smtp.from')" control="smtp-from" :hint="t('smtp.fromHint')">
+          <TextInput id="smtp-from" type="email" :model="from" @input="from = $event.detail" />
+        </Field>
+      </div>
+      <div class="keys">
+        <Key variant="secondary" :disabled="people.busy || !host.trim()" @click="saveEmail()">{{ t("smtp.save") }}</Key>
+      </div>
+      <div :if="people.smtp" class="test">
+        <Field :label="t('smtp.testTo')" control="smtp-test">
+          <TextInput id="smtp-test" type="email" :model="testTo" @input="testTo = $event.detail" />
+        </Field>
+        <Key variant="ghost" :disabled="people.busy || !testTo.includes('@')" @click="testSmtp(testTo, t('smtp.sent'))">{{ t("smtp.test") }}</Key>
+      </div>
+
+      <p :if="!owner()" class="hint">{{ t("signin.ownerOnly") }}</p>
+      <div :if="owner()" class="owner">
+        <h3 class="mm-legend is-ink">{{ t("signin.address") }}</h3>
+        <Field :label="t('signin.address')" control="instance-address" :hint="t('signin.addressHint')">
+          <TextInput id="instance-address" type="url" placeholder="https://music.example.com" :model="address" @input="address = $event.detail" />
+        </Field>
+        <div :if="account.signin" class="network">
+          <SlideSwitch :label="t('signin.network')" :off-legend="t('signin.networkOff')" :on-legend="t('signin.networkOn')" :model="people.settings?.network ?? false" @change="saveSettings({ network: $event.detail }, t('signin.saved'))" />
+          <p class="hint">{{ t("signin.networkHint") }}</p>
+        </div>
+        <div class="keys">
+          <Key variant="secondary" :disabled="people.busy" @click="saveSettings({ address }, t('signin.saved'))">{{ t("signin.save") }}</Key>
+        </div>
+
+        <div :if="!account.signin" class="turn">
+          <p class="hint">{{ people.smtp ? t("signin.turnOnHint") : t("signin.needSmtp") }}</p>
+          <div :if="people.smtp && !people.setupAttempt" class="row">
+            <Field :label="t('signin.yourEmail')" control="setup-email">
+              <TextInput id="setup-email" type="email" :model="ownEmail" @input="ownEmail = $event.detail" />
+            </Field>
+            <Key variant="secondary" :disabled="people.busy || !ownEmail.includes('@')" @click="sendSetupCode(ownEmail.trim())">{{ t("signin.sendCode") }}</Key>
+          </div>
+          <div :if="people.setupAttempt" class="row">
+            <p class="hint">{{ t("signin.codeSent", { email: people.setupEmail }) }}</p>
+            <Field :label="t('signin.code')" control="setup-code">
+              <TextInput id="setup-code" numeric inputmode="numeric" autocomplete="one-time-code" :model="setupCode" @input="setupCode = $event.detail" />
+            </Field>
+            <Key variant="primary" :disabled="people.busy || setupCode.trim().length < 6" @click="confirmSetupCode(setupCode.trim())">{{ t("signin.confirm") }}</Key>
+            <Key variant="ghost" @click="cancelSetup()">{{ t("signin.cancel") }}</Key>
+          </div>
+        </div>
+        <div :else class="turn">
+          <p class="hint">{{ t("signin.turnOffHint") }}</p>
+          <Key variant="danger" :disabled="people.busy" @click="signinOff()">{{ t("signin.turnOff") }}</Key>
+        </div>
+      </div>
+    </section>
+
+    <section :if="people.tab === 'trash'" class="tab">
+      <p class="hint">{{ t("trash.about") }}</p>
+      <p :if="people.trash.length === 0" class="hint">{{ t("trash.empty") }}</p>
+      <ul :else class="log">
+        <li :each="song in people.trash" :key="song.id" class="trashed">
+          <span class="when">{{ when(song.at / 1000) }} · {{ song.by }}</span>
+          <span class="path">{{ song.path }}</span>
+          <Key size="sm" variant="ghost" :disabled="people.busy" @click="restoreSong(song.id, t('trash.restored'))">{{ t("trash.restore") }}</Key>
+        </li>
+      </ul>
+      <div :if="people.trash.length > 0" class="keys">
+        <Key variant="danger" :disabled="people.busy" @click="emptyTrash(t('trash.emptied'))">{{ t("trash.emptyNow") }}</Key>
+      </div>
+    </section>
+
+    <section :if="people.tab === 'backups'" class="tab">
+      <p class="hint">{{ t("backups.about", { folder: people.backups?.folder ?? "" }) }}</p>
+      <h3 class="mm-legend is-ink">{{ t("backups.snapshots") }}</h3>
+      <p class="hint">{{ (people.backups?.snapshots.length ?? 0) > 0 ? people.backups?.snapshots.slice().reverse().join(" · ") : t("backups.none") }}</p>
+      <div class="keys">
+        <Key variant="secondary" :disabled="people.busy" @click="takeSnapshot(t('backups.taken'))">{{ t("backups.takeNow") }}</Key>
+      </div>
+      <h3 class="mm-legend is-ink">{{ t("backups.scrub") }}</h3>
+      <p class="hint">{{ scrubText() }}</p>
+      <div class="keys">
+        <Key variant="secondary" :disabled="people.busy || people.backups?.scrub.running" @click="startScrub()">{{ t("backups.scrubNow") }}</Key>
+      </div>
+      <h3 class="mm-legend is-ink">{{ t("backups.export") }}</h3>
+      <p class="hint">{{ exportText() || t("backups.exportAbout") }}</p>
+      <div class="keys">
+        <Key variant="secondary" :disabled="people.busy || people.backups?.export.running" @click="exportTo()">{{ t("backups.exportNow") }}</Key>
+      </div>
+    </section>
+
+    <section :if="people.tab === 'log'" class="tab">
+      <p :if="people.log.length === 0" class="hint">{{ t("log.empty") }}</p>
+      <ul :else class="log">
+        <li :each="change in people.log" :key="`${change.at}-${change.path}-${change.action}`">
+          <span class="when">{{ when(change.at) }}</span>
+          <span>{{ change.person }} {{ action(change.action) }} <span class="path">{{ change.path || change.root }}</span></span>
+        </li>
+      </ul>
+    </section>
+  </Modal>
+</div>
+
+<style scoped>
+  .people-dialog { display: contents; }
+  .tab, .form, .owner, .turn, .test, .row { display: grid; gap: var(--mm-space-3); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--mm-space-3); }
+  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .state { margin: 0; color: var(--mm-fg); }
+  .owner { padding-top: var(--mm-space-3); border-top: var(--mm-border-width) solid var(--mm-border); }
+  .list, .log {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    list-style: none;
+  }
+  .list li + li, .log li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .choice {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0 var(--mm-space-3);
+    width: 100%;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    font: inherit;
+    font-size: var(--mm-text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  .choice[aria-pressed="true"] { background: var(--mm-sunken); }
+  @media (hover: hover) { .choice:hover { background: var(--mm-hover); } }
+  .choice:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .you { font-weight: 400; color: var(--mm-fg-subtle); }
+  .meta { color: var(--mm-fg-subtle); }
+  .status { grid-column: 1 / -1; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
+  .status.off { color: var(--mm-bad); }
+  .log li { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-2) var(--mm-space-3); font-size: var(--mm-text-sm); }
+  .trashed { grid-template-columns: 1fr auto; align-items: center; }
+  .trashed .when, .trashed .path { grid-column: 1; }
+  .trashed :last-child { grid-column: 2; grid-row: 1 / span 2; }
+  .when { color: var(--mm-fg-subtle); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); }
+  .path { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); word-break: break-all; }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+  .notice { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-accent); border-radius: var(--mm-radius-key); background: var(--mm-sunken); font-size: var(--mm-text-sm); }
+</style>

@@ -59,12 +59,12 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Linux packages (Tauri's, a virtual display, and GStreamer's decoders)
+      - name: Linux packages (Tauri's, ALSA's for the native output, a virtual display, and GStreamer's decoders)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev \
-            libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb \
+            libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb libasound2-dev \
             gstreamer1.0-plugins-good gstreamer1.0-libav
 
       # wasm32: npm run build builds the tag engine for the web first (scripts/build-wasm.mjs).
@@ -93,7 +93,12 @@ jobs:
         shell: bash
         run: |
           case "$RUNNER_OS" in
-            Linux) xvfb-run -a node scripts/desktop-check.mjs target/release/jackbird ;;
+            # No sound card on the runner: ALSA's default device writes to a file, and the native
+            # player (E5) must play there.
+            Linux)
+              home="$RUNNER_TEMP/alsa-home"; mkdir -p "$home"
+              printf 'pcm.!default {\n  type file\n  slave.pcm "null"\n  file "%s"\n  format "raw"\n}\n' "$RUNNER_TEMP/alsa-out.raw" > "$home/.asoundrc"
+              HOME="$home" JACKBIRD_CHECK_NATIVE=required xvfb-run -a node scripts/desktop-check.mjs target/release/jackbird ;;
             Windows) node scripts/desktop-check.mjs target/release/jackbird.exe ;;
             macOS) node scripts/desktop-check.mjs target/release/jackbird ;;
           esac

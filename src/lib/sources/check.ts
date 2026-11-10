@@ -2,12 +2,13 @@
 // started with JACKBIRD_CHECK_FOLDER, it opens that folder through the same
 // source the app uses, inspects every track, saves a title into one of them
 // and reads it back, plays one MP3 and one FLAC for a few seconds through a
-// Web Audio analyser, then opens the folder in the library as a person would
+// Web Audio analyser and a 24/96 FLAC through the native player (E5), then opens the folder in the library as a person would
 // (so the session keeps it), and reports what it found as JSON; then the app
 // quits. Started again with JACKBIRD_CHECK_RESTORE, it reports what the
 // session reopened. Nothing happens otherwise. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { isAudioFile } from "../../helpers/formats";
 import { emptyMetadata } from "../../helpers/metadata";
 import { library } from "../library";
@@ -42,6 +43,39 @@ async function play(url: string): Promise<{ played: number; analyser: number; er
     audio.pause();
     void context.close();
   }
+}
+
+type NativeReport = { devices: number; started: unknown; ended: boolean; failed: string | null; position: number; spectrum: number };
+
+/**
+ * Plays a track a few seconds with the native player (E5): the devices it lists, how the song
+ * reached the device (or why it could not: a runner may have no sound card), how far it got,
+ * whether it ended, and the loudest bin of its spectrum.
+ */
+async function playNative(root: string, path: string): Promise<NativeReport> {
+  const report: NativeReport = { devices: 0, started: null, ended: false, failed: null, position: 0, spectrum: 0 };
+  report.devices = (await invoke<unknown[]>("audio_devices").catch(() => [])).length;
+  const stop = await listen<{ event: string; route?: unknown; message?: string }>("audio", ({ payload }) => {
+    if (payload.event === "started") report.started = payload.route;
+    if (payload.event === "failed") report.failed = payload.message ?? "failed";
+    if (payload.event === "ended") report.ended = true;
+  });
+  try {
+    await invoke("audio_configure", { settings: { mode: "shared", device: null } });
+    await invoke("audio_load", { root, path, key: "check", at: 0, play: true });
+    for (let step = 0; step < 300 && !report.failed && !report.ended; step += 1) {
+      await wait(10);
+      const heard = await invoke<{ bins: number[] } | null>("audio_spectrum").catch(() => null);
+      report.spectrum = Math.max(report.spectrum, ...(heard?.bins ?? [0]));
+      report.position = Math.max(report.position, (await invoke<{ position: number }>("audio_status")).position);
+    }
+  } catch (error) {
+    report.failed = String(error);
+  } finally {
+    await invoke("audio_stop").catch(() => undefined);
+    stop();
+  }
+  return report;
 }
 
 /** Waits until the library has its roots loaded (or 20 s). */
@@ -96,6 +130,8 @@ export async function runCheckIfAsked(): Promise<void> {
       }
     }
     report.played = played;
+    const hires = tracks.find((one) => /24-96\.flac$/.test(one.path));
+    if (hires) report.native = await playNative(folder, hires.path);
     // As a person opens a folder: the library shows it and the session keeps it.
     await hydrateRoot(source, {});
     await settled();

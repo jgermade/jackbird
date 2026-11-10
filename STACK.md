@@ -78,6 +78,13 @@ This document describes the technical stack and codebase architecture implemente
 - **`jackbird-service`** (`crates/service`): axum 0.8.9 on tokio 1.54.1, `tower-http` 0.7.1 for
   ranged file reads, the web build embedded with `rust-embed` 8.13.0; the JSON of `crates/api`
   (serde). One binary per system, built by `service.yml`.
+- **People and sign-in** (S3): SQLite through `rusqlite` 0.40.2 (bundled, nothing to install);
+  email by SMTP with `lettre` 0.11.23 (rustls); passkeys with `webauthn-rs` 0.5.5 (as intergate
+  uses `go-webauthn`), on OpenSSL built from source by Cargo (`openssl` 0.10.82, `vendored`);
+  signed tokens with `hmac` 0.13 and `sha2` 0.11; the home network's addresses with `if-addrs`
+  0.15. The tests' passkeys come from an authenticator of their own on `p256` 0.14.
+- **The family library** (F1, `crates/store`): SQLite (`rusqlite`) for its catalogue, SHA-256
+  (`sha2`) for its names; the service streams songs out with `tokio-util`'s `ReaderStream`.
 
 ### Build Tools & Tooling
 - **Bundler & Dev Server**: Vite (`^5.4.8`), with two entries: the app (`index.html`) and the

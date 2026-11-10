@@ -81,6 +81,61 @@ A single cached entry inside a `MetaSnapshot`: `checksum`, `metadata`, and `upda
 
 ---
 
+## People (the service, S3)
+
+### Person
+Someone with a place in an instance of jackbird's service: a name, a role, and, for sign-in, an
+email. Every instance starts with one, its owner. Kept in `jackbird.db` (`crates/service/src/people.rs`).
+
+### Profile
+A person while sign-in is off: picked in the browser ("Who's listening?"), with no code or
+passkey. Its role decides what is offered, not what is protected.
+
+### Role
+What a person may do, each including the ones before it: **listener** (plays), **editor**
+(changes the folders), **admin** (adds editors and listeners, email, the log), **owner** (the
+folders, the address, the network, sign-in, other owners and admins).
+
+### Sign-in
+The switch that makes people prove who they are: a one-time **code** sent by email, or a
+**passkey**. Only an owner turns it on (by confirming their own address) or off. Sign-up is by
+**invitation**: an owner or admin gives someone an address.
+
+### Disabled
+A person with sign-in on whose address is not confirmed yet: kept, with their role, but unable to
+sign in until they type the code sent to it.
+
+## The family library (F1)
+
+### Library
+The service's own store of songs, shared by its people, shown as a root (`Library`). Not a folder
+to browse: a store (`crates/store`).
+
+### Blob
+A song as it was imported, whole and never changed, named by the SHA-256 of its audio region.
+The same audio is kept once.
+
+### Layer
+A song's tags at one level: the **file's** (as imported) and the **family's** (what editors set).
+What everyone sees is the family's over the file's; the song leaves with them.
+
+### Suggestion
+Other tags brought with audio the library already has, kept beside the song for editors to apply
+for everyone; since F3 they are also the importer's own layer.
+
+### Own version
+A person's layer of a song, over the family's: what they set **only for me**. **My playlists** is
+their own folder of the library: their playlists, **Favourites** and **Recently played**.
+
+### Trash
+Where deleted songs of the library wait for 30 days before they and their blobs go.
+
+### Snapshot
+A night's copy of the library's databases, in its `backups/` folder.
+
+### Scrub
+The weekly check of every blob against its name (the SHA-256 of its audio).
+
 ## Theming
 
 ### Theme

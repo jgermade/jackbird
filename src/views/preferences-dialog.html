@@ -3,8 +3,11 @@
   // interface language, each language named in itself; in the desktop app,
   // the service (S2): its state, and Install (at logon, or with the system),
   // Start, Update and Uninstall. A view over lib/preferences.ts and
-  // lib/desktop-service.ts. See RECORD/2026-11-03.deck-design-system.WIP.md
-  // (steps 6 and 7) and RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S2).
+  // lib/desktop-service.ts. With the service's people (S3), the account: who
+  // is in, their name, their passkeys and sessions (with sign-in on), signing
+  // out or switching profile, and, for admins and owners, "People and
+  // sign-in". See RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7)
+  // and RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S2, S3).
 
   const Field = await import("../../theme/default/components/field.html")
   const Modal = await import("../../theme/default/components/modal.html")
@@ -16,14 +19,44 @@
   const { languageName, t } = await import("../lib/i18n")
   const { LANGUAGES, preferences, setLanguage, setTheme } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
-  const { isDesktop } = await import("../lib/platform")
+  const { isDesktop, isPhone } = await import("../lib/platform")
+  const { forgetInstance, instance } = await import("../lib/instance")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
+  const { account, addKey, addPasskey, can, endSession, loadMine, passkeysHere, removeKey, removePasskey, renameMe, signOut } = await import("../lib/account")
+  const { openPeople } = await import("../lib/people")
+  const { describeAgent } = await import("../helpers/agent")
+  const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
+  const { importing } = await import("../lib/importing")
+  const { loadDevices, output, setOutputDevice, setOutputKind, soundingText } = await import("../lib/output")
+  const { devicesFor } = await import("../helpers/output")
 
   // On Windows, starting with the system runs the service as the person: Windows asks for their password.
   const onWindows = /Windows/.test(navigator.userAgent)
   let password: string = ""
   const opened = (open: boolean) => {
     if (open && isDesktop) void refreshServiceStatus()
+    if (open && output.available) void loadDevices()
+    if (open && account.active && account.me) {
+      myName = account.me.name
+      void loadMine()
+    }
+  }
+  let myName: string = ""
+  let passkeyName: string = ""
+  let keyName: string = ""
+  const newKey = async () => {
+    await addKey(keyName.trim())
+    keyName = ""
+  }
+  const role = (name: string): string => t(`role.${name}` as "role.owner")
+  const newPasskey = async () => {
+    await addPasskey(passkeyName.trim())
+    passkeyName = ""
+  }
+  const when = (seconds: number): string => new Date(seconds * 1000).toLocaleString(preferences.language)
+  const people = () => {
+    ui.preferencesOpen = false
+    void openPeople(account.me?.role === "owner")
   }
   $: opened(ui.preferencesOpen)
   const way = (): string => (serviceState.status?.installed === "system" ? t("service.waySystem") : t("service.wayLogon"))
@@ -32,6 +65,13 @@
     if (!status?.installed) return t("service.none")
     return status.running ? t("service.running", { way: way(), address: `http://localhost:${status.port}` }) : t("service.stopped", { way: way() })
   }
+
+  const kinds = () => (["shared", "exclusive", "embedded"] as const).map((kind) => ({ value: kind, label: t(`output.${kind}`) }))
+  const deviceOptions = () => [
+    { value: "", label: t("output.defaultDevice") },
+    ...devicesFor(output.kind, output.devices).map((device) => ({ value: device.id, label: device.name }))
+  ]
+  const pickKind = (kind: string) => setOutputKind(kind === "exclusive" || kind === "embedded" ? kind : "shared")
 
   $: isDark = preferences.theme === "dark"
   const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
@@ -47,7 +87,99 @@
         </div>
         <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
       </section>
-      <section :if="isDesktop" class="pref service">
+      <section :if="account.active && account.me" class="pref account">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("account.title") }}</h3>
+          <p class="state">{{ t("account.as", { name: account.me?.name ?? "", role: role(account.me?.role ?? "listener") }) }}<span :if="account.me?.email"> · {{ account.me?.email }}</span></p>
+        </div>
+        <p :if="account.error" class="failure">{{ account.error }}</p>
+        <div class="row">
+          <Field :label="t('account.name')" control="account-name">
+            <TextInput id="account-name" :model="myName" @input="myName = $event.detail" />
+          </Field>
+          <Key size="sm" :disabled="account.busy || !myName.trim() || myName.trim() === account.me?.name" @click="renameMe(myName.trim())">{{ t("account.saveName") }}</Key>
+        </div>
+        <div :if="account.signin" class="sub">
+          <h4 class="mm-legend">{{ t("account.passkeys") }}</h4>
+          <p :if="account.passkeys.length === 0" class="hint">{{ t("account.passkeysNone") }}</p>
+          <ul :else class="items">
+            <li :each="passkey in account.passkeys" :key="passkey.id">
+              <span class="label">{{ passkey.name }}</span>
+              <Key size="sm" variant="ghost" :disabled="account.busy" @click="removePasskey(passkey.id)">{{ t("account.remove") }}</Key>
+            </li>
+          </ul>
+          <div :if="passkeysHere()" class="row">
+            <Field :label="t('account.passkeyName')" control="passkey-name">
+              <TextInput id="passkey-name" :model="passkeyName" @input="passkeyName = $event.detail" />
+            </Field>
+            <Key size="sm" :disabled="account.busy" @click="newPasskey()">{{ t("account.addPasskey") }}</Key>
+          </div>
+          <p :else class="hint">{{ t("account.passkeySecure") }}</p>
+          <h4 class="mm-legend">{{ t("account.sessions") }}</h4>
+          <ul class="items">
+            <li :each="session in account.sessions" :key="session.id">
+              <span class="label" :title="session.agent">{{ describeAgent(session.agent, t("account.on")) || "—" }}<small> · {{ t("account.sessionSeen", { date: when(session.seen) }) }}</small></span>
+              <Key size="sm" variant="ghost" :disabled="account.busy" @click="endSession(session.id)">{{ t("account.endSession") }}</Key>
+            </li>
+          </ul>
+        </div>
+        <div class="sub">
+          <h4 class="mm-legend">{{ t("account.keys") }}</h4>
+          <p class="hint">{{ t("account.keysHint") }}</p>
+          <p :if="account.keys.length === 0" class="hint">{{ t("account.keysNone") }}</p>
+          <ul :else class="items">
+            <li :each="key in account.keys" :key="key.id">
+              <span class="label">{{ key.name }}<small :if="key.used"> · {{ t("account.sessionSeen", { date: when(key.used ?? 0) }) }}</small></span>
+              <Key size="sm" variant="ghost" :disabled="account.busy" @click="removeKey(key.id)">{{ t("account.remove") }}</Key>
+            </li>
+          </ul>
+          <p :if="account.newKey" class="state secret">{{ t("account.newKey", { key: account.newKey }) }}</p>
+          <div class="row">
+            <Field :label="t('account.keyName')" control="key-name">
+              <TextInput id="key-name" :model="keyName" @input="keyName = $event.detail" />
+            </Field>
+            <Key size="sm" :disabled="account.busy || !keyName.trim()" @click="newKey()">{{ t("account.addKey") }}</Key>
+          </div>
+        </div>
+        <div :if="importing.available" class="sub">
+          <div class="row own">
+            <div class="text">
+              <h4 class="mm-legend">{{ t("account.ownVersion") }}</h4>
+              <p class="hint">{{ t("account.ownVersionHint") }}</p>
+            </div>
+            <SlideSwitch :label="t('account.ownVersion')" :off-legend="t('account.familyVersion')" :on-legend="t('account.mineVersion')" :model="mine.ownVersion" @change="showOwnVersion($event.detail)" />
+          </div>
+          <Key size="sm" variant="ghost" @click="clearHistory()">{{ t("account.clearHistory") }}</Key>
+        </div>
+        <div class="keys">
+          <Key :if="can('admin')" variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
+          <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
+        </div>
+      </section>
+      <section :if="output.available" class="pref output">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("output.title") }}</h3>
+          <p>{{ t("output.about") }}</p>
+          <p :if="soundingText()" class="state">{{ soundingText() }}</p>
+        </div>
+        <Field :label="t('output.kind')" control="output-kind" :hint="t('output.kindHint')">
+          <Select id="output-kind" :model="output.kind" :options="kinds()" @change="pickKind($event.detail)" />
+        </Field>
+        <Field :if="output.kind !== 'embedded'" :label="t('output.device')" control="output-device">
+          <Select id="output-device" :model="output.device ?? ''" :options="deviceOptions()" @change="setOutputDevice($event.detail || null)" />
+        </Field>
+        <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
+      </section>
+      <section :if="isPhone" class="pref service">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("instance.eyebrow") }}</h3>
+          <p class="state">{{ t("instance.now", { address: instance.address }) }}</p>
+        </div>
+        <div class="keys">
+          <Key variant="ghost" @click="forgetInstance()">{{ t("instance.change") }}</Key>
+        </div>
+      </section>
+      <section :if="isDesktop && !isPhone" class="pref service">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("service.title") }}</h3>
           <p>{{ t("service.about") }}</p>
@@ -85,8 +217,20 @@
   .text { display: grid; gap: var(--mm-space-1); }
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
-  .service { display: grid; gap: var(--mm-space-3); }
+  .service, .output { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
+  .output .state { color: var(--mm-fg); }
   .service .state { color: var(--mm-fg); }
+  .account, .sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
+  .prefs > * { min-width: 0; }
+  .account .state { color: var(--mm-fg); }
+  .sub h4 { margin: 0; }
+  .secret { overflow-wrap: anywhere; user-select: all; }
+  .own { justify-content: space-between; align-items: center; }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--mm-space-2); }
+  .items { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-1); margin: 0; padding: 0; list-style: none; font-size: var(--mm-text-sm); }
+  .items li { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-2); }
+  .items .label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .items small { color: var(--mm-fg-subtle); }
   .install { display: grid; gap: var(--mm-space-2); justify-items: start; }
   .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
