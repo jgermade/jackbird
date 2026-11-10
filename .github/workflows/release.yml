@@ -136,8 +136,13 @@ jobs:
           path: service
           merge-multiple: true
 
+      # The desktop bundles come in their bundler's folders (deb/, appimage/, dmg/, nsis/): every
+      # file is attached, never a folder.
       - name: Create the release
-        run: gh release create "$TAG" "$ASSET" desktop/* service/* --title "$TAG" --generate-notes --verify-tag
+        run: |
+          mapfile -t files < <(find desktop service -type f | sort)
+          printf '%s\n' "${files[@]}"
+          gh release create "$TAG" "$ASSET" "${files[@]}" --title "$TAG" --generate-notes --verify-tag
 
   deploy:
     name: Deploy
