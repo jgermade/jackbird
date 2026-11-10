@@ -7,7 +7,8 @@
 # the log, sessions kept across a restart), and the family library's (scripts/library-check.cjs,
 # F1, F3, F4: an owner's import, an editor's upload and retitle, a listener's playback and download,
 # their own versions, a stale save refused, the trash, and on Linux the library backed up with restic,
-# wiped and restored). The binaries are uploaded; release.yml calls it with
+# wiped and restored), and on Linux an outside OpenSubsonic client's (scripts/opensubsonic-client-check.py,
+# E6-D4: py-opensonic signed in with a key, browsing, streaming, starring and scrobbling). The binaries are uploaded; release.yml calls it with
 # the new tag and attaches them. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S1, S3, F1).
 name: service
 
@@ -20,6 +21,7 @@ on:
       - "scripts/signin-check.cjs"
       - "scripts/library-check.cjs"
       - "scripts/smtp-sink.mjs"
+      - "scripts/opensubsonic-client-check.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "package.json"
@@ -33,6 +35,7 @@ on:
       - "scripts/signin-check.cjs"
       - "scripts/library-check.cjs"
       - "scripts/smtp-sink.mjs"
+      - "scripts/opensubsonic-client-check.py"
       - "Cargo.toml"
       - "Cargo.lock"
       - "package.json"
@@ -110,6 +113,20 @@ jobs:
       - name: The family library's check
         shell: bash
         run: node scripts/library-check.cjs target/release/jackbird-service${{ runner.os == 'Windows' && '.exe' || '' }}
+
+      # E6-D4: a client written by others reads the family library over OpenSubsonic (an open
+      # instance on this machine, its owner's key; the client's version pinned).
+      - name: An outside OpenSubsonic client (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/osc" && "$RUNNER_TEMP/osc/bin/pip" install -q py-opensonic==10.4.1
+          home="$RUNNER_TEMP/osc-home"; mkdir -p "$home/Music"
+          cp fixtures/tags/*.flac fixtures/tags/*.mp3 "$home/Music/"
+          HOME="$home" XDG_DATA_HOME="$home/data" JACKBIRD_SERVICE_CONFIG="$home/service.json" \
+            target/release/jackbird-service --port 4690 & service=$!
+          for i in $(seq 50); do curl -fsS http://localhost:4690/api/info >/dev/null 2>&1 && break; sleep 0.2; done
+          "$RUNNER_TEMP/osc/bin/python3" -I scripts/opensubsonic-client-check.py http://localhost:4690 "$home/Music"
+          kill $service
 
       - name: Name the binary for its system
         shell: bash
