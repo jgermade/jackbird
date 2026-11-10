@@ -157,6 +157,9 @@ jobs:
           npx tauri ios init --ci
           npx tauri ios build --debug --target aarch64-sim --ci || { npx tauri ios build --help; exit 1; }
           find src-tauri/gen/apple -name "*.app" -type d | head
+          # src-tauri/Info.ios.plist merged: the background modes the app was built with.
+          app="$(find src-tauri/gen/apple -name 'jackbird.app' -type d | grep -i sim | head -1)"
+          plutil -extract UIBackgroundModes json -o - "$app/Info.plist" || echo "no UIBackgroundModes in $app/Info.plist"
 
       - name: The check, in the simulator
         run: |

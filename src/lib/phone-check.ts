@@ -94,7 +94,8 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
 }
 
 /**
- * Background playback (E6-D1 c): plays a minute of silence and notes, every second, how far it got
+ * Background playback (E6-D1 c): plays a minute of silence with sound (both webviews pause a muted
+ * element when hidden; muted only if the webview refuses) and notes, every second, how far it got
  * and whether the page is hidden, while the check sends the app to the background and back
  * (scripts/phone-check.mjs); then posts the samples. Where the position moved on while the page was
  * hidden, playback went on in the background.
@@ -107,16 +108,22 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   const audio = new Audio();
   // As the player's element: asked for with CORS, the instance answers the app's origin.
   audio.crossOrigin = "anonymous";
-  audio.muted = true;
   audio.src = (await source.openMedia(long.path)).url;
-  await audio.play();
+  let muted = false;
+  try {
+    await audio.play();
+  } catch {
+    muted = true;
+    audio.muted = true;
+    await audio.play();
+  }
   const samples: { at: number; position: number; hidden: boolean; paused: boolean }[] = [];
   const started = Date.now();
-  await fetch(`${config.report}?phase=playing`, { method: "POST", body: "{}" }).catch(() => undefined);
-  while (Date.now() - started < 30_000) {
+  await fetch(`${config.report}?phase=playing`, { method: "POST", body: JSON.stringify({ muted }) }).catch(() => undefined);
+  while (Date.now() - started < 45_000) {
     samples.push({ at: Date.now() - started, position: audio.currentTime, hidden: document.hidden, paused: audio.paused });
     await wait(1000);
   }
   audio.pause();
-  await fetch(`${config.report}?phase=background`, { method: "POST", body: JSON.stringify({ samples }) }).catch(() => undefined);
+  await fetch(`${config.report}?phase=background`, { method: "POST", body: JSON.stringify({ muted, samples }) }).catch(() => undefined);
 }

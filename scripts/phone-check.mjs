@@ -157,14 +157,15 @@ if (!report) {
   process.exit(1);
 }
 
-// Background playback, measured (not required): once the minute of silence plays, the app goes to
-// the background for ten seconds (the home screen; on iOS, Settings in front of it), then comes back.
+// Background playback, measured (not required): once the minute of silence plays (with sound), the
+// app goes to the background for fifteen seconds (the home screen; on iOS, Settings in front of it),
+// then comes back.
 let background = null;
 if (await within(phase("playing"), 60_000)) {
   await new Promise((done) => setTimeout(done, 4000));
   if (platform === "android") run("adb", ["shell", "input", "keyevent", "KEYCODE_HOME"]);
   else run("xcrun", ["simctl", "launch", "booted", "com.apple.Preferences"]);
-  await new Promise((done) => setTimeout(done, 10_000));
+  await new Promise((done) => setTimeout(done, 15_000));
   if (platform === "android") run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
   else run("xcrun", ["simctl", "launch", "booted", bundle]);
   background = await within(phase("background"), 60_000);
@@ -173,8 +174,15 @@ server.kill();
 if (background?.samples) {
   const hidden = background.samples.filter((sample) => sample.hidden);
   const moved = hidden.length > 1 ? hidden[hidden.length - 1].position - hidden[0].position : 0;
-  report.background = { hiddenSeconds: hidden.length, movedWhileHidden: Math.round(moved * 10) / 10, samples: background.samples };
-  console.log(`phone-check: in the background ${hidden.length} s, the position moved ${moved.toFixed(1)} s`);
+  report.background = {
+    muted: background.muted,
+    hiddenSeconds: hidden.length,
+    movedWhileHidden: Math.round(moved * 10) / 10,
+    samples: background.samples
+  };
+  console.log(
+    `phone-check: ${background.muted ? "muted" : "with sound"}, in the background ${hidden.length} s, the position moved ${moved.toFixed(1)} s`
+  );
 } else {
   report.background = null;
   console.log("phone-check: no background measurement");
