@@ -68,6 +68,8 @@ jobs:
       - name: The app for Android
         run: |
           npx tauri android init --ci
+          # jackbird's logo instead of Tauri's (src-tauri/icons/android, from phone-icon.json by `tauri icon`).
+          cp -r src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
           gradle=src-tauri/gen/android/app/build.gradle.kts
           line='manifestPlaceholders["usesCleartextTraffic"] = "false"'
           if ! grep -qF "$line" "$gradle"; then

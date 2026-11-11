@@ -80,6 +80,8 @@ jobs:
       - name: The app for Android, made for the check
         run: |
           npx tauri android init --ci
+          # jackbird's logo instead of Tauri's (src-tauri/icons/android, from phone-icon.json by `tauri icon`).
+          cp -r src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
           npx tauri android build --debug --apk --target x86_64
           find src-tauri/gen/android -name "*.apk"
 
@@ -158,6 +160,8 @@ jobs:
         run: |
           set -euo pipefail
           npx tauri ios init --ci
+          # jackbird's logo instead of Tauri's (src-tauri/icons/ios, from phone-icon.json by `tauri icon`).
+          cp src-tauri/icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/
           npx tauri ios build --debug --target aarch64-sim --ci || { npx tauri ios build --help; exit 1; }
           find src-tauri/gen/apple -name "*.app" -type d | head
           # src-tauri/Info.ios.plist merged: the background modes the app was built with.
