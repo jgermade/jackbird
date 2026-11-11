@@ -7,7 +7,9 @@ export const STORAGE_KEYS = {
   language: "mp3-manager.language",
   renamePattern: "mp3-manager.renamePattern",
   output: "mp3-manager.output",
-  outputDevice: "mp3-manager.outputDevice"
+  outputDevice: "mp3-manager.outputDevice",
+  /** An Android phone's "Bit-perfect to a USB DAC" (E6b-D10). */
+  phoneBitPerfect: "jackbird.phoneBitPerfect"
 } as const;
 
 /**

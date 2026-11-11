@@ -13,6 +13,8 @@ Every command of the phone's player, and its events.
 - `allow-status`
 - `allow-storage-access`
 - `allow-ask-storage-access`
+- `allow-set-output`
+- `allow-output-info`
 - `allow-register-listener`
 - `allow-remove-listener`
 
@@ -47,6 +49,32 @@ Enables the ask_storage_access command without any pre-configured scope.
 <td>
 
 Denies the ask_storage_access command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:allow-output-info`
+
+</td>
+<td>
+
+Enables the output_info command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-output-info`
+
+</td>
+<td>
+
+Denies the output_info command without any pre-configured scope.
 
 </td>
 </tr>
@@ -177,6 +205,32 @@ Enables the seek command without any pre-configured scope.
 <td>
 
 Denies the seek command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:allow-set-output`
+
+</td>
+<td>
+
+Enables the set_output command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-set-output`
+
+</td>
+<td>
+
+Denies the set_output command without any pre-configured scope.
 
 </td>
 </tr>

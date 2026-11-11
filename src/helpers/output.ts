@@ -40,15 +40,15 @@ export function formatRate(hertz: number): string {
   return `${Number.isInteger(kilo) ? kilo : kilo.toFixed(1)} kHz`;
 }
 
-/** A song's format: "FLAC 24 bit · 96 kHz"; MP3 has no depth of its own: "MP3 · 44.1 kHz". */
+/** A song's format: "FLAC 24 bit · 96 kHz"; MP3 has no depth of its own, nor a song whose depth is not known: "MP3 · 44.1 kHz". */
 export function describeFormat(codec: string, format: PcmFormat): string {
-  const depth = codec === "MP3" ? "" : ` ${format.bits} bit`;
+  const depth = codec === "MP3" || format.bits <= 0 ? "" : ` ${format.bits} bit`;
   return `${codec}${depth} · ${formatRate(format.rate)}`;
 }
 
 /** The short form the display shows: "24/96", "16/44.1"; "MP3" for MP3. */
 export function shortFormat(codec: string, format: PcmFormat): string {
-  if (codec === "MP3") return "MP3";
+  if (codec === "MP3" || format.bits <= 0) return codec;
   const kilo = format.rate / 1000;
   return `${format.bits}/${Number.isInteger(kilo) ? kilo : kilo.toFixed(1)}`;
 }

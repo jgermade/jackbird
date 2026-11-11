@@ -9,6 +9,8 @@
 // See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E6b, 2026-11-11).
 
 import { addPluginListener, invoke } from "@tauri-apps/api/core";
+import type { Sounding } from "./native-audio";
+import { output } from "./output";
 import { isPhone } from "./platform";
 
 /** A song for the player: the page's key for it, its media URL, and what the lock screen shows. */
@@ -32,6 +34,8 @@ export class PhoneAudio extends EventTarget {
   paused = true;
   duration = Number.NaN;
   readyState = 0;
+  /** The formats the USB DAC offers bit-perfect, as the player last said (empty: none, or no DAC). */
+  offered = "";
   #song: PhoneSong | null = null;
   #upcoming: PhoneSong[] = [];
   #position = 0;
@@ -44,6 +48,14 @@ export class PhoneAudio extends EventTarget {
     for (const name of ["state", "advance", "ended", "failed"] as const) {
       void addPluginListener<Status>(PLUGIN, name, (status) => this.#heard(name, status)).catch(() => undefined);
     }
+    // What sounds (E6b-D10): as the desktop's native player says it, an event "started" with its
+    // format and its way to the device; and, when it is not bit-perfect, what the DAC offers.
+    void addPluginListener<Sounding & { offered: string }>(PLUGIN, "sounding", ({ offered, ...sounding }) => {
+      if (sounding.key !== this.#song?.key) return;
+      this.offered = offered;
+      output.offered = offered;
+      this.dispatchEvent(new CustomEvent("started", { detail: sounding }));
+    }).catch(() => undefined);
   }
 
   #call<T>(command: string, args?: Record<string, unknown>): Promise<T> {

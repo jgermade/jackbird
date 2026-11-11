@@ -14,6 +14,8 @@ const COMMANDS: &[&str] = &[
     "status",
     "storage_access",
     "ask_storage_access",
+    "set_output",
+    "output_info",
     "register_listener",
     "remove_listener",
 ];

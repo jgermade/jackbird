@@ -16,10 +16,15 @@ import android.os.Handler
 import android.provider.Settings
 import android.os.Looper
 import android.util.Base64
+import android.webkit.WebView
+import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
@@ -54,6 +59,11 @@ class UpcomingArgs {
 }
 
 @InvokeArg
+class OutputArgs {
+  var bitPerfect: Boolean = false
+}
+
+@InvokeArg
 class SeekArgs {
   var seconds: Double = 0.0
 }
@@ -77,6 +87,9 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
       if (mediaItem != null && reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) send("advance")
     }
+
+    // A song's tracks are known: its codec, depth and rate, for what sounds (E6b-D10).
+    override fun onTracksChanged(tracks: Tracks) = sendSounding()
 
     override fun onPlayerError(error: PlaybackException) {
       val event = snapshot()
@@ -104,6 +117,80 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   }
 
   private fun send(event: String) = trigger(event, snapshot())
+
+  /** The audio format of the song playing, as its track says. */
+  private fun songFormat(): Format? =
+    player?.currentTracks?.groups?.firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }?.let { group ->
+      (0 until group.length).firstOrNull { group.isTrackSelected(it) }?.let { group.getTrackFormat(it) }
+    }
+
+  /**
+   * What sounds (E6b-D10), as the desktop's output says it (src/lib/native-audio.ts' `started`): the
+   * song's codec, depth and rate, and its way to the device, bit-perfect or through Android's mixer.
+   */
+  private fun sendSounding() {
+    val player = player ?: return
+    val key = player.currentMediaItem?.mediaId ?: return
+    val format = songFormat() ?: return
+    val way = BitPerfect.way
+    val codec = when (format.sampleMimeType) {
+      MimeTypes.AUDIO_FLAC -> "FLAC"
+      MimeTypes.AUDIO_MPEG -> "MP3"
+      MimeTypes.AUDIO_AAC -> "AAC"
+      MimeTypes.AUDIO_OPUS -> "Opus"
+      MimeTypes.AUDIO_VORBIS -> "Vorbis"
+      MimeTypes.AUDIO_ALAC -> "ALAC"
+      MimeTypes.AUDIO_RAW, MimeTypes.AUDIO_WAV -> "WAV"
+      else -> format.sampleMimeType?.substringAfter('/')?.uppercase() ?: "?"
+    }
+    val bits = when (format.pcmEncoding) {
+      C.ENCODING_PCM_16BIT -> 16
+      C.ENCODING_PCM_24BIT -> 24
+      C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
+      C.ENCODING_PCM_8BIT -> 8
+      else -> 0
+    }
+    val rate = if (format.sampleRate > 0) format.sampleRate else way?.rate ?: 0
+    val event = JSObject()
+    event.put("key", key)
+    event.put("codec", codec)
+    event.put("format", JSObject().apply {
+      put("rate", rate)
+      put("channels", format.channelCount)
+      put("bits", bits)
+    })
+    event.put("route", JSObject().apply {
+      put("device", way?.device ?: "Android")
+      put("mode", if (way?.bitPerfect == true) "exclusive" else "shared")
+      put("rate", way?.rate ?: rate)
+      put("sample", way?.sample ?: "")
+      put("fidelity", if (way?.bitPerfect == true) "bit-perfect" else "mixer")
+    })
+    event.put("offered", way?.offered ?: "")
+    trigger("sounding", event)
+  }
+
+  override fun load(webView: WebView) {
+    super.load(webView)
+    BitPerfect.listener = { main.post { sendSounding() } }
+  }
+
+  /** The person's output setting (E6b-D10): bit-perfect to a USB DAC, from the next song. */
+  @Command
+  fun setOutput(invoke: Invoke) {
+    val args = invoke.parseArgs(OutputArgs::class.java)
+    BitPerfect.wanted = args.bitPerfect
+    invoke.resolve()
+  }
+
+  /** Whether this Android can play bit-perfect to a USB DAC (14 and later), and the DAC connected, if any. */
+  @Command
+  fun outputInfo(invoke: Invoke) {
+    invoke.resolve(JSObject().apply {
+      put("bitPerfect", BitPerfect.possible)
+      put("usb", BitPerfect.usbDevice(activity)?.productName?.toString())
+    })
+  }
 
   /** Runs `work` with the player on the main thread, the player's own; an exception rejects the call. */
   private fun withPlayer(invoke: Invoke, work: (Player) -> Unit) {

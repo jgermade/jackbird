@@ -49,4 +49,9 @@ describe("output", () => {
     assert.equal(fileUrl("/storage/emulated/0/Music", "Jazz/So What #1.flac"), "file:///storage/emulated/0/Music/Jazz/So%20What%20%231.flac");
     assert.equal(fileUrl("/storage/emulated/0/Music/", "/Ñandú.mp3"), "file:///storage/emulated/0/Music/%C3%91and%C3%BA.mp3");
   });
+
+  it("leaves out a depth that is not known", () => {
+    assert.equal(describeFormat("AAC", { rate: 44100, channels: 2, bits: 0 }), "AAC · 44.1 kHz");
+    assert.equal(shortFormat("AAC", { rate: 44100, channels: 2, bits: 0 }), "AAC");
+  });
 });
