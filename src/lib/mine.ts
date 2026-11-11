@@ -16,9 +16,9 @@ import { preferences, setLanguage, setTheme } from "./preferences";
 import { refreshRoot } from "./roots";
 import {
   applySuggestion as applyToFamily,
+  currentServer,
   clearHistory as clearPlays,
   forgetMine as forget,
-  LIBRARY,
   notePlayed,
   readLibraryText,
   saveMySettings,
@@ -41,7 +41,9 @@ export const mine = $reactive({
 
 /** The library's root, if it is open. */
 function libraryRoot() {
-  return $toRaw(library).roots.find((root) => root.source.saved === LIBRARY) ?? null;
+  // The library of the server spoken to now (E6b-D11): each server has its own.
+  const server = currentServer();
+  return $toRaw(library).roots.find((root) => root.source.kind === "library" && (root.source.server ?? null) === server) ?? null;
 }
 
 /** Whether a root is the family library. */
@@ -78,7 +80,9 @@ export async function toggleFavourite(path: string): Promise<void> {
 
 /** Records a play of a song of the library. */
 export function played(rootId: string, path: string): void {
-  if (isLibraryRoot(rootId)) void notePlayed(path).catch(() => undefined);
+  // Counted on the root's own server, which may not be the one in front (E6b-D11).
+  const root = $toRaw(library).roots.find((one) => one.id === rootId);
+  if (root?.source.kind === "library" && root.source.server) void notePlayed(path, root.source.server).catch(() => undefined);
 }
 
 /** Loads what a song's tags are made of, for Info (or forgets it, given null). */

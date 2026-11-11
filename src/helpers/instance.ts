@@ -30,3 +30,24 @@ export function isLoopbackAddress(address: string): boolean {
     return false;
   }
 }
+
+/** How the session keeps a root of a server other than the page's home one (E6b-D11). */
+const ON_SERVER = "jackbird-server:";
+
+/**
+ * What the session keeps for a root of a server: its path alone on the home server (the page's own
+ * origin, or the desktop's installed service, as before E6b), or its server's address with it on any
+ * other, so the same path on two machines is two roots.
+ */
+export function savedOnServer(address: string | null, path: string): string {
+  return address ? `${ON_SERVER}${address}#${path}` : path;
+}
+
+/** A root's kept form read back: its server's address (null: the home server) and its path. */
+export function parseSaved(saved: string): { server: string | null; path: string } {
+  if (!saved.startsWith(ON_SERVER)) return { server: null, path: saved };
+  const rest = saved.slice(ON_SERVER.length);
+  const at = rest.indexOf("#");
+  if (at < 0) return { server: null, path: saved };
+  return { server: rest.slice(0, at), path: rest.slice(at + 1) };
+}

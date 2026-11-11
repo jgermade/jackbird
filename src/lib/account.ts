@@ -13,7 +13,17 @@ import { atLeast, type Role } from "../helpers/roles";
 import { t } from "./i18n";
 import { isDesktop, isService } from "./platform";
 import { preferences } from "./preferences";
-import { onUnauthorized, post, serviceJson, setServiceToken, usesToken } from "./sources/service";
+import {
+  currentServer,
+  homeServer,
+  onUnauthorized,
+  post,
+  serviceJson,
+  setServiceToken,
+  useServer,
+  usesToken,
+  type ServiceClient
+} from "./sources/service";
 
 export type Me = { id: number; name: string; email: string | null; confirmed: boolean; role: Role; enabled: boolean };
 export type Profile = { id: number; name: string; role: Role };
@@ -92,8 +102,11 @@ function welcome(me: Me, token?: string | null): void {
 export async function startAccount(): Promise<void> {
   const served = isDesktop ? await (await import("./desktop-service")).desktopUsesService() : await isService();
   if (!served) return;
+  homeServed = true;
   account.active = true;
-  onUnauthorized(() => {
+  onUnauthorized((_code, client) => {
+    // Another server's refusal is its roots' own error, not the account's (E6b-D11).
+    if (client !== currentServer()) return;
     if (account.me) {
       // The session ended (signed out elsewhere, sign-in turned on or off): start again.
       location.reload();
@@ -109,6 +122,29 @@ export async function startAccount(): Promise<void> {
   await new Promise<void>((resolve) => {
     signedIn = resolve;
   });
+}
+
+/** Whether the page started with a server of its own (the home one). */
+let homeServed = false;
+
+/**
+ * Speaks to the server of the root in front (E6b-D11): its sign-in, its profiles and its people; for
+ * a root that is on no server (the browser's or the device's own folders), the home server, if
+ * there is one. Asks to sign in there if its session is gone.
+ */
+export async function followServer(client: ServiceClient | null | undefined): Promise<void> {
+  const next = client ?? homeServer();
+  if (next === currentServer()) return;
+  useServer(next);
+  account.active = Boolean(client) || homeServed;
+  account.me = null;
+  account.profiles = null;
+  account.needed = false;
+  if (!account.active) return;
+  await loadState().catch((error) => {
+    account.error = message(error);
+  });
+  if (!account.me && currentServer() === next) account.needed = true;
 }
 
 async function busy<T>(work: () => Promise<T>): Promise<T | undefined> {

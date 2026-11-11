@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isLoopbackAddress, normaliseAddress } from "./instance.ts";
+import { isLoopbackAddress, normaliseAddress, parseSaved, savedOnServer } from "./instance.ts";
 
 describe("instance", () => {
   it("reads an address as typed", () => {
@@ -23,5 +23,15 @@ describe("instance", () => {
     assert.ok(isLoopbackAddress("http://[::1]:4646"));
     assert.ok(!isLoopbackAddress("https://music.example.org"));
     assert.ok(!isLoopbackAddress("not an address"));
+  });
+
+  it("keeps a server's roots with its address, and the home server's by their path alone", () => {
+    assert.equal(savedOnServer(null, "/music"), "/music");
+    const kept = savedOnServer("https://music.example.org", "/srv/music #1");
+    assert.equal(kept, "jackbird-server:https://music.example.org#/srv/music #1");
+    assert.deepEqual(parseSaved(kept), { server: "https://music.example.org", path: "/srv/music #1" });
+    assert.deepEqual(parseSaved(savedOnServer("http://192.168.1.20:4646", "@library")), { server: "http://192.168.1.20:4646", path: "@library" });
+    assert.deepEqual(parseSaved("/music"), { server: null, path: "/music" });
+    assert.deepEqual(parseSaved("jackbird-server:no-path"), { server: null, path: "jackbird-server:no-path" });
   });
 });

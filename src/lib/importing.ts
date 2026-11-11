@@ -10,9 +10,9 @@ import { account } from "./account";
 import { library } from "./library";
 import { refreshRoot } from "./roots";
 import {
+  currentServer,
   importFolder,
   importState,
-  LIBRARY,
   libraryDownloadUrl,
   librarySuggestions,
   uploadToLibrary,
@@ -38,7 +38,8 @@ function emptyReport(): ImportReport {
 }
 
 function refreshLibrary(): void {
-  const root = $toRaw(library).roots.find((item) => item.source.saved === LIBRARY);
+  const server = currentServer();
+  const root = $toRaw(library).roots.find((item) => item.source.kind === "library" && item.source.server === server);
   if (root) void refreshRoot(root.id);
 }
 

@@ -11,7 +11,7 @@ import { startAccount } from "./lib/account";
 import { loadFavourites, startMine } from "./lib/mine";
 import { keepPlaybackSaved, restorePlayback } from "./lib/player";
 import { isDesktop, isPhone } from "./lib/platform";
-import { keepSessionSaved, restoreSession } from "./lib/session";
+import { followActiveRoot, keepSessionSaved, restoreSession } from "./lib/session";
 import { startVerifier } from "./lib/verifier";
 import App from "./views/app.html";
 
@@ -25,6 +25,7 @@ void startAccount()
   .then(() => restoreSession())
   .then(() => {
     void loadFavourites();
+    followActiveRoot();
     restorePlayback();
     keepPlaybackSaved();
   });
