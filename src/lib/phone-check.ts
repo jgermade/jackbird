@@ -107,6 +107,11 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   const source = await openServiceFolder(config.folder);
   const song = (await source.walk()).find((entry) => entry.path.endsWith("silence-20s.flac"));
   if (!song) return;
+  const { phoneAudioAvailable } = await import("./phone-audio");
+  if (phoneAudioAvailable) {
+    await measureNativeQueue(config, () => source.openMedia(song.path).then((media) => media.url));
+    return;
+  }
   const audio = new Audio();
   // As the player's element: asked for with CORS, the instance answers the app's origin.
   audio.crossOrigin = "anonymous";
@@ -172,4 +177,52 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   }
   audio.pause();
   await post("background", { muted, mediaSession, samples, changes });
+}
+
+/**
+ * Background playback through the phone's native player (E6b-D7): a queue of five 20 s silences
+ * handed to it at once, while the check sends the app away for two minutes as above. The player
+ * goes through them by itself; the page notes each change of song it is told of (when, and whether
+ * hidden) and samples how far the queue got. Every change made while hidden must have happened
+ * (scripts/phone-check.mjs).
+ */
+async function measureNativeQueue(config: PhoneCheck, mediaUrl: () => Promise<string>): Promise<void> {
+  const { PhoneAudio } = await import("./phone-audio");
+  const audio = new PhoneAudio();
+  const songs = [];
+  for (let n = 1; n <= 5; n += 1) {
+    songs.push({ key: `silence-${n}`, url: await mediaUrl(), title: `Silence ${n}`, artist: "jackbird check", album: "E6b" });
+  }
+  const started = Date.now();
+  const now = () => Date.now() - started;
+  const changes: { at: number; hidden: boolean; key: string; started: boolean }[] = [];
+  audio.addEventListener("advance", (event) =>
+    changes.push({ at: now(), hidden: document.hidden, key: (event as CustomEvent<string>).detail, started: true })
+  );
+  let ended: number | null = null;
+  audio.addEventListener("ended", () => (ended = now()));
+  const failures: unknown[] = [];
+  audio.addEventListener("fallback", (event) => failures.push((event as CustomEvent).detail));
+  const post = (phase: string, body: unknown) =>
+    fetch(`${config.report}?phase=${phase}`, { method: "POST", body: JSON.stringify(body) }).catch(() => undefined);
+  let wasHidden = false;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !wasHidden) void post("hidden", {});
+    wasHidden ||= document.hidden;
+  });
+  audio.open(songs[0]);
+  audio.setUpcoming(songs.slice(1));
+  await audio.play();
+  const samples: { at: number; played: number; hidden: boolean; paused: boolean }[] = [];
+  let shownAgain: number | null = null;
+  await post("playing", { native: true, muted: false, mediaSession: false });
+  while (Date.now() - started < 240_000 && (shownAgain === null || Date.now() - shownAgain < 10_000)) {
+    // How far the queue got: 20 s for each song it left, and the current one's position.
+    const played = ended !== null ? songs.length * 20 : changes.length * 20 + audio.currentTime;
+    samples.push({ at: now(), played, hidden: document.hidden, paused: audio.paused });
+    if (wasHidden && !document.hidden) shownAgain ??= Date.now();
+    await wait(1000);
+  }
+  audio.removeAttribute("src");
+  await post("background", { native: true, muted: false, mediaSession: false, samples, changes, ended, failures });
 }

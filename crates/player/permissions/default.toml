@@ -1,0 +1,15 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Every command of the phone's player, and its events."
+permissions = [
+  "allow-set-queue",
+  "allow-set-upcoming",
+  "allow-play",
+  "allow-pause",
+  "allow-seek",
+  "allow-stop",
+  "allow-status",
+  "allow-register-listener",
+  "allow-remove-listener",
+]

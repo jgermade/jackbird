@@ -166,18 +166,24 @@ if (!report) {
   process.exit(1);
 }
 
-// Background playback, measured (not required): once the queue of silences plays (with sound), the app goes
+// Background playback, measured (required on Android, through the native player, E6b-D7; measured
+// only on iOS until its player, E6b's step 2): once the queue of silences plays (with sound), the app goes
 // to the background (the home screen; on iOS, Settings in front of it, which can take the simulator
 // most of a minute); two minutes after the page says it is hidden, the app comes back. Meanwhile, on
 // Android, what the system says of the app: its process's state (a frozen app plays nothing) and
 // whether it has a media session (the notification's and the lock screen's controls).
+// Whether a media session of the app's was seen playing (PlaybackState 3) while it was away: the
+// native player's (E6b), whose notification and lock screen's controls come from it.
+let sessionPlaying = false;
 const androidSays = (when) => {
   for (const [what, args] of [
     ["the process", ["shell", "dumpsys", "activity", "processes", bundle]],
     ["the media sessions", ["shell", "dumpsys", "media_session"]]
   ]) {
     try {
-      const lines = read("adb", args).split("\n");
+      const text = read("adb", args);
+      if (what === "the media sessions" && text.includes(bundle) && /state=PlaybackState \{state=(3|PLAYING)\b/.test(text)) sessionPlaying = true;
+      const lines = text.split("\n");
       const wanted = lines.filter((line) => line.includes(bundle) || /procState|frozen|state=|active=|Sessions Stack/i.test(line));
       console.log(`phone-check: ${when}, ${what}:\n${wanted.slice(0, 25).join("\n")}`);
     } catch (error) {
@@ -218,6 +224,10 @@ if (background?.samples) {
   const hiddenChanges = changes.filter((change) => change.hidden);
   for (const change of changes) console.log(`phone-check: change of song ${JSON.stringify(change)}`);
   report.background = {
+    native: Boolean(background.native),
+    sessionPlaying,
+    ended: background.ended ?? null,
+    failures: background.failures ?? [],
     muted: background.muted,
     changesWhileHidden: hiddenChanges.length,
     startedWhileHidden: hiddenChanges.filter((change) => change.started).length,
@@ -242,6 +252,16 @@ if (report.error) problems.push(`error: ${report.error}`);
 if (report.me?.role !== "owner") problems.push(`not in as the owner: ${JSON.stringify(report.me)}`);
 if (!(report.tracks >= 3)) problems.push(`tracks: ${report.tracks}`);
 if (!report.played || report.played.error || !(report.played.played > 0)) problems.push(`the FLAC did not play: ${JSON.stringify(report.played)}`);
+// The native player (E6b-D7, Android for now): the queue goes on in the background by itself.
+if (platform === "android") {
+  const background = report.background;
+  if (!background?.native) problems.push("the native player's queue was not measured");
+  else {
+    if (background.changesWhileHidden < 2) problems.push(`${background.changesWhileHidden} changes of song while hidden (2 or more expected)`);
+    if (background.failures.length > 0) problems.push(`the native player failed: ${JSON.stringify(background.failures)}`);
+    if (!background.sessionPlaying) problems.push("no media session of the app's seen playing while it was away");
+  }
+}
 if (problems.length > 0) {
   showLog();
   console.error(`phone-check: ${problems.join("; ")}`);

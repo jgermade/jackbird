@@ -334,8 +334,11 @@ pub fn run() {
         audio::audio_status,
         audio::audio_spectrum
     ]);
+    // The phone's native player (E6b): the page drives it directly (src/lib/phone-audio.ts).
     #[cfg(mobile)]
-    let builder = builder.invoke_handler(commands![]);
+    let builder = builder
+        .plugin(tauri_plugin_jackbird_player::init())
+        .invoke_handler(commands![]);
     builder
         .setup(|app| {
             #[cfg(desktop)]
