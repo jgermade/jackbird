@@ -31,6 +31,35 @@ Only one release runs at a time. If the build fails, the tag stays without a rel
 cause and release again (which makes the next version), and delete the empty tag by hand if you
 want.
 
+## `phone-release.yml`: the Android app
+
+`release.yml` calls it, and the release carries its APK: `jackbird-vX.Y.Z-android.apk`, one APK
+for phones (arm64, armv7) and emulators (x86_64). It also runs by hand (**Actions → phone-release
+→ Run workflow**, on any branch) and on pushes that change the phone's app, with the APK as the
+run's `phone-apk` artifact, to try it before a release.
+
+Android installs an update over an app only if both are signed with the same key, so the APK is
+signed with a keystore kept in the repository's secrets (**Settings → Secrets and variables →
+Actions**):
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE` | the keystore file, in base64 (`base64 -w0 jackbird-release.jks`) |
+| `ANDROID_KEYSTORE_PASSWORD` | its password |
+| `ANDROID_KEY_ALIAS` | the key's alias (`jackbird`) |
+| `ANDROID_KEY_PASSWORD` | the key's password (the same one, for a PKCS12 keystore) |
+
+It is made once, with a JDK's `keytool`:
+
+```sh
+keytool -genkeypair -v -keystore jackbird-release.jks -alias jackbird \
+  -keyalg RSA -keysize 4096 -validity 36500 -storetype PKCS12
+```
+
+Keep the file and its password somewhere safe besides GitHub: a secret cannot be read back, and
+without the key, the next APK installs only after the app is removed. Without the secrets, the APK
+is signed with a key made for that run and named `…-android-testkey.apk`.
+
 ## `deploy.yml`: deploy a release
 
 Run it by hand from **Actions → deploy → Run workflow**, with one input:

@@ -1,0 +1,122 @@
+# The phone apps for people to install (E6b, RECORD/2026-08-11.musikmatch-rust-migration.WIP.md,
+# 2026-11-11 20:52): Android's APK, release-built for phones (arm64, armv7) and emulators (x86_64)
+# in one universal APK, without the unattended check's switch. Signed with the keystore in the
+# repository's secrets (ANDROID_KEYSTORE in base64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+# ANDROID_KEY_PASSWORD); without them, with a key made for this run, and named `-testkey`: it
+# installs, but a newer one installs only after the old app is removed. Called by release.yml; run
+# by hand on any branch, or on a push that changes the phone's app, to try it: the APK is the run's
+# `phone-apk` artifact.
+name: phone-release
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: The tag or commit to build
+        type: string
+        required: true
+      version:
+        description: The release's tag, as vX.Y.Z
+        type: string
+        required: true
+  workflow_dispatch:
+  push:
+    paths:
+      - "crates/player/**"
+      - "src-tauri/**"
+      - ".github/workflows/phone-release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android's APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown, aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Android's NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018" > /dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - run: npm ci --no-audit --no-fund
+
+      # Tauri's Gradle project allows http:// only in debug builds; an instance at home is often
+      # http://192.168.…, so the release allows it too. Failing beats shipping an app that cannot
+      # reach it, should Tauri's template change.
+      - name: The app for Android
+        run: |
+          npx tauri android init --ci
+          gradle=src-tauri/gen/android/app/build.gradle.kts
+          line='manifestPlaceholders["usesCleartextTraffic"] = "false"'
+          if ! grep -qF "$line" "$gradle"; then
+            echo "::error::$gradle no longer sets usesCleartextTraffic as expected"
+            cat "$gradle"
+            exit 1
+          fi
+          sed -i 's/manifestPlaceholders\["usesCleartextTraffic"\] = "false"/manifestPlaceholders["usesCleartextTraffic"] = "true"/' "$gradle"
+          npx tauri android build --apk --target aarch64 armv7 x86_64 --ci
+          find src-tauri/gen/android -name "*.apk"
+
+      - name: Aligned and signed
+        env:
+          VERSION: ${{ inputs.version }}
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          version="${VERSION:-v$(node -p "require('./package.json').version")}"
+          apk="$(find src-tauri/gen/android -name '*universal-release-unsigned.apk' | head -1)"
+          [ -n "$apk" ] || { echo "::error::no unsigned release APK was built"; exit 1; }
+          tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$tools/zipalign" -p -f 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          keystore="$RUNNER_TEMP/release.jks"
+          if [ -n "$ANDROID_KEYSTORE" ]; then
+            echo "$ANDROID_KEYSTORE" | base64 -d > "$keystore"
+            suffix=""
+          else
+            echo "::warning::No Android keystore in the repository's secrets: the APK is signed with a key made for this run, and a newer one installs only after the old app is removed."
+            export ANDROID_KEYSTORE_PASSWORD="$(openssl rand -hex 16)" ANDROID_KEY_ALIAS=jackbird
+            export ANDROID_KEY_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+            keytool -genkeypair -keystore "$keystore" -storetype PKCS12 -alias "$ANDROID_KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=jackbird test key" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD"
+            suffix="-testkey"
+          fi
+          mkdir -p "$RUNNER_TEMP/phone"
+          out="$RUNNER_TEMP/phone/jackbird-$version-android$suffix.apk"
+          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+            --out "$out" "$RUNNER_TEMP/aligned.apk"
+          rm -f "$keystore"
+          "$tools/apksigner" verify --print-certs "$out"
+          echo "APK: \`$(basename "$out")\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: phone-apk
+          path: ${{ runner.temp }}/phone
+          if-no-files-found: error

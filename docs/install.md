@@ -92,3 +92,18 @@ update` with the new binary, or the desktop app's **Update**.
 Install the app from the latest release; in **Preferences**, **Service**, **Install** starts the
 service when you log in (or **Install with the system**, with administrator rights once). The app
 is then its interface; the rest is as above (see [Using jackbird](usage.md)).
+
+## The Android app
+
+The Android app is a client of an instance installed in one of the ways above: it asks for the
+instance's address the first time (`192.168.1.20:4646` at home, or the address it has outside
+home, such as one through intergate) and signs in there. Its player keeps playing with the screen
+off, with its controls in the notification and on the lock screen.
+
+1. On the phone, download `jackbird-vX.Y.Z-android.apk` from the latest release.
+2. Open it. The first time, Android asks to allow the browser (or Files) to install apps: allow it,
+   go back, and install.
+3. Updating: install the new APK over the old one. An APK named `…-android-testkey.apk` was signed
+   with a key made for that build: remove the app before installing the next one.
+
+Android 7 or later. It is not in Google Play.
