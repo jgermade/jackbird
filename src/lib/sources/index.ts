@@ -15,6 +15,13 @@ import type { ServiceClient } from "./service";
  * `server`, a folder of that server's machine (E6b-D11). Null when the person cancels.
  */
 export async function pickSource(server?: ServiceClient): Promise<RootSource | null> {
+  // The phone's own folders (E6b-D9): once "All files access" is granted, by their paths, as on a computer.
+  if (isPhone && !server) {
+    const { deviceFolders, ensureStorageAccess } = await import("../device-storage");
+    if (!(await ensureStorageAccess())) throw new Error(t("sources.storageDenied"));
+    const path = await (await import("../folders")).chooseMachineFolder(deviceFolders);
+    return path === null ? null : (await import("./desktop")).restoreDesktopSource(path);
+  }
   if (server) {
     const path = await (await import("../folders")).chooseMachineFolder();
     return path === null ? null : (await import("./service")).openServiceFolder(path, server);

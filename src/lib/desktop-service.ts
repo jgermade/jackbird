@@ -50,11 +50,8 @@ let usesService: Promise<boolean> | null = null;
  * announced. Asked once per window.
  */
 export function desktopUsesService(): Promise<boolean> {
-  // A phone has no service of its own: it is a client of its family's instance (E6's spike).
-  if (isPhone) {
-    usesService ??= import("./instance").then((instance) => instance.phoneUsesInstance());
-    return usesService;
-  }
+  // A phone has no service of its own, nor a home server: servers are sources it adds (E6b-D11).
+  if (isPhone) return Promise.resolve(false);
   usesService ??= (async () => {
     let found = await status();
     if (!found?.installed) {

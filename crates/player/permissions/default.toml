@@ -10,6 +10,8 @@ permissions = [
   "allow-seek",
   "allow-stop",
   "allow-status",
+  "allow-storage-access",
+  "allow-ask-storage-access",
   "allow-register-listener",
   "allow-remove-listener",
 ]

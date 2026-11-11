@@ -11,6 +11,8 @@ Every command of the phone's player, and its events.
 - `allow-seek`
 - `allow-stop`
 - `allow-status`
+- `allow-storage-access`
+- `allow-ask-storage-access`
 - `allow-register-listener`
 - `allow-remove-listener`
 
@@ -22,6 +24,32 @@ Every command of the phone's player, and its events.
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`jackbird-player:allow-ask-storage-access`
+
+</td>
+<td>
+
+Enables the ask_storage_access command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-ask-storage-access`
+
+</td>
+<td>
+
+Denies the ask_storage_access command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -253,6 +281,32 @@ Enables the stop command without any pre-configured scope.
 <td>
 
 Denies the stop command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:allow-storage-access`
+
+</td>
+<td>
+
+Enables the storage_access command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-storage-access`
+
+</td>
+<td>
+
+Denies the storage_access command without any pre-configured scope.
 
 </td>
 </tr>

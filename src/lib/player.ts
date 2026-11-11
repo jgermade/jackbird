@@ -20,6 +20,7 @@ import {
   restoreQueue,
   type QueuePosition
 } from "../helpers/queue";
+import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
 import { spectrumBands } from "../helpers/spectrum";
@@ -337,7 +338,8 @@ function songOf(opened: MediaHandle, key: string): PhoneSong {
   const metadata = track?.metadata;
   return {
     key,
-    url: opened.url,
+    // A file of the phone's own folders (E6b-D9) is read by the player itself; a server's by its URL.
+    url: opened.native ? fileUrl(opened.native.root, opened.native.path) : opened.url,
     title: metadata?.title || track?.name || trackId.split("/").pop() || trackId,
     artist: metadata?.artist ?? "",
     album: metadata?.album ?? "",

@@ -37,8 +37,8 @@ export function serverName(): string {
 /** The sources this runtime offers now, in order. */
 export function sourcesHere(): SourceKind[] {
   const kinds: SourceKind[] = [];
-  // The browser's folders when no service serves the page; the desktop's; a phone's in E6b's step 3.3.
-  if ((isDesktop && !isPhone) || (!isDesktop && adding.served === false)) kinds.push("device");
+  // The browser's folders when no service serves the page; the desktop's; an Android phone's (E6b-D9).
+  if ((isDesktop && (!isPhone || /Android/.test(navigator.userAgent))) || adding.served === false) kinds.push("device");
   // A folder of the server in front, for its owners: the page's own server, or one the app added
   // (the desktop's installed service is its "device" already).
   const server = currentServer();

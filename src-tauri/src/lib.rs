@@ -254,6 +254,55 @@ fn media_url(roots: State<'_, Roots>, media: State<'_, Media>, root: String, pat
     })
 }
 
+/// One folder of the phone's storage, for its folder chooser (E6b-D9): its subfolders and its parent.
+#[derive(Serialize)]
+struct DeviceFolder {
+    path: String,
+    parent: Option<String>,
+    folders: Vec<DeviceSubfolder>,
+}
+
+#[derive(Serialize)]
+struct DeviceSubfolder {
+    name: String,
+    path: String,
+}
+
+/// Where a phone's storage starts: its shared storage, which "All files access" opens to the app.
+const DEVICE_HOME: &str = "/storage/emulated/0";
+
+/// The folders in a folder of the device (its storage's top when none is given), hidden ones left
+/// out, by name; no parent above the storage's top.
+#[tauri::command]
+async fn device_folders(path: Option<String>) -> Answer<DeviceFolder> {
+    let path = path.unwrap_or_else(|| DEVICE_HOME.to_owned());
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut folders: Vec<DeviceSubfolder> = std::fs::read_dir(&path)
+            .map_err(|error| failure("io", format!("{path}: {error}")))?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                (!name.starts_with('.')).then(|| DeviceSubfolder {
+                    path: entry.path().display().to_string(),
+                    name,
+                })
+            })
+            .collect();
+        folders.sort_by_key(|folder| folder.name.to_lowercase());
+        let parent = (path.trim_end_matches('/') != DEVICE_HOME)
+            .then(|| {
+                std::path::Path::new(&path)
+                    .parent()
+                    .map(|parent| parent.display().to_string())
+            })
+            .flatten();
+        Ok(DeviceFolder { path, parent, folders })
+    })
+    .await
+    .map_err(|error| failure("io", error.to_string()))?
+}
+
 /// The unattended check's folder, when the app runs it (`JACKBIRD_CHECK_FOLDER`, `desktop.yml`).
 #[tauri::command]
 fn check_folder() -> Option<String> {
@@ -298,6 +347,7 @@ macro_rules! commands {
             check_folder,
             check_restore,
             check_report,
+            device_folders,
             service::service_status,
             service::service_install,
             service::service_uninstall,

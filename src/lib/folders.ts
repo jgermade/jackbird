@@ -14,13 +14,15 @@ export const folderPicker = $reactive({
 });
 
 let settle: ((path: string | null) => void) | null = null;
+/** Where the folders come from: the server's machine (S1-D5), or the phone's own storage (E6b-D9). */
+let lister: (path?: string) => Promise<MachineFolder> = machineFolder;
 
 /** Shows a folder's subfolders; on failure, says why and stays where it was. */
 export async function enterFolder(path?: string): Promise<void> {
   folderPicker.busy = true;
   folderPicker.error = "";
   try {
-    folderPicker.here = await machineFolder(path);
+    folderPicker.here = await lister(path);
   } catch (error) {
     folderPicker.error = error instanceof Error ? error.message : String(error);
   } finally {
@@ -28,9 +30,10 @@ export async function enterFolder(path?: string): Promise<void> {
   }
 }
 
-/** Opens the dialog at the person's home; the folder chosen, or null. */
-export function chooseMachineFolder(): Promise<string | null> {
+/** Opens the dialog at the person's home (or where `list` starts); the folder chosen, or null. */
+export function chooseMachineFolder(list: (path?: string) => Promise<MachineFolder> = machineFolder): Promise<string | null> {
   settle?.(null);
+  lister = list;
   folderPicker.open = true;
   folderPicker.here = null;
   void enterFolder();

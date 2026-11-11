@@ -20,7 +20,6 @@
   const { LANGUAGES, preferences, setLanguage, setTheme } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
   const { isDesktop, isPhone } = await import("../lib/platform")
-  const { forgetInstance, instance } = await import("../lib/instance")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
   const { account, addKey, addPasskey, can, endSession, loadMine, passkeysHere, removeKey, removePasskey, renameMe, signOut } = await import("../lib/account")
   const { openPeople } = await import("../lib/people")
@@ -169,15 +168,6 @@
           <Select id="output-device" :model="output.device ?? ''" :options="deviceOptions()" @change="setOutputDevice($event.detail || null)" />
         </Field>
         <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
-      </section>
-      <section :if="isPhone && instance.address" class="pref service">
-        <div class="text">
-          <h3 class="mm-legend is-ink">{{ t("instance.eyebrow") }}</h3>
-          <p class="state">{{ t("instance.now", { address: instance.address }) }}</p>
-        </div>
-        <div class="keys">
-          <Key variant="ghost" @click="forgetInstance()">{{ t("instance.change") }}</Key>
-        </div>
       </section>
       <section :if="isDesktop && !isPhone" class="pref service">
         <div class="text">
