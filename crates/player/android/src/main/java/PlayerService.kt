@@ -38,6 +38,10 @@ class PlayerService : MediaSessionService() {
       builder.setSessionActivity(PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE))
     }
     val made = builder.build()
+    // Added by hand: Media3 adds a session when a MediaController asks for it, and PlayerPlugin uses
+    // the player directly. Only an added session gets the notification, and with it the foreground
+    // service; without one Android stops the service a minute after the app leaves the screen.
+    addSession(made)
     session = made
     current = made.player
     waiting.forEach { it(made.player) }
