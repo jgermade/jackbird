@@ -8,9 +8,17 @@ import { t } from "../i18n";
 import { isDesktop, isPhone, isService } from "../platform";
 import { parseSaved } from "../../helpers/instance";
 import { pickBrowserSource, restoreBrowserSource } from "./browser";
+import type { ServiceClient } from "./service";
 
-/** Asks for a folder to open: the browser's picker, the system's dialog, or the service's. Null when the person cancels. */
-export async function pickSource(): Promise<RootSource | null> {
+/**
+ * Asks for a folder to open: the browser's picker, the system's dialog, or the service's; with
+ * `server`, a folder of that server's machine (E6b-D11). Null when the person cancels.
+ */
+export async function pickSource(server?: ServiceClient): Promise<RootSource | null> {
+  if (server) {
+    const path = await (await import("../folders")).chooseMachineFolder();
+    return path === null ? null : (await import("./service")).openServiceFolder(path, server);
+  }
   // A phone has no folder dialog: the instance's own folder chooser, as on the web (E6's spike).
   if (isPhone && (await (await import("../desktop-service")).desktopUsesService())) {
     const path = await (await import("../folders")).chooseMachineFolder();

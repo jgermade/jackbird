@@ -15,6 +15,7 @@ import { flushMeta, readMetaSnapshot } from "./meta";
 import { dropFromQueue } from "./player";
 import { loadPlaylists } from "./playlists";
 import { pickSource } from "./sources";
+import type { ServiceClient } from "./sources/service";
 
 /** Replaces the roots with `update(current)`, as a setState updater would. */
 export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[]): void {
@@ -299,14 +300,14 @@ export async function hydrateRoot(
   })();
 }
 
-/** Asks for a folder and opens it. */
-export async function openFolder(): Promise<void> {
+/** Asks for a folder and opens it: one of this device, or of `server`'s machine (E6b-D11). */
+export async function openFolder(server?: ServiceClient): Promise<void> {
   library.loading = true;
   library.errorMessage = null;
   library.infoMessage = null;
 
   try {
-    const source = await pickSource();
+    const source = await pickSource(server);
     if (source) {
       await hydrateRoot(source, {});
     }

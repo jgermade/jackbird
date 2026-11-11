@@ -67,6 +67,10 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
       (error: unknown) => String(error)
     );
     beacon(config, "info", info);
+    // The instance is added as a source, as a person does (E6b-D11): "Add to the library…", its address.
+    const { adding, addServer } = await import("./adding");
+    await within("add the server", addServer(config.address));
+    beacon(config, "server", adding.error || "added");
     const { account } = await import("./account");
     for (let step = 0; step < 200 && !account.me; step += 1) await wait(100);
     report.me = account.me ? { name: account.me.name, role: account.me.role } : null;

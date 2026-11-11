@@ -25,7 +25,8 @@
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum } = await import("../lib/player")
   const { soundingBadge, soundingText } = await import("../lib/output")
-  const { closeRoot, openFolder, selectRoot } = await import("../lib/roots")
+  const { closeRoot, selectRoot } = await import("../lib/roots")
+  const { openAdding, sourcesHere } = await import("../lib/adding")
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
   const { ui } = await import("../lib/ui")
@@ -110,12 +111,12 @@
   </div>
 
   <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
-        :add-label="folderLabel" :add-disabled="library.loading || !can('owner')" @add="openFolder()"
+        :add-label="folderLabel" :add-disabled="library.loading || sourcesHere().length === 0" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
       <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
-      <span :if="can('owner')" class="open-folder" :class.has-roots="hasRoots">
-        <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openFolder()">
+      <span :if="sourcesHere().length > 0" class="open-folder" :class.has-roots="hasRoots">
+        <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openAdding()">
           <Reel :if="library.loading" :size="12" speed="fast" />
           <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
           <span class="folder-text">{{ folderText }}</span>

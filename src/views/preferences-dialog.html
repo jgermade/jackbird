@@ -170,7 +170,7 @@
         </Field>
         <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
       </section>
-      <section :if="isPhone" class="pref service">
+      <section :if="isPhone && instance.address" class="pref service">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("instance.eyebrow") }}</h3>
           <p class="state">{{ t("instance.now", { address: instance.address }) }}</p>

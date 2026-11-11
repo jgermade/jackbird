@@ -69,7 +69,7 @@ export function passkeysHere(): boolean {
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-let signedIn: (() => void) | null = null;
+let signedIn: ((done: boolean) => void) | null = null;
 
 function apply(state: State): void {
   account.signin = state.signin;
@@ -90,8 +90,30 @@ function welcome(me: Me, token?: string | null): void {
   account.step = "email";
   account.attempt = "";
   account.error = "";
-  signedIn?.();
+  signedIn?.(true);
   signedIn = null;
+}
+
+/** Resolves once someone is in on the server spoken to now (true), or the sign-in is given up (false). */
+export function whenSignedIn(): Promise<boolean> {
+  if (account.me) return Promise.resolve(true);
+  signedIn?.(false);
+  return new Promise((resolve) => {
+    signedIn = resolve;
+  });
+}
+
+/**
+ * Gives up signing in to a server the person added (E6b-D11): the account goes back to the home
+ * server. The home server's own sign-in cannot be given up: the library waits behind it.
+ */
+export function cancelSignIn(): void {
+  if (currentServer() === homeServer() && account.active && homeServed) return;
+  account.needed = false;
+  account.error = "";
+  signedIn?.(false);
+  signedIn = null;
+  void followServer(null);
 }
 
 /**
@@ -119,7 +141,7 @@ export async function startAccount(): Promise<void> {
   });
   if (account.me) return;
   account.needed = true;
-  await new Promise<void>((resolve) => {
+  await new Promise<boolean>((resolve) => {
     signedIn = resolve;
   });
 }

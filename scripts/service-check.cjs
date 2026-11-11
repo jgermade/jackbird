@@ -81,7 +81,7 @@ const fail = (why) => {
     await page.goto(base);
 
     // Open the folder through the service's dialog: home, then Music.
-    await page.getByRole("button", { name: /^(Open library|Add a folder)$/ }).first().click();
+    await page.getByRole("button", { name: /^(Open library|Add a folder|Add to the library)$/ }).first().click();
     await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
     await page.getByText("Before").first().waitFor({ timeout: 30000 });

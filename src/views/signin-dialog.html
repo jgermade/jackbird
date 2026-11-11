@@ -11,7 +11,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { t } = await import("../lib/i18n")
-  const { account, askCode, checkCode, otherAddress, passkeySignIn, passkeysHere, pickProfile } = await import("../lib/account")
+  const { account, askCode, cancelSignIn, checkCode, otherAddress, passkeySignIn, passkeysHere, pickProfile } = await import("../lib/account")
 
   let email: string = ""
   let code: string = ""
@@ -30,7 +30,7 @@
 </script>
 
 <div class="signin-dialog">
-  <Modal :open="account.needed" :eyebrow="t('account.eyebrow')" :title="title()" size="sm" :close-label="t('people.close')" @close="">
+  <Modal :open="account.needed" :eyebrow="t('account.eyebrow')" :title="title()" size="sm" :close-label="t('people.close')" @close="cancelSignIn()">
     <div :if="picking()" class="profiles">
       <p class="hint">{{ t("account.whoHint") }}</p>
       <ul class="list">
