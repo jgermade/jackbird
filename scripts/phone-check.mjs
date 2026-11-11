@@ -141,11 +141,6 @@ const showLog = () => {
 if (platform === "android") {
   startLog();
   run("adb", ["install", "-r", app]);
-  // The phone's own folder (E6b-D9): the fixtures copied into its shared storage, and "All files
-  // access" granted as the person would in Android's settings.
-  run("adb", ["shell", "mkdir", "-p", "/sdcard/Music/jackbird-check"]);
-  for (const name of readdirSync(music)) run("adb", ["push", join(music, name), `/sdcard/Music/jackbird-check/${name}`]);
-  run("adb", ["shell", "appops", "set", "--uid", bundle, "MANAGE_EXTERNAL_STORAGE", "allow"]);
   run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
 } else {
   const devices = JSON.parse(read("xcrun", ["simctl", "list", "devices", "available", "-j"])).devices;
@@ -259,11 +254,6 @@ if (!(report.tracks >= 3)) problems.push(`tracks: ${report.tracks}`);
 if (!report.played || report.played.error || !(report.played.played > 0)) problems.push(`the FLAC did not play: ${JSON.stringify(report.played)}`);
 // The native player (E6b-D7, Android for now): the queue goes on in the background by itself.
 if (platform === "android") {
-  // The phone's own folder (E6b-D9): granted, listed, opened, walked, and a FLAC of it played.
-  const device = report.device;
-  if (!device?.granted || !device.listed || !device.opened || !(device.tracks >= 3) || !(device.played > 0) || device.failures?.length) {
-    problems.push(`the phone's own folder: ${JSON.stringify(device ?? null)}`);
-  }
   const background = report.background;
   if (!background?.native) problems.push("the native player's queue was not measured");
   else {

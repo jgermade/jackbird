@@ -7,8 +7,7 @@
 
 import { isAudioFile } from "../helpers/formats";
 
-/** `deviceFolder`: a folder of the phone's own storage, with the fixtures in it (Android, E6b-D9). */
-type PhoneCheck = { address: string; folder: string; report: string; deviceFolder?: string };
+type PhoneCheck = { address: string; folder: string; report: string };
 
 /** The check this build was made for, if any. */
 export function phoneCheck(): PhoneCheck | null {
@@ -89,10 +88,7 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
       report.played = { path: flac.path, ...(await play(media.url)) };
       beacon(config, "played", report.played);
     }
-    if (config.deviceFolder) {
-      report.device = await within("the phone's folder", checkDeviceFolder(config.deviceFolder));
-      beacon(config, "device", report.device);
-    }
+
   } catch (error) {
     report.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   }
@@ -234,35 +230,4 @@ async function measureNativeQueue(config: PhoneCheck, mediaUrl: () => Promise<st
   }
   audio.removeAttribute("src");
   await post("background", { native: true, muted: false, mediaSession: false, samples, changes, ended, failures });
-}
-
-/**
- * The phone's own folder as a source (E6b-D9): "All files access" granted (the check grants it with
- * `appops`), its folders listed, the folder opened as on a computer, its songs walked, and a FLAC of
- * it played a few seconds by the native player, from its file.
- */
-async function checkDeviceFolder(folder: string): Promise<Record<string, unknown>> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  const { deviceFolders } = await import("./device-storage");
-  const { restoreDesktopSource } = await import("./sources/desktop");
-  const { PhoneAudio } = await import("./phone-audio");
-  const { fileUrl } = await import("../helpers/output");
-  const granted = await invoke<{ granted: boolean }>("plugin:jackbird-player|storage_access").then((answer) => answer.granted);
-  const parent = folder.slice(0, folder.lastIndexOf("/"));
-  const listed = (await deviceFolders(parent)).folders.some((one) => one.path === folder);
-  const source = await restoreDesktopSource(folder);
-  if (!source) return { granted, listed, opened: false };
-  const tracks = (await source.walk()).filter((entry) => isAudioFile(entry.path));
-  const flac = tracks.find((track) => track.path.toLowerCase().endsWith(".flac") && !track.path.includes("silence"));
-  if (!flac) return { granted, listed, opened: true, tracks: tracks.length };
-  const audio = new PhoneAudio();
-  const failures: unknown[] = [];
-  audio.addEventListener("fallback", (event) => failures.push((event as CustomEvent).detail));
-  audio.open({ key: "device-flac", url: fileUrl(folder, flac.path), title: flac.path });
-  await audio.play();
-  for (let step = 0; step < 40 && audio.currentTime < 1; step += 1) await wait(100);
-  const played = audio.currentTime;
-  audio.removeAttribute("src");
-  source.close();
-  return { granted, listed, opened: true, tracks: tracks.length, path: flac.path, played, failures };
 }

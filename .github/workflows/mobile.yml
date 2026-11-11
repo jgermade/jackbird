@@ -5,8 +5,7 @@
 # scripts/phone-check.mjs checks its report. Then the app goes to the background for two minutes
 # while a queue plays: on Android through the native player (E6b, crates/player), and every change
 # of song must happen meanwhile, with the app's media session playing; on iOS, until its native
-# player, only measured. On Android, a folder of the phone's own storage is opened and played from
-# too (E6b-D9). Nothing here is signed or shipped.
+# player, only measured. Nothing here is signed or shipped.
 name: mobile
 
 on:
@@ -38,8 +37,7 @@ jobs:
     timeout-minutes: 40
     env:
       # The emulator reaches this machine at 10.0.2.2 (scripts/phone-check.mjs).
-      # And a folder of the phone's own storage, which the check fills (E6b-D9).
-      VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://10.0.2.2:4647","folder":"/tmp/jackbird-phone-music","report":"http://10.0.2.2:4700/report","deviceFolder":"/storage/emulated/0/Music/jackbird-check"}'
+      VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://10.0.2.2:4647","folder":"/tmp/jackbird-phone-music","report":"http://10.0.2.2:4700/report"}'
 
     steps:
       - uses: actions/checkout@v6

@@ -5,15 +5,8 @@
 
 package es.germade.jackbird.player
 
-import android.Manifest
 import android.app.Activity
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.os.Environment
 import android.os.Handler
-import android.provider.Settings
 import android.os.Looper
 import android.util.Base64
 import android.webkit.WebView
@@ -290,38 +283,4 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     withPlayer(invoke) { invoke.resolve(snapshot()) }
   }
 
-  /** Whether the app may read and write the phone's shared storage (E6b-D9): "All files access" from Android 11. */
-  private fun storageGranted(): Boolean =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager()
-    else activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-
-  @Command
-  fun storageAccess(invoke: Invoke) {
-    invoke.resolve(JSObject().apply { put("granted", storageGranted()) })
-  }
-
-  /**
-   * Asks for it: Android's own page for "All files access" (Android 11 and later), or the storage
-   * permission's dialog before. Resolves at once; the page asks again when the app is back in front.
-   */
-  @Command
-  fun askStorageAccess(invoke: Invoke) {
-    main.post {
-      try {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-          val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${activity.packageName}"))
-          try {
-            activity.startActivity(intent)
-          } catch (_: Exception) {
-            activity.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-          }
-        } else {
-          activity.requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE), 4646)
-        }
-        invoke.resolve()
-      } catch (error: Exception) {
-        invoke.reject(error.message ?: error.toString())
-      }
-    }
-  }
 }

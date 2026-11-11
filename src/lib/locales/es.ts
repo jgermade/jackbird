@@ -247,7 +247,6 @@ export const es: Record<MessageKey, string> = {
   "sources.back": "Atrás",
   "sources.close": "Cerrar",
   "sources.thisServer": "este servidor",
-  "sources.storageDenied": "jackbird necesita \"Acceso a todos los archivos\" para leer la música de este teléfono. Permítelo en los ajustes de Android y vuelve a intentarlo.",
   "sources.nothingOpen": "Conectado a {server}: todavía no tiene biblioteca ni carpetas abiertas para ti.",
   "instance.address": "La dirección de la instancia",
   "instance.addressHint": "Como musica.ejemplo.org, o 192.168.1.20:4646 en casa.",

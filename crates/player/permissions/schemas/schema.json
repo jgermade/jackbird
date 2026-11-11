@@ -295,18 +295,6 @@
       "type": "string",
       "oneOf": [
         {
-          "description": "Enables the ask_storage_access command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-ask-storage-access",
-          "markdownDescription": "Enables the ask_storage_access command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the ask_storage_access command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-ask-storage-access",
-          "markdownDescription": "Denies the ask_storage_access command without any pre-configured scope."
-        },
-        {
           "description": "Enables the output_info command without any pre-configured scope.",
           "type": "string",
           "const": "allow-output-info",
@@ -439,22 +427,10 @@
           "markdownDescription": "Denies the stop command without any pre-configured scope."
         },
         {
-          "description": "Enables the storage_access command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-storage-access",
-          "markdownDescription": "Enables the storage_access command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the storage_access command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-storage-access",
-          "markdownDescription": "Denies the storage_access command without any pre-configured scope."
-        },
-        {
-          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-storage-access`\n- `allow-ask-storage-access`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-register-listener`\n- `allow-remove-listener`",
+          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-register-listener`\n- `allow-remove-listener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-storage-access`\n- `allow-ask-storage-access`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-register-listener`\n- `allow-remove-listener`"
+          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-register-listener`\n- `allow-remove-listener`"
         }
       ]
     }

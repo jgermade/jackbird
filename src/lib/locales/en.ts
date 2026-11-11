@@ -246,7 +246,6 @@ export const en = {
   "sources.back": "Back",
   "sources.close": "Close",
   "sources.thisServer": "this server",
-  "sources.storageDenied": "jackbird needs \"All files access\" to read the music on this phone. Allow it in Android's settings, and try again.",
   "sources.nothingOpen": "Connected to {server}: it has no library or open folder for you yet.",
   "instance.address": "The instance's address",
   "instance.addressHint": "Such as music.example.org, or 192.168.1.20:4646 at home.",
