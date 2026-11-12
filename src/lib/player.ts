@@ -14,6 +14,7 @@ import {
   addTo,
   clearUpcoming as clearAfterCurrent,
   dropItems,
+  isOneAlbum,
   moveTo,
   playNextIn,
   removeAt,
@@ -137,6 +138,21 @@ export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
         state: at < index ? "played" : at === index ? "current" : "upcoming",
         missing: !track
       };
+    })
+  );
+});
+
+/** Whether the queue is one disc (its played tracks are then not dimmed), from the queue and the library. */
+export const queueIsAlbum = $computed((): boolean => {
+  const queue = playback.queue;
+  if (!queue) return false;
+  const roots = new Map(library.roots.map((root) => [root.id, root]));
+  return isOneAlbum(
+    queue.items.map((item) => {
+      const track = roots.get(item.rootId)?.tracks.find((one) => one.id === item.trackId);
+      if (!track) return null;
+      const folder = `${item.rootId}/${track.relativePath.split("/").slice(0, -1).join("/")}`;
+      return { album: track.metadata.album, artist: track.metadata.artist, folder };
     })
   );
 });

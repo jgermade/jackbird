@@ -137,3 +137,20 @@ export function restoreQueue(saved: QueuePosition, openRoots: ReadonlySet<string
   const dropped = dropItems(saved, (item) => !openRoots.has(item.rootId));
   return { queue: dropped.queue, index: dropped.index };
 }
+
+/** What `isOneAlbum` looks at in each queued track (null for one no longer in the library). */
+export type AlbumPart = { album: string; artist: string; folder: string } | null;
+
+/**
+ * Whether a queue is one disc rather than a list: every track there, of the same album (named), and
+ * either by the same artist or in the same folder (a compilation keeps its tracks together). Its
+ * tracks played are not dimmed then: a disc plays through, a list is worked through. See
+ * RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 15:00).
+ */
+export function isOneAlbum(parts: readonly AlbumPart[]): boolean {
+  if (parts.length < 2 || parts.some((part) => !part)) return false;
+  const [first, ...rest] = parts as { album: string; artist: string; folder: string }[];
+  const album = first.album.trim().toLowerCase();
+  if (!album || rest.some((part) => part.album.trim().toLowerCase() !== album)) return false;
+  return rest.every((part) => part.artist === first.artist) || rest.every((part) => part.folder === first.folder);
+}

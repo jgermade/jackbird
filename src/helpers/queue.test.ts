@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { addTo, clearUpcoming, dropItems, moveTo, playNextIn, queueOf, removeAt, restoreQueue, sameItem, type QueuePosition } from "./queue.ts";
+import { addTo, clearUpcoming, dropItems, isOneAlbum, moveTo, playNextIn, queueOf, removeAt, restoreQueue, sameItem, type QueuePosition } from "./queue.ts";
 
 const item = (rootId: string, trackId: string) => ({ rootId, trackId });
 const ids = (position: QueuePosition): string[] => position.queue?.items.map((one) => `${one.rootId}:${one.trackId}`) ?? [];
@@ -164,5 +164,22 @@ describe("restoreQueue", () => {
     assert.equal(restoreQueue(mixed, new Set(["talk"])), null);
     assert.equal(restoreQueue({ queue: null, index: 0 }, new Set(["music"])), null);
     assert.equal(restoreQueue({ ...mixed, index: 9 }, new Set(["music"])), null);
+  });
+});
+
+describe("isOneAlbum", () => {
+  const part = (album: string, artist: string, folder = "r/Black Album") => ({ album, artist, folder });
+  it("is a disc when every track is of one named album, by one artist or in one folder", () => {
+    assert.equal(isOneAlbum([part("Metallica", "Metallica"), part("metallica ", "Metallica", "r/other")]), true);
+    // A compilation: several artists, one folder.
+    assert.equal(isOneAlbum([part("Hits", "A"), part("Hits", "B")]), true);
+  });
+  it("is a list otherwise", () => {
+    assert.equal(isOneAlbum([part("Metallica", "Metallica"), part("Load", "Metallica")]), false);
+    assert.equal(isOneAlbum([part("Hits", "A", "r/one"), part("Hits", "B", "r/two")]), false);
+    assert.equal(isOneAlbum([part("", "A"), part("", "A")]), false);
+    assert.equal(isOneAlbum([part("Hits", "A"), null]), false);
+    assert.equal(isOneAlbum([part("Hits", "A")]), false);
+    assert.equal(isOneAlbum([]), false);
   });
 });

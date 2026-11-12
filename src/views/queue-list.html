@@ -1,7 +1,7 @@
 <script :setup lang="ts">
   // The queue as a list, in the queue's dialog (computers) and its panel
   // (phones): the tracks queued from any open roots with their covers (the
-  // one playing larger), the played ones dimmed, the current one with its
+  // one playing larger), the played ones dimmed (not in a disc: queueIsAlbum), the current one with its
   // bars. A click (or Enter) plays a track, the current one pauses or
   // resumes. A track's grip (⠿) drags it to another place (mouse, pen or
   // touch), but not the current one, which has no grip (its larger cover takes
@@ -17,7 +17,7 @@
 
   const { t } = await import("../lib/i18n")
   const { playback } = await import("../lib/playback")
-  const { moveInQueue, playAt, queueEntries, removeFromQueue } = await import("../lib/player")
+  const { moveInQueue, playAt, queueEntries, queueIsAlbum, removeFromQueue } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
 
   type Entry = { index: number; title: string; artist: string; rootLabel: string; cover: string | null; state: "played" | "current" | "upcoming"; missing: boolean }
@@ -187,7 +187,7 @@
   <ol :else class="queue" role="listbox" tabindex="0" :aria-label="t('queue.title')"
       :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
     <li :each="entry in entries()" :key="entry.index" :id="itemId(entry.index)" role="option" class="item"
-        :class.played="entry.state === 'played'" :class.current="entry.state === 'current'"
+        :class.played="entry.state === 'played' && !queueIsAlbum.value" :class.current="entry.state === 'current'"
         :class.missing="entry.missing" :class.focused="entry.index === focused"
         :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
       <!-- The one playing stays where it is: no grip; its larger cover takes the grip's place. -->
