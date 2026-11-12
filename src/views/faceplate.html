@@ -221,7 +221,8 @@
         :add-label="folderLabel" :add-disabled="library.loading || sourcesHere().length === 0" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
-      <span :if="sourcesHere().length > 0" class="open-folder" :class.has-roots="hasRoots">
+      <!-- Adding another folder, once one is open: before that, the welcome offers it. -->
+      <span :if="hasRoots && sourcesHere().length > 0" class="open-folder" :class.has-roots="hasRoots">
         <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openAdding()">
           <Reel :if="library.loading" :size="12" speed="fast" />
           <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
