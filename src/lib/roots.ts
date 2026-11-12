@@ -316,6 +316,8 @@ export async function openFolder(server?: ServiceClient): Promise<void> {
       await hydrateRoot(source, {});
     }
   } catch (error) {
+    // The dialog closed with no folder chosen (the browser's picker rejects with AbortError): nothing to say.
+    if (error instanceof DOMException && error.name === "AbortError") return;
     library.errorMessage = error instanceof Error ? error.message : t("message.scanFailed");
   } finally {
     library.loading = false;

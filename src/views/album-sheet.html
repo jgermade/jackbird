@@ -38,21 +38,6 @@
   // A disc's number column, only when one of its tracks has a number; a track without one leaves it blank.
   const discNumbered = (disc: { tracks: Track[] }): boolean => disc.tracks.some((track) => !!track.metadata.trackNumber?.trim())
 
-  // Over the heading: what is shown, by the library's view (a folder, a
-  // playlist, or the view's name).
-  const VIEW_NAMES: Record<string, string> = {
-    artists: "views.artists",
-    albumsByArtist: "views.albumsByArtist",
-    albums: "views.albums",
-    compilations: "views.compilations",
-    songs: "views.songs"
-  }
-  const eyebrow = (): string => {
-    const view = root()?.view ?? "files"
-    if (view === "playlists") return t("playlist.eyebrow")
-    return VIEW_NAMES[view] ? t(VIEW_NAMES[view]) : t("album.folder")
-  }
-
   // A disc's box, by its track count: ticked when all its tracks are
   // selected, a dash when some are. A click selects them all, or, when all
   // are, none; the rest of the selection stays.
@@ -99,13 +84,6 @@
 
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">
-      <!-- What is shown, over its albums; not for the whole root, whose name and count its tab shows. -->
-      <header :if="!scope().whole" class="scope-head">
-        <span class="mm-legend">{{ eyebrow() }}</span>
-        <h2>{{ scope().label }}</h2>
-        <p>{{ tn("album.count", albums().length) }}, {{ tn("tracks.count", scope().tracks.length) }}</p>
-      </header>
-
       <article :each="album in albums()" :key="album.key" class="album">
         <div class="cover">
           <img :if="album.coverDataUrl" :src="album.coverDataUrl" :alt="t('album.coverOf', { title: album.title })" />
@@ -194,9 +172,6 @@
   /* Its albums are laid out by the sheet's own width, not the screen's: a narrow pane beside the
      tree (a tablet upright) stacks them as a phone does. */
   .albums { display: grid; gap: var(--mm-space-5); padding: var(--mm-space-5); container-type: inline-size; }
-  .scope-head { display: grid; gap: var(--mm-space-1); }
-  .scope-head h2 { font-size: var(--mm-text-2xl); overflow-wrap: anywhere; }
-  .scope-head p { margin: 0; color: var(--mm-fg-muted); }
 
   /* The cover beside the head and the discs; in a narrow sheet the discs go under both. */
   .album {
