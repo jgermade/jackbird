@@ -91,25 +91,31 @@ async function windowCompact(keepFull: boolean): Promise<void> {
 }
 
 /**
- * Gives the window this inner size (in physical pixels) at `place`, and checks it took. On macOS a
- * window is sized from its bottom edge: grown back from the compact size, its top would go up past
- * the screen's, and macOS cuts it short to keep it on the screen (the content comes out short by
- * that much, and stays so once moved). So there it is first moved down by what it will grow, so it
- * grows up into place. Elsewhere a window is sized from its top. Either way it is put at `place`
- * after, and sized again until the inside is the one asked for (up to three times).
+ * Gives the window this inner size (in physical pixels) at `place`, and checks it held. On macOS a
+ * title bar turned on is laid out later, asynchronously: a size set meanwhile is the bare frame's,
+ * and when the bar comes it is taken out of the content (29 pixels short). And a window is sized
+ * from its bottom edge there, so it is first moved down by what it will grow, to grow up into place
+ * rather than past the screen's top. So: size, place, wait, read; and only when the inside is right
+ * on two reads apart, done (up to four rounds, each waiting longer).
  */
 async function placeAndSize(place: { x: number; y: number }, width: number, height: number): Promise<void> {
   const { win, PhysicalPosition, PhysicalSize } = await windowApi();
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const right = async () => {
+    const inner = await win.innerSize();
+    return Math.abs(inner.width - width) <= 1 && Math.abs(inner.height - height) <= 1;
+  };
+  for (const wait of [100, 300, 600, 1000]) {
     if (isMac()) {
       const inner = await win.innerSize();
       await win.setPosition(new PhysicalPosition(place.x, place.y + Math.max(0, height - inner.height)));
     }
     await win.setSize(new PhysicalSize(width, height));
     await win.setPosition(new PhysicalPosition(place.x, place.y));
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    const inner = await win.innerSize();
-    if (Math.abs(inner.width - width) <= 1 && Math.abs(inner.height - height) <= 1) return;
+    await pause(wait);
+    if (!(await right())) continue;
+    await pause(300);
+    if (await right()) return;
   }
 }
 
@@ -118,6 +124,8 @@ async function windowFull(): Promise<void> {
   await win.setAlwaysOnTop(false);
   await win.setDecorations(true);
   await win.setMinSize(new LogicalSize(FULL_MIN.width, FULL_MIN.height));
+  // The title bar comes asynchronously on macOS: give it a moment before sizing (placeAndSize checks after).
+  await new Promise((resolve) => setTimeout(resolve, 200));
   const full = saved.full;
   if (full) {
     await placeAndSize(full, full.width, full.height);
