@@ -91,7 +91,7 @@
   <SourcesDialog />
 </main>
 <!-- Embedded: the compact player, outside the window (which turns and clips what it holds). -->
-<div :if="embed" class="mini"><Compact /></div>
+<div :if="embed" class="mini" :class.listed="compact.list"><Compact /></div>
 
 <style scoped>
   .app {
@@ -142,12 +142,16 @@
     z-index: 2;
     left: 6rem;
     bottom: 1.5rem;
+    /* The compact window's own size (helpers/compact.ts): 22rem by 11rem, and 14rem more upwards
+       with the queue's list. */
     width: 22rem;
-    height: 12.5rem;
+    height: 11rem;
     overflow: hidden;
     border: var(--mm-border-width) solid var(--mm-border-strong);
     border-radius: var(--mm-radius-lg);
     /* Within the frame's 1.5rem below it, or the iframe cuts it. */
     box-shadow: 0 .5rem .875rem rgba(0, 0, 0, .3), 0 .125rem .375rem rgba(0, 0, 0, .2);
+    transition: height var(--mm-duration) var(--mm-ease);
   }
+  .mini.listed { height: 25rem; }
 </style>

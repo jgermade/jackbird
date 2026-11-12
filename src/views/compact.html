@@ -17,7 +17,7 @@
   const { compact, compactKeys, dragWindow, leaveCompact, setCompactList, setOnTop } = await import("../lib/compact")
   const { playback } = await import("../lib/playback")
   const { isEmbed } = await import("../lib/platform")
-  // Embedded in the landing page: no way back (it is drawn always) and no list (the window beside it has the queue).
+  // Embedded in the landing page: no way back (it is drawn always).
   const embed: boolean = isEmbed
 
   $: backLabel = compact.mode === "window" ? t("compact.back") : t("compact.backPage")
@@ -39,7 +39,7 @@
       </div>
       <DeckKeys place="compact" />
       <div class="side end">
-        <Key :if="!embed" size="sm" square :pressed="compact.list" :disabled="!playback.queue && !compact.list" :label="t('compact.list')" :title="t('compact.list')" @click="setCompactList(!compact.list)">
+        <Key size="sm" square :pressed="compact.list" :disabled="!playback.queue && !compact.list" :label="t('compact.list')" :title="t('compact.list')" @click="setCompactList(!compact.list)">
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
         </Key>
       </div>

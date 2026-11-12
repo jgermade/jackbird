@@ -236,10 +236,10 @@ async function main() {
       await page.keyboard.press("Escape");
       await page.waitForTimeout(600);
     }
-    // The compact player, the card, as its window shows it (a little taller), for the landing
-    // page's hero; the track still playing.
+    // The compact player, the card, as its window shows it (22 by 11), for the landing page's
+    // hero; the track still playing.
     await page.keyboard.press("Control+Shift+M");
-    await page.setViewportSize({ width: 440, height: 250 });
+    await page.setViewportSize({ width: 440, height: 220 });
     // As the landing page's live player draws it: no key back to the full view (the page's own
     // way back, which a picture of it on the landing page has nowhere to go to).
     await page.addStyleTag({ content: ".compact .keys .side:first-child { visibility: hidden; }" });
