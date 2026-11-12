@@ -220,7 +220,8 @@ h1 em {
   overflow: hidden;
   border: var(--mm-border-width) solid var(--mm-border-strong);
   border-radius: var(--mm-radius-lg);
-  box-shadow: 0 2rem 3rem rgba(0, 0, 0, .3), 0 .5rem 1rem rgba(0, 0, 0, .2);
+  /* As the embedded app draws it, where a longer shadow would be cut by the iframe. */
+  box-shadow: 0 .5rem .875rem rgba(0, 0, 0, .3), 0 .125rem .375rem rgba(0, 0, 0, .2);
   transform: rotateY(-1deg) translateZ(4rem);
   transition: transform .8s cubic-bezier(.2, .7, .2, 1);
 }
