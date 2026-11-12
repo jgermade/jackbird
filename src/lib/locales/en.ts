@@ -263,7 +263,6 @@ export const en = {
   "sources.chooseFolder": "Choose a folder…",
   "sources.chooseFolderHint": "Your device's own dialog opens; jackbird reaches the folder you choose, and nothing else.",
   "sources.chooseServerFolder": "Choose a folder of {server}…",
-  "sources.phoneSaveSoon": "Saving tags in this phone's folders comes in the next update: for now they are read and played.",
   "sources.close": "Close",
   "sources.thisServer": "this server",
   "sources.recent": "Closed lately",

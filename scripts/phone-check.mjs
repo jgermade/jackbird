@@ -179,6 +179,8 @@ if (platform === "android") {
   run("adb", ["shell", "mkdir", "-p", "/sdcard/Music/jackbird-check"]);
   for (const name of readdirSync(music)) run("adb", ["push", join(music, name), `/sdcard/Music/jackbird-check/${name}`]);
   run("adb", ["push", "fixtures/tags/flac-full.flac", "/sdcard/Music/jackbird-check/flac-full.flac"]);
+  // An MP3 with no tags, for a save that does not fit in place (E6b-D9's second part).
+  run("adb", ["push", "fixtures/tags/mp3-no-tag.mp3", "/sdcard/Music/jackbird-check/mp3-no-tag.mp3"]);
   run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
 } else {
   const devices = JSON.parse(read("xcrun", ["simctl", "list", "devices", "available", "-j"])).devices;
@@ -298,6 +300,23 @@ if (platform === "android") {
   const device = report.device;
   if (!device?.picked || !(device.tracks >= 4) || device.title !== "Before" || !(device.played > 0) || device.failures?.length) {
     problems.push(`the phone's folder: ${JSON.stringify(device ?? null)}`);
+  }
+  // What is written there (E6b-D9's second part): a title in place, one beside and put in its place,
+  // a rename into a folder, a playlist.
+  const written = device?.written;
+  const savedWell = (one, title) => one?.title === title && one?.returned === title && one?.audioKept === true;
+  if (
+    !written ||
+    written.error ||
+    !savedWell(written.inPlace, "Saved on the phone") ||
+    !savedWell(written.beside, "Grown on the phone") ||
+    !written.beside.kept ||
+    written.beside.leftovers?.length ||
+    !written.renamed ||
+    written.renamedTitle !== "Grown on the phone" ||
+    !written.playlist
+  ) {
+    problems.push(`writing in the phone's folder: ${JSON.stringify(written ?? null)}`);
   }
   if (!background?.native) problems.push("the native player's queue was not measured");
   else {

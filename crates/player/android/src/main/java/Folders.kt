@@ -161,7 +161,8 @@ class Folders(private val resolver: ContentResolver) {
         DocumentsContract.buildDocumentUriUsingTree(tree, targetId)
       ) ?: throw FileNotFoundException(to)
     }
-    if (fromName != toName) moved = DocumentsContract.renameDocument(resolver, moved, toName) ?: throw FileNotFoundException(to)
+    // A provider that keeps the document's id on a rename gives back no new address: it is the same one.
+    if (fromName != toName) moved = DocumentsContract.renameDocument(resolver, moved, toName) ?: moved
     forget(tree, from)
     ids[key(tree, to.trim('/'))] = DocumentsContract.getDocumentId(moved)
   }
@@ -174,6 +175,52 @@ class Folders(private val resolver: ContentResolver) {
 
   /** A file's `content://` address, for the player. */
   fun address(tree: Uri, path: String): String = need(tree, path).toString()
+
+  /**
+   * A new, empty file beside `path`, in its folder, for a save whose new tags no longer fit in the
+   * old ones' room (E6b-D9's second part): named after it, hidden (".<name>.jackbird-save", or as
+   * the provider makes it unique), opened for Rust ("rw") and its descriptor given up. Its path and
+   * its descriptor.
+   */
+  fun detachBeside(tree: Uri, path: String): Pair<String, Int> {
+    val clean = path.trim('/')
+    val parent = clean.substringBeforeLast('/', "")
+    val wanted = ".${clean.substringAfterLast('/')}.jackbird-save"
+    val parentId = idOf(tree, parent) ?: throw FileNotFoundException(parent)
+    val made = DocumentsContract.createDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, parentId), "application/octet-stream", wanted)
+      ?: throw FileNotFoundException(clean)
+    val name = resolver.query(made, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null } ?: wanted
+    val madePath = if (parent.isEmpty()) name else "$parent/$name"
+    ids[key(tree, madePath)] = DocumentsContract.getDocumentId(made)
+    val fd = (resolver.openFileDescriptor(made, "rw") ?: throw FileNotFoundException(madePath)).detachFd()
+    return madePath to fd
+  }
+
+  /**
+   * Puts the file at `from` in the place of the one at `to`, in the same folder: the old one is
+   * removed, then the new one takes its name. If the old one cannot be removed, the new one is, and
+   * the old one is as it was. If the new one cannot then be renamed, it is kept, whole and checked:
+   * it is the only copy, under its hidden name, and the error says so.
+   */
+  fun replace(tree: Uri, from: String, to: String) {
+    val source = need(tree, from)
+    val name = to.trim('/').substringAfterLast('/')
+    try {
+      DocumentsContract.deleteDocument(resolver, need(tree, to))
+    } catch (error: Exception) {
+      runCatching { DocumentsContract.deleteDocument(resolver, source) }
+      forget(tree, from)
+      throw error
+    }
+    forget(tree, to)
+    val renamed = try {
+      DocumentsContract.renameDocument(resolver, source, name) ?: source
+    } catch (error: Exception) {
+      throw java.io.IOException("$to was saved as $from, which could not take its name: ${error.message}", error)
+    }
+    forget(tree, from)
+    ids[key(tree, to.trim('/'))] = DocumentsContract.getDocumentId(renamed)
+  }
 
   /** Opens a file for Rust ("r", or "rw" to write its tags in place), and gives up its descriptor: Rust closes it. */
   fun detachFile(tree: Uri, path: String, write: Boolean): Int =

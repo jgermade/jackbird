@@ -271,6 +271,53 @@ async fn phone_inspect(app: AppHandle, tree: String, path: String, known: Option
     .map(Into::into)
 }
 
+/// New tags into a file of a folder the person chose in Android's folder picker (E6b-D9's second
+/// part): the plugin opens it for reading and writing and hands its descriptor to Rust, and
+/// `jackbird-core` writes the splice in place when it fits. When it does not, the plugin makes a
+/// file beside it, Rust writes the new tags and the old audio into it and checks the audio, and the
+/// plugin puts it in the old one's place; on a failure before that, the file beside is removed and
+/// the old one is untouched (the plugin's `replace` says what it leaves if it fails itself). The
+/// file as it is after.
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn phone_save(
+    app: AppHandle,
+    tree: String,
+    path: String,
+    previous: Metadata,
+    metadata: Metadata,
+) -> Answer<InspectionJson> {
+    use tauri_plugin_jackbird_player::{open_beside, open_file, remove_file, replace_file};
+    let edit = edit_for(&previous, metadata);
+    tauri::async_runtime::spawn_blocking(move || {
+        let file = phone::take(open_file(&app, &tree, &path, true).map_err(|error| failure("io", error))?)?;
+        let mut made: Option<String> = None;
+        let saved = jackbird_core::save_open(file, &path, &edit, || {
+            let (beside, fd) = open_beside(&app, &tree, &path).map_err(jackbird_core::Error::Io)?;
+            made = Some(beside);
+            phone::take(fd).map_err(|error| jackbird_core::Error::Io(error.message))
+        });
+        match (saved, made) {
+            (Ok(jackbird_core::Saved::Done(after)), _) => Ok(after),
+            // The plugin cleans up after itself here: it removes the file beside when the old one
+            // stays, and keeps it when it is the only copy left.
+            (Ok(jackbird_core::Saved::Beside(after)), Some(beside)) => replace_file(&app, &tree, &beside, &path)
+                .map(|()| after)
+                .map_err(|error| failure("io", error)),
+            (Ok(jackbird_core::Saved::Beside(_)), None) => Err(failure("io", "the file beside was not made")),
+            (Err(error), made) => {
+                if let Some(beside) = made {
+                    let _ = remove_file(&app, &tree, &beside);
+                }
+                Err(Failure::from(error))
+            }
+        }
+    })
+    .await
+    .map_err(|error| failure("io", error.to_string()))?
+    .map(Into::into)
+}
+
 /// The one place the app takes a file descriptor it did not open itself (E6b-D9; the second unsafe
 /// code the workspace allows, after `crates/tags-wasm`'s exports: see AGENTS.md).
 #[cfg(target_os = "android")]
@@ -381,7 +428,7 @@ pub fn run() {
     #[cfg(target_os = "android")]
     let builder = builder
         .plugin(tauri_plugin_jackbird_player::init())
-        .invoke_handler(commands![phone_inspect]);
+        .invoke_handler(commands![phone_inspect, phone_save]);
     #[cfg(target_os = "ios")]
     let builder = builder
         .plugin(tauri_plugin_jackbird_player::init())

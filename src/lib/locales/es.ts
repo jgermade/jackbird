@@ -264,7 +264,6 @@ export const es: Record<MessageKey, string> = {
   "sources.chooseFolder": "Elegir una carpeta…",
   "sources.chooseFolderHint": "Se abre el diálogo de tu dispositivo; jackbird entra en la carpeta que elijas, y en nada más.",
   "sources.chooseServerFolder": "Elegir una carpeta de {server}…",
-  "sources.phoneSaveSoon": "Guardar etiquetas en las carpetas de este teléfono llega en la próxima actualización: de momento se leen y se reproducen.",
   "sources.close": "Cerrar",
   "sources.thisServer": "este servidor",
   "sources.recent": "Cerradas hace poco",

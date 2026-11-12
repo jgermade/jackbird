@@ -231,6 +231,54 @@ pub fn save(root: &Root, relative: &str, edit: &Edit) -> Result<Inspection, Erro
     Ok(after)
 }
 
+/// What `save_open` did to a file already open.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Saved {
+    /// The file itself holds the new tags (written in place, or nothing to change): it as it is after.
+    Done(Inspection),
+    /// The new tags did not fit: the new file was written beside the old one and checked, and is
+    /// what is given; the caller puts it in the old one's place (a document provider renames by
+    /// its own means), or removes it on an error after.
+    Beside(Inspection),
+}
+
+/// `save` on a file already open for reading and writing (one of a phone's folders, opened by
+/// Android's document provider and handed over, E6b-D9). The same splice, checked by the same
+/// safeguards: written in place when the new tags are as long as the old ones; otherwise into the
+/// file `beside()` gives (open for reading and writing, empty), the new tags and then the old
+/// file's bytes after its tags, copied, and its audio checked. Either way the audio region hashed
+/// after must be the source's. `shown` names the file in errors.
+pub fn save_open<F>(mut file: File, shown: &str, edit: &Edit, beside: F) -> Result<Saved, Error>
+where
+    F: FnOnce() -> Result<File, Error>,
+{
+    let len = file.metadata().map_err(io(shown))?.len();
+    let (layout, head) = layout_of(&mut file, len, shown)?;
+    let (_, before) = hashes(&mut file, &layout.audio, shown)?;
+    let splice = jackbird_tags::write_head(&head, &layout, edit)?;
+    if splice.with[..] == head[..layout.tags_end as usize] {
+        return inspect_handle(&mut file, shown, None).map(Saved::Done);
+    }
+    let (mut after, saved): (File, fn(Inspection) -> Saved) = if splice.with.len() as u64 == layout.tags_end {
+        file.seek(SeekFrom::Start(0)).map_err(io(shown))?;
+        file.write_all(&splice.with).map_err(io(shown))?;
+        file.sync_all().map_err(io(shown))?;
+        (file, Saved::Done)
+    } else {
+        let mut target = beside()?;
+        target.write_all(&splice.with).map_err(io(shown))?;
+        file.seek(SeekFrom::Start(layout.tags_end)).map_err(io(shown))?;
+        io::copy(&mut file, &mut target).map_err(io(shown))?;
+        target.sync_all().map_err(io(shown))?;
+        (target, Saved::Beside)
+    };
+    let inspection = inspect_handle(&mut after, shown, None)?;
+    if inspection.audio_checksum != before {
+        return Err(Error::Tags(jackbird_tags::Error::Refused(Refusal::Audio)));
+    }
+    Ok(saved(inspection))
+}
+
 /// The new file beside the old one, checked, then renamed over it.
 fn write_beside(
     path: &Path,

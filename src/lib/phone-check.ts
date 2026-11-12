@@ -6,6 +6,8 @@
 // See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E6).
 
 import { isAudioFile } from "../helpers/formats";
+import { emptyMetadata } from "../helpers/metadata";
+import type { RootSource } from "../types";
 
 /** `deviceFolder`: a folder of the phone (its `content://` address) with the fixtures in it, chosen in Android's folder picker (E6b-D9). */
 type PhoneCheck = { address: string; folder: string; report: string; deviceFolder?: string };
@@ -241,7 +243,9 @@ async function measureNativeQueue(config: PhoneCheck, mediaUrl: () => Promise<st
  * A folder of the phone as a source (E6b-D9): Android's folder picker opened at it (the check taps
  * "Use this folder" and "Allow" in it, scripts/phone-check.mjs), its songs walked, a FLAC's tags read
  * by Rust through the file Android opens, and the FLAC played a moment by the native player from
- * its `content://` address.
+ * its `content://` address. Then what is written there (E6b-D9's second part): a title saved in
+ * place, a title saved into a file with no tags (the new tags do not fit: written beside and put
+ * in its place), a rename into a folder, and a playlist written and read back.
  */
 async function checkPhoneFolder(config: PhoneCheck, folder: string): Promise<Record<string, unknown>> {
   const { pickPhoneFolder } = await import("./sources/phone");
@@ -264,7 +268,9 @@ async function checkPhoneFolder(config: PhoneCheck, folder: string): Promise<Rec
   for (let step = 0; step < 40 && audio.currentTime < 0.2; step += 1) await wait(100);
   const played = audio.currentTime;
   audio.removeAttribute("src");
+  const written = await checkPhoneWrites(source, tagged.path).catch((error: unknown) => ({ error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }));
   return {
+    written,
     picked: true,
     tracks: tracks.length,
     path: flac.path,
@@ -274,4 +280,32 @@ async function checkPhoneFolder(config: PhoneCheck, folder: string): Promise<Rec
     played,
     failures
   };
+}
+
+/** Saves a title into a file of the phone's folder and reads it back: what it reads, and whether its audio is the same. */
+async function saveTitle(source: RootSource, path: string, title: string): Promise<{ title: string | null; audioKept: boolean; returned: string | null }> {
+  const before = await source.inspect(path);
+  const previous = before.metadata ?? emptyMetadata();
+  const saved = await source.save(path, previous, { ...previous, title });
+  const after = await source.inspect(path);
+  return { title: after.metadata?.title ?? null, audioKept: after.audioChecksum === before.audioChecksum, returned: saved.metadata?.title ?? null };
+}
+
+/** What a phone's folder is written: tags in place and beside, a rename, a playlist (E6b-D9's second part). */
+async function checkPhoneWrites(source: RootSource, tagged: string): Promise<Record<string, unknown>> {
+  const inPlace = await saveTitle(source, tagged, "Saved on the phone");
+  // mp3-no-tag.mp3 has no tags: any title makes them longer, so the save goes beside and is put in its place.
+  const bare = "mp3-no-tag.mp3";
+  const beside = await saveTitle(source, bare, "Grown on the phone");
+  const left = (await source.walk()).map((entry) => entry.path);
+  const leftovers = left.filter((path) => path.includes(".jackbird-save"));
+  const kept = left.includes(bare);
+  await source.vfs.rename(bare, "renamed/Grown on the phone.mp3");
+  const after = (await source.walk()).map((entry) => entry.path);
+  const renamed = after.includes("renamed/Grown on the phone.mp3") && !after.includes(bare);
+  const renamedTitle = renamed ? ((await source.inspect("renamed/Grown on the phone.mp3")).metadata?.title ?? null) : null;
+  const text = "#EXTM3U\n#EXTINF:-1,Grown on the phone\nrenamed/Grown on the phone.mp3\n";
+  await source.vfs.write("check.m3u8", new TextEncoder().encode(text));
+  const playlist = new TextDecoder().decode(await source.vfs.read("check.m3u8")) === text;
+  return { inPlace, beside: { ...beside, kept, leftovers }, renamed, renamedTitle, playlist };
 }

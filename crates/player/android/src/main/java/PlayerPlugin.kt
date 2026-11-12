@@ -414,6 +414,33 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
+  /**
+   * A new file beside one of the folder's, for a save whose tags no longer fit (E6b-D9's second
+   * part), opened for Rust and its descriptor given up: `{ path, fd }`. Rust alone calls it, as
+   * `folderDetach`; it is not among the plugin's permissions.
+   */
+  @Command
+  fun folderBeside(invoke: Invoke) {
+    val args = invoke.parseArgs(TreePathArgs::class.java)
+    work(invoke) {
+      val (path, fd) = folders.detachBeside(Uri.parse(args.tree), args.path)
+      invoke.resolve(JSObject().apply {
+        put("path", path)
+        put("fd", fd)
+      })
+    }
+  }
+
+  /** The file written beside one put in its place (`from` over `to`). Rust alone calls it, after checking the new file. */
+  @Command
+  fun folderReplace(invoke: Invoke) {
+    val args = invoke.parseArgs(TreeRenameArgs::class.java)
+    work(invoke) {
+      folders.replace(Uri.parse(args.tree), args.from, args.to)
+      invoke.resolve()
+    }
+  }
+
   /** The person's output setting (E6b-D10): bit-perfect to a USB DAC, from the next song. */
   @Command
   fun setOutput(invoke: Invoke) {
