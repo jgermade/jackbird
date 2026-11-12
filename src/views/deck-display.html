@@ -131,7 +131,7 @@
 </script>
 
 <div class="unit">
-  <Display live>
+  <Display live joined>
     <div class="lcd" :class.small="small">
       <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
       <button :if="playback.playing" type="button" class="lcd-mark playing"
@@ -198,7 +198,7 @@
   </Display>
   <!-- The play modes, joined to the display's right edge as keys on its bezel. -->
   <div class="modes" role="group" :aria-label="t('faceplate.modes')">
-    <!-- Keys of the bezel's own: the whole side, one over the other, under the display's edge; their icon at the left, their LED against the right edge. -->
+    <!-- Keys of the bezel's own: the whole side, one over the other, under the display's edge; their icon in the middle, their LED against the right edge. -->
     <button type="button" class="mode" :aria-pressed="String(playback.shuffle)" :aria-label="t('faceplate.shuffle')" :title="t('faceplate.shuffle')" @click="toggleShuffle()">
       <span class="mode-led" :class.on="playback.shuffle" aria-hidden="true"></span>
       <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1 2.6-2.2M9 6.7c.6-1.2 1.4-2.2 2.5-2.2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
@@ -235,12 +235,12 @@
   .mode {
     position: relative;
     display: grid;
-    /* The icon at the left of what shows of the key (its first .5rem is under the display). */
-    place-items: center start;
+    /* The icon in the middle of what shows of the key (its first .5rem is under the display). */
+    place-items: center;
     min-height: 0;
     padding: 0;
     border: 0;
-    padding-left: calc(.5rem + .3rem);
+    padding-left: .5rem;
     background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
     color: var(--mm-fg);
     cursor: pointer;
@@ -255,7 +255,7 @@
   @media (hover: hover) { .mode:hover { filter: brightness(1.04); } }
   .mode-icon { width: .875rem; height: .875rem; }
   /* The LED: a short bar at the top, against the right edge. */
-  .mode-led { position: absolute; top: .3rem; right: 0; width: .3125rem; height: .1875rem; border-radius: 1px 0 0 1px; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
+  .mode-led { position: absolute; top: .2rem; right: 0; width: .3125rem; height: .1875rem; border-radius: 1px 0 0 1px; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
   /* Lit in the signal's orange (shuffle, repeating the queue); blue repeating one track. */
   /* Its glow thrown to the right, past the key's edge. */
   .mode-led.on { background: var(--mm-accent); box-shadow: .2rem 0 .3rem var(--mm-accent); }
