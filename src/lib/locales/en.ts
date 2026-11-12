@@ -13,7 +13,6 @@ export const en = {
   "picker.addRoot": "Add to the library",
   "picker.openLibrary": "Open library",
 
-  "roots.empty": "No roots open",
   "roots.close": "Close {name}",
   "roots.fallbackName": "Root {number}",
 

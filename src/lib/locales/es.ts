@@ -14,7 +14,6 @@ export const es: Record<MessageKey, string> = {
   "picker.addRoot": "Añadir a la biblioteca",
   "picker.openLibrary": "Abrir librería",
 
-  "roots.empty": "Sin roots abiertas",
   "roots.close": "Cerrar {name}",
   "roots.fallbackName": "Root {number}",
 
