@@ -127,7 +127,7 @@ const downloads = document.querySelector(".downloads");
 const mine = system && downloads?.querySelector(`.download[data-os="${system}"]`);
 if (mine) {
   mine.classList.add("mine");
-  mine.dataset.ribbon = "This device";
+  mine.dataset.ribbon = "Detected";
   downloads.prepend(mine);
 }
 
