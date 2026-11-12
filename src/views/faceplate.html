@@ -400,8 +400,8 @@
   .lcd { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--mm-space-3); min-width: 0; }
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
   .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
-  /* The title and the artist from the top, level with the clock's first line, not centred against it. */
-  .lcd-text { display: grid; flex: 1 1 auto; align-self: flex-start; gap: var(--mm-space-1); min-width: 0; }
+  /* The title and the artist, centred against the clock. */
+  .lcd-text { display: grid; flex: 1 1 auto; align-self: center; gap: var(--mm-space-1); min-width: 0; }
   /* The clock: a key with no keycap, like the display's left. */
   .lcd-time {
     flex: none;
@@ -419,9 +419,14 @@
   .lcd-time .lead { opacity: .35; }
   @media (min-width: 641px) {
     .lcd-mark { width: 7rem; }
+    /* A tablet's or a desktop's display is wide: its lines a size up from a phone's. */
+    .lcd-text .mm-display-title { font-size: var(--mm-text-lg); }
+    .lcd-text .artist { font-size: var(--mm-text-md); }
   }
-  /* Phones: a smaller mark, so the title keeps its room. */
+  /* Phones: a smaller mark, so the title keeps its room; the lines a little under the top rather
+     than centred against the clock, which would sit them low. */
   @media (max-width: 640px) {
+    .lcd-text { align-self: flex-start; padding-top: .25rem; }
     .lcd-mark { width: 2.5rem; height: 2.5rem; }
     .lcd-mark.playing { width: 4.5rem; }
   }
