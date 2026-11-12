@@ -233,14 +233,14 @@
   }
   /* The display's second line: the artist, under the title. */
   .artist { font-weight: var(--mm-weight-regular); font-size: var(--mm-text-sm); opacity: .85; }
-  /* The name in brushed metal, raised: the metal's sheen through the letters, a light edge under
-     them and a shadow over them, as the lettering on a hi-fi deck's front panel. */
+  /* The name in polished metal, raised from the faceplate as the lettering on a hi-fi receiver's
+     front panel: the brushing and the chrome through the letters, and their relief around them. */
   .wordmark {
-    background-image: var(--mm-metal-face);
+    background-image: var(--mm-metal-grain), var(--mm-metal-face);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    filter: drop-shadow(0 1px 0 var(--mm-metal-light)) drop-shadow(0 -1px 0 var(--mm-metal-shadow));
+    filter: var(--mm-metal-relief);
     font-family: var(--mm-font-label);
     font-stretch: var(--mm-stretch-label);
     font-weight: 800;

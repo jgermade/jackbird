@@ -114,11 +114,18 @@
   --mm-display-inset: inset 0 2px 6px rgba(0, 0, 0, .35);
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .5);
   --mm-brush: rgba(255, 255, 255, .05);
-  /* Lettering in brushed metal, raised from the chassis: the face's sheen top to bottom, a light
-     edge below and a shadow above (the faceplate's wordmark). */
-  --mm-metal-face: linear-gradient(180deg, #a7acb0 0%, #767c81 32%, #3f4448 52%, #81878c 70%, #b4b9bc 100%);
-  --mm-metal-light: rgba(255, 255, 255, .9);
-  --mm-metal-shadow: rgba(0, 0, 0, .45);
+  /* Lettering in polished metal, raised from the chassis as on a hi-fi receiver's front panel (the
+     faceplate's wordmark): the brushing's hairlines over a chrome face that mirrors the room (a
+     bright sky, a sharp horizon, a darker floor that brightens towards the bottom edge); then
+     its relief, a bevel catching the light on top, the letters' sides below and the shadow
+     they cast on the chassis. */
+  --mm-metal-grain: repeating-linear-gradient(180deg, rgba(255, 255, 255, .22) 0 1px, rgba(0, 0, 0, .06) 1px 2px, transparent 2px 3px);
+  --mm-metal-face: linear-gradient(180deg, #e6e9ea 0%, #aeb3b7 38%, #737a7f 49%, #3f4448 51%, #646a6f 72%, #9ea3a7 92%, #c9cdd0 100%);
+  --mm-metal-relief:
+    drop-shadow(0 -1px 0 rgba(255, 255, 255, .95))
+    drop-shadow(0 1px 0 #6a7075)
+    drop-shadow(0 1px 0 #4a4f53)
+    drop-shadow(0 2px 2px rgba(20, 24, 24, .35));
 
   /* ---- type --------------------------------------------------------------- */
 
@@ -243,9 +250,13 @@
   --mm-display-inset: inset 0 2px 8px rgba(0, 0, 0, .8);
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .1);
   --mm-brush: rgba(255, 255, 255, .025);
-  --mm-metal-face: linear-gradient(180deg, #f6f7f8 0%, #c3c7ca 30%, #6f7479 50%, #aeb3b7 68%, #e3e6e8 100%);
-  --mm-metal-light: rgba(255, 255, 255, .18);
-  --mm-metal-shadow: rgba(0, 0, 0, .85);
+  --mm-metal-grain: repeating-linear-gradient(180deg, rgba(255, 255, 255, .18) 0 1px, rgba(0, 0, 0, .08) 1px 2px, transparent 2px 3px);
+  --mm-metal-face: linear-gradient(180deg, #ffffff 0%, #dfe2e4 36%, #a4a9ad 49%, #5c6166 51%, #858b90 70%, #c8cccf 92%, #f2f3f4 100%);
+  --mm-metal-relief:
+    drop-shadow(0 -1px 0 rgba(255, 255, 255, .55))
+    drop-shadow(0 1px 0 #3c4044)
+    drop-shadow(0 1px 0 #1c1e20)
+    drop-shadow(0 2px 3px rgba(0, 0, 0, .9));
 
   color-scheme: dark;
 }
