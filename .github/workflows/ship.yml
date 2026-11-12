@@ -9,10 +9,11 @@ name: ship
 
 on:
   # A push runs this only when its last commit's message asks for it: `[ci ship]`, or
-  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests, by hand and
-  # from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
+  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests that are not
+  # drafts (and when one is marked ready), by hand and from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/**"
       - "src/**"
@@ -47,7 +48,7 @@ permissions:
 
 jobs:
   linux:
-    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci ship]') || contains(github.event.head_commit.message, '[ci all]')
+    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name != 'push' && github.event_name != 'pull_request') || contains(github.event.head_commit.message, '[ci ship]') || contains(github.event.head_commit.message, '[ci all]')
     name: Linux ${{ matrix.arch }}, static
     strategy:
       fail-fast: false
@@ -148,7 +149,7 @@ jobs:
           if-no-files-found: error
 
   macos-x64:
-    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci ship]') || contains(github.event.head_commit.message, '[ci all]')
+    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name != 'push' && github.event_name != 'pull_request') || contains(github.event.head_commit.message, '[ci ship]') || contains(github.event.head_commit.message, '[ci all]')
     name: macOS x64
     runs-on: macos-latest
     steps:
