@@ -103,6 +103,11 @@
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
   .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
   .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
+  /* In the welcome on a phone (one column): the keys centred under their hints. */
+  @container welcome (max-width: 35.99rem) {
+    .source { justify-items: center; }
+    .source > .hint { justify-self: stretch; }
+  }
   /* In the welcome, where it is wide enough (views/workspace.html's container): the options side by
      side, a line between them; the folders closed lately across both. The dialog keeps one column. */
   @container welcome (min-width: 36rem) {
