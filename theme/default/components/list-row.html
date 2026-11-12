@@ -44,7 +44,7 @@
   // something missing. `no-toggle`: a folder's glyph is part of the row
   // (its click is `select` too), for a list that opens folders its own way
   // (a phone's levels). `sub` is
-  // a second line under the label, smaller and lighter (a track's artist). `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (before the cue),
+  // a second line under the label, smaller and lighter (a track's artist). `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (after the cue),
   // shown on hover, on the current, chosen and playing rows, and always where
   // there is no hover (a touch screen); give it `@click.stop` so it does not
   // also select the row.
@@ -96,6 +96,7 @@
      :class.current="flag(current)"
      :class.muted="flag(muted)"
      :class.two="!!sub"
+     :class.keyed="!!$slots.action"
      :class.numbered="isPickable && hasLead"
      :id="rowId || null"
      role="treeitem"
@@ -140,9 +141,12 @@
     cursor: pointer;
     user-select: none;
   }
-  /* A folder ends in its keys (a small square key's glyph sits .5rem in from its edge): the room
-     to the right of its last glyph is about the room to the left of its own. */
-  .row.folder { padding-right: calc(1.125rem - .5rem); }
+  /* A row ends in its keys (a small square key's glyph sits .5rem in from its edge): the room
+     to the right of its last glyph is about the room to the left of its own. A track's cue (its ▶
+     or its bars) goes before its keys, where a folder has its ❯, so every row's ⋮ is in one column. */
+  .row.folder, .row.keyed { padding-right: calc(1.125rem - .5rem); }
+  .cue { order: 1; }
+  .action { order: 2; }
   @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row:active { background: var(--mm-sunken); }
   .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
