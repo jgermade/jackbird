@@ -1,7 +1,9 @@
 <script :setup lang="ts">
-  // The app's top bar as a Deck faceplate: the brand, the display, the keys
+  // The app's top bar as a Deck faceplate: the wordmark, the display (the logo lit in it, the title
+  // and the artist on two lines, the meter), the keys
   // (DeckKeys: transport, back to the list playing, preferences; on phones
-  // they go to the footer and the panel selector takes their place), and the open roots as
+  // they go to the footer, and a key at the roots' bar's right turns between the library and the
+  // details), and the open roots as
   // tabs (a dropdown on phones) with the folder key and, while tracks are
   // selected, the selection's key: it opens the selection's dialog on Edit. A view: it reads the
   // lib/ stores and calls lib/ actions, and draws with theme components. See
@@ -10,7 +12,6 @@
   const Counter = await import("../../theme/default/components/counter.html")
   const Display = await import("../../theme/default/components/display.html")
   const Key = await import("../../theme/default/components/key.html")
-  const KeySelect = await import("../../theme/default/components/key-select.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
   const Spectrum = await import("../../theme/default/components/spectrum.html")
@@ -25,16 +26,17 @@
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum } = await import("../lib/player")
   const { soundingBadge, soundingText } = await import("../lib/output")
-  const { closeRoot, openFolder, selectRoot } = await import("../lib/roots")
+  const { closeRoot, selectRoot } = await import("../lib/roots")
+  const { chooseTab, openAdding, shownTab, sourcesHere, tabsHere } = await import("../lib/adding")
+  const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
   const { ui } = await import("../lib/ui")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   $: current = nowPlaying.value
-  // Above 640px the display shows the spectrum, moving while the music plays
-  // (from 901 to 1024px it takes the wordmark's room; to 900px the display has a row of its own).
-  // At 640px and below, three bands of it take the state glyph's place while the music plays.
+  // While the music plays, the spectrum takes the logo's place at the display's left: 16 bands
+  // above 640px, 6 below.
   const WIDE = matchMedia("(min-width: 641px)")
   let wide: boolean = WIDE.matches
   const onWidth = (event: MediaQueryListEvent) => {
@@ -63,7 +65,14 @@
     : current ? t("faceplate.state.paused")
     : t("faceplate.state.stopped")
   $: stateGlyph = playback.error ? "■" : playback.playing || playback.loading ? "▶" : current ? "❚❚" : "■"
-  $: titleLine = playback.error || (current ? (current.artist ? `${current.title} — ${current.artist}` : current.title) : t("faceplate.idle"))
+  // Two lines: the title (or what went wrong, or that nothing plays), and the artist under it.
+  $: titleLine = playback.error || (current ? current.title : t("faceplate.idle"))
+  $: artistLine = playback.error ? "" : (current?.artist ?? "")
+  // The position split for the display's two lines: minutes (at least two digits), then seconds.
+  $: minutes = String(Math.floor(Math.max(0, playback.position) / 60)).padStart(2, "0")
+  $: seconds = String(Math.floor(Math.max(0, playback.position) % 60)).padStart(2, "0")
+  // The minutes' zeros at the left (never the last digit), dimmed: "03" shows its 3 lit.
+  $: minutesLead = (/^0+/.exec(minutes.slice(0, -1)) ?? [""])[0]
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
 
   $: tabs = library.roots.map((root) => ({
@@ -77,24 +86,36 @@
 <header class="faceplate">
   <div class="deck">
     <div class="brand-mark">
-      <img class="logo" :src="logoUrl" alt="" />
       <span class="wordmark">{{ t("app.name") }}</span>
     </div>
 
     <div class="screen">
       <Display live>
         <div class="lcd">
-          <span class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="16" :active="wide && playback.playing" /></span>
+          <!-- The logo, lit; while the music plays, the spectrum in its place. -->
+          <span class="lcd-mark" aria-hidden="true">
+            <span :if="playback.playing" class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
+            <span :else class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
+          </span>
           <div class="lcd-main">
-            <div class="mm-display-row">
-              <span class="now">
-                <span :if="!wide && playback.playing" class="mini-spectrum" aria-hidden="true"><Spectrum :source="readSpectrum" :bands="3" :active="!wide && playback.playing" /></span>
-                <span :else class="state" aria-hidden="true">{{ stateGlyph }}</span>
-                <span class="visually-hidden">{{ stateLabel }}</span>
-                <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
-              </span>
-              <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
-              <Counter>{{ formatTime(playback.position) }}</Counter>
+            <div class="lcd-lines">
+              <!-- Two lines: the state and the title, then the artist (and what reaches the device). -->
+              <div class="lcd-text">
+                <span class="now">
+                  <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
+                  <span class="visually-hidden">{{ stateLabel }}</span>
+                  <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+                </span>
+                <span class="now">
+                  <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
+                  <span :if="soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
+                </span>
+              </div>
+              <!-- Where the song is, on two lines too: its minutes, and under them its seconds; nothing with no song loaded. -->
+              <div :if="current" class="lcd-time" :aria-label="positionText">
+                <span class="minutes"><Counter><span class="lead">{{ minutesLead }}</span>{{ minutes.slice(minutesLead.length) }}</Counter></span>
+                <span class="seconds"><Counter>{{ seconds }}</Counter></span>
+              </div>
             </div>
             <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
           </div>
@@ -103,19 +124,17 @@
     </div>
 
     <div class="controls"><DeckKeys place="header" /></div>
-    <div class="pane-pick">
-      <KeySelect :label="t('panels.label')" :model="ui.pane" @change="pickPane($event.detail)"
-                 :options="[{ value: 'library', label: t('library.title') }, { value: 'details', label: t('panels.details') }]" />
-    </div>
   </div>
 
-  <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
-        :add-label="folderLabel" :add-disabled="library.loading || !can('owner')" @add="openFolder()"
+  <!-- While no folder is open: the sources' tabs, a folder or a server (their content is the
+       workspace's welcome, views/sources-panel.html), instead of the roots and the key to add one. -->
+  <Tabs :if="!hasRoots && !library.restoring && sourceTabs().length > 1" :label="t('sources.tabs')" :items="sourceTabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
+  <Tabs :else :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
+        :add-label="folderLabel" :add-disabled="library.loading || sourcesHere().length === 0" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
-      <span :if="!hasRoots" class="mm-legend">{{ t("roots.empty") }}</span>
-      <span :if="can('owner')" class="open-folder" :class.has-roots="hasRoots">
-        <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openFolder()">
+      <span :if="sourcesHere().length > 0" class="open-folder" :class.has-roots="hasRoots">
+        <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openAdding()">
           <Reel :if="library.loading" :size="12" speed="fast" />
           <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
           <span class="folder-text">{{ folderText }}</span>
@@ -132,6 +151,15 @@
         </Key>
         <Key size="sm" variant="ghost" square :label="t('actions.clearSelection')" :title="t('actions.clearSelection')" @click="clearSelection()">
           <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+        </Key>
+      </span>
+      <!-- Phones: the key that turns between the library and the details, at the bar's right. -->
+      <span class="pane-pick">
+        <Key size="sm" square :label="ui.pane === 'library' ? t('panels.details') : t('library.title')" :title="ui.pane === 'library' ? t('panels.details') : t('library.title')"
+             @click="pickPane(ui.pane === 'library' ? 'details' : 'library')">
+          <!-- The details: a sheet; the library: a list. -->
+          <svg :if="ui.pane === 'library'" class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="1.75" width="10" height="12.5" rx="1" /><path d="M5.5 5.25h5M5.5 8h5M5.5 10.75h3" /></svg>
+          <svg :else class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M6 4h8M6 8h8M6 12h8" /><circle cx="2.75" cy="4" r=".9" fill="currentColor" stroke="none" /><circle cx="2.75" cy="8" r=".9" fill="currentColor" stroke="none" /><circle cx="2.75" cy="12" r=".9" fill="currentColor" stroke="none" /></svg>
         </Key>
       </span>
     </template>
@@ -160,12 +188,11 @@
   .screen { grid-area: screen; min-width: 0; }
   .controls { grid-area: controls; display: flex; align-items: center; }
   /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
-  .pane-pick { grid-area: controls; display: none; justify-self: end; }
+  .pane-pick { display: none; }
 
-  /* What reaches the device in the native output (E5): "24/96 bit-perfect", before the time. */
+  /* What reaches the device in a native output (E5, E6b-D10): "24/96 bit-perfect", "16/44.1 DAC", on the artist's line. */
   .route {
     flex: none;
-    margin-left: auto;
     padding-right: var(--mm-space-2);
     font-family: var(--mm-font-label);
     font-size: var(--mm-text-xs);
@@ -174,7 +201,7 @@
     white-space: nowrap;
     opacity: .8;
   }
-  /* The display's one text row: the state glyph, then the title, which ellipsises. */
+  /* Each of the display's text lines: the state glyph and the title, or the artist and the badge; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .state {
     flex: none;
@@ -184,8 +211,6 @@
     letter-spacing: -.1em;
     text-align: center;
   }
-  /* Three bands of the spectrum, in the glyph's place, on phones while the music plays. */
-  .mini-spectrum { display: inline-block; flex: none; align-self: center; width: 1.1em; height: .95em; }
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -195,8 +220,27 @@
     white-space: nowrap;
   }
 
-  .logo { display: block; flex: none; height: 2.75rem; width: auto; }
+  /* The display's left: the logo, lit in the display's own ink (its shape as a mask), or the spectrum while the music plays. */
+  .lcd-mark { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; align-self: center; }
+  .lcd-spectrum { display: block; width: 100%; height: 100%; }
+  .lcd-logo {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: currentColor;
+    -webkit-mask: var(--logo) center / contain no-repeat;
+    mask: var(--logo) center / contain no-repeat;
+  }
+  /* The display's second line: the artist, under the title. */
+  .artist { font-weight: var(--mm-weight-regular); font-size: var(--mm-text-sm); opacity: .85; }
+  /* The name in brushed metal, raised: the metal's sheen through the letters, a light edge under
+     them and a shadow over them, as the lettering on a hi-fi deck's front panel. */
   .wordmark {
+    background-image: var(--mm-metal-face);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 1px 0 var(--mm-metal-light)) drop-shadow(0 -1px 0 var(--mm-metal-shadow));
     font-family: var(--mm-font-label);
     font-stretch: var(--mm-stretch-label);
     font-weight: 800;
@@ -213,12 +257,19 @@
 
   /* The display: the spectrum at the left above 640px, the title row and the meter beside it.
      From 901 to 1024px the wordmark goes, so the display keeps its room. */
-  .lcd { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .lcd { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--mm-space-3); min-width: 0; }
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
-  .lcd-spectrum { display: none; }
+  .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
+  .lcd-text { display: grid; flex: 1 1 auto; gap: var(--mm-space-1); min-width: 0; }
+  .lcd-time { display: grid; flex: none; justify-items: end; gap: 0; line-height: 1; }
+  /* The minutes' zeros at the left, dimmed, so the minutes read at a glance. */
+  .lcd-time .lead { opacity: .35; }
   @media (min-width: 641px) {
-    .lcd { grid-template-columns: 7rem minmax(0, 1fr); column-gap: var(--mm-space-3); }
-    .lcd-spectrum { display: block; }
+    .lcd-mark { width: 7rem; }
+  }
+  /* Phones: a smaller mark, so the title keeps its room. */
+  @media (max-width: 640px) {
+    .lcd-mark { width: 2.5rem; height: 2.5rem; }
   }
   @media (min-width: 901px) and (max-width: 1024px) {
     .wordmark { display: none; }
@@ -244,12 +295,14 @@
       padding: var(--mm-space-2) var(--mm-space-3);
     }
     .wordmark { display: none; }
-    .logo { height: 2.25rem; }
-  }
-  /* Phones: the keys go to the footer and the panel selector takes their place;
+    }
+  /* Phones: the keys go to the footer, and the panes' key goes to the roots' bar;
      once a root is open, adding another is an option of the root picker, and
      the selection's key is its count. */
   @media (max-width: 720px) {
+    /* One row: the display alone (the key that turns between the panes is in the roots' bar). */
+    .deck { grid-template-columns: minmax(0, 1fr); grid-template-areas: "screen"; }
+    .brand-mark { display: none; }
     .controls { display: none; }
     .pane-pick { display: flex; }
     .open-folder.has-roots { display: none; }

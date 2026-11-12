@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "phone",
+  "description": "On a phone, the main window drives the native player (E6b, crates/player).",
+  "platforms": ["android", "iOS"],
+  "windows": ["main"],
+  "permissions": ["jackbird-player:default"]
+}

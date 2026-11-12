@@ -75,6 +75,7 @@
     cursor: pointer;
   }
   @media (hover: hover) { .choice:hover:not(:disabled) { background: var(--mm-hover); } }
+  .choice:active:not(:disabled) { background: var(--mm-sunken); }
   .choice:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .choice:disabled { opacity: .45; cursor: default; }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

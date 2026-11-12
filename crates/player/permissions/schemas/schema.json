@@ -1,0 +1,582 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PermissionFile",
+  "description": "Permission file that can define a default permission, a set of permissions or a list of inlined permissions.",
+  "type": "object",
+  "properties": {
+    "default": {
+      "description": "The default permission set for the plugin",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/DefaultPermission"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "set": {
+      "description": "A list of permissions sets defined",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PermissionSet"
+      }
+    },
+    "permission": {
+      "description": "A list of inlined permissions",
+      "default": [],
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Permission"
+      }
+    }
+  },
+  "definitions": {
+    "DefaultPermission": {
+      "description": "The default permission set of the plugin.\n\nWorks similarly to a permission with the \"default\" identifier.",
+      "type": "object",
+      "required": [
+        "permissions"
+      ],
+      "properties": {
+        "version": {
+          "description": "The version of the permission.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 1.0
+        },
+        "description": {
+          "description": "Human-readable description of what the permission does. Tauri convention is to use `<h4>` headings in markdown content for Tauri documentation generation purposes.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "permissions": {
+          "description": "All permissions this set contains.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "PermissionSet": {
+      "description": "A set of direct permissions grouped together under a new name.",
+      "type": "object",
+      "required": [
+        "description",
+        "identifier",
+        "permissions"
+      ],
+      "properties": {
+        "identifier": {
+          "description": "A unique identifier for the permission.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of what the permission does.",
+          "type": "string"
+        },
+        "permissions": {
+          "description": "All permissions this set contains.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PermissionKind"
+          }
+        }
+      }
+    },
+    "Permission": {
+      "description": "Descriptions of explicit privileges of commands.\n\nIt can enable commands to be accessible in the frontend of the application.\n\nIf the scope is defined it can be used to fine grain control the access of individual or multiple commands.",
+      "type": "object",
+      "required": [
+        "identifier"
+      ],
+      "properties": {
+        "version": {
+          "description": "The version of the permission.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 1.0
+        },
+        "identifier": {
+          "description": "A unique identifier for the permission.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of what the permission does. Tauri internal convention is to use `<h4>` headings in markdown content for Tauri documentation generation purposes.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "commands": {
+          "description": "Allowed or denied commands when using this permission.",
+          "default": {
+            "allow": [],
+            "deny": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/Commands"
+            }
+          ]
+        },
+        "scope": {
+          "description": "Allowed or denied scoped when using this permission.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Scopes"
+            }
+          ]
+        },
+        "platforms": {
+          "description": "Target platforms this permission applies. By default all platforms are affected by this permission.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Target"
+          }
+        }
+      }
+    },
+    "Commands": {
+      "description": "Allowed and denied commands inside a permission.\n\nIf two commands clash inside of `allow` and `deny`, it should be denied by default.",
+      "type": "object",
+      "properties": {
+        "allow": {
+          "description": "Allowed command.",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deny": {
+          "description": "Denied command, which takes priority.",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Scopes": {
+      "description": "An argument for fine grained behavior control of Tauri commands.\n\nIt can be of any serde serializable type and is used to allow or prevent certain actions inside a Tauri command. The configured scope is passed to the command and will be enforced by the command implementation.\n\n## Example\n\n```json { \"allow\": [{ \"path\": \"$HOME/**\" }], \"deny\": [{ \"path\": \"$HOME/secret.txt\" }] } ```",
+      "type": "object",
+      "properties": {
+        "allow": {
+          "description": "Data that defines what is allowed by the scope.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Value"
+          }
+        },
+        "deny": {
+          "description": "Data that defines what is denied by the scope. This should be prioritized by validation logic.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Value"
+          }
+        }
+      }
+    },
+    "Value": {
+      "description": "All supported ACL values.",
+      "anyOf": [
+        {
+          "description": "Represents a null JSON value.",
+          "type": "null"
+        },
+        {
+          "description": "Represents a [`bool`].",
+          "type": "boolean"
+        },
+        {
+          "description": "Represents a valid ACL [`Number`].",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Number"
+            }
+          ]
+        },
+        {
+          "description": "Represents a [`String`].",
+          "type": "string"
+        },
+        {
+          "description": "Represents a list of other [`Value`]s.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Value"
+          }
+        },
+        {
+          "description": "Represents a map of [`String`] keys to [`Value`]s.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Value"
+          }
+        }
+      ]
+    },
+    "Number": {
+      "description": "A valid ACL number.",
+      "anyOf": [
+        {
+          "description": "Represents an [`i64`].",
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "description": "Represents a [`f64`].",
+          "type": "number",
+          "format": "double"
+        }
+      ]
+    },
+    "Target": {
+      "description": "Platform target.",
+      "oneOf": [
+        {
+          "description": "MacOS.",
+          "type": "string",
+          "enum": [
+            "macOS"
+          ]
+        },
+        {
+          "description": "Windows.",
+          "type": "string",
+          "enum": [
+            "windows"
+          ]
+        },
+        {
+          "description": "Linux.",
+          "type": "string",
+          "enum": [
+            "linux"
+          ]
+        },
+        {
+          "description": "Android.",
+          "type": "string",
+          "enum": [
+            "android"
+          ]
+        },
+        {
+          "description": "iOS.",
+          "type": "string",
+          "enum": [
+            "iOS"
+          ]
+        }
+      ]
+    },
+    "PermissionKind": {
+      "type": "string",
+      "oneOf": [
+        {
+          "description": "Enables the folder_address command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-address",
+          "markdownDescription": "Enables the folder_address command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_address command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-address",
+          "markdownDescription": "Denies the folder_address command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-check",
+          "markdownDescription": "Enables the folder_check command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-check",
+          "markdownDescription": "Denies the folder_check command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-delete",
+          "markdownDescription": "Enables the folder_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-delete",
+          "markdownDescription": "Denies the folder_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-list",
+          "markdownDescription": "Enables the folder_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-list",
+          "markdownDescription": "Denies the folder_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-mkdir",
+          "markdownDescription": "Enables the folder_mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-mkdir",
+          "markdownDescription": "Denies the folder_mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-read",
+          "markdownDescription": "Enables the folder_read command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-read",
+          "markdownDescription": "Denies the folder_read command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_rename command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-rename",
+          "markdownDescription": "Enables the folder_rename command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_rename command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-rename",
+          "markdownDescription": "Denies the folder_rename command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_stat command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-stat",
+          "markdownDescription": "Enables the folder_stat command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_stat command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-stat",
+          "markdownDescription": "Denies the folder_stat command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_walk command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-walk",
+          "markdownDescription": "Enables the folder_walk command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_walk command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-walk",
+          "markdownDescription": "Denies the folder_walk command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-write",
+          "markdownDescription": "Enables the folder_write command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-write",
+          "markdownDescription": "Denies the folder_write command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the output_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-output-info",
+          "markdownDescription": "Enables the output_info command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the output_info command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-output-info",
+          "markdownDescription": "Denies the output_info command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the pause command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-pause",
+          "markdownDescription": "Enables the pause command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the pause command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-pause",
+          "markdownDescription": "Denies the pause command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the pick_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-pick-folder",
+          "markdownDescription": "Enables the pick_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the pick_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-pick-folder",
+          "markdownDescription": "Denies the pick_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the play command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-play",
+          "markdownDescription": "Enables the play command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the play command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-play",
+          "markdownDescription": "Denies the play command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the register_listener command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-register-listener",
+          "markdownDescription": "Enables the register_listener command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the register_listener command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-register-listener",
+          "markdownDescription": "Denies the register_listener command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the remove_listener command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-remove-listener",
+          "markdownDescription": "Enables the remove_listener command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the remove_listener command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-remove-listener",
+          "markdownDescription": "Denies the remove_listener command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the safe_area command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-safe-area",
+          "markdownDescription": "Enables the safe_area command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the safe_area command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-safe-area",
+          "markdownDescription": "Denies the safe_area command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the seek command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-seek",
+          "markdownDescription": "Enables the seek command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the seek command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-seek",
+          "markdownDescription": "Denies the seek command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_output command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-output",
+          "markdownDescription": "Enables the set_output command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_output command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-output",
+          "markdownDescription": "Denies the set_output command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_queue command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-queue",
+          "markdownDescription": "Enables the set_queue command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_queue command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-queue",
+          "markdownDescription": "Denies the set_queue command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_upcoming command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-upcoming",
+          "markdownDescription": "Enables the set_upcoming command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_upcoming command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-upcoming",
+          "markdownDescription": "Denies the set_upcoming command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-status",
+          "markdownDescription": "Enables the status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-status",
+          "markdownDescription": "Denies the status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the stop command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-stop",
+          "markdownDescription": "Enables the stop command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the stop command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-stop",
+          "markdownDescription": "Denies the stop command without any pre-configured scope."
+        },
+        {
+          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`",
+          "type": "string",
+          "const": "default",
+          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`"
+        }
+      ]
+    }
+  }
+}

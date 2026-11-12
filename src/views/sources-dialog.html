@@ -1,0 +1,29 @@
+<script :setup lang="ts">
+  // "Add to the library…" (E6b-D11, as the owner drew it on 2026-11-12): a tab for a folder (of this
+  // device, of the server in front, or one closed lately) and one for a jackbird server, in a dialog
+  // once a folder is open (while none is, they are in the roots' bar and the library's place).
+  // Its tabs' content is views/sources-panel.html. A view over lib/adding.ts. See
+  // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-11 22:47 and after).
+
+  const Modal = await import("../../theme/default/components/modal.html")
+  const Tabs = await import("../../theme/default/components/tabs.html")
+  const SourcesPanel = await import("./sources-panel.html")
+
+  const { t } = await import("../lib/i18n")
+  const { adding, chooseTab, closeAdding, shownTab, tabsHere } = await import("../lib/adding")
+
+  const tabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
+</script>
+
+<div class="sources-dialog">
+  <Modal :open="adding.open" :eyebrow="t('sources.eyebrow')" :title="shownTab() === 'server' ? t('sources.server') : t('sources.folderTab')" size="sm" :close-label="t('sources.close')" @close="closeAdding()">
+    <template :slot.nav>
+      <Tabs :if="tabs().length > 1" plain :label="t('sources.tabs')" :items="tabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
+    </template>
+    <SourcesPanel />
+  </Modal>
+</div>
+
+<style scoped>
+  .sources-dialog { display: contents; }
+</style>

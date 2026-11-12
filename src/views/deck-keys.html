@@ -40,7 +40,8 @@
       <Key square :label="t('playback.previous')" :title="t('playback.previous')" :disabled="!current || current.position === 1" @click="previous()">
         <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="2" y="3" width="2" height="10" /><path d="M14 3v10L5 8z" /></svg>
       </Key>
-      <Key square size="lg" :label="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :title="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :pressed="playback.playing" :disabled="!current" @click="togglePlay()">
+      <!-- Lit (the accent's colour) while the music plays. -->
+      <Key square size="lg" :variant="playback.playing ? 'primary' : 'secondary'" :label="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :title="playback.playing ? t('faceplate.pause') : t('faceplate.play')" :pressed="playback.playing" :disabled="!current" @click="togglePlay()">
         <svg :if="playback.playing" class="icon big" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3" width="3" height="10" /><rect x="9.5" y="3" width="3" height="10" /></svg>
         <svg :else class="icon big" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
       </Key>

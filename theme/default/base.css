@@ -9,6 +9,9 @@
 
 html, body { background: var(--mm-bg); }
 
+/* A touch draws no browser highlight of its own: every control shows its :active state instead. */
+html { -webkit-tap-highlight-color: transparent; }
+
 body {
   margin: 0;
   color: var(--mm-fg);

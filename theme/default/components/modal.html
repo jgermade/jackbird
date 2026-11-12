@@ -247,6 +247,8 @@
         display var(--mm-duration-slow) allow-discrete;
     }
     .modal[open] { transform: translateY(0); }
+    /* A phone's navigation bar under the sheet (--mm-safe-bottom, set by the app on Android). */
+    .modal { padding-bottom: var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)); }
     @starting-style {
       .modal[open] { opacity: 1; transform: translateY(100%); }
     }

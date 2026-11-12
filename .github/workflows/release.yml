@@ -1,6 +1,7 @@
 # Bumps the version, builds the new tag (build.yml), the desktop app's bundles (desktop.yml) and
 # the service's binaries (service.yml; static Linux ones and macOS x64 from ship.yml, which also pushes
-# the Docker image to ghcr.io), publishes a GitHub release with the build attached as
+# the Docker image to ghcr.io), Android's APK (phone-release.yml, signed with the keystore in the
+# repository's secrets), publishes a GitHub release with the build attached as
 # <repo>-vX.Y.Z.zip and the bundles and binaries beside it, and, if the `deploy` box is ticked,
 # deploys it (deploy.yml).
 #
@@ -102,9 +103,19 @@ jobs:
       publish: true
       version: ${{ needs.version.outputs.tag }}
 
+  phone:
+    name: Phone apps
+    needs: version
+    uses: ./.github/workflows/phone-release.yml
+    with:
+      ref: ${{ needs.version.outputs.tag }}
+      version: ${{ needs.version.outputs.tag }}
+    # The Android keystore (ANDROID_KEYSTORE…): without it, the APK is signed with a run's own key.
+    secrets: inherit
+
   release:
     name: Publish release
-    needs: [version, build, desktop, service, ship]
+    needs: [version, build, desktop, service, ship, phone]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -136,11 +147,16 @@ jobs:
           path: service
           merge-multiple: true
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: phone-apk
+          path: phone
+
       # The desktop bundles come in their bundler's folders (deb/, appimage/, dmg/, nsis/): every
       # file is attached, never a folder.
       - name: Create the release
         run: |
-          mapfile -t files < <(find desktop service -type f | sort)
+          mapfile -t files < <(find desktop service phone -type f | sort)
           printf '%s\n' "${files[@]}"
           gh release create "$TAG" "$ASSET" "${files[@]}" --title "$TAG" --generate-notes --verify-tag
 

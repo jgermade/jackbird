@@ -10,6 +10,10 @@ type PersistedSession = Session<FileSystemDirectoryHandle | string>;
 const DB_NAME = "mp3-manager";
 const STORE_NAME = "session";
 const SESSION_KEY = "roots-session";
+const RECENT_KEY = "recent-roots";
+
+/** A folder closed lately (lib/recent.ts): what the session kept of it, and its label. */
+export type RecentRoot = { label: string; saved: FileSystemDirectoryHandle | string };
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -58,5 +62,25 @@ export async function saveRootSession(session: PersistedSession): Promise<void> 
 
     const store = tx.objectStore(STORE_NAME);
     store.put(session, SESSION_KEY);
+  });
+}
+
+/** The folders closed lately, newest first (lib/recent.ts). */
+export async function loadRecentRoots(): Promise<RecentRoot[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(RECENT_KEY);
+    request.onsuccess = () => resolve((request.result as RecentRoot[] | undefined) ?? []);
+    request.onerror = () => reject(request.error ?? new Error("Could not read the folders closed lately."));
+  });
+}
+
+export async function saveRecentRoots(list: RecentRoot[]): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save the folders closed lately."));
+    tx.objectStore(STORE_NAME).put(list, RECENT_KEY);
   });
 }

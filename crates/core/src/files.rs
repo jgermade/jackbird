@@ -164,11 +164,22 @@ pub fn inspect(root: &Root, relative: &str, known: Option<&str>) -> Result<Inspe
     inspect_path(&path, relative, known)
 }
 
+/// A file already open (one of a phone's folders, opened by Android's document provider and handed
+/// over, E6b-D9): its size, date and checksums; its tags too, unless its full checksum is still
+/// `known`. Streamed, as `inspect`; `shown` names it in errors.
+pub fn inspect_open(mut file: File, shown: &str, known: Option<&str>) -> Result<Inspection, Error> {
+    inspect_handle(&mut file, shown, known)
+}
+
 fn inspect_path(path: &Path, shown: &str, known: Option<&str>) -> Result<Inspection, Error> {
     let mut file = File::open(path).map_err(io(shown))?;
+    inspect_handle(&mut file, shown, known)
+}
+
+fn inspect_handle(file: &mut File, shown: &str, known: Option<&str>) -> Result<Inspection, Error> {
     let metadata = file.metadata().map_err(io(shown))?;
-    let (layout, head) = layout_of(&mut file, metadata.len(), shown)?;
-    let (full_checksum, audio_checksum) = hashes(&mut file, &layout.audio, shown)?;
+    let (layout, head) = layout_of(file, metadata.len(), shown)?;
+    let (full_checksum, audio_checksum) = hashes(file, &layout.audio, shown)?;
     let tags = (known != Some(full_checksum.as_str())).then(|| found(&head, &layout));
     Ok(Inspection {
         stat: Stat::of(&metadata),

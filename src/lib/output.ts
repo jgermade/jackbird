@@ -23,8 +23,39 @@ export const output = $reactive({
   /** What the native player plays now; null in the embedded output. */
   sounding: null as Sounding | null,
   /** Why the last song went to the embedded output instead. */
-  fallback: ""
+  fallback: "",
+  /** An Android phone's native player (E6b-D10): whether it is the one here. */
+  phone: isPhone && /Android/.test(navigator.userAgent),
+  /** "Bit-perfect to a USB DAC", kept on the phone; off by default. */
+  bitPerfect: readStored(STORAGE_KEYS.phoneBitPerfect) === "on",
+  /** Whether this Android can (14 and later), and the USB DAC connected, if any. */
+  bitPerfectPossible: false,
+  usb: null as string | null,
+  /** The formats the USB DAC takes bit-perfect, as the phone's player last said. */
+  offered: ""
 });
+
+const PLAYER = "plugin:jackbird-player";
+
+/** Gives the phone's player its setting (from the next song). */
+function applyPhoneOutput(): void {
+  if (output.phone) void invoke(`${PLAYER}|set_output`, { bitPerfect: output.bitPerfect }).catch(() => undefined);
+}
+
+/** Turns "Bit-perfect to a USB DAC" on or off (E6b-D10). */
+export function setBitPerfect(on: boolean): void {
+  output.bitPerfect = on;
+  writeStored(STORAGE_KEYS.phoneBitPerfect, on ? "on" : "");
+  applyPhoneOutput();
+}
+
+/** Asks the phone's player what it can do, and which DAC is connected. */
+export async function loadPhoneOutput(): Promise<void> {
+  if (!output.phone) return;
+  const info = await invoke<{ bitPerfect: boolean; usb: string | null }>(`${PLAYER}|output_info`).catch(() => null);
+  output.bitPerfectPossible = info?.bitPerfect ?? false;
+  output.usb = info?.usb ?? null;
+}
 
 /** Gives the native player its settings (nothing for the embedded output). */
 export function applyOutput(): void {
@@ -51,6 +82,7 @@ export async function loadDevices(): Promise<void> {
 }
 
 applyOutput();
+applyPhoneOutput();
 
 /** "Now: FLAC 24 bit · 96 kHz → USB DAC · 96 kHz · bit-perfect"; empty in the embedded output. */
 export function soundingText(): string {
@@ -67,5 +99,13 @@ export function soundingText(): string {
 /** The display's short line: "24/96 bit-perfect"; empty in the embedded output. */
 export function soundingBadge(): string {
   const sounding = output.sounding;
-  return sounding ? `${shortFormat(sounding.codec, sounding.format)} ${t(`output.badge.${sounding.route.fidelity}`)}` : "";
+  if (!sounding) return "";
+  const format = shortFormat(sounding.codec, sounding.format);
+  // On a phone (E6b-D10): bit-perfect to a DAC, through Android's mixer to a USB DAC ("DAC"), or the
+  // format alone to the phone's own output.
+  if (output.phone) {
+    if (sounding.route.fidelity === "bit-perfect") return `${format} ${t("output.badge.bit-perfect")}`;
+    return sounding.route.device !== "Android" ? `${format} ${t("output.badge.dac")}` : format;
+  }
+  return `${format} ${t(`output.badge.${sounding.route.fidelity}`)}`;
 }

@@ -7,12 +7,13 @@
 
 import { $toRaw } from "jq79";
 import { sameSession, sessionOf, type Session } from "../helpers/session";
-import { account } from "./account";
+import { account, followServer } from "./account";
 import { importing } from "./importing";
 import { library } from "./library";
 import { loadRootSession, saveRootSession } from "./rootSessionStore";
 import { hydrateRoot } from "./roots";
 import { restoreSource } from "./sources";
+import { currentServer } from "./sources/service";
 
 /**
  * Reopens the roots saved last time that still have permission, in their
@@ -57,7 +58,7 @@ export async function restoreSession(): Promise<void> {
       }
     }
 
-    importing.available = $toRaw(library).roots.some((root) => root.source.kind === "library");
+    importing.available = $toRaw(library).roots.some((root) => root.source.kind === "library" && root.source.server === currentServer());
 
     if (session.activeRootId && reopened.includes(session.activeRootId)) {
       library.activeRootId = session.activeRootId;
@@ -71,6 +72,24 @@ export async function restoreSession(): Promise<void> {
   } finally {
     library.restoring = false;
   }
+}
+
+/**
+ * Keeps the account on the server of the root in front (E6b-D11): when another root comes to the
+ * front, the account, people and the family library's features follow its server, and the
+ * favourites are read there. Start it once the session is restored.
+ */
+export function followActiveRoot(): void {
+  library.$on("activeRootId", () => {
+    const root = $toRaw(library).roots.find((one) => one.id === $toRaw(library).activeRootId);
+    if (!root) return;
+    const before = currentServer();
+    void followServer(root.source.server).then(async () => {
+      if (currentServer() === before) return;
+      importing.available = $toRaw(library).roots.some((one) => one.source.kind === "library" && one.source.server === currentServer());
+      await (await import("./mine")).loadFavourites();
+    });
+  });
 }
 
 /**

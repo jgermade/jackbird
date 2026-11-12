@@ -114,6 +114,11 @@
   --mm-display-inset: inset 0 2px 6px rgba(0, 0, 0, .35);
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .5);
   --mm-brush: rgba(255, 255, 255, .05);
+  /* Lettering in brushed metal, raised from the chassis: the face's sheen top to bottom, a light
+     edge below and a shadow above (the faceplate's wordmark). */
+  --mm-metal-face: linear-gradient(180deg, #a7acb0 0%, #767c81 32%, #3f4448 52%, #81878c 70%, #b4b9bc 100%);
+  --mm-metal-light: rgba(255, 255, 255, .9);
+  --mm-metal-shadow: rgba(0, 0, 0, .45);
 
   /* ---- type --------------------------------------------------------------- */
 
@@ -238,16 +243,24 @@
   --mm-display-inset: inset 0 2px 8px rgba(0, 0, 0, .8);
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .1);
   --mm-brush: rgba(255, 255, 255, .025);
+  --mm-metal-face: linear-gradient(180deg, #f6f7f8 0%, #c3c7ca 30%, #6f7479 50%, #aeb3b7 68%, #e3e6e8 100%);
+  --mm-metal-light: rgba(255, 255, 255, .18);
+  --mm-metal-shadow: rgba(0, 0, 0, .85);
 
   color-scheme: dark;
 }
 
 /* Phones: the root font size follows the viewport's width, and with it
-   every size in rem. 4vw is 16px on a 400px-wide screen, the size the
-   theme is drawn at; a 360px phone gets 14.4px and a 430px one 17.2px. */
-:root { --mm-root-phone: 4vw; }
+   every size in rem. 4.5vw is 18px on a 400px-wide screen, a little over
+   the 16px the theme is drawn at, for fingers; a 360px phone gets 16.2px
+   and a 430px one 19.35px. */
+:root { --mm-root-phone: 4.5vw; }
 @media (max-width: 480px) {
   html { font-size: var(--mm-root-phone); }
+}
+/* Tablets and other touch screens wider than a phone: 18px, for fingers too. */
+@media (pointer: coarse) and (min-width: 481px) {
+  html { font-size: 18px; }
 }
 
 /* Once, here, instead of a media query in every component: every transition

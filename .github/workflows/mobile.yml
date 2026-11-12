@@ -2,7 +2,10 @@
 # Android and iOS as a client of a family instance, each started in an emulator or simulator with
 # a debug build made for the unattended check (src/lib/phone-check.ts): jackbird's service runs on
 # the runner, the phone connects to it, opens a folder, lists it and plays a FLAC; then
-# scripts/phone-check.mjs checks its report. Nothing here is signed or shipped.
+# scripts/phone-check.mjs checks its report. Then the app goes to the background for two minutes
+# while a queue plays: on Android through the native player (E6b, crates/player), and every change
+# of song must happen meanwhile, with the app's media session playing; on iOS, until its native
+# player, only measured. Nothing here is signed or shipped.
 name: mobile
 
 on:
@@ -34,7 +37,8 @@ jobs:
     timeout-minutes: 40
     env:
       # The emulator reaches this machine at 10.0.2.2 (scripts/phone-check.mjs).
-      VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://10.0.2.2:4647","folder":"/tmp/jackbird-phone-music","report":"http://10.0.2.2:4700/report"}'
+      # And a folder of the phone, chosen in Android's folder picker (E6b-D9; scripts/phone-check.mjs fills it).
+      VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://10.0.2.2:4647","folder":"/tmp/jackbird-phone-music","report":"http://10.0.2.2:4700/report","deviceFolder":"content://com.android.externalstorage.documents/document/primary%3AMusic%2Fjackbird-check"}'
 
     steps:
       - uses: actions/checkout@v6
@@ -77,6 +81,8 @@ jobs:
       - name: The app for Android, made for the check
         run: |
           npx tauri android init --ci
+          # jackbird's logo instead of Tauri's (src-tauri/icons/android, from phone-icon.json by `tauri icon`).
+          cp -r src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
           npx tauri android build --debug --apk --target x86_64
           find src-tauri/gen/android -name "*.apk"
 
@@ -155,6 +161,8 @@ jobs:
         run: |
           set -euo pipefail
           npx tauri ios init --ci
+          # jackbird's logo instead of Tauri's (src-tauri/icons/ios, from phone-icon.json by `tauri icon`).
+          cp src-tauri/icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/
           npx tauri ios build --debug --target aarch64-sim --ci || { npx tauri ios build --help; exit 1; }
           find src-tauri/gen/apple -name "*.app" -type d | head
           # src-tauri/Info.ios.plist merged: the background modes the app was built with.

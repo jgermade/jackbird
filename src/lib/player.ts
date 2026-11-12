@@ -5,7 +5,9 @@
 // plays, where it is and how long the track is. It plays the file itself
 // (the root's source: lib/sources/), not a copy of its bytes, and opens it again when it is
 // rewritten (see refresh). The queue's actions (play next, add, move,
-// remove…) are here too; their list logic is helpers/queue.ts.
+// remove…) are here too; their list logic is helpers/queue.ts. On the desktop it may play through
+// the app's native output (E5, lib/native-audio.ts); on a phone, through the phone's native player
+// (E6b, lib/phone-audio.ts), handed the queue's next tracks ahead so it goes on in the background.
 
 import { $computed, $toRaw } from "jq79";
 import {
@@ -18,11 +20,13 @@ import {
   restoreQueue,
   type QueuePosition
 } from "../helpers/queue";
+import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
 import { spectrumBands } from "../helpers/spectrum";
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
+import { PhoneAudio, phoneAudioAvailable, type PhoneSong } from "./phone-audio";
 import { output } from "./output";
 import { played } from "./mine";
 import { t } from "./i18n";
@@ -145,10 +149,17 @@ if (embedded) {
 // The desktop app's native player (E5), shaped like the element; it plays the desktop's own
 // folders' tracks unless the embedded output is chosen.
 const native: NativeAudio | null = output.available && embedded ? new NativeAudio() : null;
-/** The element that plays the loaded track: the embedded one or the native one. */
-let audio: HTMLAudioElement | NativeAudio | null = embedded;
-/** The next track, as handed to the native player to follow without a gap. */
-let upcoming: { key: string; rootId: string; relativePath: string; lastModified?: number; media: MediaHandle } | null = null;
+// The phone's native player (E6b), shaped like the element too: on a phone it plays every track,
+// and the queue's next ones are handed to it ahead, so it goes on with the app in the background.
+const phone: PhoneAudio | null = phoneAudioAvailable && embedded ? new PhoneAudio() : null;
+/** The element that plays the loaded track: the embedded one, the desktop's native one or the phone's. */
+let audio: HTMLAudioElement | NativeAudio | PhoneAudio | null = phone ?? embedded;
+/** A track after the loaded one, as handed to a native player to follow by itself. */
+type Ahead = { key: string; rootId: string; relativePath: string; lastModified?: number; media: MediaHandle };
+/** The tracks handed ahead: the next one to the desktop's player (gapless), up to PHONE_AHEAD to the phone's. */
+let upcoming: Ahead[] = [];
+/** How many tracks after the loaded one the phone's player is given. */
+const PHONE_AHEAD = 50;
 
 // Bookkeeping, not state: which track the element holds, where its file is,
 // the file it opened, and the date the library gave it then.
@@ -226,6 +237,9 @@ function routeThroughAnalyser(element: HTMLAudioElement): void {
  * where the browser has no Web Audio.
  */
 export function readSpectrum(bands: number): number[] | null {
+  if (phone && audio === phone) {
+    return null;
+  }
   if (native && audio === native) {
     const heard = native.spectrum();
     return heard ? spectrumBands(heard.bins, bands, heard.rate) : null;
@@ -295,7 +309,7 @@ async function refresh(force = false): Promise<void> {
  * desktop folder's track (unless the embedded output is chosen), else the embedded element.
  */
 function setSource(opened: MediaHandle, key: string): void {
-  const target = native && opened.native && output.kind !== "embedded" ? native : embedded;
+  const target = phone ?? (native && opened.native && output.kind !== "embedded" ? native : embedded);
   if (!target) return;
   if (audio !== target && audio) {
     const was = audio;
@@ -304,7 +318,9 @@ function setSource(opened: MediaHandle, key: string): void {
     was.removeAttribute("src");
   }
   audio = target;
-  if (target === native && opened.native) {
+  if (target === phone) {
+    phone.open(songOf(opened, key));
+  } else if (target === native && opened.native) {
     native.open({ ...opened.native, key });
   } else if (embedded) {
     embedded.src = opened.url;
@@ -312,26 +328,73 @@ function setSource(opened: MediaHandle, key: string): void {
   output.sounding = null;
 }
 
+/** A track as the phone's player takes it: its media URL, and what the lock screen shows. */
+function songOf(opened: MediaHandle, key: string): PhoneSong {
+  const [rootId, ...rest] = key.split(":");
+  const trackId = rest.join(":");
+  const track = $toRaw(library)
+    .roots.find((root) => root.id === rootId)
+    ?.tracks.find((one) => one.id === trackId);
+  const metadata = track?.metadata;
+  return {
+    key,
+    // A file of the phone's own folders (E6b-D9) is read by the player itself; a server's by its URL.
+    url: opened.native ? fileUrl(opened.native.root, opened.native.path) : opened.url,
+    title: metadata?.title || track?.name || trackId.split("/").pop() || trackId,
+    artist: metadata?.artist ?? "",
+    album: metadata?.album ?? "",
+    cover: metadata?.coverDataUrl ?? null
+  };
+}
+
+/** The queue's tracks after the loaded one, up to `count`, opened: what a native player is handed ahead. */
+async function openAhead(count: number): Promise<Ahead[] | null> {
+  const { queue, index } = $toRaw(playback);
+  const roots = $toRaw(library).roots;
+  const items = queue?.items.slice(index + 1, index + 1 + count) ?? [];
+  const opened = await Promise.all(
+    items.map(async (item): Promise<Ahead | null> => {
+      const root = roots.find((one) => one.id === item.rootId);
+      const track = root?.tracks.find((one) => one.id === item.trackId);
+      if (!root || !track) return null;
+      const media = await root.source.openMedia(track.relativePath).catch(() => null);
+      return media ? { key: keyOf(item), rootId: item.rootId, relativePath: track.relativePath, lastModified: track.lastModified, media } : null;
+    })
+  );
+  // The queue moved on meanwhile: what was opened is no longer what follows.
+  if ($toRaw(playback).queue !== queue || $toRaw(playback).index !== index) return null;
+  // Up to the first that could not be opened: the queue stops there, and the page takes it up.
+  const end = opened.indexOf(null);
+  return (end < 0 ? opened : opened.slice(0, end)) as Ahead[];
+}
+
 /**
- * Tells the native player the track after the loaded one, so it follows without a gap: only
- * when the native player plays and the next track is a file it can open too.
+ * Tells the native player the tracks after the loaded one, so it goes on by itself: the desktop's
+ * the next one (gapless), when it is a file it can open too; the phone's up to PHONE_AHEAD of them.
  */
 async function sendNext(): Promise<void> {
+  if (phone && audio === phone) {
+    const ahead = await openAhead(PHONE_AHEAD);
+    if (!ahead || audio !== phone) return;
+    upcoming = ahead;
+    phone.setUpcoming(ahead.map((one) => songOf(one.media, one.key)));
+    return;
+  }
   if (!native) return;
   const { queue, index } = $toRaw(playback);
   const item = queue?.items[index + 1];
   const root = item ? $toRaw(library).roots.find((one) => one.id === item.rootId) : undefined;
   const track = item ? root?.tracks.find((one) => one.id === item.trackId) : undefined;
   if (audio !== native || !item || !root || !track) {
-    upcoming = null;
+    upcoming = [];
     native.setNext(null);
     return;
   }
   const key = keyOf(item);
-  if (upcoming?.key === key) return;
+  if (upcoming[0]?.key === key) return;
   const media = await root.source.openMedia(track.relativePath).catch(() => null);
   if (!media?.native || audio !== native) return;
-  upcoming = { key, rootId: item.rootId, relativePath: track.relativePath, lastModified: track.lastModified, media };
+  upcoming = [{ key, rootId: item.rootId, relativePath: track.relativePath, lastModified: track.lastModified, media }];
   native.setNext({ ...media.native, key });
 }
 
@@ -412,7 +475,7 @@ async function load(current: NowPlaying | null): Promise<void> {
 }
 
 /** The element's events, heard only while it is the one playing the loaded track. */
-function wire(element: HTMLAudioElement | NativeAudio): void {
+function wire(element: HTMLAudioElement | NativeAudio | PhoneAudio): void {
   element.addEventListener("play", () => {
     if (element !== audio) return;
     if (element === embedded) routeThroughAnalyser(embedded);
@@ -462,26 +525,30 @@ function wire(element: HTMLAudioElement | NativeAudio): void {
   }
 }
 
-/** The native player's own events: what sounds, the next track started by itself, and a track it cannot play. */
-function wireNative(element: NativeAudio): void {
+/** A native player's own events: what sounds, the next track started by itself, and a track it cannot play. */
+function wireNative(element: NativeAudio | PhoneAudio): void {
   element.addEventListener("started", (event) => {
     if (element === audio) output.sounding = (event as CustomEvent<Sounding>).detail;
   });
-  // The next track began without a gap: it is the loaded one now, and the queue moves on to it.
+  // The next track began by itself (gapless on the desktop; on a phone, perhaps in the background,
+  // or from the lock screen): it is the loaded one now, and the queue moves on to it.
   element.addEventListener("advance", (event) => {
     const key = (event as CustomEvent<string>).detail;
     const { queue, index } = $toRaw(playback);
     const at = queue ? queue.items.findIndex((item, place) => place > index && keyOf(item) === key) : -1;
-    if (element !== audio || !upcoming || upcoming.key !== key || at < 0) return;
-    const next = upcoming;
-    upcoming = null;
+    const taken = upcoming.findIndex((one) => one.key === key);
+    if (element !== audio || taken < 0 || at < 0) return;
+    const next = upcoming[taken];
+    upcoming = upcoming.slice(taken + 1);
     release();
     media = next.media;
     loadedKey = key;
     loaded = { rootId: next.rootId, relativePath: next.relativePath, lastModified: next.lastModified };
     playback.position = 0;
     playback.index = at;
-    void sendNext();
+    // The desktop's player has only the next one: it is given the one after. The phone's has the
+    // rest, topped up once half of them are played (if the page can reach the instance now).
+    if (element === native || upcoming.length < PHONE_AHEAD / 2) void sendNext();
   });
   // The native player could not play it (its format, the device): the embedded output takes over, where it was.
   element.addEventListener("fallback", (event) => {
@@ -508,6 +575,7 @@ function wireNative(element: NativeAudio): void {
  * was (the person switched between the embedded and the native output).
  */
 function switchOutput(): void {
+  if (phone) return;
   const current = $toRaw(nowPlaying).value;
   const target = native && output.kind !== "embedded" ? native : embedded;
   if (!audio || !current || !loadedKey || audio === target) return;
@@ -521,6 +589,10 @@ if (embedded) {
   if (native) {
     wire(native);
     wireNative(native);
+  }
+  if (phone) {
+    wire(phone);
+    wireNative(phone);
   }
   // Once per change of the queue: its queue and index are written one after
   // the other, and in between the old index can point at another track of the
@@ -540,7 +612,9 @@ if (embedded) {
   );
   if (native) {
     output.$on("kind", switchOutput);
-    // The queue changed around the loaded track: the native player's next one may have too.
+  }
+  if (native || phone) {
+    // The queue changed around the loaded track: the native player's next ones may have too.
     let nextQueued = false;
     playback.$on("queue", () => {
       if (nextQueued) return;
@@ -746,7 +820,7 @@ export function keepPlaybackSaved(): void {
     void playback.playing;
     savePlayback();
   });
-  for (const element of [embedded, native]) {
+  for (const element of [embedded, native, phone]) {
     element?.addEventListener("timeupdate", () => {
       if (element === audio && Date.now() - last > 1000) {
         last = Date.now();

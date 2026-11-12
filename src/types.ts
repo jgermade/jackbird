@@ -1,4 +1,5 @@
 import type { VFSAdapter, WalkedFile } from "@cloudauthn/vfs-sync";
+import type { ServiceClient } from "./lib/sources/service";
 
 export type TrackMetadata = {
   title: string;
@@ -169,8 +170,10 @@ export type RootSource = {
   readonly kind: "browser" | "desktop" | "service" | "library";
   /** The small-file adapter: `.meta/`, playlists, renames, deletes. */
   readonly vfs: VFSAdapter;
-  /** What the session keeps to reopen it: a directory handle, or a path. */
+  /** What the session keeps to reopen it: a directory handle, or a path (with its server's address, on a server other than the home one). */
   readonly saved: FileSystemDirectoryHandle | string;
+  /** The server it is on (E6b-D11); none for the browser's and the device's own folders. */
+  readonly server?: ServiceClient;
   /** Every file under it, with its size and date. */
   walk(): Promise<WalkedFile[]>;
   /** One file's checksums, size and date; its tags too, unless its full checksum is still `known`. */

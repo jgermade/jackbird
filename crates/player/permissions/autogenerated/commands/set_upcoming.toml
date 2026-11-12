@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-set-upcoming"
+description = "Enables the set_upcoming command without any pre-configured scope."
+commands.allow = ["set_upcoming"]
+
+[[permission]]
+identifier = "deny-set-upcoming"
+description = "Denies the set_upcoming command without any pre-configured scope."
+commands.deny = ["set_upcoming"]

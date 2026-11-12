@@ -7,7 +7,8 @@
 
 import { isAudioFile } from "../helpers/formats";
 
-type PhoneCheck = { address: string; folder: string; report: string };
+/** `deviceFolder`: a folder of the phone (its `content://` address) with the fixtures in it, chosen in Android's folder picker (E6b-D9). */
+type PhoneCheck = { address: string; folder: string; report: string; deviceFolder?: string };
 
 /** The check this build was made for, if any. */
 export function phoneCheck(): PhoneCheck | null {
@@ -58,8 +59,8 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
   const started = Date.now();
   const heartbeat = setInterval(() => beacon(config, "alive", Math.round((Date.now() - started) / 1000)), 5000);
   // Each step has 30 seconds: one that hangs is reported, not waited for.
-  const within = <T>(step: string, work: Promise<T>): Promise<T> =>
-    Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${step}: no answer in 30 s`)), 30_000))]);
+  const within = <T>(step: string, work: Promise<T>, ms = 30_000): Promise<T> =>
+    Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${step}: no answer in ${ms / 1000} s`)), ms))]);
   const report: Record<string, unknown> = { userAgent: navigator.userAgent, drawn: Boolean(document.querySelector("#app")?.children.length) };
   try {
     const info = await fetch(`${config.address}/api/info`).then(
@@ -67,6 +68,10 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
       (error: unknown) => String(error)
     );
     beacon(config, "info", info);
+    // The instance is added as a source, as a person does (E6b-D11): "Add to the library…", its address.
+    const { adding, addServer } = await import("./adding");
+    await within("add the server", addServer(config.address));
+    beacon(config, "server", adding.error || "added");
     const { account } = await import("./account");
     for (let step = 0; step < 200 && !account.me; step += 1) await wait(100);
     report.me = account.me ? { name: account.me.name, role: account.me.role } : null;
@@ -84,6 +89,11 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
       report.played = { path: flac.path, ...(await play(media.url)) };
       beacon(config, "played", report.played);
     }
+    if (config.deviceFolder) {
+      report.device = await within("the phone's folder", checkPhoneFolder(config, config.deviceFolder), 120_000);
+      beacon(config, "device", report.device);
+    }
+
   } catch (error) {
     report.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   }
@@ -107,6 +117,11 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   const source = await openServiceFolder(config.folder);
   const song = (await source.walk()).find((entry) => entry.path.endsWith("silence-20s.flac"));
   if (!song) return;
+  const { phoneAudioAvailable } = await import("./phone-audio");
+  if (phoneAudioAvailable) {
+    await measureNativeQueue(config, () => source.openMedia(song.path).then((media) => media.url));
+    return;
+  }
   const audio = new Audio();
   // As the player's element: asked for with CORS, the instance answers the app's origin.
   audio.crossOrigin = "anonymous";
@@ -172,4 +187,91 @@ async function measureBackground(config: PhoneCheck): Promise<void> {
   }
   audio.pause();
   await post("background", { muted, mediaSession, samples, changes });
+}
+
+/**
+ * Background playback through the phone's native player (E6b-D7): a queue of five 20 s silences
+ * handed to it at once, while the check sends the app away for two minutes as above. The player
+ * goes through them by itself; the page notes each change of song it is told of (when, and whether
+ * hidden) and samples how far the queue got. Every change made while hidden must have happened
+ * (scripts/phone-check.mjs).
+ */
+async function measureNativeQueue(config: PhoneCheck, mediaUrl: () => Promise<string>): Promise<void> {
+  const { PhoneAudio } = await import("./phone-audio");
+  const audio = new PhoneAudio();
+  const songs = [];
+  for (let n = 1; n <= 5; n += 1) {
+    songs.push({ key: `silence-${n}`, url: await mediaUrl(), title: `Silence ${n}`, artist: "jackbird check", album: "E6b" });
+  }
+  const started = Date.now();
+  const now = () => Date.now() - started;
+  const changes: { at: number; hidden: boolean; key: string; started: boolean }[] = [];
+  audio.addEventListener("advance", (event) =>
+    changes.push({ at: now(), hidden: document.hidden, key: (event as CustomEvent<string>).detail, started: true })
+  );
+  let ended: number | null = null;
+  audio.addEventListener("ended", () => (ended = now()));
+  const failures: unknown[] = [];
+  audio.addEventListener("fallback", (event) => failures.push((event as CustomEvent).detail));
+  const post = (phase: string, body: unknown) =>
+    fetch(`${config.report}?phase=${phase}`, { method: "POST", body: JSON.stringify(body) }).catch(() => undefined);
+  let wasHidden = false;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !wasHidden) void post("hidden", {});
+    wasHidden ||= document.hidden;
+  });
+  audio.open(songs[0]);
+  audio.setUpcoming(songs.slice(1));
+  await audio.play();
+  const samples: { at: number; played: number; hidden: boolean; paused: boolean }[] = [];
+  let shownAgain: number | null = null;
+  await post("playing", { native: true, muted: false, mediaSession: false });
+  while (Date.now() - started < 240_000 && (shownAgain === null || Date.now() - shownAgain < 10_000)) {
+    // How far the queue got: 20 s for each song it left, and the current one's position.
+    const played = ended !== null ? songs.length * 20 : changes.length * 20 + audio.currentTime;
+    samples.push({ at: now(), played, hidden: document.hidden, paused: audio.paused });
+    if (wasHidden && !document.hidden) shownAgain ??= Date.now();
+    await wait(1000);
+  }
+  audio.removeAttribute("src");
+  await post("background", { native: true, muted: false, mediaSession: false, samples, changes, ended, failures });
+}
+
+/**
+ * A folder of the phone as a source (E6b-D9): Android's folder picker opened at it (the check taps
+ * "Use this folder" and "Allow" in it, scripts/phone-check.mjs), its songs walked, a FLAC's tags read
+ * by Rust through the file Android opens, and the FLAC played a moment by the native player from
+ * its `content://` address.
+ */
+async function checkPhoneFolder(config: PhoneCheck, folder: string): Promise<Record<string, unknown>> {
+  const { pickPhoneFolder } = await import("./sources/phone");
+  const { PhoneAudio } = await import("./phone-audio");
+  beacon(config, "picking", folder);
+  const source = await pickPhoneFolder(folder);
+  if (!source) return { picked: false };
+  const tracks = (await source.walk()).filter((entry) => isAudioFile(entry.path));
+  const flac = tracks.find((track) => track.path.toLowerCase().endsWith(".flac") && !track.path.includes("silence"));
+  if (!flac) return { picked: true, tracks: tracks.length };
+  // The tagged fixture (fixtures/tags/flac-full.flac, titled "Before") for the tags; the FLAC for playing.
+  const tagged = tracks.find((track) => track.path === "flac-full.flac") ?? flac;
+  const inspection = await source.inspect(tagged.path);
+  const media = await source.openMedia(flac.path);
+  const audio = new PhoneAudio();
+  const failures: unknown[] = [];
+  audio.addEventListener("fallback", (event) => failures.push((event as CustomEvent).detail));
+  audio.open({ key: "phone-folder-flac", url: media.url, title: flac.path });
+  await audio.play();
+  for (let step = 0; step < 40 && audio.currentTime < 0.2; step += 1) await wait(100);
+  const played = audio.currentTime;
+  audio.removeAttribute("src");
+  return {
+    picked: true,
+    tracks: tracks.length,
+    path: flac.path,
+    tagged: tagged.path,
+    title: inspection.metadata?.title ?? null,
+    checksum: inspection.fullChecksum ?? null,
+    played,
+    failures
+  };
 }

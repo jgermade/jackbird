@@ -13,7 +13,17 @@ import { atLeast, type Role } from "../helpers/roles";
 import { t } from "./i18n";
 import { isDesktop, isService } from "./platform";
 import { preferences } from "./preferences";
-import { onUnauthorized, post, serviceJson, setServiceToken, usesToken } from "./sources/service";
+import {
+  currentServer,
+  homeServer,
+  onUnauthorized,
+  post,
+  serviceJson,
+  setServiceToken,
+  useServer,
+  usesToken,
+  type ServiceClient
+} from "./sources/service";
 
 export type Me = { id: number; name: string; email: string | null; confirmed: boolean; role: Role; enabled: boolean };
 export type Profile = { id: number; name: string; role: Role };
@@ -59,7 +69,7 @@ export function passkeysHere(): boolean {
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-let signedIn: (() => void) | null = null;
+let signedIn: ((done: boolean) => void) | null = null;
 
 function apply(state: State): void {
   account.signin = state.signin;
@@ -80,8 +90,30 @@ function welcome(me: Me, token?: string | null): void {
   account.step = "email";
   account.attempt = "";
   account.error = "";
-  signedIn?.();
+  signedIn?.(true);
   signedIn = null;
+}
+
+/** Resolves once someone is in on the server spoken to now (true), or the sign-in is given up (false). */
+export function whenSignedIn(): Promise<boolean> {
+  if (account.me) return Promise.resolve(true);
+  signedIn?.(false);
+  return new Promise((resolve) => {
+    signedIn = resolve;
+  });
+}
+
+/**
+ * Gives up signing in to a server the person added (E6b-D11): the account goes back to the home
+ * server. The home server's own sign-in cannot be given up: the library waits behind it.
+ */
+export function cancelSignIn(): void {
+  if (currentServer() === homeServer() && account.active && homeServed) return;
+  account.needed = false;
+  account.error = "";
+  signedIn?.(false);
+  signedIn = null;
+  void followServer(null);
 }
 
 /**
@@ -92,8 +124,11 @@ function welcome(me: Me, token?: string | null): void {
 export async function startAccount(): Promise<void> {
   const served = isDesktop ? await (await import("./desktop-service")).desktopUsesService() : await isService();
   if (!served) return;
+  homeServed = true;
   account.active = true;
-  onUnauthorized(() => {
+  onUnauthorized((_code, client) => {
+    // Another server's refusal is its roots' own error, not the account's (E6b-D11).
+    if (client !== currentServer()) return;
     if (account.me) {
       // The session ended (signed out elsewhere, sign-in turned on or off): start again.
       location.reload();
@@ -106,9 +141,32 @@ export async function startAccount(): Promise<void> {
   });
   if (account.me) return;
   account.needed = true;
-  await new Promise<void>((resolve) => {
+  await new Promise<boolean>((resolve) => {
     signedIn = resolve;
   });
+}
+
+/** Whether the page started with a server of its own (the home one). */
+let homeServed = false;
+
+/**
+ * Speaks to the server of the root in front (E6b-D11): its sign-in, its profiles and its people; for
+ * a root that is on no server (the browser's or the device's own folders), the home server, if
+ * there is one. Asks to sign in there if its session is gone.
+ */
+export async function followServer(client: ServiceClient | null | undefined): Promise<void> {
+  const next = client ?? homeServer();
+  if (next === currentServer()) return;
+  useServer(next);
+  account.active = Boolean(client) || homeServed;
+  account.me = null;
+  account.profiles = null;
+  account.needed = false;
+  if (!account.active) return;
+  await loadState().catch((error) => {
+    account.error = message(error);
+  });
+  if (!account.me && currentServer() === next) account.needed = true;
 }
 
 async function busy<T>(work: () => Promise<T>): Promise<T | undefined> {

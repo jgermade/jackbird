@@ -40,15 +40,25 @@ export function formatRate(hertz: number): string {
   return `${Number.isInteger(kilo) ? kilo : kilo.toFixed(1)} kHz`;
 }
 
-/** A song's format: "FLAC 24 bit · 96 kHz"; MP3 has no depth of its own: "MP3 · 44.1 kHz". */
+/** A song's format: "FLAC 24 bit · 96 kHz"; MP3 has no depth of its own, nor a song whose depth is not known: "MP3 · 44.1 kHz". */
 export function describeFormat(codec: string, format: PcmFormat): string {
-  const depth = codec === "MP3" ? "" : ` ${format.bits} bit`;
+  const depth = codec === "MP3" || format.bits <= 0 ? "" : ` ${format.bits} bit`;
   return `${codec}${depth} · ${formatRate(format.rate)}`;
 }
 
 /** The short form the display shows: "24/96", "16/44.1"; "MP3" for MP3. */
 export function shortFormat(codec: string, format: PcmFormat): string {
-  if (codec === "MP3") return "MP3";
+  if (codec === "MP3" || format.bits <= 0) return codec;
   const kilo = format.rate / 1000;
   return `${format.bits}/${Number.isInteger(kilo) ? kilo : kilo.toFixed(1)}`;
+}
+
+/**
+ * A file of a folder opened on the device, as a `file://` URL a native player opens (E6b-D9: the
+ * phone's player reads the file itself): the folder's absolute path and the file's path in it, each
+ * name escaped.
+ */
+export function fileUrl(root: string, path: string): string {
+  const names = `${root.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`.split("/");
+  return `file://${names.map((name) => encodeURIComponent(name)).join("/")}`;
 }

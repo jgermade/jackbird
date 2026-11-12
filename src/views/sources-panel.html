@@ -1,0 +1,101 @@
+<script :setup lang="ts">
+  // What "Add to the library…" offers in its tab (E6b-D11, as the owner drew it on 2026-11-12): in
+  // Folder, the folders closed lately and a key per folder source; in Server, the address. In the
+  // dialog (views/sources-dialog.html), and in the library's place while no folder is open
+  // (views/library.html), under the roots' bar's own tabs. A view over lib/adding.ts.
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+
+  const { t } = await import("../lib/i18n")
+  const { addFrom, addServer, adding, folderSources, recentFolders, reopenRecent, serverName, shownTab } = await import("../lib/adding")
+
+  // Each folder source is a key that opens its dialog: the device's own (the system's, Android's
+  // folder picker, the browser's), or the server's folder chooser.
+  type Choice = { kind: "device" | "serverFolder" | "server"; label: string; hint: string }
+  const folders = (): Choice[] =>
+    folderSources().map((kind) => ({
+      kind,
+      label: kind === "device" ? t("sources.chooseFolder") : t("sources.chooseServerFolder", { server: serverName() }),
+      hint: kind === "device" ? t("sources.chooseFolderHint") : t("sources.serverFolderHint")
+    }))
+
+  let address: string = ""
+  const submit = (event: Event) => {
+    event.preventDefault()
+    void addServer(address)
+  }
+</script>
+
+<div class="sources-panel">
+  <section :if="shownTab() === 'folder'" class="tab">
+    <div :if="recentFolders().length > 0" class="recent">
+      <h3 class="mm-legend">{{ t("sources.recent") }}</h3>
+      <ul class="list">
+        <li :each="entry in recentFolders()" :key="entry.label">
+          <button type="button" class="choice" :aria-label="t('sources.reopen', { name: entry.label })" @click="reopenRecent(entry)">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z" /></svg>
+            <span class="name">{{ entry.label }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div :each="choice in folders()" :key="choice.kind" class="source">
+      <p class="hint">{{ choice.hint }}</p>
+      <Key :variant="choice.kind === 'device' ? 'primary' : 'secondary'" @click="addFrom(choice.kind)">{{ choice.label }}</Key>
+    </div>
+  </section>
+
+  <form :if="shownTab() === 'server'" class="tab form" @submit="submit($event)">
+    <p class="hint">{{ t("sources.serverHint") }}</p>
+    <Field :label="t('instance.address')" control="server-address" :hint="t('instance.addressHint')">
+      <TextInput id="server-address" type="url" inputmode="url" autocomplete="url" :model="address" @input="address = $event.detail" />
+    </Field>
+    <p :if="adding.error" class="failure">{{ adding.error }}</p>
+    <div class="keys">
+      <Key type="submit" variant="primary" :disabled="adding.busy || !address.trim()">{{ t("instance.connect") }}</Key>
+    </div>
+  </form>
+</div>
+
+<style scoped>
+  .sources-panel { display: contents; }
+  .tab { display: grid; gap: var(--mm-space-3); }
+  .recent { display: grid; gap: var(--mm-space-2); }
+  .recent .mm-legend { margin: 0; }
+  .list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    list-style: none;
+  }
+  .list li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .choice {
+    display: flex;
+    align-items: center;
+    gap: var(--mm-space-2);
+    width: 100%;
+    min-height: 2.75rem;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    font: inherit;
+    font-size: var(--mm-text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  @media (hover: hover) { .choice:hover { background: var(--mm-hover); } }
+  .choice:active { background: var(--mm-sunken); }
+  .choice:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .icon { flex: none; width: 1rem; height: 1rem; color: var(--mm-fg-muted); }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .source { display: grid; justify-items: start; gap: var(--mm-space-2); }
+  .source + .source, .recent + .source { padding-top: var(--mm-space-3); border-top: var(--mm-border-width) solid var(--mm-border); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+  .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
+</style>

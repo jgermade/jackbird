@@ -82,7 +82,7 @@ jobs:
       - name: The app's own lints and tests
         if: runner.os == 'Linux'
         run: |
-          cargo clippy -p jackbird --all-targets --locked -- -D warnings
+          cargo clippy -p jackbird -p tauri-plugin-jackbird-player --all-targets --locked -- -D warnings
           cargo test -p jackbird --locked
 
       # Runs npm run build first (beforeBuildCommand in tauri.conf.json).

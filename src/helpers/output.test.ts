@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_OUTPUT, describeFormat, devicesFor, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo } from "./output.ts";
+import { DEFAULT_OUTPUT, describeFormat, devicesFor, fileUrl, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo } from "./output.ts";
 
 const devices: DeviceInfo[] = [
   { id: "coreaudio:dac", name: "USB DAC", default: true, modes: ["shared", "exclusive"] },
@@ -43,5 +43,15 @@ describe("output", () => {
     assert.equal(shortFormat("FLAC", { rate: 96000, channels: 2, bits: 24 }), "24/96");
     assert.equal(shortFormat("FLAC", { rate: 44100, channels: 2, bits: 16 }), "16/44.1");
     assert.equal(shortFormat("MP3", { rate: 44100, channels: 2, bits: 24 }), "MP3");
+  });
+
+  it("makes a file's URL for the phone's player", () => {
+    assert.equal(fileUrl("/storage/emulated/0/Music", "Jazz/So What #1.flac"), "file:///storage/emulated/0/Music/Jazz/So%20What%20%231.flac");
+    assert.equal(fileUrl("/storage/emulated/0/Music/", "/Ñandú.mp3"), "file:///storage/emulated/0/Music/%C3%91and%C3%BA.mp3");
+  });
+
+  it("leaves out a depth that is not known", () => {
+    assert.equal(describeFormat("AAC", { rate: 44100, channels: 2, bits: 0 }), "AAC · 44.1 kHz");
+    assert.equal(shortFormat("AAC", { rate: 44100, channels: 2, bits: 0 }), "AAC");
   });
 });

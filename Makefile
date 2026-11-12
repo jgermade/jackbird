@@ -21,18 +21,19 @@ up: node_modules/.package-lock.json
 test: node_modules/.package-lock.json
 	npm test
 
-# The desktop app (package `jackbird`) needs WebKitGTK on Linux: make desktop-test checks it.
+# The desktop app (package `jackbird`) and the phone's player plugin (Tauri, E6b) need WebKitGTK on
+# Linux: make desktop-test checks them.
 test-crates:
 	cargo fmt --all --check
-	cargo clippy --workspace --exclude jackbird --all-targets --locked -- -D warnings
-	cargo test --workspace --exclude jackbird --locked
+	cargo clippy --workspace --exclude jackbird --exclude tauri-plugin-jackbird-player --all-targets --locked -- -D warnings
+	cargo test --workspace --exclude jackbird --exclude tauri-plugin-jackbird-player --locked
 
 service: node_modules/.package-lock.json
 	npm run service
 
 desktop-test:
 	npm run build && node scripts/sidecar.mjs
-	cargo clippy -p jackbird --all-targets --locked -- -D warnings
+	cargo clippy -p jackbird -p tauri-plugin-jackbird-player --all-targets --locked -- -D warnings
 	cargo test -p jackbird --locked
 
 build: node_modules/.package-lock.json

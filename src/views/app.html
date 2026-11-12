@@ -2,7 +2,7 @@
   // The app: the faceplate on top, the workspace in the rest of a full-height
   // column (each pane scrolls on its own, so the page never does), and the
   // dialogs: the selection's, the queue's, the playlists', the preferences
-  // and, when the service serves the page, the folder chooser, people and
+  // "Add to the library…" (its sources, E6b-D11), and, when a server is spoken to, the folder chooser, people and
   // sign-in, and the way in (S3), and adding music to the library (F1). The page's title follows the language. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
 
@@ -14,7 +14,7 @@
   const PreferencesDialog = await import("./preferences-dialog.html")
   const FolderDialog = await import("./folder-dialog.html")
   const SigninDialog = await import("./signin-dialog.html")
-  const InstanceDialog = await import("./instance-dialog.html")
+  const SourcesDialog = await import("./sources-dialog.html")
   const PeopleDialog = await import("./people-dialog.html")
   const ImportDialog = await import("./import-dialog.html")
   const { t } = await import("../lib/i18n")
@@ -36,16 +36,21 @@
   <PeopleDialog />
   <ImportDialog />
   <SigninDialog />
-  <InstanceDialog />
+  <SourcesDialog />
 </main>
 
 <style scoped>
   .app {
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;
     height: 100vh;
     height: 100dvh;
+    /* Clear of a phone's cutouts at the sides (landscape); the top's and the bottom's are the faceplate's and the footbar's. */
+    padding-right: var(--mm-safe-right, env(safe-area-inset-right, 0px));
+    padding-left: var(--mm-safe-left, env(safe-area-inset-left, 0px));
   }
-  .top { flex: none; position: relative; z-index: 1; }
+  /* Under a phone's status bar and selfie camera: the chassis goes on behind them, the faceplate starts below. */
+  .top { flex: none; position: relative; z-index: 1; padding-top: var(--mm-safe-top, env(safe-area-inset-top, 0px)); background: var(--mm-chassis); }
   .body { flex: 1 1 auto; min-height: 0; }
 </style>

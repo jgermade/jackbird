@@ -70,11 +70,44 @@ createServer((request, response) => {
     console.log(`phone-check: <- ${request.method} ${request.url} ${body.slice(0, 400)}`);
     if (request.method !== "POST") return;
     const name = new URL(request.url, "http://localhost").searchParams.get("phase") ?? "report";
+    if (name === "step" && platform === "android" && JSON.parse(body || "{}").step === "picking") void grantFolder();
     phase(name);
     waiting[name](JSON.parse(body || "{}"));
   });
 }).listen(4700);
 const reported = phase("report");
+
+// Android's folder picker, as a person goes through it (E6b-D9): it opens at the folder the build
+// names; "Use this folder", then "Allow". Its screen is read with uiautomator, and each key tapped
+// at its middle. Tries for a minute.
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+async function tapText(pattern) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      execFileSync("adb", ["shell", "uiautomator", "dump", "/sdcard/ui.xml"], { timeout: 30_000 });
+      const xml = execFileSync("adb", ["shell", "cat", "/sdcard/ui.xml"], { encoding: "utf8", timeout: 30_000 });
+      for (const node of xml.match(/<node [^>]*>/g) ?? []) {
+        const text = /text="([^"]*)"/.exec(node)?.[1] ?? "";
+        const bounds = /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(node);
+        if (bounds && pattern.test(text)) {
+          const [x, y] = [(+bounds[1] + +bounds[3]) >> 1, (+bounds[2] + +bounds[4]) >> 1];
+          console.log(`phone-check: picker: tapping "${text}" at ${x},${y}`);
+          execFileSync("adb", ["shell", "input", "tap", String(x), String(y)], { timeout: 30_000 });
+          return true;
+        }
+      }
+    } catch (error) {
+      console.log(`phone-check: picker: ${error.message}`);
+    }
+    await sleep(3000);
+  }
+  console.log(`phone-check: picker: no ${pattern} on the screen`);
+  return false;
+}
+async function grantFolder() {
+  await sleep(3000);
+  if (await tapText(/^use this folder$/i)) await tapText(/^allow$/i);
+}
 const within = (promise, ms) => Promise.race([promise, new Promise((done) => setTimeout(() => done(null), ms))]);
 
 // Android's emulator reaches this machine at 10.0.2.2 (not through `adb reverse`, which did not keep
@@ -141,6 +174,11 @@ const showLog = () => {
 if (platform === "android") {
   startLog();
   run("adb", ["install", "-r", app]);
+  // A folder of the phone (E6b-D9): the audio fixtures and a tagged FLAC, in its shared storage, for
+  // Android's folder picker to grant (driven below, when the page says it is picking).
+  run("adb", ["shell", "mkdir", "-p", "/sdcard/Music/jackbird-check"]);
+  for (const name of readdirSync(music)) run("adb", ["push", join(music, name), `/sdcard/Music/jackbird-check/${name}`]);
+  run("adb", ["push", "fixtures/tags/flac-full.flac", "/sdcard/Music/jackbird-check/flac-full.flac"]);
   run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
 } else {
   const devices = JSON.parse(read("xcrun", ["simctl", "list", "devices", "available", "-j"])).devices;
@@ -166,18 +204,24 @@ if (!report) {
   process.exit(1);
 }
 
-// Background playback, measured (not required): once the queue of silences plays (with sound), the app goes
+// Background playback, measured (required on Android, through the native player, E6b-D7; measured
+// only on iOS until its player, E6b's step 2): once the queue of silences plays (with sound), the app goes
 // to the background (the home screen; on iOS, Settings in front of it, which can take the simulator
 // most of a minute); two minutes after the page says it is hidden, the app comes back. Meanwhile, on
 // Android, what the system says of the app: its process's state (a frozen app plays nothing) and
 // whether it has a media session (the notification's and the lock screen's controls).
+// Whether a media session of the app's was seen playing (PlaybackState 3) while it was away: the
+// native player's (E6b), whose notification and lock screen's controls come from it.
+let sessionPlaying = false;
 const androidSays = (when) => {
   for (const [what, args] of [
     ["the process", ["shell", "dumpsys", "activity", "processes", bundle]],
     ["the media sessions", ["shell", "dumpsys", "media_session"]]
   ]) {
     try {
-      const lines = read("adb", args).split("\n");
+      const text = read("adb", args);
+      if (what === "the media sessions" && text.includes(bundle) && /state=PlaybackState \{state=(3|PLAYING)\b/.test(text)) sessionPlaying = true;
+      const lines = text.split("\n");
       const wanted = lines.filter((line) => line.includes(bundle) || /procState|frozen|state=|active=|Sessions Stack/i.test(line));
       console.log(`phone-check: ${when}, ${what}:\n${wanted.slice(0, 25).join("\n")}`);
     } catch (error) {
@@ -218,6 +262,10 @@ if (background?.samples) {
   const hiddenChanges = changes.filter((change) => change.hidden);
   for (const change of changes) console.log(`phone-check: change of song ${JSON.stringify(change)}`);
   report.background = {
+    native: Boolean(background.native),
+    sessionPlaying,
+    ended: background.ended ?? null,
+    failures: background.failures ?? [],
     muted: background.muted,
     changesWhileHidden: hiddenChanges.length,
     startedWhileHidden: hiddenChanges.filter((change) => change.started).length,
@@ -242,6 +290,22 @@ if (report.error) problems.push(`error: ${report.error}`);
 if (report.me?.role !== "owner") problems.push(`not in as the owner: ${JSON.stringify(report.me)}`);
 if (!(report.tracks >= 3)) problems.push(`tracks: ${report.tracks}`);
 if (!report.played || report.played.error || !(report.played.played > 0)) problems.push(`the FLAC did not play: ${JSON.stringify(report.played)}`);
+// The native player (E6b-D7, Android for now): the queue goes on in the background by itself.
+if (platform === "android") {
+  const background = report.background;
+  // A folder of the phone (E6b-D9): granted in Android's picker, walked, the tagged FLAC's title read by
+  // Rust through the file Android opened, and a FLAC played from its content:// address.
+  const device = report.device;
+  if (!device?.picked || !(device.tracks >= 4) || device.title !== "Before" || !(device.played > 0) || device.failures?.length) {
+    problems.push(`the phone's folder: ${JSON.stringify(device ?? null)}`);
+  }
+  if (!background?.native) problems.push("the native player's queue was not measured");
+  else {
+    if (background.changesWhileHidden < 2) problems.push(`${background.changesWhileHidden} changes of song while hidden (2 or more expected)`);
+    if (background.failures.length > 0) problems.push(`the native player failed: ${JSON.stringify(background.failures)}`);
+    if (!background.sessionPlaying) problems.push("no media session of the app's seen playing while it was away");
+  }
+}
 if (problems.length > 0) {
   showLog();
   console.error(`phone-check: ${problems.join("; ")}`);

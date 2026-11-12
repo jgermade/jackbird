@@ -1,0 +1,29 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Every command of the phone's player, and its events."
+permissions = [
+  "allow-set-queue",
+  "allow-set-upcoming",
+  "allow-play",
+  "allow-pause",
+  "allow-seek",
+  "allow-stop",
+  "allow-status",
+  "allow-set-output",
+  "allow-output-info",
+  "allow-pick-folder",
+  "allow-folder-check",
+  "allow-folder-walk",
+  "allow-folder-list",
+  "allow-folder-stat",
+  "allow-folder-read",
+  "allow-folder-write",
+  "allow-folder-delete",
+  "allow-folder-rename",
+  "allow-folder-mkdir",
+  "allow-folder-address",
+  "allow-safe-area",
+  "allow-register-listener",
+  "allow-remove-listener",
+]

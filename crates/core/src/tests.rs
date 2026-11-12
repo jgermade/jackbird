@@ -173,6 +173,21 @@ fn inspect_gives_each_fixtures_checksums_and_tags() {
     }
 }
 
+/// A file already open, as a phone's folders hand theirs over (E6b-D9): the same inspection as by its root.
+#[test]
+fn inspect_open_reads_a_file_already_open() {
+    let (folder, root) = fixture_root();
+    for case in cases() {
+        let file = fs::File::open(folder.join(&case.file)).unwrap();
+        let found = inspect_open(file, &case.file, None).unwrap();
+        let expected = inspect(&root, &case.file, None).unwrap();
+        assert_eq!(found.full_checksum, expected.full_checksum, "{}", case.name);
+        assert_eq!(found.audio_checksum, expected.audio_checksum, "{}", case.name);
+        assert_eq!(found.tags, expected.tags, "{}", case.name);
+        assert_eq!(found.stat.size, expected.stat.size, "{}", case.name);
+    }
+}
+
 fn cover() -> Cover {
     Cover {
         data: fs::read(fixtures().join("covers/cover9.jpg")).unwrap(),

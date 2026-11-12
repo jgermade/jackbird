@@ -16,6 +16,11 @@
   const AlbumSheet = await import("./album-sheet.html")
   const DeckKeys = await import("./deck-keys.html")
   const QueuePanel = await import("./queue-panel.html")
+  const SourcesPanel = await import("./sources-panel.html")
+  const { t } = await import("../lib/i18n")
+  const { tabsHere } = await import("../lib/adding")
+  // The welcome: no folder open, none coming back, and something to offer.
+  const welcome = (): boolean => !library.restoring && library.roots.length === 0 && tabsHere().length > 0
   const { parseViewState } = await import("../helpers/session")
   const { library } = await import("../lib/library")
   const { SESSION_KEYS, readSession, writeSession } = await import("../lib/storage")
@@ -95,7 +100,15 @@
 
 <div class="workspace">
   <div class="stage">
-    <div class="panes" @scrollend="settle($event)">
+    <!-- While no folder is open (and none is coming back), one space, not the two panes: what the
+         roots' bar's tab offers, a folder or a server (views/sources-panel.html). -->
+    <section :if="welcome()" class="welcome" :aria-label="t('sources.eyebrow')">
+      <div class="welcome-body">
+        <p class="welcome-lead">{{ t("sources.welcome") }}</p>
+        <SourcesPanel />
+      </div>
+    </section>
+    <div :else class="panes" @scrollend="settle($event)">
       <div class="pane tree-pane"><Library /></div>
       <div class="pane sheet-pane"><AlbumSheet /></div>
     </div>
@@ -116,6 +129,10 @@
     font-size: var(--mm-text-md);
   }
   .footbar { display: none; }
+  /* The welcome: one space, its content centred in a readable column. */
+  .welcome { display: flex; flex: 1 1 auto; justify-content: center; min-height: 0; overflow: auto; padding: var(--mm-space-6) var(--mm-space-4); background: var(--mm-sheet); }
+  .welcome-body { display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; }
+  .welcome-lead { margin: 0; font-size: var(--mm-text-md); color: var(--mm-fg); }
   .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   .panes {
     display: grid;
@@ -133,7 +150,7 @@
     .footbar {
       display: flex;
       flex: none;
-      padding: var(--mm-space-2) var(--mm-space-3) max(var(--mm-space-2), env(safe-area-inset-bottom));
+      padding: var(--mm-space-2) var(--mm-space-3) max(var(--mm-space-2), var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)));
       border-top: var(--mm-border-width) solid var(--mm-chassis-lo);
       background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
     }
