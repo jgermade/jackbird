@@ -126,6 +126,12 @@
   }
   @media (hover: hover) { .variant-primary:hover:not(:disabled) { background: var(--mm-accent-hover); border-color: var(--mm-accent-hover); } }
   .variant-primary:active:not(:disabled) { background: var(--mm-accent-hover); box-shadow: var(--mm-key-pressed-signal); }
+  /* A latched key in the signal colour (play, while it plays) is down and lit: its whole face
+     glows orange, not only its edge. */
+  .variant-primary[aria-pressed="true"] {
+    background: var(--mm-accent);
+    box-shadow: var(--mm-key-pressed-signal), 0 0 .625rem color-mix(in srgb, var(--mm-accent) 55%, transparent);
+  }
 
   .variant-danger {
     background: var(--mm-bad);
