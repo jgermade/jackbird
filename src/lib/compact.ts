@@ -71,7 +71,7 @@ async function boundsOf(): Promise<Bounds> {
 
 /** Turns the window compact; `keepFull` is false at a start, when the full window's place is the saved one. */
 async function windowCompact(keepFull: boolean): Promise<void> {
-  const { win, LogicalSize, PhysicalPosition, PhysicalSize } = await windowApi();
+  const { win, LogicalSize, PhysicalPosition } = await windowApi();
   if (keepFull) {
     const maximized = await win.isMaximized();
     saved.full = { ...(await boundsOf()), maximized };
@@ -81,7 +81,7 @@ async function windowCompact(keepFull: boolean): Promise<void> {
   await win.setDecorations(false);
   await win.setMinSize(new LogicalSize(size.minWidth, size.minHeight));
   if (saved.compact) {
-    await win.setSize(new PhysicalSize(saved.compact.width, saved.compact.height));
+    await sizeTo(saved.compact.width, saved.compact.height);
     await win.setPosition(new PhysicalPosition(saved.compact.x, saved.compact.y));
   } else {
     await win.setSize(new LogicalSize(size.width, size.height));
@@ -89,14 +89,30 @@ async function windowCompact(keepFull: boolean): Promise<void> {
   await win.setAlwaysOnTop(compact.onTop);
 }
 
+/**
+ * Gives the window this inner size (in physical pixels) and checks it took. On macOS a title bar
+ * turned on or off is laid out after the call that asked for it: a size set meanwhile is measured
+ * against the old frame, and the content comes out short by the bar's height. So the size is set
+ * again until the inside is the one asked for (or three times).
+ */
+async function sizeTo(width: number, height: number): Promise<void> {
+  const { win, PhysicalSize } = await windowApi();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await win.setSize(new PhysicalSize(width, height));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const inner = await win.innerSize();
+    if (Math.abs(inner.width - width) <= 1 && Math.abs(inner.height - height) <= 1) return;
+  }
+}
+
 async function windowFull(): Promise<void> {
-  const { win, LogicalSize, PhysicalPosition, PhysicalSize } = await windowApi();
+  const { win, LogicalSize, PhysicalPosition } = await windowApi();
   await win.setAlwaysOnTop(false);
   await win.setDecorations(true);
   await win.setMinSize(new LogicalSize(FULL_MIN.width, FULL_MIN.height));
   const full = saved.full;
   if (full) {
-    await win.setSize(new PhysicalSize(full.width, full.height));
+    await sizeTo(full.width, full.height);
     await win.setPosition(new PhysicalPosition(full.x, full.y));
     if (full.maximized) await win.maximize();
   } else {
