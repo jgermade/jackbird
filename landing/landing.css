@@ -209,11 +209,11 @@ h1 em {
 .shot { display: grid; justify-items: center; gap: var(--mm-space-4); }
 /* The desktop app in a little perspective, turned towards the page's middle, and the compact
    player in front of it over its bottom left corner, as two windows on a desk. */
-.stage { position: relative; width: 100%; padding: 0 0 4rem 0; perspective: 160rem; }
+.stage { position: relative; width: 100%; padding: 0 0 1.5rem 0; perspective: 160rem; }
 .stage .window { transform: rotateY(-9deg) rotateX(4deg); transform-origin: 70% 50%; transition: transform .8s cubic-bezier(.2, .7, .2, 1); }
 .mini {
   position: absolute;
-  left: 2rem;
+  left: 4.5rem;
   bottom: 0;
   width: min(32%, 26rem);
   margin: 0;
