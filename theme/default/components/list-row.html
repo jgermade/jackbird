@@ -100,6 +100,7 @@
      :class.flat="flag(flat)"
      :class.caret-only="flag(caretOnly)"
      :class.two="!!sub"
+     :class.numbered="isPickable && hasLead"
      :id="rowId || null"
      role="treeitem"
      :aria-level="level + 1"
@@ -115,8 +116,9 @@
   <span class="icon" :class.pick="isPickable" @click="flag(caretOnly) || caret($event)">
     <svg :if="isFolder && flag(expanded)" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 13V3.5h4.2l1.4 1.6h5.4v2.2M1.5 13l2.1-5.7h11.1L12.6 13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
     <svg :elseif="isFolder" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4.2l1.4 1.6h7.4v8.4h-13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
-    <SelectBox :elseif="isPickable" :chosen="flag(chosen)" @pick="$emit('pick', $event.detail)" />
+    <span :elseif="isPickable" class="box"><SelectBox :chosen="flag(chosen)" @pick="$emit('pick', $event.detail)" /></span>
     <svg :else viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
+    <span :if="isPickable && hasLead" class="slot-lead">{{ lead }}</span>
   </span>
   <span class="label" :class.led="hasLead"><span :if="hasLead" class="lead">{{ lead }}</span><span class="title">{{ label }}</span><span :if="sub" class="sub">{{ sub }}</span></span>
   <span class="end"><span class="meta">{{ meta }}</span></span>
@@ -181,9 +183,23 @@
   .label.led .sub { grid-column: 2; grid-row: 2; }
   .two .label { row-gap: .0625rem; padding-block: var(--mm-space-1); }
   /* A row's box: smaller than a form's, and dimmed until it is ticked or the row is pointed at. */
-  .icon.pick { transform: scale(.75); opacity: .55; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .row[aria-selected="true"] .icon.pick, .row.current .icon.pick { opacity: 1; }
-  @media (hover: hover) { .row:hover .icon.pick { opacity: 1; } }
+  .icon.pick > * { grid-area: 1 / 1; }
+  .icon .box { display: grid; place-items: center; transform: scale(.75); opacity: .55; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .row[aria-selected="true"] .icon .box, .row.current .icon .box { opacity: 1; }
+  @media (hover: hover) { .row:hover .icon .box { opacity: 1; } }
+  /* The number in the box's place: only with a pointer (a computer), where the box shows on the
+     row pointed at, chosen or current, and the number otherwise. On a touch screen the box is
+     always there and the number beside it, in the label. */
+  .slot-lead { display: none; }
+  @media (hover: hover) {
+    .numbered .slot-lead { display: block; font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; line-height: 1; color: var(--mm-fg-subtle); }
+    .numbered .label .lead { display: none; }
+    .numbered .label.led { grid-template-columns: minmax(0, 1fr); }
+    .numbered .label.led .title, .numbered .label.led .sub { grid-column: 1; }
+    .numbered .icon .box { visibility: hidden; }
+    .numbered:hover .icon .box, .numbered[aria-selected="true"] .icon .box, .numbered.current .icon .box, .numbered:focus-within .icon .box { visibility: visible; }
+    .numbered:hover .slot-lead, .numbered[aria-selected="true"] .slot-lead, .numbered.current .slot-lead, .numbered:focus-within .slot-lead { visibility: hidden; }
+  }
   .title, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The second line: smaller and lighter than the label, in the subtle ink. */
   .sub { font-size: var(--mm-text-xs); font-weight: var(--mm-weight-light); line-height: var(--mm-leading-tight); color: var(--mm-fg-muted); }
