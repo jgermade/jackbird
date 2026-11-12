@@ -98,6 +98,14 @@ export function clearUpcoming(position: QueuePosition): QueuePosition {
   return withItems(position, position.queue.items.slice(0, position.index + 1), position.index);
 }
 
+/** The queue from the current track on: the ones played before it removed. */
+export function clearPlayed(position: QueuePosition): QueuePosition {
+  if (!position.queue) {
+    return position;
+  }
+  return withItems(position, position.queue.items.slice(position.index), 0);
+}
+
 /**
  * The queue without the items `gone` matches (a closed root's, or tracks
  * removed from the library). The current track stays current if it stays;

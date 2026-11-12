@@ -12,6 +12,7 @@
 import { $computed, $reactive, $toRaw } from "jq79";
 import {
   addTo,
+  clearPlayed as clearBeforeCurrent,
   clearUpcoming as clearAfterCurrent,
   dropItems,
   isOneAlbum,
@@ -770,6 +771,16 @@ export function moveInQueue(from: number, to: number): void {
 /** Removes every track after the current one. */
 export function clearUpcoming(): void {
   apply(clearAfterCurrent(position()));
+}
+
+/** Removes every track before the current one. */
+export function clearPlayed(): void {
+  apply(clearBeforeCurrent(position()));
+}
+
+/** Empties the queue, for a new one: the music stops. */
+export function clearQueue(): void {
+  apply({ queue: null, index: 0 });
 }
 
 /**

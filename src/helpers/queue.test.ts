@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { addTo, clearUpcoming, dropItems, isOneAlbum, moveTo, playNextIn, queueOf, removeAt, restoreQueue, sameItem, type QueuePosition } from "./queue.ts";
+import { addTo, clearPlayed, clearUpcoming, dropItems, isOneAlbum, moveTo, playNextIn, queueOf, removeAt, restoreQueue, sameItem, type QueuePosition } from "./queue.ts";
 
 const item = (rootId: string, trackId: string) => ({ rootId, trackId });
 const ids = (position: QueuePosition): string[] => position.queue?.items.map((one) => `${one.rootId}:${one.trackId}`) ?? [];
@@ -113,6 +113,15 @@ describe("clearUpcoming", () => {
     assert.deepEqual(ids(next), ["music:a", "music:b"]);
     assert.equal(current(next), "music:b");
     assert.deepEqual(clearUpcoming({ queue: null, index: 0 }), { queue: null, index: 0 });
+  });
+});
+
+describe("clearPlayed", () => {
+  it("keeps the queue from the current track on", () => {
+    const next = clearPlayed(playing);
+    assert.deepEqual(ids(next), ["music:b", "music:c", "music:d"]);
+    assert.equal(current(next), "music:b");
+    assert.deepEqual(clearPlayed({ queue: null, index: 0 }), { queue: null, index: 0 });
   });
 });
 

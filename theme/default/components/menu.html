@@ -1,12 +1,15 @@
-<script :setup="{ items = [], label = '', disabled = false }: Props" lang="ts">
+<script :setup="{ items = [], label = '', disabled = false, size = 'sm', variant = 'ghost' }: Props" lang="ts">
   // A menu behind a key with three vertical dots: what can be done with the
   // row (or anything) it sits on.
   //
   //   <Menu label="More for So What" :items="[{ id: 'next', label: 'Play next' }, { id: 'remove', label: 'Remove', danger: true, rule: true }]"
   //         @select="act($event.detail)" />
   //
-  // An item is `{ id, label, danger?, rule? }`: `danger` prints it in the
-  // error ink, `rule` draws a line above it. A choice closes the menu and
+  // Its key's `size` and `variant` are Key's (small and ghost by default), and
+  // an `icon` slot draws another glyph in place of the dots.
+  //
+  // An item is `{ id, label, danger?, rule?, disabled? }`: `danger` prints it in the
+  // error ink, `rule` draws a line above it, `disabled` shows it unavailable. A choice closes the menu and
   // emits `select` with the item's id. The list opens in the top layer (a
   // manual popover), under the key, or above it when there is no room below;
   // at 720px and below it is a sheet at the bottom of the screen over a
@@ -19,8 +22,8 @@
   // `tokens.css`. See `RECORD/2026-11-04.github-actions-workflows.WIP.md`
   // (23:32, W4).
 
-  type Item = { id: string; label: string; danger?: boolean; rule?: boolean }
-  type Props = { items?: Item[]; label?: string; disabled?: boolean | "" }
+  type Item = { id: string; label: string; danger?: boolean; rule?: boolean; disabled?: boolean }
+  type Props = { items?: Item[]; label?: string; disabled?: boolean | ""; size?: "sm" | "md" | "lg"; variant?: string }
 
   const Key = await import("./key.html")
 
@@ -32,7 +35,7 @@
 
   const list = (): HTMLElement | null => $self(".list") as HTMLElement | null
   const key = (): HTMLButtonElement | null => ($self(".menu") as HTMLElement | null)?.querySelector("button.key") ?? null
-  const entries = (): HTMLButtonElement[] => Array.from(list()?.querySelectorAll<HTMLButtonElement>("button.item") ?? [])
+  const entries = (): HTMLButtonElement[] => Array.from(list()?.querySelectorAll<HTMLButtonElement>("button.item:not(:disabled)") ?? [])
 
   // Under the key, its right edges aligned, or above it when it does not fit
   // below; kept inside the window. On a phone the sheet's own place holds.
@@ -108,12 +111,13 @@
 </script>
 
 <span class="menu" @click="stop($event)" @pointerdown="stop($event)" @dblclick="stop($event)" @keydown="onKey($event)">
-  <Key square size="sm" variant="ghost" popup="menu" :expanded="open" :disabled="disabled" :label="label" :title="label" @click="toggle()">
-    <svg class="dots" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.25" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="12.75" r="1.4" /></svg>
+  <Key square :size="size" :variant="variant" popup="menu" :expanded="open" :disabled="disabled" :label="label" :title="label" @click="toggle()">
+    <slot.icon :if="$slots.icon" />
+    <svg :else class="dots" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.25" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="12.75" r="1.4" /></svg>
   </Key>
   <div class="list" popover="manual" role="menu" :aria-label="label || null">
     <button :each="item in items" :key="item.id" type="button" role="menuitem" tabindex="-1" class="item"
-            :class.danger="!!item.danger" :class.rule="!!item.rule" @click="choose(item)">{{ item.label }}</button>
+            :class.danger="!!item.danger" :class.rule="!!item.rule" :disabled="!!item.disabled" @click="choose(item)">{{ item.label }}</button>
   </div>
 </span>
 
@@ -152,9 +156,10 @@
   }
   .item.rule { margin-top: var(--mm-space-1); box-shadow: inset 0 var(--mm-border-width) 0 var(--mm-border); }
   .item.danger { color: var(--mm-bad); }
+  .item:disabled { color: var(--mm-fg-subtle); cursor: default; }
   .item:focus { outline: none; background: var(--mm-hover); }
-  @media (hover: hover) { .item:hover { background: var(--mm-hover); } }
-  .item:active { background: var(--mm-sunken); }
+  @media (hover: hover) { .item:not(:disabled):hover { background: var(--mm-hover); } }
+  .item:not(:disabled):active { background: var(--mm-sunken); }
 
   /* Phones: a sheet at the bottom, the whole width, over a dimmed page. */
   @media (max-width: 720px) {
