@@ -7,7 +7,7 @@
 /** The compact window's size, and the least it can be made, in rem. */
 export const COMPACT = { width: 34, height: 7, minWidth: 20, minHeight: 6, pipHeight: 8.75 } as const;
 
-/** A window's place and size, in physical pixels (as the desktop app reports them). */
+/** A window's place and its whole size (title bar and all), in physical pixels, as the desktop app reports them. */
 export type Bounds = { x: number; y: number; width: number; height: number };
 
 /** What is kept across restarts. */

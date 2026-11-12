@@ -78,7 +78,7 @@ async function playNative(root: string, path: string): Promise<NativeReport> {
   return report;
 }
 
-type WindowShape = { width: number; height: number; outerHeight: number; decorated: boolean; onTop: boolean; workHeight: number | null };
+type WindowShape = { width: number; height: number; outerWidth: number; outerHeight: number; decorated: boolean; onTop: boolean; workHeight: number | null };
 
 /**
  * The compact mode's window (C2): turned compact and back, through the app's own actions; the
@@ -103,6 +103,7 @@ async function checkCompact(): Promise<Record<string, unknown>> {
     return {
       width: Math.round(size.width / scale),
       height: Math.round(size.height / scale),
+      outerWidth: Math.round(outer.width / scale),
       outerHeight: Math.round(outer.height / scale),
       decorated,
       onTop,

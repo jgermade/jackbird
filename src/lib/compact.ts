@@ -65,7 +65,9 @@ const windowApi = () => (windowModule ??= loadWindowApi());
 
 async function boundsOf(): Promise<Bounds> {
   const { win } = await windowApi();
-  const [place, size] = await Promise.all([win.outerPosition(), win.innerSize()]);
+  // The whole window's size, title bar and all: the inside is not the same measure before and after
+  // the title bar comes and goes (on macOS it grew by the bar, and past the screen).
+  const [place, size] = await Promise.all([win.outerPosition(), win.outerSize()]);
   return { x: place.x, y: place.y, width: size.width, height: size.height };
 }
 
@@ -91,34 +93,30 @@ async function windowCompact(keepFull: boolean): Promise<void> {
 }
 
 /**
- * Gives the window this inner size (in physical pixels) at `place`, and checks it held. On macOS a
- * title bar turned on is laid out later, asynchronously: a size set meanwhile is the bare frame's,
- * and when the bar comes it is taken out of the content (29 pixels short). And a window is sized
- * from its bottom edge there, so it is first moved down by what it will grow, to grow up into place
- * rather than past the screen's top. So: size, place, wait, read; and only when the inside is right
- * on two reads apart, done (up to four rounds, each waiting longer).
+ * Gives the window this whole size, title bar and all (in physical pixels), at `place`, and checks
+ * it held. Tauri sizes a window by its inside, so the inside asked for is the whole size less what
+ * the frame takes now; on macOS the title bar comes back asynchronously, so that is read again each
+ * round. A window is sized from its bottom edge there: it is first moved down by what it will grow,
+ * to grow up into place. Done when the whole size is right on two reads apart (up to four rounds,
+ * each waiting longer), or when the same wrong size comes twice (the screen gives no more).
  */
 async function placeAndSize(place: { x: number; y: number }, width: number, height: number): Promise<void> {
   const { win, PhysicalPosition, PhysicalSize } = await windowApi();
   const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const right = async () => {
-    const inner = await win.innerSize();
-    return Math.abs(inner.width - width) <= 1 && Math.abs(inner.height - height) <= 1;
+    const outer = await win.outerSize();
+    return Math.abs(outer.width - width) <= 1 && Math.abs(outer.height - height) <= 1;
   };
   let last = "";
   for (const wait of [100, 300, 600, 1000]) {
-    if (isMac()) {
-      const inner = await win.innerSize();
-      await win.setPosition(new PhysicalPosition(place.x, place.y + Math.max(0, height - inner.height)));
-    }
-    await win.setSize(new PhysicalSize(width, height));
+    const [inner, outer] = await Promise.all([win.innerSize(), win.outerSize()]);
+    if (isMac()) await win.setPosition(new PhysicalPosition(place.x, place.y + Math.max(0, height - outer.height)));
+    await win.setSize(new PhysicalSize(width - (outer.width - inner.width), height - (outer.height - inner.height)));
     await win.setPosition(new PhysicalPosition(place.x, place.y));
     await pause(wait);
     if (!(await right())) {
-      // The same wrong size twice: the screen will not give more (macOS keeps a window within its
-      // work area); trying again only waits longer.
-      const inner = await win.innerSize();
-      const seen = `${inner.width}x${inner.height}`;
+      const now = await win.outerSize();
+      const seen = `${now.width}x${now.height}`;
       if (seen === last) return;
       last = seen;
       continue;

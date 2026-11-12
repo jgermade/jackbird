@@ -64,12 +64,10 @@ const shown = (holding) => (holding ?? []).find((root) => root.path === folder);
 const kind = process.env.JACKBIRD_CHECK_KIND ?? "desktop";
 if (shown(report.library)?.kind !== kind) problems.push(`the root is ${shown(report.library)?.kind}, not ${kind}`);
 if (shown(report.library)?.tracks !== audio.length) problems.push(`the library shows ${JSON.stringify(report.library)}`);
-// Back at its size; or, where the window had opened taller than the screen's work area (a small
-// runner's screen: macOS lets a window open past it but not be sized past it), as tall as that area.
+// Back at its size: the whole window's, title bar and all (its inside is not the same measure
+// with and without the bar on macOS).
 const near = (a, b) => typeof a === "number" && typeof b === "number" && Math.abs(a - b) <= 2;
-const backAtSize = (after, before) =>
-  near(after?.width, before?.width) &&
-  (near(after?.height, before?.height) || (before?.outerHeight > before?.workHeight && near(after?.outerHeight, after?.workHeight)));
+const backAtSize = (after, before) => near(after?.outerWidth, before?.outerWidth) && near(after?.outerHeight, before?.outerHeight);
 // The compact mode (C2): the window turned small and bare, and back to its size and its title bar.
 const compact = report.compact ?? {};
 if (compact.error) problems.push(`compact mode: ${compact.error}`);
