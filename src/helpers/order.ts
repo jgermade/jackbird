@@ -58,7 +58,7 @@ export function previousIndex(index: number, total: number, mode: PlayMode): num
   return mode.repeat === "all" ? order[order.length - 1] : index;
 }
 
-/** The repeat key's turn: off, the whole queue, one track, off again. */
+/** The repeat key's turn: off, this track, the whole queue, off again. */
 export function nextRepeat(repeat: Repeat): Repeat {
-  return repeat === "off" ? "all" : repeat === "all" ? "one" : "off";
+  return repeat === "off" ? "one" : repeat === "one" ? "all" : "off";
 }

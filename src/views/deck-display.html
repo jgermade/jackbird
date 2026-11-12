@@ -198,7 +198,7 @@
   </Display>
   <!-- The play modes, joined to the display's right edge as keys on its bezel. -->
   <div class="modes" role="group" :aria-label="t('faceplate.modes')">
-    <!-- Keys of the bezel's own: the whole side, one over the other, their LED at the top left. -->
+    <!-- Keys of the bezel's own: the whole side, one over the other, under the display's edge; their LED at the top right. -->
     <button type="button" class="mode" :aria-pressed="String(playback.shuffle)" :aria-label="t('faceplate.shuffle')" :title="t('faceplate.shuffle')" @click="toggleShuffle()">
       <span class="mode-led" :class.on="playback.shuffle" aria-hidden="true"></span>
       <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1 2.6-2.2M9 6.7c.6-1.2 1.4-2.2 2.5-2.2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
@@ -215,11 +215,14 @@
   /* The display and its play modes' keys, one unit: the keys on a bezel joined to the display's
      right edge, one over the other. */
   .unit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; min-width: 0; }
+  /* The display over the keys: they run in under its right edge, so its rounded corners are
+     whole over them, with no seam where its curve meets them. */
+  .unit > :first-child { position: relative; z-index: 1; }
   .modes {
     display: grid;
     grid-template-rows: 1fr 1fr;
     width: 2.25rem;
-    margin-left: -1px;
+    margin-left: -.5rem;
     overflow: hidden;
     border-top: var(--mm-border-width) solid var(--mm-display-rim);
     border-right: var(--mm-border-width) solid var(--mm-display-rim);
@@ -234,7 +237,7 @@
     min-height: 0;
     padding: 0;
     border: 0;
-    border-left: var(--mm-border-width) solid var(--mm-display-rim);
+    padding-left: .5rem;
     background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
     color: var(--mm-fg);
     cursor: pointer;
@@ -245,7 +248,8 @@
   .mode:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   @media (hover: hover) { .mode:hover { filter: brightness(1.04); } }
   .mode-icon { width: .875rem; height: .875rem; }
-  .mode-led { position: absolute; top: .3rem; left: .3rem; width: .3rem; height: .3rem; border-radius: 50%; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
+  /* The LED: a small bar at the top right, clear of the edges. */
+  .mode-led { position: absolute; top: .3rem; right: .3rem; width: .5rem; height: .1875rem; border-radius: 1px; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
   .mode-led.on { background: var(--mm-accent); box-shadow: 0 0 .3rem var(--mm-accent); }
   .mode-one { position: absolute; right: .3rem; bottom: .2rem; font: 700 .5rem / 1 var(--mm-font-label); color: var(--mm-accent-ink); }
   /* Each of the display's text lines: the title, or the artist; the text ellipsises. */

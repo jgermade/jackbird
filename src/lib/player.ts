@@ -902,7 +902,7 @@ export function hasPrevious(): boolean {
   return total > 0 && previousIndex(playback.index, total, keyMode()) !== playback.index;
 }
 
-/** The repeat key: off, the whole queue, one track. What a native player was handed ahead follows. */
+/** The repeat key: off, this track, the whole queue. What a native player was handed ahead follows. */
 export function turnRepeat(): void {
   playback.repeat = nextRepeat(playback.repeat);
   void sendNext();

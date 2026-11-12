@@ -47,8 +47,8 @@ test("shuffledOrder puts the first first and every index once", () => {
   assert.equal(isOrderOf([0, 1, 3], 3), false);
 });
 
-test("nextRepeat turns off, all, one, off", () => {
-  assert.equal(nextRepeat("off"), "all");
-  assert.equal(nextRepeat("all"), "one");
-  assert.equal(nextRepeat("one"), "off");
+test("nextRepeat turns off, this track, the whole queue, off", () => {
+  assert.equal(nextRepeat("off"), "one");
+  assert.equal(nextRepeat("one"), "all");
+  assert.equal(nextRepeat("all"), "off");
 });
