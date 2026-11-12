@@ -8,6 +8,7 @@ import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
 import { byCaret, followFolder } from "../helpers/follow";
+import { levelsOf, openOnEntering, openOnLeaving, type Levels } from "../helpers/levels";
 import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
 import { orderDetailPlaylist } from "../helpers/tracks";
@@ -81,6 +82,9 @@ export const activeRoot = $computed((): Opaque<RootWorkspace | null> => new Opaq
 
 /** The tree's visible rows, in order. */
 export const treeRows = $computed((): Opaque<WizardTreeRow[]> => new Opaque(derive().rows));
+
+/** A phone's list of the same rows: the open folders, one per level, and what the last one holds (helpers/levels.ts). */
+export const treeLevels = $computed((): Opaque<Levels> => new Opaque(levelsOf(derive().rows)));
 
 /** What the album sheet shows. */
 export const detail = $computed((): Opaque<Scope> => new Opaque(derive().scope));
@@ -190,12 +194,17 @@ export function setCurrentRow(rowKey: string): void {
  * the current row, Space picks the current track (Shift: up to it). True when
  * the tree took it, so the view can stop the page scrolling.
  */
-export function navigateTree(key: string, shiftKey = false): boolean {
+export function navigateTree(key: string, shiftKey = false, levels = false): boolean {
   const root = current();
-  const rows = derive().rows;
+  // A phone's levels: the keys move over what it lists, and open and close a folder as a tap does.
+  const listed = levels ? levelsOf(derive().rows) : null;
+  const rows = listed ? [...listed.open, ...listed.rows] : derive().rows;
   const action = treeKeyAction(rows, root?.activeRowKey ?? null, key, shiftKey);
   if (action && "toggle" in action) {
-    toggleFolder(action.toggle);
+    const folder = rows.find((row) => row.kind === "album" && row.album === action.toggle);
+    if (!listed || !folder) toggleFolder(action.toggle);
+    else if (folder.expanded) leaveLevel(folder.key);
+    else enterLevel(folder.key);
   } else if (action && "move" in action) {
     setCurrentRow(action.move);
   } else if (action && "play" in action) {
@@ -242,6 +251,32 @@ export function followRow(rowKey: string): void {
   const next = followFolder({ expanded: root.expandedAlbums, auto: autoOpened.get(root.id) ?? [] }, row.kind === "album" ? row.album : null, ancestors);
   autoOpened.set(root.id, next.auto);
   updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: next.expanded }));
+}
+
+/**
+ * A tap on a folder's row on a phone: its content takes the list (it and the folders above it the
+ * only ones open of those listed), and it becomes the current row, so the album sheet is on it.
+ */
+export function enterLevel(rowKey: string): void {
+  const root = current();
+  const rows = derive().rows;
+  if (!root || !rows.some((row) => row.key === rowKey)) return;
+  // None is "opened by a click" any more: a computer's tree would close them behind the current row.
+  autoOpened.set(root.id, []);
+  updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: openOnEntering(rows, item.expandedAlbums, rowKey) }));
+}
+
+/**
+ * A tap on an open level's row on a phone: it closes, with the ones under it, and the list is
+ * back at the level that holds it, which becomes the current row (at the top, none: the whole root).
+ */
+export function leaveLevel(rowKey: string): void {
+  const root = current();
+  const rows = derive().rows;
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row) return;
+  autoOpened.set(root.id, []);
+  updateActive((item) => ({ ...item, activeRowKey: row.parentKey, expandedAlbums: openOnLeaving(rows, item.expandedAlbums, rowKey) }));
 }
 
 /** Lists the active root by `view`; the current row stays if the view has it. */

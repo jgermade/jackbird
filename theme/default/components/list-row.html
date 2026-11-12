@@ -10,8 +10,7 @@
   playable = false,
   current = false,
   muted = false,
-  flat = false,
-  caretOnly = false,
+  noToggle = false,
   rowId = '',
   lead = '',
   label = '',
@@ -27,8 +26,9 @@
   //
   // A click emits `select` (the native event as `$event.detail`, for its
   // modifier keys), a double click `activate`, and a click on a folder's
-  // caret or glyph (or between them and the row's left edge) `toggle`
-  // instead of `select`. An open folder draws an open folder. A `selectable` item shows a
+  // glyph (or between it and the row's left edge) `toggle` instead of
+  // `select`: the glyph is what opens and closes it, and there is no caret.
+  // An open folder draws an open folder. A `selectable` item shows a
   // `SelectBox` in place of its glyph, for a list whose click does something
   // else (plays): a click on the box emits `pick` (the native event as
   // `$event.detail`) instead of `select`. With a pointer (a computer) the box shows only on
@@ -41,10 +41,9 @@
   // own state and ignores on a component tag). `current` marks the row the
   // keyboard is on, apart from the selection, and `rowId` is its id for the
   // tree's `aria-activedescendant`. `muted` dims a row that stands for
-  // something missing. `flat` drops the caret's column, for a list with no
-  // folders in it (the column is kept so items line up with folders).
-  // `caret-only`: a folder opens and closes from its caret alone (its glyph
-  // is then part of the row, whose click is `select`). `sub` is
+  // something missing. `no-toggle`: a folder's glyph is part of the row
+  // (its click is `select` too), for a list that opens folders its own way
+  // (a phone's levels). `sub` is
   // a second line under the label, smaller and lighter (a track's artist). `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (before the cue),
   // shown on hover, on the current, chosen and playing rows, and always where
   // there is no hover (a touch screen); give it `@click.stop` so it does not
@@ -65,8 +64,7 @@
     playable?: boolean | ""
     current?: boolean | ""
     muted?: boolean | ""
-    flat?: boolean | ""
-    caretOnly?: boolean | ""
+    noToggle?: boolean | ""
     sub?: string
     rowId?: string
     lead?: string | number
@@ -82,12 +80,11 @@
   $: isPickable = !isFolder && flag(selectable)
   $: isCued = !isFolder && (flag(playable) || flag(playing))
   $: level = Math.max(0, Number(depth) || 0)
-  // A box stands one step back, under its folder's glyph: the row's caret column is empty anyway.
-  $: indent = isPickable && !flag(flat) ? Math.max(0, level - 1) : level
+  $: toggles = isFolder && !flag(noToggle)
   $: hasLead = lead !== "" && lead !== undefined && lead !== null
 
-  const caret = (event: MouseEvent) => {
-    if (!isFolder) return
+  const glyph = (event: MouseEvent) => {
+    if (!toggles) return
     event.stopPropagation()
     $emit("toggle", event)
   }
@@ -98,8 +95,6 @@
      :class.playing="flag(playing)"
      :class.current="flag(current)"
      :class.muted="flag(muted)"
-     :class.flat="flag(flat)"
-     :class.caret-only="flag(caretOnly)"
      :class.two="!!sub"
      :class.numbered="isPickable && hasLead"
      :id="rowId || null"
@@ -108,13 +103,10 @@
      :aria-expanded="isFolder ? String(flag(expanded)) : null"
      :aria-selected="String(flag(chosen))"
      :tabindex="flag(focusable) ? 0 : -1"
-     :style="`--depth: ${indent}`"
+     :style="`--depth: ${level}`"
      @click="$emit('select', $event)"
      @dblclick="$emit('activate', $event)">
-  <span :if="!flag(flat)" class="caret" @click="caret($event)">
-    <svg :if="isFolder" viewBox="0 0 8 8" aria-hidden="true"><path d="M2 1l4 3-4 3z" fill="currentColor" /></svg>
-  </span>
-  <span class="icon" :class.pick="isPickable" @click="flag(caretOnly) || caret($event)">
+  <span class="icon" :class.pick="isPickable" :class.toggle="toggles" @click="glyph($event)">
     <svg :if="isFolder && flag(expanded)" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 13V3.5h4.2l1.4 1.6h5.4v2.2M1.5 13l2.1-5.7h11.1L12.6 13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
     <svg :elseif="isFolder" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4.2l1.4 1.6h7.4v8.4h-13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
     <span :elseif="isPickable" class="box"><SelectBox :chosen="flag(chosen)" @pick="$emit('pick', $event.detail)" /></span>
@@ -133,23 +125,23 @@
 <style scoped>
   .row {
     display: grid;
-    grid-template-columns: .875rem 1.125rem minmax(0, 1fr) auto;
+    grid-template-columns: 1.125rem minmax(0, 1fr) auto;
     /* The action slot (as wide as its keys) and the cue, when there are, in the same row. */
     grid-auto-columns: auto;
     grid-auto-flow: column;
     align-items: center;
     gap: var(--mm-space-2);
     min-height: 1.75rem;
-    padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + var(--depth) * .875rem);
+    /* Each level one step in from the one that holds it. */
+    padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + var(--depth) * 1rem);
     border-left: .1875rem solid transparent;
     color: var(--mm-fg);
     font: var(--mm-text-sm) / var(--mm-leading-tight) var(--mm-font-sans);
     cursor: pointer;
     user-select: none;
   }
-  .row.flat { grid-template-columns: 1.125rem minmax(0, 1fr) auto; }
   /* A folder ends in its keys (a small square key's glyph sits .5rem in from its edge): the room
-     to the right of its last glyph matches the room to the left of its caret (1.125rem). */
+     to the right of its last glyph is about the room to the left of its own. */
   .row.folder { padding-right: calc(1.125rem - .5rem); }
   @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row:active { background: var(--mm-sunken); }
@@ -159,21 +151,17 @@
   .row.muted .label, .row.muted .meta { color: var(--mm-fg-subtle); font-style: italic; }
   .row.current:not([aria-selected="true"]) { background: var(--mm-hover); box-shadow: inset 0 0 0 1px var(--mm-border-strong); }
 
-  .caret { position: relative; display: grid; place-items: center; align-self: stretch; color: var(--mm-fg-subtle); }
-  /* A folder opens from its caret, its glyph, or anywhere between them and
-     the row's left edge: the 8px triangle alone takes too much aim. */
-  .folder .caret::before {
+  /* A folder opens and closes from its glyph, or anywhere between it and the row's left edge:
+     the glyph alone takes too much aim. */
+  .folder .icon { align-self: stretch; }
+  .icon.toggle { position: relative; cursor: pointer; }
+  .icon.toggle::before {
     content: "";
     position: absolute;
-    inset: 0 calc(-1 * var(--mm-space-2)) 0 calc(-1 * (var(--mm-space-3) + var(--depth) * .875rem));
+    inset: 0 calc(-1 * var(--mm-space-1)) 0 calc(-1 * (var(--mm-space-3) + var(--depth) * 1rem));
   }
-  .folder .caret, .folder .icon { cursor: pointer; }
-  .caret-only.folder .icon { cursor: inherit; }
   /* The ink, near black in Silver; black itself would vanish in Graphite. */
-  @media (hover: hover) { .folder .caret:hover { color: var(--mm-fg); } }
-  .folder .icon { align-self: stretch; }
-  .caret svg { width: .5rem; height: .5rem; transition: transform var(--mm-duration) var(--mm-ease); }
-  .row[aria-expanded="true"] .caret svg { transform: rotate(90deg); }
+  @media (hover: hover) { .icon.toggle:hover { color: var(--mm-fg); } }
   .icon { display: grid; place-items: center; color: var(--mm-fg-muted); }
   .icon svg { width: 1rem; height: 1rem; }
   .label { display: grid; min-width: 0; }

@@ -22,25 +22,26 @@
   const { rescanRoot } = await import("../lib/roots")
   const {
     activeRoot,
+    enterLevel,
     followRow,
+    leaveLevel,
     navigateTree,
     playFromTree,
     selectTrack,
     setCurrentRow,
     setView,
     toggleFolder,
+    treeLevels,
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; inView?: string; missing?: boolean }
+  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; playlist?: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; inView?: string; missing?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
   const rowDomId = (rowKey: string): string => `tree-row-${rowKey.replace(/[^\w-]/g, "_")}`
   const root = () => activeRoot.value.data
   const rows = () => treeRows.value.data
-  // No folders in the list: the rows need no caret's column.
-  const flat = (): boolean => !rows().some((row) => row.kind === "album")
   const isLoading = (): boolean => !!root()?.loadingMetadata
   const playingId = (): string | null => {
     const playing = nowPlaying.value
@@ -76,9 +77,12 @@
   // becomes the current row. The second click of a double click is not
   // another one, or a double click would play and then pause. A track's box
   // selects it. A folder's ❯ key shows it in the album sheet and brings that
-  // panel into view on a phone (`ui.pane`).
-  // A phone (the panes one at a time): a folder's row, but for its caret and its ⋮, opens it in
-  // Details, and its ❯ key is not needed.
+  // panel into view on a phone (`ui.pane`). A folder's glyph opens and closes it (there is no
+  // caret).
+  // A phone (the panes one at a time) lists no nesting: one level at a time (lib/workspace.ts,
+  // `treeLevels`). The open folders are stacked at the top, from the first one down, and under
+  // them only what the last one holds. A folder's row enters it; an open one's row leaves it (and
+  // the ones under it); its ❯ key opens it in Details.
   const PHONE = matchMedia("(max-width: 720px)")
   let phone: boolean = PHONE.matches
   const onPhone = (event: MediaQueryListEvent) => {
@@ -86,15 +90,21 @@
   }
   PHONE.addEventListener("change", onPhone)
   $destroyed(() => PHONE.removeEventListener("change", onPhone))
+  // What is listed: a computer's tree, or a phone's level; and, on a phone, the open levels above it.
+  const listed = (): Row[] => (phone ? treeLevels.value.data.rows : rows())
+  const levels = (): Row[] => (phone ? treeLevels.value.data.open : [])
 
   const open = (row: Row, event: MouseEvent) => {
     if (event?.detail > 1) return
+    if (phone && row.kind === "album") {
+      enterLevel(row.key)
+      return
+    }
     // A computer: the tree follows the click (a folder opens, and closes again as the current row
-    // leaves it, unless its caret opened it).
+    // leaves it, unless its glyph opened it).
     if (phone) setCurrentRow(row.key)
     else followRow(row.key)
     if (row.kind === "track" && row.trackId) playFromTree(row.key)
-    else if (row.kind === "album" && phone) ui.pane = "details"
   }
   const pick = (row: Row, event: MouseEvent) => {
     if (!row.trackId) return
@@ -107,7 +117,7 @@
   }
 
   const onKey = (event: KeyboardEvent) => {
-    if (!navigateTree(event.key, event.shiftKey)) return
+    if (!navigateTree(event.key, event.shiftKey, phone)) return
     event.preventDefault()
     requestAnimationFrame(() => {
       const id = activeId()
@@ -156,10 +166,31 @@
 
   <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
-    <ListRow :each="row in rows()"
+    <!-- A phone: the open levels, stacked from the first one down; a tap on one leaves it. -->
+    <div :if="levels().length > 0" class="levels">
+      <ListRow :each="row in levels()"
+               :key="row.key"
+               kind="folder"
+               :label="rowLabel(row)"
+               :meta="rowMeta(row)"
+               expanded
+               no-toggle
+               :row-id="rowDomId(row.key)"
+               @select="leaveLevel(row.key)">
+        <template :slot.action>
+          <span class="row-keys" @click.stop="null">
+            <Key square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
+              <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
+            </Key>
+            <Menu :label="t('menu.folder', { title: rowLabel(row) })" :items="rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
+          </span>
+        </template>
+      </ListRow>
+    </div>
+    <ListRow :each="row in listed()"
              :key="row.key"
              :kind="row.kind === 'album' ? 'folder' : 'item'"
-             :depth="row.depth"
+             :depth="phone ? 0 : row.depth"
              :label="rowLabel(row)"
              :lead="rowLead(row)"
              :meta="rowMeta(row)"
@@ -173,14 +204,13 @@
              :selectable="row.kind === 'track' && !!row.trackId"
              :playable="row.kind === 'track' && !!row.trackId"
              :muted="!!row.missing"
-             :flat="flat()"
-             :caret-only="phone"
+             :no-toggle="phone"
              @select="open(row, $event.detail)"
              @pick="pick(row, $event.detail)"
              @toggle="toggleFolder(row.album)">
       <template :slot.action>
         <span class="row-keys" @click.stop="null">
-          <Key :if="row.kind === 'album' && !phone" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
+          <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
           <Menu :if="row.kind === 'album' || row.trackId || row.playlist" :label="t(row.kind === 'album' ? 'menu.folder' : 'menu.track', { title: rowLabel(row) })" :items="rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
@@ -228,6 +258,17 @@
 
   .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }
   .tree { padding-block: var(--mm-space-2); outline: none; }
+  /* A phone's open levels: they stay under the head while the level's list scrolls. */
+  .levels {
+    position: sticky;
+    /* The head's height, its border in it. */
+    top: 2.75rem;
+    z-index: 1;
+    /* Against the head: the tree's own room above its rows is the levels'. */
+    margin: calc(-1 * var(--mm-space-2)) 0 var(--mm-space-1);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-sunken);
+  }
   .tree:focus-visible { box-shadow: inset 0 0 0 2px var(--mm-accent); }
   .row-keys { display: flex; align-items: center; gap: var(--mm-space-1); }
 </style>

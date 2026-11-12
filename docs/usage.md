@@ -135,22 +135,27 @@ proxy is refused.
 
 ## The library
 
-The left panel lists the active root's folders and tracks. A click on a folder's triangle or
-its folder glyph opens or closes it (an open folder draws an open folder). Choosing a folder shows
+The left panel lists the active root's folders and tracks. A click on a folder's glyph opens or
+closes it (an open folder draws an open folder). Choosing a folder shows
 what it holds on the right, and choosing a track shows its folder. Until you choose one, the right panel shows the whole root.
 
 A click on a track plays it (its folder, from that track): on a computer, a ▶ at the end of the
 row shows when the pointer is over it, and the track playing shows moving bars there. Each folder
 has a ❯ key at its end (on a computer, it shows when the pointer is over the row) that shows the
 folder on the right; on a phone, it also takes you to the **Details** panel. The box at the left
-of each track selects it (see [Selecting tracks](#selecting-tracks)).
+of each track selects it (see [Selecting tracks](#selecting-tracks)); on a computer the box shows
+when the pointer is over the row (a track's number sits there otherwise), and stays on the
+tracks selected.
 
 With the keyboard, the arrows move through the tree and open and close folders, **Enter** plays
 the row you are on (on a folder, from its first track), and **Space** selects or deselects the
 track you are on.
 
 On a phone, the two panels take turns: swipe between them, or use the **Library** and **Details**
-keys at the top right.
+keys at the top right. The library there lists one level at a time, with no nesting: tap a folder
+(or an artist, an album) and the list is what it holds, with the folders you came through stacked
+above it, the first at the top; tap one of those to go back out of it. A folder's ❯ shows it in
+**Details**.
 
 ### Views
 
