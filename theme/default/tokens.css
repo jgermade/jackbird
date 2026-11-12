@@ -243,11 +243,16 @@
 }
 
 /* Phones: the root font size follows the viewport's width, and with it
-   every size in rem. 4vw is 16px on a 400px-wide screen, the size the
-   theme is drawn at; a 360px phone gets 14.4px and a 430px one 17.2px. */
-:root { --mm-root-phone: 4vw; }
+   every size in rem. 4.5vw is 18px on a 400px-wide screen, a little over
+   the 16px the theme is drawn at, for fingers; a 360px phone gets 16.2px
+   and a 430px one 19.35px. */
+:root { --mm-root-phone: 4.5vw; }
 @media (max-width: 480px) {
   html { font-size: var(--mm-root-phone); }
+}
+/* Tablets and other touch screens wider than a phone: 18px, for fingers too. */
+@media (pointer: coarse) and (min-width: 481px) {
+  html { font-size: 18px; }
 }
 
 /* Once, here, instead of a media query in every component: every transition

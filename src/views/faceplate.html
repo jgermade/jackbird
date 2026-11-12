@@ -34,9 +34,8 @@
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   $: current = nowPlaying.value
-  // Above 640px the display shows the spectrum, moving while the music plays
-  // (from 901 to 1024px it takes the wordmark's room; to 900px the display has a row of its own).
-  // At 640px and below, three bands of it take the state glyph's place while the music plays.
+  // While the music plays, the spectrum takes the logo's place at the display's left: 16 bands
+  // above 640px, 6 below.
   const WIDE = matchMedia("(min-width: 641px)")
   let wide: boolean = WIDE.matches
   const onWidth = (event: MediaQueryListEvent) => {
@@ -87,20 +86,31 @@
     <div class="screen">
       <Display live>
         <div class="lcd">
-          <span class="lcd-logo" aria-hidden="true" :style="`--logo: url(${logoUrl})`"></span>
-          <span class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="16" :active="wide && playback.playing" /></span>
+          <!-- The logo, lit; while the music plays, the spectrum in its place. -->
+          <span class="lcd-mark" aria-hidden="true">
+            <span :if="playback.playing" class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
+            <span :else class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
+          </span>
           <div class="lcd-main">
-            <div class="mm-display-row">
-              <span class="now">
-                <span :if="!wide && playback.playing" class="mini-spectrum" aria-hidden="true"><Spectrum :source="readSpectrum" :bands="3" :active="!wide && playback.playing" /></span>
-                <span :else class="state" aria-hidden="true">{{ stateGlyph }}</span>
-                <span class="visually-hidden">{{ stateLabel }}</span>
-                <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
-              </span>
-              <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
-              <Counter>{{ formatTime(playback.position) }}</Counter>
+            <div class="lcd-lines">
+              <!-- Two lines: the state and the title, then the artist (and what reaches the device). -->
+              <div class="lcd-text">
+                <span class="now">
+                  <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
+                  <span class="visually-hidden">{{ stateLabel }}</span>
+                  <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+                </span>
+                <span class="now">
+                  <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
+                  <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
+                </span>
+              </div>
+              <!-- The time on two lines too: where it is, and how long the song is. -->
+              <div class="lcd-time">
+                <Counter :size="wide ? 'lg' : 'sm'">{{ formatTime(playback.position) }}</Counter>
+                <Counter size="sm">{{ formatTime(playback.duration) }}</Counter>
+              </div>
             </div>
-            <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
             <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
           </div>
         </div>
@@ -169,7 +179,6 @@
   /* What reaches the device in the native output (E5): "24/96 bit-perfect", before the time. */
   .route {
     flex: none;
-    margin-left: auto;
     padding-right: var(--mm-space-2);
     font-family: var(--mm-font-label);
     font-size: var(--mm-text-xs);
@@ -188,8 +197,6 @@
     letter-spacing: -.1em;
     text-align: center;
   }
-  /* Three bands of the spectrum, in the glyph's place, on phones while the music plays. */
-  .mini-spectrum { display: inline-block; flex: none; align-self: center; width: 1.1em; height: .95em; }
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -199,13 +206,13 @@
     white-space: nowrap;
   }
 
-  /* The logo, lit in the display's own ink (its shape as a mask). */
+  /* The display's left: the logo, lit in the display's own ink (its shape as a mask), or the spectrum while the music plays. */
+  .lcd-mark { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; align-self: center; }
+  .lcd-spectrum { display: block; width: 100%; height: 100%; }
   .lcd-logo {
     display: block;
-    flex: none;
-    width: 2.75rem;
-    height: 2.75rem;
-    align-self: center;
+    width: 100%;
+    height: 100%;
     background: currentColor;
     -webkit-mask: var(--logo) center / contain no-repeat;
     mask: var(--logo) center / contain no-repeat;
@@ -231,10 +238,15 @@
      From 901 to 1024px the wordmark goes, so the display keeps its room. */
   .lcd { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--mm-space-3); min-width: 0; }
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
-  .lcd-spectrum { display: none; }
+  .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
+  .lcd-text { display: grid; flex: 1 1 auto; gap: var(--mm-space-1); min-width: 0; }
+  .lcd-time { display: grid; flex: none; justify-items: end; gap: var(--mm-space-1); }
   @media (min-width: 641px) {
-    .lcd { grid-template-columns: auto 7rem minmax(0, 1fr); }
-    .lcd-spectrum { display: block; }
+    .lcd-mark { width: 7rem; }
+  }
+  /* Phones: a smaller mark, and the time's two lines at the same size (lcd-time), so the title keeps its room. */
+  @media (max-width: 640px) {
+    .lcd-mark { width: 2.5rem; height: 2.5rem; }
   }
   @media (min-width: 901px) and (max-width: 1024px) {
     .wordmark { display: none; }
@@ -260,8 +272,7 @@
       padding: var(--mm-space-2) var(--mm-space-3);
     }
     .wordmark { display: none; }
-    .lcd-logo { width: 2.25rem; height: 2.25rem; }
-  }
+    }
   /* Phones: the keys go to the footer and the panel selector takes their place;
      once a root is open, adding another is an option of the root picker, and
      the selection's key is its count. */
