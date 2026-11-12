@@ -270,14 +270,13 @@
         <Field :label="t('rename.pattern')" control="rename-pattern">
           <TextInput id="rename-pattern" :model="renamer.pattern" @input="setRenamePattern($event.detail)" />
         </Field>
-        <div class="rename-side">
-          <Field :label="t('rename.presets')" control="rename-preset">
-            <Select id="rename-preset" :model="presetValue()" :options="presetOptions()" @change="pickPreset($event.detail)" />
-          </Field>
-          <Checkbox id="rename-diff" :model="diffShown" @change="diffShown = $event.detail">{{ t("rename.diff") }}</Checkbox>
-        </div>
+        <Field :label="t('rename.presets')" control="rename-preset">
+          <Select id="rename-preset" :model="presetValue()" :options="presetOptions()" @change="pickPreset($event.detail)" />
+        </Field>
+        <!-- Under the pattern, its fields; under the templates, the diff's checkbox: one line. -->
+        <p class="hint mono">{{ t("rename.fields", { fields: fieldList() }) }}</p>
+        <span class="rename-diff"><Checkbox id="rename-diff" :model="diffShown" @change="diffShown = $event.detail">{{ t("rename.diff") }}</Checkbox></span>
       </div>
-      <p class="hint mono">{{ t("rename.fields", { fields: fieldList() }) }}</p>
       <p :if="reading()" class="failure" role="status">{{ t("rename.loading") }}</p>
       <p :if="library.errorMessage" class="failure" role="alert">{{ library.errorMessage }}</p>
       <div class="mm-table-wrap">
@@ -388,10 +387,11 @@
   /* Rename */
   .rename { display: grid; gap: var(--mm-space-3); }
   .rename-head { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--mm-space-3); }
-  .rename-side { display: grid; gap: var(--mm-space-2); align-content: start; }
-  /* The diff: what goes struck through in the error's ink, what comes highlighted in the signal's. */
+  .rename-head .hint { align-self: center; }
+  .rename-diff { display: flex; align-items: center; }
+  /* The diff: what goes struck through in the error's ink, what comes highlighted in the good ink. */
   .preview .removed { border-radius: 2px; background: var(--mm-bad-soft); color: var(--mm-bad); text-decoration: line-through; }
-  .preview .added { border-radius: 2px; background: var(--mm-accent-soft); color: var(--mm-accent-ink); }
+  .preview .added { border-radius: 2px; background: var(--mm-ok-soft); color: var(--mm-ok); }
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); overflow-wrap: anywhere; }
   .preview td { overflow-wrap: anywhere; }
   .preview .state { width: 1%; white-space: nowrap; text-align: right; }
