@@ -328,9 +328,9 @@ h1 em {
 
 .phone { display: grid; grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); align-items: center; gap: 4rem; }
 .phone img {
-  /* A thin bezel, the corners of a phone's screen rather than a pebble's. */
-  border: .25rem solid #0d0e0f;
-  border-radius: 1.25rem;
+  /* A hairline bezel, the corners of a phone's screen rather than a pebble's. */
+  border: 1px solid #0d0e0f;
+  border-radius: .75rem;
   box-shadow: var(--mm-shadow-lg), 0 0 0 1px var(--mm-border-strong);
   transform: rotate(-4deg);
 }
