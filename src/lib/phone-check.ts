@@ -27,7 +27,7 @@ export function phoneCheck(): PhoneCheck | null {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Plays a URL a few seconds, muted; how far it got. */
-async function play(url: string): Promise<{ played: number; error?: string }> {
+async function play(url: string): Promise<{ played: number; error?: string; firstError?: string }> {
   const audio = new Audio();
   // As the player's element: asked for with CORS, the instance answers the app's origin.
   audio.crossOrigin = "anonymous";
@@ -88,7 +88,15 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
     const flac = tracks.find((track) => track.path.toLowerCase().endsWith(".flac"));
     if (flac) {
       const media = await within("open the media", source.openMedia(flac.path));
-      report.played = { path: flac.path, ...(await play(media.url)) };
+      // Once more on a new element if it did not play: a simulator's media request can stall and be
+      // aborted with no media error (seen on iOS, 2026-11-12), which says nothing of the app.
+      let played = await play(media.url);
+      if (played.error || !(played.played > 0)) {
+        beacon(config, "played-retry", played);
+        const again = await within("open the media again", source.openMedia(flac.path));
+        played = { ...(await play(again.url)), ...(played.error ? { firstError: played.error } : {}) };
+      }
+      report.played = { path: flac.path, ...played };
       beacon(config, "played", report.played);
     }
     if (config.deviceFolder) {
