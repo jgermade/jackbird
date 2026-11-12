@@ -323,7 +323,7 @@ export const en = {
   "output.way.mixer": "via mixer",
   "output.phoneAbout": "How this phone plays: its own player, which goes on with the screen off.",
   "output.bitPerfect": "Bit-perfect to a USB DAC",
-  "output.bitPerfectHint": "With a USB DAC connected, each song goes to it untouched, at its own rate and depth: the system's sounds are not mixed in meanwhile, and the volume is the DAC's. A song the DAC cannot take as it is plays through Android's mixer. From the next song.",
+  "output.bitPerfectHint": "With a USB DAC connected, each song goes to it untouched, at its own rate and depth: the system's sounds are not mixed in meanwhile, and the volume is the DAC's. A song the DAC cannot take as it is plays through Android's mixer.",
   "output.bitPerfectOld": "Bit-perfect output needs Android 14 or later.",
   "output.usb": "USB DAC: {device}",
   "output.noUsb": "No USB DAC connected.",
