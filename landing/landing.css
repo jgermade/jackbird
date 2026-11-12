@@ -210,7 +210,7 @@ h1 em {
 /* The desktop app in a little perspective, turned towards the page's middle, and the compact
    player in front of it over its bottom left corner, as two windows on a desk. */
 .stage { position: relative; width: 100%; padding: 0 0 1.5rem 0; perspective: 160rem; }
-.stage .window { transform: rotateY(-9deg) rotateX(4deg); transform-origin: 70% 50%; transition: transform .8s cubic-bezier(.2, .7, .2, 1); }
+.stage .window { transform: rotateY(var(--tilt-y, -9deg)) rotateX(var(--tilt-x, 4deg)); transform-origin: 70% 50%; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
 .mini {
   position: absolute;
   left: 4.5rem;
@@ -225,10 +225,35 @@ h1 em {
   transition: transform .8s cubic-bezier(.2, .7, .2, 1);
 }
 .mini img { display: block; width: 100%; height: auto; }
-@media (hover: hover) {
-  .stage:hover .window { transform: rotateY(-3deg) rotateX(1deg); }
-  .stage:hover .mini { transform: rotateY(-1deg) translateZ(4rem) translateY(-.5rem); }
+/* The app itself, once asked for: an iframe over the stage, the screenshots kept under it for its
+   size. The key that asks for it, over the window's middle; computers only. */
+.stage .live { position: absolute; inset: -1.5rem -1.5rem 0; width: calc(100% + 3rem); height: calc(100% + 1.5rem); border: 0; background: transparent; }
+.stage.live-on .window, .stage.live-on .mini { visibility: hidden; }
+.live-key { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); box-shadow: var(--mm-key-shadow-signal), 0 1rem 2rem rgba(0, 0, 0, .25); }
+.stage.live-on .live-key { display: none; }
+@media (max-width: 900px) { .live-key { display: none; } }
+/* The invitation to the demo, when the embedded app is asked for a folder. */
+.invite {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  gap: var(--mm-space-3);
+  width: min(26rem, 90%);
+  padding: var(--mm-space-5);
+  transform: translate(-50%, -50%);
+  border: var(--mm-border-width) solid var(--mm-border-strong);
+  border-radius: var(--mm-radius-lg);
+  background: var(--mm-surface);
+  box-shadow: var(--mm-shadow-lg);
 }
+.invite[hidden] { display: none; }
+.invite p { grid-column: 1 / -1; margin: 0; color: var(--mm-fg-muted); }
+.invite strong { color: var(--mm-fg); }
+
 /* Narrow screens: flat, the compact player under the window's corner, smaller. */
 @media (max-width: 640px) {
   .stage { padding-bottom: 2.5rem; }
@@ -327,6 +352,8 @@ h1 em {
 .glyph { flex: none; width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .tab, .download .label, .way h3 { display: inline-flex; align-items: center; gap: .6em; }
 .download .label .glyph { width: 1.5rem; height: 1.5rem; color: var(--mm-fg); }
+/* The systems' own logos (Simple Icons, CC0; Windows' four panes drawn here): filled, not stroked. */
+.glyph.logo { fill: currentColor; stroke: none; }
 
 /* Get it: two tabs, the downloads (this device's first, larger) and the server. */
 .tabs { display: flex; gap: var(--mm-space-2); margin-bottom: var(--mm-space-5); }

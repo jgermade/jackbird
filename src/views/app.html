@@ -38,6 +38,24 @@
     document.body.style.margin = "0"
     document.body.style.perspective = "160rem"
     document.body.style.overflow = "hidden"
+    // The window turns to face the pointer (as the landing page's screenshots do), and back to rest
+    // when it leaves. Smoothed by the window's transition.
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches
+    const tilt = (x: number | null, y: number | null) => {
+      const app = document.querySelector<HTMLElement>(".app.embed")
+      if (!app) return
+      if (x === null || y === null) {
+        app.style.removeProperty("--tilt-x")
+        app.style.removeProperty("--tilt-y")
+        return
+      }
+      app.style.setProperty("--tilt-x", `${((0.5 - y) * 8).toFixed(2)}deg`)
+      app.style.setProperty("--tilt-y", `${((x - 0.5) * 14 - 4).toFixed(2)}deg`)
+    }
+    if (!still) {
+      document.addEventListener("pointermove", (event) => tilt(event.clientX / innerWidth, event.clientY / innerHeight))
+      document.documentElement.addEventListener("pointerleave", () => tilt(null, null))
+    }
   }
   $: small = compact.mode === "window" || compact.mode === "page"
 
@@ -108,8 +126,9 @@
     border-radius: var(--mm-radius-lg);
     background: var(--mm-chassis);
     box-shadow: var(--mm-shadow-lg);
-    transform: rotateY(-9deg) rotateX(4deg);
+    transform: rotateY(var(--tilt-y, -9deg)) rotateX(var(--tilt-x, 4deg));
     transform-origin: 70% 50%;
+    transition: transform .5s cubic-bezier(.2, .7, .2, 1);
   }
   .window-bar { display: flex; flex: none; gap: .4rem; padding: .6rem .9rem; border-bottom: var(--mm-border-width) solid var(--mm-border); background: var(--mm-chassis); }
   .window-bar span { width: .65rem; height: .65rem; border-radius: 50%; }

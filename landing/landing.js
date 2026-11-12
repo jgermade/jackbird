@@ -19,6 +19,7 @@ toneKey.addEventListener("click", () => {
   root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
   try { localStorage.setItem(KEY, root.dataset.theme); } catch {}
   showTone();
+  tellTone();
 });
 
 // ---- the tab's icon -----------------------------------------------------------------------
@@ -72,6 +73,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) =>
   if (!saved) {
     root.dataset.theme = event.matches ? "dark" : "light";
     showTone();
+    tellTone();
   }
 });
 
@@ -154,3 +156,56 @@ fetch("https://api.github.com/repos/jgermade/jackbird/releases/latest", { header
 for (const img of document.querySelectorAll(".mini img")) {
   img.addEventListener("error", () => img.closest(".mini")?.remove(), { once: true });
 }
+
+// ---- the stage: the window's tilt, and the app itself -------------------------------------------
+
+const stage = document.querySelector(".stage");
+
+/** The tilt for a pointer at (x, y), each 0 to 1 across the stage: the window turns to face it. */
+function tiltFor(x, y) {
+  return { x: `${((0.5 - y) * 8).toFixed(2)}deg`, y: `${((x - 0.5) * 14 - 4).toFixed(2)}deg` };
+}
+
+if (stage && matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  stage.addEventListener("pointermove", (event) => {
+    const box = stage.getBoundingClientRect();
+    const tilt = tiltFor((event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
+    stage.style.setProperty("--tilt-x", tilt.x);
+    stage.style.setProperty("--tilt-y", tilt.y);
+  });
+  // Off the stage, back to rest (the stylesheet's).
+  stage.addEventListener("pointerleave", () => {
+    stage.style.removeProperty("--tilt-x");
+    stage.style.removeProperty("--tilt-y");
+  });
+}
+
+let live = null;
+
+/** The landing page's tone, to the embedded app. */
+function tellTone() {
+  live?.contentWindow?.postMessage({ type: "jackbird:tone", tone: root.dataset.theme === "dark" ? "dark" : "light" }, location.origin);
+}
+
+stage?.querySelector(".live-key")?.addEventListener("click", () => {
+  if (live) return;
+  live = document.createElement("iframe");
+  live.className = "live";
+  live.title = "jackbird, playing the sample music";
+  live.allow = "autoplay";
+  live.src = `./demo/?embed&lang=en&tone=${root.dataset.theme === "dark" ? "dark" : "light"}`;
+  stage.append(live);
+  stage.classList.add("live-on");
+  live.focus();
+});
+
+// The embedded app asked for a folder: the demo is where one opens.
+const invite = stage?.querySelector(".invite");
+window.addEventListener("message", (event) => {
+  if (event.origin !== location.origin || event.data?.type !== "jackbird:demo" || !invite) return;
+  invite.hidden = false;
+  invite.querySelector("a")?.focus();
+});
+invite?.querySelector("[data-close]")?.addEventListener("click", () => {
+  invite.hidden = true;
+});
