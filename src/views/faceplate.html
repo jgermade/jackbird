@@ -2,7 +2,7 @@
   // The app's top bar as a Deck faceplate: the wordmark, the display (the logo lit in it, the title
   // and the artist on two lines, the meter), the keys
   // (DeckKeys: transport, back to the list playing, preferences; on phones
-  // they go to the footer, and a key beside the display turns between the library and the
+  // they go to the footer, and a key at the roots' bar's right turns between the library and the
   // details), and the open roots as
   // tabs (a dropdown on phones) with the folder key and, while tracks are
   // selected, the selection's key: it opens the selection's dialog on Edit. A view: it reads the
@@ -67,6 +67,9 @@
   // Two lines: the title (or what went wrong, or that nothing plays), and the artist under it.
   $: titleLine = playback.error || (current ? current.title : t("faceplate.idle"))
   $: artistLine = playback.error ? "" : (current?.artist ?? "")
+  // The position split for the display's two lines: minutes (at least two digits), then seconds.
+  $: minutes = String(Math.floor(Math.max(0, playback.position) / 60)).padStart(2, "0")
+  $: seconds = String(Math.floor(Math.max(0, playback.position) % 60)).padStart(2, "0")
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
 
   $: tabs = library.roots.map((root) => ({
@@ -105,10 +108,10 @@
                   <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
                 </span>
               </div>
-              <!-- The time on two lines too: where it is, and how long the song is. -->
-              <div class="lcd-time">
-                <Counter :size="wide ? 'lg' : 'sm'">{{ formatTime(playback.position) }}</Counter>
-                <Counter size="sm">{{ formatTime(playback.duration) }}</Counter>
+              <!-- Where the song is, on two lines too: its minutes, and under them its seconds. -->
+              <div class="lcd-time" :aria-label="positionText">
+                <Counter>{{ minutes }}</Counter>
+                <Counter>{{ seconds }}</Counter>
               </div>
             </div>
             <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
@@ -118,10 +121,6 @@
     </div>
 
     <div class="controls"><DeckKeys place="header" /></div>
-    <div class="pane-pick">
-      <Key size="sm" :label="ui.pane === 'library' ? t('panels.details') : t('library.title')"
-           @click="pickPane(ui.pane === 'library' ? 'details' : 'library')">{{ ui.pane === "library" ? t("panels.details") : t("library.title") }}</Key>
-    </div>
   </div>
 
   <Tabs :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
@@ -146,6 +145,15 @@
         </Key>
         <Key size="sm" variant="ghost" square :label="t('actions.clearSelection')" :title="t('actions.clearSelection')" @click="clearSelection()">
           <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+        </Key>
+      </span>
+      <!-- Phones: the key that turns between the library and the details, at the bar's right. -->
+      <span class="pane-pick">
+        <Key size="sm" square :label="ui.pane === 'library' ? t('panels.details') : t('library.title')" :title="ui.pane === 'library' ? t('panels.details') : t('library.title')"
+             @click="pickPane(ui.pane === 'library' ? 'details' : 'library')">
+          <!-- The details: a sheet; the library: a list. -->
+          <svg :if="ui.pane === 'library'" class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="1.75" width="10" height="12.5" rx="1" /><path d="M5.5 5.25h5M5.5 8h5M5.5 10.75h3" /></svg>
+          <svg :else class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M6 4h8M6 8h8M6 12h8" /><circle cx="2.75" cy="4" r=".9" fill="currentColor" stroke="none" /><circle cx="2.75" cy="8" r=".9" fill="currentColor" stroke="none" /><circle cx="2.75" cy="12" r=".9" fill="currentColor" stroke="none" /></svg>
         </Key>
       </span>
     </template>
@@ -174,7 +182,7 @@
   .screen { grid-area: screen; min-width: 0; }
   .controls { grid-area: controls; display: flex; align-items: center; }
   /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
-  .pane-pick { grid-area: controls; display: none; justify-self: end; }
+  .pane-pick { display: none; }
 
   /* What reaches the device in the native output (E5): "24/96 bit-perfect", before the time. */
   .route {
@@ -240,11 +248,11 @@
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
   .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
   .lcd-text { display: grid; flex: 1 1 auto; gap: var(--mm-space-1); min-width: 0; }
-  .lcd-time { display: grid; flex: none; justify-items: end; gap: var(--mm-space-1); }
+  .lcd-time { display: grid; flex: none; justify-items: end; gap: 0; line-height: 1; }
   @media (min-width: 641px) {
     .lcd-mark { width: 7rem; }
   }
-  /* Phones: a smaller mark, and the time's two lines at the same size (lcd-time), so the title keeps its room. */
+  /* Phones: a smaller mark, so the title keeps its room. */
   @media (max-width: 640px) {
     .lcd-mark { width: 2.5rem; height: 2.5rem; }
   }
@@ -273,12 +281,12 @@
     }
     .wordmark { display: none; }
     }
-  /* Phones: the keys go to the footer and the panel selector takes their place;
+  /* Phones: the keys go to the footer, and the panes' key goes to the roots' bar;
      once a root is open, adding another is an option of the root picker, and
      the selection's key is its count. */
   @media (max-width: 720px) {
-    /* One row: the display, and the key that turns between the panes at its right. */
-    .deck { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "screen controls"; }
+    /* One row: the display alone (the key that turns between the panes is in the roots' bar). */
+    .deck { grid-template-columns: minmax(0, 1fr); grid-template-areas: "screen"; }
     .brand-mark { display: none; }
     .controls { display: none; }
     .pane-pick { display: flex; }
