@@ -114,8 +114,12 @@
     : t("faceplate.state.stopped")
   $: stateGlyph = playback.error ? "■" : playback.playing || playback.loading ? "▶" : current ? "❚❚" : "■"
   // Two lines: the title (or what went wrong, or that nothing plays), and the artist under it.
-  $: titleLine = playback.error || (current ? current.title : t("faceplate.idle"))
-  $: artistLine = playback.error ? "" : (current?.artist ?? "")
+  // While the display's left shows the DAC, its two lines say which one and how the music reaches
+  // it, in place of the song's title and artist.
+  $: dacName = markView === "dac" ? (soundingDevice()?.device ?? "") : ""
+  $: dacWay = markView === "dac" ? (soundingDevice()?.route ?? "") : ""
+  $: titleLine = dacName || playback.error || (current ? current.title : t("faceplate.idle"))
+  $: artistLine = dacName ? dacWay : playback.error ? "" : (current?.artist ?? "")
   // The clock at the display's right, turned with a click or a tap: where the song is (its minutes
   // over its seconds), its length (the same), or both (where it is over its length, each mm:ss).
   // The minutes' zeros at the left are dimmed: "03" shows its 3 lit, "00" nothing lit.
@@ -165,12 +169,11 @@
               </span>
               <span :if="markParts()?.route" class="quality route">{{ markParts()?.route }}</span>
             </span>
-            <!-- The DAC: its mark, its name, the depth and rate it runs at, and how faithful the way is. -->
+            <!-- The DAC: its mark and the depth and rate it runs at; its name and the way take the title's
+                 and the artist's lines meanwhile. -->
             <span :elseif="markView === 'dac' && soundingDevice()" class="lcd-format">
               <span class="icons"><DisplayIcon filled>DAC</DisplayIcon></span>
-              <span class="quality device">{{ soundingDevice()?.device }}</span>
               <span :if="soundingDevice()?.quality" class="quality"><span :each="part in soundingDevice()?.quality.split(' · ') ?? []">{{ part }}</span></span>
-              <span :if="soundingDevice()?.route" class="quality route">{{ soundingDevice()?.route }}</span>
             </span>
             <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
           </button>
@@ -358,8 +361,6 @@
   /* The quality keeps its units' case ("kHz", "kbps"); the route is a printed label. */
   .lcd-format .quality:not(.route) { display: grid; justify-items: center; text-transform: none; letter-spacing: .02em; }
   .lcd-format .route { opacity: .6; }
-  /* The DAC's name, as long as the window lets it be. */
-  .lcd-format .quality.device { display: block; width: 100%; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; text-transform: none; letter-spacing: .02em; }
   .quality-line { display: flex; align-items: center; gap: .35em; }
   /* The VBR mark, small beside the figure it qualifies (the icon is sized in em). */
   .vbr { display: inline-flex; font-size: .62em; }
