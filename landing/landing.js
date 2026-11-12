@@ -76,3 +76,75 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) =>
 });
 
 showTone();
+
+// ---- get it: the tabs ---------------------------------------------------------------------
+
+const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+
+function showTab(tab) {
+  for (const one of tabs) {
+    const on = one === tab;
+    one.setAttribute("aria-selected", String(on));
+    one.tabIndex = on ? 0 : -1;
+    document.getElementById(one.getAttribute("aria-controls")).hidden = !on;
+  }
+}
+
+for (const tab of tabs) {
+  tab.addEventListener("click", () => showTab(tab));
+  // Left and right move between the tabs, as a tab list does.
+  tab.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const next = tabs[(tabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+    showTab(next);
+    next.focus();
+    event.preventDefault();
+  });
+}
+if (location.hash === "#server") showTab(tabs[1]);
+
+// ---- get it: this device's download, and the latest release's files -------------------------
+
+/** The system this browser runs on, as the downloads name it; null where there is no app for it. */
+function thisSystem() {
+  const agent = navigator.userAgent;
+  if (/Android/i.test(agent)) return "android";
+  if (/iPhone|iPad|iPod/i.test(agent)) return null;
+  // An iPad asks for the desktop site as a Mac: its touch gives it away.
+  if (/Macintosh|Mac OS X/i.test(agent)) return navigator.maxTouchPoints > 1 ? null : "mac";
+  if (/Windows/i.test(agent)) return "windows";
+  if (/Linux|X11|CrOS/i.test(agent)) return "linux";
+  return null;
+}
+
+const megabytes = (bytes) => `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+
+// This device's first: its first download (an AppImage before a .deb), the whole first row.
+const system = thisSystem();
+const downloads = document.querySelector(".downloads");
+const mine = system && downloads?.querySelector(`.download[data-os="${system}"]`);
+if (mine) {
+  mine.classList.add("mine");
+  mine.dataset.action = "Download";
+  downloads.prepend(mine);
+}
+
+// The latest release's files, by name: each link to its file, with its size; on any failure the
+// links stay on the release's page.
+fetch("https://api.github.com/repos/jgermade/jackbird/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+  .then((response) => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
+  .then((release) => {
+    const assets = release.assets ?? [];
+    for (const link of document.querySelectorAll("[data-asset]")) {
+      const pattern = new RegExp(link.dataset.asset);
+      const asset = assets.find((one) => pattern.test(one.name));
+      if (!asset) continue;
+      link.href = asset.browser_download_url;
+      const file = link.querySelector(".file");
+      if (file) file.textContent = `${file.textContent} · ${megabytes(asset.size)}`;
+      if (link === mine) mine.dataset.action = `Download · ${megabytes(asset.size)}`;
+    }
+    const version = document.querySelector(".release");
+    if (version && release.tag_name) version.textContent = `jackbird ${release.tag_name}.`;
+  })
+  .catch(() => {});

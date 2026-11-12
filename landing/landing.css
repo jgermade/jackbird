@@ -311,27 +311,110 @@ h1 em {
 
 /* ---- platforms ------------------------------------------------------------------------------ */
 
-.bays { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--mm-space-4); }
-.bay {
+/* Get it: two tabs, the downloads (this device's first, larger) and the server. */
+.tabs { display: flex; gap: var(--mm-space-2); margin-bottom: var(--mm-space-5); }
+.tab {
+  min-height: 2.5rem;
+  padding: 0 var(--mm-space-5);
+  border: var(--mm-border-width) solid var(--mm-border-strong);
+  border-radius: var(--mm-radius-key);
+  background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+  box-shadow: var(--mm-key-shadow);
+  color: var(--mm-fg);
+  font: 700 var(--mm-text-sm) / 1 var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.tab[aria-selected="true"] { transform: translateY(1px); background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); color: var(--mm-accent-ink); }
+.tab:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+.panel[hidden] { display: none; }
+
+.downloads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--mm-space-4); }
+.download {
   display: grid;
   align-content: start;
   gap: var(--mm-space-2);
-  padding: var(--mm-space-6) var(--mm-space-5);
+  padding: var(--mm-space-5);
   border: var(--mm-border-width) solid var(--mm-border-strong);
-  border-radius: var(--mm-radius-md);
+  border-radius: var(--mm-radius-lg);
   background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
   box-shadow: var(--mm-key-shadow);
+  color: var(--mm-fg);
   text-decoration: none;
-  transition: transform .08s;
 }
-.bay strong { font-family: var(--mm-font-label); font-stretch: var(--mm-stretch-heading); font-size: var(--mm-text-lg); }
-.bay span:last-child { color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
-.bay:active { transform: translateY(1px); background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
-.bay:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+.download strong { font-family: var(--mm-font-label); font-stretch: var(--mm-stretch-heading); font-size: var(--mm-text-lg); }
+.download .file { color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+.download:active { transform: translateY(1px); background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
+.download:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+/* This device's: the whole first row, the signal's colour, a key that says so. */
+.download.mine {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--mm-space-5);
+  padding: var(--mm-space-6);
+  border-color: var(--mm-accent);
+}
+.download.mine > * { grid-column: 1; }
+.download.mine strong { font-size: clamp(1.4rem, 2.6vw, 2rem); }
+.download.mine::after {
+  content: attr(data-action);
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  padding: var(--mm-space-3) var(--mm-space-6);
+  border-radius: var(--mm-radius-key);
+  background: var(--mm-accent);
+  box-shadow: var(--mm-key-shadow-signal);
+  color: var(--mm-on-accent-key, #fff);
+  font: 700 var(--mm-text-md) / 1.2 var(--mm-font-label);
+  font-stretch: var(--mm-stretch-label);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 @media (hover: hover) {
-  .bay:hover { border-color: var(--mm-accent); }
-  .bay:hover strong { color: var(--mm-accent-ink); }
+  .download:hover { border-color: var(--mm-accent); }
+  .download:hover strong { color: var(--mm-accent-ink); }
 }
+.note { margin: var(--mm-space-4) 0 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+
+.lead { max-width: 46rem; margin: 0 0 var(--mm-space-5); color: var(--mm-fg-muted); }
+.ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--mm-space-4); }
+.way {
+  display: grid;
+  align-content: start;
+  gap: var(--mm-space-3);
+  min-width: 0;
+  padding: var(--mm-space-5);
+  border: var(--mm-border-width) solid var(--mm-border);
+  border-radius: var(--mm-radius-lg);
+  background: var(--mm-surface);
+}
+.way h3 { margin: 0; font-family: var(--mm-font-label); font-stretch: var(--mm-stretch-heading); font-size: var(--mm-text-lg); }
+.way p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+.way pre {
+  margin: 0;
+  padding: var(--mm-space-3);
+  overflow-x: auto;
+  border-radius: var(--mm-radius-md);
+  background: var(--mm-sunken);
+  font: var(--mm-text-xs) / 1.5 var(--mm-font-mono);
+}
+.way code { font-family: var(--mm-font-mono); font-size: .92em; overflow-wrap: anywhere; }
+.way pre code { overflow-wrap: normal; }
+.files { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+.file-link {
+  padding: var(--mm-space-1) var(--mm-space-3);
+  border: var(--mm-border-width) solid var(--mm-border-strong);
+  border-radius: var(--mm-radius-full);
+  color: var(--mm-fg);
+  font-size: var(--mm-text-xs);
+  text-decoration: none;
+}
+@media (hover: hover) { .file-link:hover { border-color: var(--mm-accent); color: var(--mm-accent-ink); } }
+
 
 /* ---- footer --------------------------------------------------------------------------------- */
 
@@ -350,13 +433,15 @@ h1 em {
   .pitch > * { grid-column: 1 !important; grid-row: auto !important; }
   .pitch > .lede { margin-top: var(--mm-space-6); }
   .modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .downloads, .ways { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   main { gap: 4.5rem; padding-top: 2.5rem; }
   .nav { display: none; }
   .tone { margin-left: auto; }
-  .modules, .bays { grid-template-columns: minmax(0, 1fr); }
+  .modules, .downloads, .ways { grid-template-columns: minmax(0, 1fr); }
+  .download.mine { grid-template-columns: minmax(0, 1fr); }
+  .download.mine::after { grid-column: 1; grid-row: auto; justify-self: start; margin-top: var(--mm-space-3); }
   .phone { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2.5rem; }
   .phone img { max-width: 14rem; }
 }
