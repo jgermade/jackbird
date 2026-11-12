@@ -243,6 +243,7 @@ export const es: Record<MessageKey, string> = {
   "message.readFailed.one": "No se pudo leer {count} archivo de {name}.",
   "message.readFailed.other": "No se pudieron leer {count} archivos de {name}.",
   "message.resyncing": "Resincronizando root {name}...",
+  "library.rescan": "Volver a escanear la carpeta",
   "message.playNext.one": "«{title}» suena a continuación.",
   "message.playNext.other": "{count} pistas suenan a continuación.",
   "message.queued.one": "«{title}» añadida a la cola.",

@@ -10,10 +10,12 @@
   playable = false,
   current = false,
   muted = false,
+  flat = false,
   rowId = '',
   lead = '',
   label = '',
-  meta = ''
+  meta = '',
+  sub = ''
 }: Props" lang="ts">
   // One row of the library tree: a folder or a track. It is a `treeitem`;
   // the tree around it owns focus and the arrow keys, which reach it as
@@ -37,7 +39,9 @@
   // own state and ignores on a component tag). `current` marks the row the
   // keyboard is on, apart from the selection, and `rowId` is its id for the
   // tree's `aria-activedescendant`. `muted` dims a row that stands for
-  // something missing. `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (before the cue),
+  // something missing. `flat` drops the caret's column, for a list with no
+  // folders in it (the column is kept so items line up with folders). `sub` is
+  // a second line under the label, smaller and lighter (a track's artist). `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (before the cue),
   // shown on hover, on the current, chosen and playing rows, and always where
   // there is no hover (a touch screen); give it `@click.stop` so it does not
   // also select the row.
@@ -57,6 +61,8 @@
     playable?: boolean | ""
     current?: boolean | ""
     muted?: boolean | ""
+    flat?: boolean | ""
+    sub?: string
     rowId?: string
     lead?: string | number
     label?: string
@@ -84,6 +90,8 @@
      :class.playing="flag(playing)"
      :class.current="flag(current)"
      :class.muted="flag(muted)"
+     :class.flat="flag(flat)"
+     :class.two="!!sub"
      :id="rowId || null"
      role="treeitem"
      :aria-level="level + 1"
@@ -93,7 +101,7 @@
      :style="`--depth: ${level}`"
      @click="$emit('select', $event)"
      @dblclick="$emit('activate', $event)">
-  <span class="caret" @click="caret($event)">
+  <span :if="!flag(flat)" class="caret" @click="caret($event)">
     <svg :if="isFolder" viewBox="0 0 8 8" aria-hidden="true"><path d="M2 1l4 3-4 3z" fill="currentColor" /></svg>
   </span>
   <span class="icon" @click="caret($event)">
@@ -102,7 +110,7 @@
     <SelectBox :elseif="isPickable" :chosen="flag(chosen)" @pick="$emit('pick', $event.detail)" />
     <svg :else viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
   </span>
-  <span class="label"><span :if="lead !== '' && lead !== undefined && lead !== null" class="lead">{{ lead }}</span>{{ label }}</span>
+  <span class="label"><span class="title"><span :if="lead !== '' && lead !== undefined && lead !== null" class="lead">{{ lead }}</span>{{ label }}</span><span :if="sub" class="sub">{{ sub }}</span></span>
   <span class="end"><span class="meta">{{ meta }}</span></span>
   <span :if="$slots.action" class="action"><slot.action /></span>
   <span :if="isCued" class="cue" aria-hidden="true">
@@ -128,6 +136,7 @@
     cursor: pointer;
     user-select: none;
   }
+  .row.flat { grid-template-columns: 1.125rem minmax(0, 1fr) auto; }
   @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row:active { background: var(--mm-sunken); }
   .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
@@ -152,7 +161,11 @@
   .row[aria-expanded="true"] .caret svg { transform: rotate(90deg); }
   .icon { display: grid; place-items: center; color: var(--mm-fg-muted); }
   .icon svg { width: 1rem; height: 1rem; }
-  .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .label { display: grid; min-width: 0; }
+  .two .label { gap: .0625rem; padding-block: var(--mm-space-1); }
+  .title, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The second line: smaller and lighter than the label, in the subtle ink. */
+  .sub { font-size: var(--mm-text-xs); font-weight: var(--mm-weight-light); line-height: var(--mm-leading-tight); color: var(--mm-fg-muted); }
   .lead { display: inline-block; min-width: 1.5em; margin-right: var(--mm-space-2); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .action { display: flex; align-items: center; min-width: 1.5rem; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
   .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }

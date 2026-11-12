@@ -20,6 +20,7 @@
   const { ui } = await import("../lib/ui")
   const { nowPlaying } = await import("../lib/player")
   const { onRowMenu, rowMenu } = await import("../lib/menus")
+  const { rescanRoot } = await import("../lib/roots")
   const {
     activeRoot,
     navigateTree,
@@ -38,6 +39,8 @@
   const rowDomId = (rowKey: string): string => `tree-row-${rowKey.replace(/[^\w-]/g, "_")}`
   const root = () => activeRoot.value.data
   const rows = () => treeRows.value.data
+  // No folders in the list: the rows need no caret's column.
+  const flat = (): boolean => !rows().some((row) => row.kind === "album")
   const isLoading = (): boolean => !!root()?.loadingMetadata
   const playingId = (): string | null => {
     const playing = nowPlaying.value
@@ -51,7 +54,9 @@
 
   // The views, as keys in the head: the open one is down.
   const view = (): string => root()?.view ?? "files"
-  const rowMeta = (row: Row): string => (row.meta ?? (row.kind === "track" ? row.artist : "") ?? "")
+  // A track's artist goes under its title (`sub`), not at the row's end.
+  const rowSub = (row: Row): string => (row.kind === "track" && row.trackId ? (row.artist ?? "") : "")
+  const rowMeta = (row: Row): string => (rowSub(row) && row.meta === row.artist ? "" : (row.meta ?? ""))
   const emptyText = (): string => {
     if (isLoading()) return t("tree.loadingLibrary")
     if (view() === "playlists") return t("views.empty.playlists")
@@ -122,6 +127,10 @@
         <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" stroke="none" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" stroke="none" /></svg>
       </Key>
     </div>
+    <!-- At the head's right: the folder scanned again (new, changed and removed files). -->
+    <div class="rescan"><Key square size="sm" variant="ghost" :label="t('library.rescan')" :title="t('library.rescan')" :disabled="isLoading()" @click="rescanRoot(root().id)">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.25 8A5.25 5.25 0 1 1 11.7 4.3" /><path d="M12.25 1.75v2.9h-2.9" /></svg>
+    </Key></div>
   </header>
 
   <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
@@ -144,6 +153,7 @@
              :label="rowLabel(row)"
              :lead="rowLead(row)"
              :meta="rowMeta(row)"
+             :sub="rowSub(row)"
              :expanded="!!row.expanded"
              :chosen="isChosen(row)"
              :current="isCurrent(row)"
@@ -153,6 +163,7 @@
              :selectable="row.kind === 'track' && !!row.trackId"
              :playable="row.kind === 'track' && !!row.trackId"
              :muted="!!row.missing"
+             :flat="flat()"
              @select="open(row, $event.detail)"
              @pick="pick(row, $event.detail)"
              @toggle="toggleFolder(row.album)">
@@ -184,6 +195,8 @@
     background: var(--mm-surface);
   }
   .views { display: flex; flex-wrap: wrap; align-items: center; gap: .125rem; }
+  /* The rescan key, alone at the head's right. */
+  .rescan { display: flex; margin-left: auto; }
   .icon { width: .875rem; height: .875rem; }
 
   .messages { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-3) var(--mm-space-4) 0; }

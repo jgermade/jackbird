@@ -145,6 +145,7 @@
   --mm-text-display-sm: 1.0625rem;
   --mm-text-display-md: 1.5rem;
   --mm-text-display-lg: 1.875rem;
+  --mm-weight-light: 300;
   --mm-weight-regular: 400;
   --mm-weight-medium: 500;
   --mm-weight-bold: 600;
@@ -256,18 +257,24 @@
 }
 
 /* Phones: the root font size follows the viewport's width, and with it
-   every size in rem. 4.5vw is 18px on a 400px-wide screen, a little over
-   the 16px the theme is drawn at, for fingers; a 360px phone gets 16.2px
-   and a 430px one 19.35px. */
+   every size in rem, so the whole interface scales linearly with the screen,
+   as far as the phone's layout goes (720px, where the keys go to the footer).
+   4.5vw is 18px on a 400px-wide screen, a little over the 16px the theme is
+   drawn at, for fingers; a 360px phone gets 16.2px and a 430px one 19.35px. */
 :root { --mm-root-phone: 4.5vw; }
-@media (max-width: 480px) {
+@media (max-width: 720px) {
   html { font-size: var(--mm-root-phone); }
 }
 /* Wider than a phone, a desktop as a tablet: 18px, rows and keys as easy to hit with a
    pointer as with a finger. */
-@media (min-width: 481px) {
+@media (min-width: 721px) {
   html { font-size: 18px; }
 }
+/* The compact player (its window, the floating one, or the page turned compact): the root
+   follows the window's width and its height, the lesser, so the card scales as a picture does
+   and always fits. 4.5vw and 9vh are 18px in its 396 × 198 window. */
+:root { --mm-root-compact: min(4.5vw, 9vh); }
+html[data-mm-compact] { font-size: var(--mm-root-compact); }
 
 /* Once, here, instead of a media query in every component: every transition
    and animation a component writes takes its time from these. The looping

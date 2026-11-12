@@ -248,6 +248,8 @@ async function floatOpen(): Promise<void> {
   const home = { parent: slot.parentNode as Node, next: slot.nextSibling };
   pip.document.title = document.title;
   const stopStyles = mirrorStyles(pip.document);
+  // Its root's size follows its own size, as the compact window's does (tokens.css).
+  pip.document.documentElement.setAttribute("data-mm-compact", "");
   pip.document.body.style.margin = "0";
   pip.document.body.append(slot);
   slot.hidden = false;

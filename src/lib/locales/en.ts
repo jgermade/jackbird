@@ -242,6 +242,7 @@ export const en = {
   "message.readFailed.one": "{count} file in {name} could not be read.",
   "message.readFailed.other": "{count} files in {name} could not be read.",
   "message.resyncing": "Resyncing root {name}…",
+  "library.rescan": "Scan the folder again",
   "message.playNext.one": "“{title}” plays next.",
   "message.playNext.other": "{count} tracks play next.",
   "message.queued.one": "“{title}” added to the queue.",

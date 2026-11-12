@@ -352,6 +352,23 @@ export function refreshRoot(rootId: string): Promise<void> {
   return resyncRootIfNeeded(rootId);
 }
 
+/**
+ * Scans a root again, whatever changed: walks its folder and reads the tags of new and changed
+ * files (the library's rescan key). Nothing while it is still being read.
+ */
+export async function rescanRoot(rootId: string): Promise<void> {
+  const root = $toRaw(library).roots.find((item) => item.id === rootId);
+  if (!root || root.loadingMetadata) return;
+  library.errorMessage = null;
+  library.infoMessage = null;
+  await hydrateRoot(root.source, {
+    rootId: root.id,
+    rootLabel: root.label,
+    groupingMode: root.groupingMode,
+    setActive: false
+  });
+}
+
 async function resyncRootIfNeeded(rootId: string): Promise<void> {
   const root = $toRaw(library).roots.find((item) => item.id === rootId);
   if (!root || root.loadingMetadata) {

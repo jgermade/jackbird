@@ -25,6 +25,12 @@
   const { compact } = await import("../lib/compact")
   $: small = compact.mode === "window" || compact.mode === "page"
 
+  // While the window or the page is compact, the root's size follows the window (tokens.css).
+  const scaled = (on: boolean) => {
+    document.documentElement.toggleAttribute("data-mm-compact", on)
+  }
+  $: scaled(small)
+
   const title = (text: string) => {
     document.title = text
   }
