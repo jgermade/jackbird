@@ -1,7 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window: Tauri's core. jackbird's own commands are its own (src/lib.rs), and reach only the folders the person opened.",
+  "description": "The main window: Tauri's core, and the window calls of the compact mode (src/lib/compact.ts). jackbird's own commands are its own (src/lib.rs), and reach only the folders the person opened.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-size",
+    "core:window:allow-set-min-size",
+    "core:window:allow-set-position",
+    "core:window:allow-set-decorations",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-start-dragging",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize"
+  ]
 }

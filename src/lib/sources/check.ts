@@ -3,7 +3,7 @@
 // source the app uses, inspects every track, saves a title into one of them
 // and reads it back, plays one MP3 and one FLAC for a few seconds through a
 // Web Audio analyser and a 24/96 FLAC through the native player (E5), then opens the folder in the library as a person would
-// (so the session keeps it), and reports what it found as JSON; then the app
+// (so the session keeps it), turns the window compact and back (C2), and reports what it found as JSON; then the app
 // quits. Started again with JACKBIRD_CHECK_RESTORE, it reports what the
 // session reopened. Nothing happens otherwise. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md.
 
@@ -78,6 +78,49 @@ async function playNative(root: string, path: string): Promise<NativeReport> {
   return report;
 }
 
+type WindowShape = { width: number; height: number; outerWidth: number; outerHeight: number; decorated: boolean; onTop: boolean; workHeight: number | null };
+
+/**
+ * The compact mode's window (C2): turned compact and back, through the app's own actions; the
+ * window's logical size, its decorations and "on top" before, while compact, and after.
+ */
+async function checkCompact(): Promise<Record<string, unknown>> {
+  const { compact, enterCompact, leaveCompact } = await import("../compact");
+  const { currentMonitor, getCurrentWindow } = await import("@tauri-apps/api/window");
+  const win = getCurrentWindow();
+  // The inside, the whole window's height, and the screen's work area's height (a window cannot be
+  // made taller than it), all in logical pixels.
+  const shape = async (): Promise<WindowShape> => {
+    const [size, outer, scale, decorated, onTop, monitor] = await Promise.all([
+      win.innerSize(),
+      win.outerSize(),
+      win.scaleFactor(),
+      win.isDecorated(),
+      win.isAlwaysOnTop(),
+      currentMonitor().catch(() => null)
+    ]);
+    const work = monitor?.workArea?.size;
+    return {
+      width: Math.round(size.width / scale),
+      height: Math.round(size.height / scale),
+      // X with no window manager (the Linux runner) reports no frame: the inside is the whole window.
+      outerWidth: Math.round((outer.width > 0 ? outer.width : size.width) / scale),
+      outerHeight: Math.round((outer.height > 0 ? outer.height : size.height) / scale),
+      decorated,
+      onTop,
+      workHeight: work ? Math.round(work.height / scale) : null
+    };
+  };
+  const before = await shape();
+  await enterCompact();
+  await wait(800);
+  const during = { ...(await shape()), mode: compact.mode, drawn: Boolean(document.querySelector("section.compact")) };
+  await leaveCompact();
+  await wait(800);
+  const after = { ...(await shape()), mode: compact.mode };
+  return { before, during, after };
+}
+
 /** Waits until the library has its roots loaded (or 20 s). */
 async function settled(): Promise<void> {
   for (let step = 0; step < 200; step += 1) {
@@ -136,6 +179,7 @@ export async function runCheckIfAsked(): Promise<void> {
     await hydrateRoot(source, {});
     await settled();
     report.library = holding();
+    report.compact = await checkCompact().catch((error: unknown) => ({ error: String(error) }));
     await wait(1500);
   } catch (error) {
     report.error = error instanceof Error ? `${error.name}: ${error.message}` : String(error);

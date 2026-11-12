@@ -81,13 +81,18 @@ const fail = (why) => {
     await page.goto(base);
 
     // Open the folder through the service's dialog: home, then Music.
-    await page.getByRole("button", { name: /^(Open library|Add a folder|Add to the library)$/ }).first().click();
+    await page.getByRole("button", { name: /^(Open library|Add a folder|Add to the library|Choose a folder( of .+)?…)$/ }).first().click();
     await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
     await page.getByText("Before").first().waitFor({ timeout: 30000 });
-    const tracks = await page.evaluate(() => document.body.innerText.match(/(\d+) tracks/)?.[1]);
+    // The open root's tab counts its tracks ("12/26" while their tags load, then "26").
+    const counted = await page.waitForFunction(() => {
+      const meta = document.querySelector('[role="tab"][aria-selected="true"] .meta')?.textContent?.trim() ?? "";
+      return /^\d+$/.test(meta) ? meta : null;
+    }, null, { timeout: 30000 });
+    const tracks = await counted.jsonValue();
     console.log("opened: the library shows", tracks, "tracks");
-    if (Number(tracks) < 26) fail(`the library shows ${tracks} tracks`);
+    if (!(Number(tracks) >= 26)) fail(`the library shows ${tracks} tracks`);
 
     // Save a title through the edit dialog.
     await page.getByRole("button", { name: "More for Before" }).first().click();

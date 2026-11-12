@@ -266,6 +266,89 @@ fn save_gives_the_engines_bytes_in_place_or_beside() {
     );
 }
 
+/// `save_open`, as a phone's folders save (E6b-D9): the same bytes as `save` gives, in place in
+/// the file handed over or in the one beside it, and a refusal that changes nothing.
+#[test]
+fn save_open_gives_what_save_gives() {
+    let edits = [
+        Edit {
+            title: Some("New title".into()),
+            ..Edit::default()
+        },
+        Edit {
+            cover: CoverEdit::Set(cover()),
+            ..Edit::default()
+        },
+        Edit {
+            cover: CoverEdit::Remove,
+            ..Edit::default()
+        },
+    ];
+    let (mut in_place, mut beside_count) = (0, 0);
+    for edit in &edits {
+        let (folder, _) = fixture_root();
+        for case in cases() {
+            let path = folder.join(&case.file);
+            let source = fs::read(&path).unwrap();
+            let expected = jackbird_tags::write(&source, edit);
+            let next = folder.join(format!("{}.new", case.file));
+            let file = fs::OpenOptions::new().read(true).write(true).open(&path).unwrap();
+            let made = || {
+                fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create_new(true)
+                    .open(&next)
+                    .map_err(crate::root::io(&case.file))
+            };
+            match save_open(file, &case.file, edit, made) {
+                Ok(Saved::Done(after)) => {
+                    let saved = fs::read(&path).unwrap();
+                    assert_eq!(Ok(saved.clone()), expected, "{}: {edit:?}", case.name);
+                    assert_eq!(after.full_checksum, sha1_hex(&saved), "{}", case.name);
+                    assert_eq!(after.audio_checksum, case.region_sha1, "{}", case.name);
+                    assert!(!next.exists(), "{}: nothing beside", case.name);
+                    if saved != source {
+                        in_place += 1;
+                    }
+                }
+                Ok(Saved::Beside(after)) => {
+                    assert_eq!(
+                        fs::read(&path).unwrap(),
+                        source,
+                        "{}: the old file is left whole",
+                        case.name
+                    );
+                    let saved = fs::read(&next).unwrap();
+                    assert_eq!(Ok(saved.clone()), expected, "{}: {edit:?}", case.name);
+                    assert_eq!(after.full_checksum, sha1_hex(&saved), "{}", case.name);
+                    assert_eq!(after.audio_checksum, case.region_sha1, "{}", case.name);
+                    assert_eq!(after.stat.size, saved.len() as u64, "{}", case.name);
+                    beside_count += 1;
+                }
+                Err(error) => {
+                    assert_eq!(
+                        Err(error.code()),
+                        expected.map_err(|error| error.code()).map(|_| ""),
+                        "{}",
+                        case.name
+                    );
+                    assert_eq!(
+                        fs::read(&path).unwrap(),
+                        source,
+                        "{}: a refused save changes nothing",
+                        case.name
+                    );
+                }
+            }
+        }
+    }
+    assert!(
+        in_place > 0 && beside_count > 0,
+        "both routes taken: {in_place} in place, {beside_count} beside"
+    );
+}
+
 #[test]
 fn a_refused_save_says_why_by_code() {
     let (folder, root) = fixture_root();

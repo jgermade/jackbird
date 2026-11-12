@@ -2,22 +2,25 @@
 // the app that folder alone. It is kept by its `content://` address. Its files are reached through
 // the app's plugin by their paths in the folder (crates/player, Folders.kt); their tags and
 // checksums are worked out by Rust (`phone_inspect`) on the file the plugin opens for it, streamed, so no
-// song's bytes cross to the page. The player plays each file by its `content://` address. Saving
-// tags waits for E6b-D9's second part. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md
-// (2026-11-11 23:33 and after).
+// song's bytes cross to the page. Saving tags is Rust's too (`phone_save`): in place when they fit,
+// else into a file beside, checked, that the plugin puts in the old one's place (E6b-D9's second
+// part). Renames and playlists go through the plugin's own commands. The player plays each file by
+// its `content://` address. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-11 23:33
+// and after).
 
 import type { VFSAdapter, VFSListEntry, VFSStat, WalkedFile } from "@cloudauthn/vfs-sync";
 import { invoke } from "@tauri-apps/api/core";
 import type { Inspection, MediaHandle, RootSource } from "../../types";
-import { t } from "../i18n";
 import { TagError } from "../tags";
 
 const PLUGIN = "plugin:jackbird-player";
+/** The app's own commands (src-tauri), not the plugin's. */
+const APP_COMMANDS = new Set(["phone_inspect", "phone_save"]);
 
 /** Calls one of the plugin's folder commands (or the app's); its failure becomes a TagError, so the interface says why. */
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
-    return await invoke<T>(command.includes("|") || command === "phone_inspect" ? command : `${PLUGIN}|${command}`, args);
+    return await invoke<T>(command.includes("|") || APP_COMMANDS.has(command) ? command : `${PLUGIN}|${command}`, args);
   } catch (error) {
     const failure = (typeof error === "object" && error ? error : { message: String(error) }) as { code?: string; message?: string };
     throw new TagError(failure.code ?? "io", failure.message ?? String(error));
@@ -69,9 +72,7 @@ function phoneSource(tree: string, name: string): RootSource {
     saved: tree,
     walk: async () => (await call<{ files: WalkedFile[] }>("folder_walk", { tree })).files,
     inspect: (path, known) => call<InspectionJson>("phone_inspect", { tree, path, known: known ?? null }),
-    save: async () => {
-      throw new TagError("unsupported", t("sources.phoneSaveSoon"));
-    },
+    save: (path, previous, metadata) => call<InspectionJson>("phone_save", { tree, path, previous, metadata }),
     async openMedia(path): Promise<MediaHandle> {
       const { address } = await call<{ address: string }>("folder_address", { tree, path });
       const before = await vfs.stat(path);

@@ -5,6 +5,9 @@
   // "Add to the library…" (its sources, E6b-D11), and, when a server is spoken to, the folder chooser, people and
   // sign-in, and the way in (S3), and adding music to the library (F1). The page's title follows the language. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
+  // In the compact mode (lib/compact.ts) the compact player takes the faceplate's and the
+  // workspace's place in the window or the page; floating (Picture-in-Picture), it is drawn in the
+  // slot, which lib/compact.ts moves into the floating window, and the page stays as it is.
 
   const Faceplate = await import("./faceplate.html")
   const Workspace = await import("./workspace.html")
@@ -17,7 +20,10 @@
   const SourcesDialog = await import("./sources-dialog.html")
   const PeopleDialog = await import("./people-dialog.html")
   const ImportDialog = await import("./import-dialog.html")
+  const Compact = await import("./compact.html")
   const { t } = await import("../lib/i18n")
+  const { compact } = await import("../lib/compact")
+  $: small = compact.mode === "window" || compact.mode === "page"
 
   const title = (text: string) => {
     document.title = text
@@ -25,9 +31,12 @@
   $: title(t("app.name"))
 </script>
 
-<main class="app">
-  <div class="top"><Faceplate /></div>
-  <div class="body"><Workspace /></div>
+<main class="app" :class.small="small">
+  <div :if="small" class="body"><Compact /></div>
+  <!-- Hidden, not dropped, while compact: the library keeps its place and its scroll. -->
+  <div class="top" :class.gone="small"><Faceplate /></div>
+  <div class="body" :class.gone="small"><Workspace /></div>
+  <div id="compact-slot" class="slot" hidden><Compact :if="compact.mode === 'pip'" /></div>
   <SelectionDialog />
   <QueueDialog />
   <PlaylistDialog />
@@ -53,4 +62,7 @@
   /* Under a phone's status bar and selfie camera: the chassis goes on behind them, the faceplate starts below. */
   .top { flex: none; position: relative; z-index: 1; padding-top: var(--mm-safe-top, env(safe-area-inset-top, 0px)); background: var(--mm-chassis); }
   .body { flex: 1 1 auto; min-height: 0; }
+  /* The floating window's body: the compact player, the window's whole height. */
+  .slot { height: 100vh; }
+  .slot[hidden], .gone { display: none; }
 </style>
