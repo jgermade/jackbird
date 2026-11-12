@@ -205,10 +205,12 @@ export async function setCompactList(on: boolean): Promise<void> {
   saved.list = on;
   save();
   if (compact.mode === "window") {
-    const { win, LogicalSize } = await windowApi();
-    const [inner, factor] = await Promise.all([win.innerSize(), win.scaleFactor()]);
-    const width = inner.width / factor;
-    await win.setSize(new LogicalSize(width, compactHeightFor(width, on)));
+    // It grows (and shrinks) downwards, its top left corner where it is: placeAndSize() keeps the
+    // place, which a plain resize does not on macOS (it sizes a window from its bottom edge).
+    const { win } = await windowApi();
+    const [bounds, factor] = await Promise.all([boundsOf(), win.scaleFactor()]);
+    const height = Math.round(compactHeightFor(bounds.width / factor, on) * factor);
+    await placeAndSize(bounds, bounds.width, height);
   } else if (compact.mode === "pip" && floating) {
     const { pip } = floating;
     pip.document.documentElement.setAttribute("data-mm-compact", compactMarker(on));
