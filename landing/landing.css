@@ -251,7 +251,7 @@ h1 em {
 .window-bar span:nth-child(2) { background: var(--mm-stripe-2); }
 .window-bar span:nth-child(3) { background: var(--mm-stripe-1); }
 :root[data-theme="dark"] .only-light, :root:not([data-theme="dark"]) .only-dark { display: none; }
-.caption { margin: 0; font-size: var(--mm-text-sm); color: var(--mm-fg-muted); text-align: center; }
+.caption { margin: var(--mm-space-5) 0 0; font-size: var(--mm-text-sm); color: var(--mm-fg-muted); text-align: center; }
 .caption span { display: block; font-size: var(--mm-text-xs); color: var(--mm-fg-subtle); }
 
 /* ---- features ------------------------------------------------------------------------------ */
