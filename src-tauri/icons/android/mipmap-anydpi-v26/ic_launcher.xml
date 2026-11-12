@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher icon: the bird inside the safe zone, on the chassis' dark; and in one colour for
+     Android 13's themed icons (scripts/android-icons.py). -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-  <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
   <background android:drawable="@color/ic_launcher_background"/>
+  <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+  <monochrome android:drawable="@mipmap/ic_launcher_monochrome"/>
 </adaptive-icon>
