@@ -135,17 +135,16 @@
                   :title="soundingText()" @click="mark.toggle()">
             <span :if="markView === 'format' && markParts()" class="lcd-format">
               <!-- The codec: FLAC in the heavy lower case of its own lettering, MP3 by its mark (lit in the
-                   display's ink, as the logo is), any other as an icon of the display's own; and a VBR
-                   badge beside it when the bitrate varies. -->
+                   display's ink, as the logo is), any other as an icon of the display's own. -->
               <span class="icons">
                 <span :if="markParts()?.format === 'FLAC'" class="codec-flac">flac</span>
                 <span :elseif="markParts()?.format === 'MP3'" class="codec-mark" role="img" aria-label="MP3" :style="`--codec: url(${mp3Url})`"></span>
                 <DisplayIcon :else>{{ markParts()?.format }}</DisplayIcon>
-                <DisplayIcon :if="markParts()?.vbr">VBR</DisplayIcon>
               </span>
-              <!-- Its parts one under the other: "24 bit" over "96 kHz". -->
+              <!-- Its parts one under the other: "24 bit" over "96 kHz"; a varying bitrate marked VBR, lit
+                   solid, before it. -->
               <span :if="markParts()?.quality" class="quality">
-                <span :each="part in markParts()?.quality.split(' · ') ?? []">{{ part }}</span>
+                <span :each="(part, at) in markParts()?.quality.split(' · ') ?? []" class="quality-line"><DisplayIcon :if="at === 0 && markParts()?.vbr" filled>VBR</DisplayIcon>{{ part }}</span>
               </span>
               <span :if="markParts()?.route" class="quality route">{{ markParts()?.route }}</span>
             </span>
@@ -332,6 +331,8 @@
   /* The quality keeps its units' case ("kHz", "kbps"); the route is a printed label. */
   .lcd-format .quality:not(.route) { display: grid; justify-items: center; text-transform: none; letter-spacing: .02em; }
   .lcd-format .route { opacity: .6; }
+  .quality-line { display: flex; align-items: center; gap: .35em; }
+  .quality-line > :first-child:not(:only-child) { font-size: .8em; }
   .lcd-logo {
     display: block;
     width: 100%;
