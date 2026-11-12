@@ -84,6 +84,7 @@
   .pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .pick:focus-within { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
   @media (hover: hover) { .pick:hover:not(.disabled) { background: var(--mm-hover); } }
+  .pick:active:not(.disabled) { background: var(--mm-sunken); }
   .pick.disabled { opacity: .45; cursor: default; }
   .progress { display: grid; gap: var(--mm-space-1); font-size: var(--mm-text-sm); color: var(--mm-fg-muted); }
   .progress progress { width: 100%; }

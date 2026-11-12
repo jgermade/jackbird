@@ -1,6 +1,6 @@
 <script :setup lang="ts">
   // The library pane: the active root's folders and tracks as a tree (or as
-  // one of its views), with its head (the view keys and the track count),
+  // one of its views), with its head (the view keys),
   // its messages and the scan meter. Each row's ⋮ is its menu (lib/menus.ts).
   // A view over lib/workspace.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5) and
@@ -14,7 +14,7 @@
   const Reel = await import("../../theme/default/components/reel.html")
 
   const { formatTrackNumber } = await import("../helpers/format")
-  const { t, tn } = await import("../lib/i18n")
+  const { t } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { ui } = await import("../lib/ui")
@@ -120,7 +120,6 @@
         <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" stroke="none" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" stroke="none" /></svg>
       </Key>
     </div>
-    <span class="count" :title="tn('tracks.count', root().tracks.length)">{{ root().tracks.length }}</span>
   </header>
 
   <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
@@ -169,7 +168,7 @@
 
 <style scoped>
   .library { display: flex; flex-direction: column; color: var(--mm-fg); }
-  /* The view keys from the left, flat on the head, the open one down; the track count after them. */
+  /* The view keys from the left, flat on the head, the open one down. */
   .head {
     position: sticky;
     top: 0;
@@ -183,7 +182,6 @@
     background: var(--mm-surface);
   }
   .views { display: flex; flex-wrap: wrap; align-items: center; gap: .125rem; }
-  .count { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .icon { width: .875rem; height: .875rem; }
 
   .messages { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-3) var(--mm-space-4) 0; }
