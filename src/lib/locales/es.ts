@@ -190,7 +190,7 @@ export const es: Record<MessageKey, string> = {
   "queue.clearUpcoming": "Vaciar lo siguiente",
   "queue.menu": "Opciones de la cola",
   "queue.clearPlayed": "Vaciar lo ya escuchado",
-  "queue.new": "Cola nueva",
+  "queue.new": "Lista nueva",
   "queue.close": "Cerrar",
   "playback.loadFailed": "No se pudo cargar el audio.",
   "playback.folderGone": "La carpeta de la lista de reproducción ya no está disponible.",

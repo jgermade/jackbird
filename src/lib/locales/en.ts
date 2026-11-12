@@ -189,7 +189,7 @@ export const en = {
   "queue.clearUpcoming": "Clear upcoming",
   "queue.menu": "Queue options",
   "queue.clearPlayed": "Clear played",
-  "queue.new": "New queue",
+  "queue.new": "New list",
   "queue.close": "Close",
   "playback.loadFailed": "Could not load the audio.",
   "playback.folderGone": "The playlist's folder is no longer available.",
