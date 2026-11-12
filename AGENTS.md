@@ -56,7 +56,10 @@ desktop app, which needs WebKitGTK on Linux) before committing a change to them.
 jq79 pitfalls found here (details in `RECORD/2026-11-03.deck-design-system.WIP.md`):
 
 - A prop can't be called `value`, `checked`, `selected`, `text`, `html` or `class`: those are
-  jq79 directives and are ignored on a component tag.
+  jq79 directives and are ignored on a component tag (jq79 warns about it since 0.7.12).
+- Each write to a store runs the effects it wakes at once. Writes that make one change together
+  (a queue and its index) go in one `$batch(() => …)` (jq79 0.7.12): the effects and `$computed`s
+  they wake run once, after it, with the final state. No `queueMicrotask` to coalesce them.
 - A `$computed` must not read another `$computed`'s object value: it wakes itself again and jq79
   gives up after 100 rounds. Derive from the source store, as `derive()` in
   `src/lib/workspace.ts` does.

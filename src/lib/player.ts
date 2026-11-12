@@ -9,7 +9,7 @@
 // the app's native output (E5, lib/native-audio.ts); on a phone, through the phone's native player
 // (E6b, lib/phone-audio.ts), handed the queue's next tracks ahead so it goes on in the background.
 
-import { $computed, $reactive, $toRaw } from "jq79";
+import { $batch, $computed, $reactive, $toRaw } from "jq79";
 import {
   addTo,
   clearPlayed as clearBeforeCurrent,
@@ -699,22 +699,10 @@ if (embedded) {
     wire(phone);
     wireNative(phone);
   }
-  // Once per change of the queue: its queue and index are written one after
-  // the other, and in between the old index can point at another track of the
-  // new queue; loading on each write would start that track for a moment.
-  let loadQueued = false;
-  nowPlaying.$on(
-    "value",
-    () => {
-      if (loadQueued) return;
-      loadQueued = true;
-      queueMicrotask(() => {
-        loadQueued = false;
-        void load($toRaw(nowPlaying).value);
-      });
-    },
-    { immediate: true }
-  );
+  // Once per change of the queue: a queue and its index are written together, in one $batch
+  // (playQueue, apply, lib/mirror.ts), so the track is worked out once, never the old index's in
+  // the new queue.
+  nowPlaying.$on("value", () => void load($toRaw(nowPlaying).value), { immediate: true });
   if (native) {
     output.$on("kind", switchOutput);
   }
@@ -738,8 +726,11 @@ if (embedded) {
  */
 export function playQueue(queue: PlaybackQueue, index: number): void {
   startPaused = null;
-  playback.queue = queue;
-  playback.index = index;
+  // One change: the track loads once, never the old index's in the new queue.
+  $batch(() => {
+    playback.queue = queue;
+    playback.index = index;
+  });
   if (mirror.following) {
     sendCommand("play");
     return;
@@ -770,8 +761,10 @@ function apply(next: QueuePosition, paused = false): void {
   } else if (startPaused !== key) {
     startPaused = null;
   }
-  playback.queue = next.queue;
-  playback.index = next.index;
+  $batch(() => {
+    playback.queue = next.queue;
+    playback.index = next.index;
+  });
 }
 
 /**

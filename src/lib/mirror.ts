@@ -6,7 +6,7 @@
 // itself. A phone with no windows to answer it (the frame opened alone) plays by itself after a
 // moment. See RECORD/2026-11-12.landing-page.WIP.md (2026-11-12 19:40 UTC).
 
-import { $reactive, $toRaw } from "jq79";
+import { $batch, $reactive, $toRaw } from "jq79";
 import { embedKind } from "./platform";
 import { playback } from "./playback";
 
@@ -51,20 +51,18 @@ export async function startMirror(): Promise<boolean> {
   const leading = embedKind === "windows";
   channel = new BroadcastChannel(CHANNEL);
 
-  // The order (queue, track, repeat, shuffle) goes both ways, once per moment (the queue and its
-  // track are written one after the other: never half of it); what was just received is not sent back.
+  // The order (queue, track, repeat, shuffle) goes both ways, whole: its fields are written in one
+  // $batch on both sides, so the effect below sees it once; what was just received is not sent back.
   let seen = "";
   let joined = leading;
   let applying = false;
-  let pending = false;
   const applyOrder = (order: Order) => {
     applying = true;
-    Object.assign(playback, { queue: order.queue, index: order.index, repeat: order.repeat, shuffle: order.shuffle, order: order.order });
+    $batch(() => Object.assign(playback, { queue: order.queue, index: order.index, repeat: order.repeat, shuffle: order.shuffle, order: order.order }));
     applying = false;
     seen = JSON.stringify(orderNow());
   };
   const sendOrder = () => {
-    pending = false;
     const order = orderNow();
     const text = JSON.stringify(order);
     if (text === seen || !joined) return;
@@ -77,9 +75,8 @@ export async function startMirror(): Promise<boolean> {
     void playback.repeat;
     void playback.shuffle;
     void playback.order;
-    if (applying || pending) return;
-    pending = true;
-    queueMicrotask(sendOrder);
+    if (applying) return;
+    sendOrder();
   });
 
   if (leading) {
@@ -144,7 +141,7 @@ export async function startMirror(): Promise<boolean> {
         }
       } else if (data?.type === "status") {
         const { stream, ...status } = data.status;
-        Object.assign(playback, status);
+        $batch(() => Object.assign(playback, status));
         Object.assign(player.stream, stream);
       } else if (data?.type === "spectrum") {
         heard = { bins: data.bins, rate: data.rate };
