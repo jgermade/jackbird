@@ -20,8 +20,10 @@ const path = require("node:path");
 const { chromium } = require("playwright");
 
 const binary = path.resolve(process.argv[2] ?? "target/release/jackbird-service");
-const port = 4646 + Math.floor(Math.random() * 1000);
-const smtpPort = port + 1000;
+const { freePort } = require("./free-port.cjs");
+// Free on both loopbacks (scripts/free-port.cjs), not picked at random.
+const port = freePort();
+const smtpPort = freePort();
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "jackbird-library-check-"));
 const music = path.join(home, "Music");
 const elsewhere = path.join(home, "Elsewhere");
