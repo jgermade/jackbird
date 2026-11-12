@@ -1,10 +1,9 @@
-<script :setup="{ filled = false }: Props" lang="ts">
+<script :setup lang="ts">
   // An icon printed in the display, as a VFD's fixed segments are: a short
-  // word in the label face, lit in the display's ink. Framed, as a format
-  // ("FLAC", "MP3"); `filled`, lit solid with the word cut out of it, as a
-  // badge ("HD"). Ours, drawn here: no product's or format's logo.
+  // word in the label face, lit in the display's ink and framed, as a format
+  // ("MP3"). Ours, drawn here: no product's or format's logo.
   //
-  //   <DisplayIcon>FLAC</DisplayIcon> <DisplayIcon filled>HD</DisplayIcon>
+  //   <DisplayIcon>MP3</DisplayIcon>
   //
   // It takes the colour around it, so inside a Display it lights up with the
   // window (and glows with it in Graphite). Its size follows the font size
@@ -12,13 +11,9 @@
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
-
-  type Props = { filled?: boolean | "" }
-
-  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
 </script>
 
-<span class="icon" :class.filled="flag(filled)"><slot /></span>
+<span class="icon"><slot /></span>
 
 <style scoped>
   .icon {
@@ -34,11 +29,5 @@
     text-transform: uppercase;
     white-space: nowrap;
     box-shadow: var(--mm-display-glow);
-  }
-  /* Lit solid: the word in the window's own ground, cut out of the ink. */
-  .filled {
-    background: currentColor;
-    text-shadow: none;
-    -webkit-text-fill-color: var(--mm-display-bg);
   }
 </style>
