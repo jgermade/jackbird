@@ -215,12 +215,15 @@
   /* The display and its play modes' keys, one unit: the keys on a bezel joined to the display's
      right edge, one over the other. */
   .unit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; min-width: 0; }
+  /* (The keys behind the display within the unit, which holds them both.) */
   /* The display over the keys: they run in under its right edge, so its rounded corners are
      whole over them, with no seam where its curve meets them. */
-  .unit > :first-child { position: relative; z-index: 1; }
+  .unit { position: relative; z-index: 0; }
   .modes {
     display: grid;
     grid-template-rows: 1fr 1fr;
+    position: relative;
+    z-index: -1;
     width: 2.25rem;
     margin-left: -.5rem;
     overflow: hidden;
