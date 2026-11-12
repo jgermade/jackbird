@@ -7,7 +7,8 @@
 
 import { $reactive } from "jq79";
 import { invoke } from "@tauri-apps/api/core";
-import { describeFormat, fileKind, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo, type OutputKind } from "../helpers/output";
+import { kilohertz, streamQuality, type StreamInfo } from "../helpers/stream-info";
+import { describeFormat, fileKind, formatRate, parseOutputKind, settingsFor, type DeviceInfo, type OutputKind } from "../helpers/output";
 import { t } from "./i18n";
 import type { Sounding } from "./native-audio";
 import { isDesktop, isPhone } from "./platform";
@@ -97,23 +98,29 @@ export function soundingText(): string {
 }
 
 /**
- * What the display shows of the song's format, in two parts: the format ("24/96", "MP3") and how
- * it reaches the device ("bit-perfect", "DAC", "native"; empty when there is nothing to say). In a
- * native output, what it reports; in the embedded one (the browser's), the file's kind alone, from
- * `relativePath`. Null with neither.
+ * What the display shows of the song's format, in three parts: the codec ("FLAC", "MP3"), its
+ * quality ("24 bit · 96 kHz", "320 kbps · 44.1 kHz") and how it reaches the device ("bit-perfect",
+ * "DAC", "native"; empty in the browser, or when there is nothing to say). The quality is the
+ * file's own (`info`, read from it), else what a native output reports it decodes; with neither,
+ * the file's kind alone, from `relativePath`. Null when there is nothing at all.
  */
-export function soundingParts(relativePath?: string): { format: string; quality: string } | null {
+export function soundingParts(info: StreamInfo | null, relativePath?: string): { format: string; quality: string; route: string } | null {
   const sounding = output.sounding;
   if (!sounding) {
+    if (info) return { format: info.codec, quality: streamQuality(info), route: "" };
     const kind = relativePath ? fileKind(relativePath) : "";
-    return kind ? { format: kind, quality: "" } : null;
+    return kind ? { format: kind, quality: "", route: "" } : null;
   }
-  const format = shortFormat(sounding.codec, sounding.format);
-  // On a phone (E6b-D10): bit-perfect to a DAC, through Android's mixer to a USB DAC ("DAC"), or the
-  // format alone to the phone's own output.
-  if (output.phone) {
-    if (sounding.route.fidelity === "bit-perfect") return { format, quality: t("output.badge.bit-perfect") };
-    return { format, quality: sounding.route.device !== "Android" ? t("output.badge.dac") : "" };
-  }
-  return { format, quality: t(`output.badge.${sounding.route.fidelity}`) };
+  const rate = `${kilohertz(sounding.format.rate)} kHz`;
+  const quality = info ? streamQuality(info) : sounding.format.bits > 0 ? `${sounding.format.bits} bit · ${rate}` : rate;
+  // On a phone (E6b-D10): bit-perfect to a DAC, through Android's mixer to a USB DAC ("DAC"), or
+  // nothing to say of the phone's own output.
+  const route = output.phone
+    ? sounding.route.fidelity === "bit-perfect"
+      ? t("output.badge.bit-perfect")
+      : sounding.route.device !== "Android"
+        ? t("output.badge.dac")
+        : ""
+    : t(`output.badge.${sounding.route.fidelity}`);
+  return { format: sounding.codec, quality, route };
 }

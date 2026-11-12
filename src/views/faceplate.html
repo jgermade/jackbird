@@ -24,7 +24,7 @@
   const { importing, openImport } = await import("../lib/importing")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
-  const { nowPlaying, readSpectrum } = await import("../lib/player")
+  const { nowPlaying, readSpectrum, stream } = await import("../lib/player")
   const { soundingParts, soundingText } = await import("../lib/output")
   const { closeRoot, selectRoot } = await import("../lib/roots")
   const { chooseTab, openAdding, shownTab, sourcesHere, tabsHere } = await import("../lib/adding")
@@ -39,7 +39,7 @@
   // reaches the device ("24/96" over "bit-perfect"). A click or a tap turns from one to the other;
   // each song starts on its format for two seconds, then turns to the spectrum.
   let markView: "format" | "spectrum" = "spectrum"
-  const markParts = () => soundingParts(current?.relativePath)
+  const markParts = () => soundingParts(stream.key === current?.key ? stream.info : null, current?.relativePath)
   const mark = (() => {
     const FORMAT_FIRST = 2000
     let timer = 0
@@ -133,7 +133,11 @@
                   :title="soundingText()" @click="mark.toggle()">
             <span :if="markView === 'format' && markParts()" class="lcd-format">
               <span class="format">{{ markParts()?.format }}</span>
-              <span :if="markParts()?.quality" class="quality">{{ markParts()?.quality }}</span>
+              <!-- Its parts one under the other: "24 bit" over "96 kHz". -->
+              <span :if="markParts()?.quality" class="quality">
+                <span :each="part in markParts()?.quality.split(' · ') ?? []">{{ part }}</span>
+              </span>
+              <span :if="markParts()?.route" class="quality route">{{ markParts()?.route }}</span>
             </span>
             <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
           </button>
@@ -277,7 +281,8 @@
     container-type: inline-size;
   }
   .lcd-mark.playing:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
-  /* The song's format in the spectrum's place: "24/96" in large dots, how it reaches the device under it. */
+  /* The song's format in the spectrum's place: the codec in large dots, its quality under it
+     ("24 bit · 96 kHz"), and in a native output how it reaches the device. */
   .lcd-format { display: grid; place-content: center; justify-items: center; gap: var(--mm-space-1); width: 100%; height: 100%; }
   .lcd-format .format {
     font-family: var(--mm-font-display);
@@ -295,6 +300,9 @@
     white-space: nowrap;
     opacity: .85;
   }
+  /* The quality keeps its units' case ("kHz", "kbps"); the route is a printed label. */
+  .lcd-format .quality:not(.route) { display: grid; justify-items: center; text-transform: none; letter-spacing: .02em; }
+  .lcd-format .route { opacity: .6; }
   .lcd-logo {
     display: block;
     width: 100%;
