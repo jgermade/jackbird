@@ -291,6 +291,13 @@
   @media (min-width: 641px) {
     .lcd-mark { width: 7rem; }
   }
+  /* A computer: a shorter display, so the faceplate stays low. The clock and the text's rows at the
+     small display size (the Counter reads the token), and the logo and the spectrum as tall as
+     the lines and the meter. */
+  @media (min-width: 721px) {
+    .lcd:not(.small) { --mm-text-display-md: var(--mm-text-display-sm); }
+    .lcd:not(.small) .lcd-mark { height: auto; min-height: 0; align-self: stretch; }
+  }
   /* Phones: a smaller mark, so the title keeps its room. */
   @media (max-width: 640px) {
     .lcd-mark { width: 2.5rem; height: 2.5rem; }
