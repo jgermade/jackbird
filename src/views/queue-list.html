@@ -4,7 +4,8 @@
   // one playing larger), the played ones dimmed, the current one with its
   // bars. A click (or Enter) plays a track, the current one pauses or
   // resumes. A track's grip (⠿) drags it to another place (mouse, pen or
-  // touch); × removes it (not the current one). Up, Down, Home and End move
+  // touch), but not the current one, which has no grip (its larger cover takes
+  // the grip's place, its right edge on the others'); × removes it (not the current one). Up, Down, Home and End move
   // between tracks, Alt with Up or Down moves the track, Delete removes it.
   // A view over the queue's actions in lib/player.ts. See
   // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3;
@@ -53,6 +54,8 @@
   }
   const move = (from: number, to: number) => {
     if (to < 0 || to >= entries().length || from === to) return
+    // The track playing is not moved (the others move around it).
+    if (entries()[from]?.state === "current") return
     moveInQueue(from, to)
     focusOn(to)
   }
@@ -187,7 +190,8 @@
         :class.played="entry.state === 'played'" :class.current="entry.state === 'current'"
         :class.missing="entry.missing" :class.focused="entry.index === focused"
         :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
-      <span class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
+      <!-- The one playing stays where it is: no grip; its larger cover takes the grip's place. -->
+      <span :if="entry.state !== 'current'" class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
             @pointerdown="drag.start(entry.index, $event)" @click.stop="null">
         <svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="8" r="1.2" /><circle cx="7" cy="8" r="1.2" /><circle cx="3" cy="13" r="1.2" /><circle cx="7" cy="13" r="1.2" /></svg>
       </span>
@@ -218,7 +222,7 @@
   .item {
     position: relative;
     display: grid;
-    grid-template-columns: 1.25rem auto minmax(0, 1fr) 1.25rem auto;
+    grid-template-columns: 1.25rem 2.25rem minmax(0, 1fr) 1.25rem auto;
     align-items: center;
     gap: var(--mm-space-3);
     min-height: 3rem;
@@ -252,7 +256,8 @@
   .item.drop-after::after { bottom: -1px; }
 
   .art { display: block; width: 2.25rem; aspect-ratio: 1; overflow: hidden; border-radius: 3px; box-shadow: var(--mm-shadow-sm, 0 1px 2px rgb(0 0 0 / .15)); }
-  .current .art { width: 3.25rem; }
+  /* The one playing, larger, in the grip's column and the cover's, its right edge on the others'. */
+  .current .art { grid-column: 1 / 3; justify-self: end; width: 3.25rem; }
   .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .no-cover { position: relative; display: block; height: 100%; background: var(--mm-display-bezel); }
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 16%; }
