@@ -21,7 +21,9 @@ assets such as styles, fonts and images):
 
 `npm test` runs the layer check, a type check of the helpers and their tests, the unit tests
 (Node's own runner, no framework), and a coverage check that holds **every** helper file to the
-90% floor and fails on a helper no test loads. Run it before every commit.
+90% floor and fails on a helper no test loads; and the check of the service's one-line setup
+(`landing/setup.sh`, run against a stand-in binary: `scripts/setup-check.mjs`). Run it before
+every commit.
 
 `src/types.ts` holds types only and may be imported from anywhere.
 

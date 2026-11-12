@@ -425,7 +425,8 @@ h1 em {
 .note { margin: var(--mm-space-4) 0 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
 
 .lead { max-width: 46rem; margin: 0 0 var(--mm-space-5); color: var(--mm-fg-muted); }
-.ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--mm-space-4); }
+/* One above the other: a command's line has the page's width, and is read whole. */
+.ways { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-4); }
 .way {
   display: grid;
   align-content: start;
@@ -448,6 +449,14 @@ h1 em {
 }
 .way code { font-family: var(--mm-font-mono); font-size: .92em; overflow-wrap: anywhere; }
 .way pre code { overflow-wrap: normal; }
+.way a:not(.file-link) { color: var(--mm-accent-ink); }
+/* The commands' colours, written by hand in the page: a command, its flags, what it is given
+   (an address, a variable), and what is only punctuation or a remark. */
+.t-cmd { color: var(--mm-accent-ink); font-weight: var(--mm-weight-medium); }
+.t-flag { color: var(--mm-ok); }
+.t-str { color: var(--mm-warn); }
+.t-op, .t-com { color: var(--mm-fg-subtle); }
+.t-com { font-style: italic; }
 .files { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
 .file-link {
   padding: var(--mm-space-1) var(--mm-space-3);
@@ -477,13 +486,13 @@ h1 em {
   .pitch > * { grid-column: 1 !important; grid-row: auto !important; }
   .pitch > .lede { margin-top: var(--mm-space-6); }
   .modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .downloads, .ways { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .downloads { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   main { gap: 4.5rem; padding-top: 2.5rem; }
   .nav { display: none; }
   .tone { margin-left: auto; }
-  .modules, .downloads, .ways { grid-template-columns: minmax(0, 1fr); }
+  .modules, .downloads { grid-template-columns: minmax(0, 1fr); }
   .phone { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2.5rem; }
   .handset { max-width: 14rem; }
 }

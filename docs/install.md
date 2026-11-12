@@ -64,7 +64,30 @@ see [Keeping the library safe](usage.md#people-and-sign-in-the-service).
 
 ## A binary
 
-Download the binary for the machine from the latest release, then, on Linux (needs systemd):
+On Linux (needs systemd) or macOS, one line sets it up:
+
+```sh
+curl -fsSL https://jgermade.github.io/jackbird/setup.sh | sh
+```
+
+It says what is installed and asks what to do: **install**, **re-install**, **update** or
+**uninstall**. It downloads the latest release's binary for the machine and runs that binary's own
+commands (below), with `sudo` where the service is installed with the system; the library and the
+service's configuration are never touched. Installing, it asks how the service should start (with
+the system, from boot, or when you log in, with no administrator rights) and then offers to set up
+sign-in and the first owner. With no questions, say what to do:
+
+```sh
+curl -fsSL https://jgermade.github.io/jackbird/setup.sh | sh -s -- install          # or: install --logon
+curl -fsSL https://jgermade.github.io/jackbird/setup.sh | sh -s -- update           # the latest release
+curl -fsSL https://jgermade.github.io/jackbird/setup.sh | sh -s -- reinstall
+curl -fsSL https://jgermade.github.io/jackbird/setup.sh | sh -s -- uninstall --yes
+```
+
+(`status` says what is installed; `--version vX.Y.Z` takes a release other than the latest;
+`--binary PATH` a binary you already have.)
+
+**By hand**: download the binary for the machine from the latest release, then, on Linux:
 
 ```sh
 chmod +x jackbird-service-linux-arm64-static
@@ -74,7 +97,9 @@ sudo ./jackbird-service-linux-arm64-static install --with-system --user "$USER" 
 or on macOS (`jackbird-service-macos-arm64`, `…-x64`), the same `install --with-system`. It is
 installed as a service of the system that starts at boot and runs as you, on
 <http://localhost:4646>. `jackbird-service install` without `--with-system` starts it when you log
-in, with no administrator rights. Then, on the same machine:
+in, with no administrator rights. Then, on the same machine, with the installed binary (the
+installation prints where it is: `/usr/local/lib/jackbird/jackbird-service` on Linux, with the
+system):
 
 ```sh
 jackbird-service setup        # email, the first owner, sign-in on
@@ -84,8 +109,8 @@ jackbird-service status       # installed, running, its version
 The library lives in `~/.local/share/jackbird/library` on Linux and `~/Library/Application
 Support/jackbird/library` on macOS (or `service.json`'s `library`). From outside home, as with
 Docker: a proxy with HTTPS in front (Caddy: `caddy reverse-proxy --from music.example.com --to
-localhost:4646`) and the instance's address set in **Sign-in**. **Updating**: `jackbird-service
-update` with the new binary, or the desktop app's **Update**.
+localhost:4646`) and the instance's address set in **Sign-in**. **Updating**: the one-line
+setup's **update**, `jackbird-service update` with the new binary, or the desktop app's **Update**.
 
 ## The desktop app
 
