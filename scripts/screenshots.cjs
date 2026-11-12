@@ -240,6 +240,9 @@ async function main() {
     // page's hero; the track still playing.
     await page.keyboard.press("Control+Shift+M");
     await page.setViewportSize({ width: 440, height: 250 });
+    // As the landing page's live player draws it: no key back to the full view (the page's own
+    // way back, which a picture of it on the landing page has nowhere to go to).
+    await page.addStyleTag({ content: ".compact .keys .side:first-child { visibility: hidden; }" });
     // Past the format the display shows a song's first two seconds: the spectrum.
     await page.waitForTimeout(3000);
     await page.locator(".compact").first().screenshot({ path: path.join(out, `compact-${name}.png`) });
