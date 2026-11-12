@@ -19,6 +19,7 @@
   const SourcesPanel = await import("./sources-panel.html")
   const { t } = await import("../lib/i18n")
   const { tabsHere } = await import("../lib/adding")
+  const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   // The welcome: no folder open, none coming back, and something to offer.
   const welcome = (): boolean => !library.restoring && library.roots.length === 0 && tabsHere().length > 0
   const { parseViewState } = await import("../helpers/session")
@@ -161,6 +162,7 @@
          roots' bar's tab offers, a folder or a server (views/sources-panel.html). -->
     <section :if="welcome()" class="welcome" :aria-label="t('sources.eyebrow')">
       <div class="welcome-body">
+        <img class="welcome-logo" :src="logoUrl" alt="" width="1152" height="1061" />
         <p class="welcome-lead">{{ t("sources.welcome") }}</p>
         <SourcesPanel />
       </div>
@@ -198,6 +200,8 @@
   .welcome { display: flex; flex: 1 1 auto; justify-content: center; min-height: 0; overflow: auto; padding: var(--mm-space-6) var(--mm-space-4); background: var(--mm-sheet); }
   .welcome-body { display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; }
   .welcome-lead { margin: 0; font-size: var(--mm-text-md); color: var(--mm-fg); }
+  /* The brand's own logo, in its metal, over what the welcome offers. */
+  .welcome-logo { display: block; width: 6rem; height: auto; aspect-ratio: 1152 / 1061; margin-bottom: var(--mm-space-2); }
   .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   .panes {
     /* The library's width as chosen (--split, in rem), within the room: at least 16rem, leaving the
