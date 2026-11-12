@@ -2,14 +2,13 @@
 // 2026-11-11 23:33 and after): chosen in Android's own folder picker, which grants the app that
 // folder alone, for good (a persisted permission on its tree). Everything in it is reached through
 // Android's document provider by the path relative to the folder: listing, small files, renames,
-// and the files themselves opened for Rust's tag engine (as `/proc/self/fd/<n>`) and for the player
+// and the files themselves opened for Rust's tag engine (their descriptors handed to it) and for the player
 // (by their `content://` address). Nothing here asks for access to any other file.
 
 package es.germade.jackbird.player
 
 import android.content.ContentResolver
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import java.io.FileNotFoundException
@@ -21,8 +20,6 @@ data class Found(val path: String, val name: String, val folder: Boolean, val si
 class Folders(private val resolver: ContentResolver) {
   /** Document ids by tree and path, filled as the tree is walked and looked up. */
   private val ids = ConcurrentHashMap<String, String>()
-  /** The files opened for Rust, by their descriptor's number. */
-  private val open = ConcurrentHashMap<Int, ParcelFileDescriptor>()
 
   private val columns = arrayOf(
     Document.COLUMN_DOCUMENT_ID,
@@ -178,15 +175,7 @@ class Folders(private val resolver: ContentResolver) {
   /** A file's `content://` address, for the player. */
   fun address(tree: Uri, path: String): String = need(tree, path).toString()
 
-  /** Opens a file for Rust ("r", or "rw" to write its tags in place); its descriptor's number. */
-  fun openFile(tree: Uri, path: String, write: Boolean): Int {
-    val descriptor = resolver.openFileDescriptor(need(tree, path), if (write) "rw" else "r") ?: throw FileNotFoundException(path)
-    open[descriptor.fd] = descriptor
-    return descriptor.fd
-  }
-
-  /** Closes a file opened for Rust. */
-  fun closeFile(fd: Int) {
-    open.remove(fd)?.close()
-  }
+  /** Opens a file for Rust ("r", or "rw" to write its tags in place), and gives up its descriptor: Rust closes it. */
+  fun detachFile(tree: Uri, path: String, write: Boolean): Int =
+    (resolver.openFileDescriptor(need(tree, path), if (write) "rw" else "r") ?: throw FileNotFoundException(path)).detachFd()
 }

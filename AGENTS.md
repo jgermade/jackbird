@@ -39,8 +39,12 @@ JSON. `crates/store` (F1) is the other crate that touches it: the family library
 its catalogue (SQLite) in a folder of its own, on `crates/core`. `crates/audio` (E5) reads files too, to play them: the desktop app's native output (`symphonia` decoding, `cpal` and each system's exclusive path behind its `device` feature, which needs ALSA's headers on Linux); without that feature it builds with no system library, and its tests play to a capture output. The tag crates depend on nothing but
 each other (`crates/core` adds `sha1` and `sha2`); a dependency in `[dev-dependencies]` is for
 tests only. `crates/tags-wasm` is the web app's WebAssembly module, built by
-`scripts/build-wasm.mjs` (not committed); its exports' `#[unsafe(no_mangle)]` is the only unsafe
-code the workspace allows, and it has no unsafe block. They are written from the formats' specifications; other libraries are references for
+`scripts/build-wasm.mjs` (not committed); its exports' `#[unsafe(no_mangle)]` is unsafe code the
+workspace allows, and it has no unsafe block. The only other is one block in `src-tauri`
+(`phone::take`, Android only, approved by the owner on 2026-11-12): it takes a file descriptor
+Android's document provider opened for a folder the person chose (E6b-D9), handed to Rust by the
+app's plugin and never by the page. Both crates set `unsafe_code` to "deny" instead of the
+workspace's "forbid", and allow it only where it is. They are written from the formats' specifications; other libraries are references for
 behaviour and edge cases, and no code is copied from GPL or LGPL ones. Tests run on the shared
 fixtures in `fixtures/tags/` (made by `fixtures/tags/make.mjs`, whose expectations come from how
 each file is built). Run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --

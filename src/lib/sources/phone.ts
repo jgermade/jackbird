@@ -1,7 +1,7 @@
 // A root on the phone (E6b-D9): a folder the person chose in Android's folder picker, which grants
 // the app that folder alone. It is kept by its `content://` address. Its files are reached through
 // the app's plugin by their paths in the folder (crates/player, Folders.kt); their tags and
-// checksums are worked out by Rust (`inspect_fd`) on the file the plugin opens, streamed, so no
+// checksums are worked out by Rust (`phone_inspect`) on the file the plugin opens for it, streamed, so no
 // song's bytes cross to the page. The player plays each file by its `content://` address. Saving
 // tags waits for E6b-D9's second part. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md
 // (2026-11-11 23:33 and after).
@@ -17,7 +17,7 @@ const PLUGIN = "plugin:jackbird-player";
 /** Calls one of the plugin's folder commands (or the app's); its failure becomes a TagError, so the interface says why. */
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
-    return await invoke<T>(command.includes("|") || command === "inspect_fd" ? command : `${PLUGIN}|${command}`, args);
+    return await invoke<T>(command.includes("|") || command === "phone_inspect" ? command : `${PLUGIN}|${command}`, args);
   } catch (error) {
     const failure = (typeof error === "object" && error ? error : { message: String(error) }) as { code?: string; message?: string };
     throw new TagError(failure.code ?? "io", failure.message ?? String(error));
@@ -68,14 +68,7 @@ function phoneSource(tree: string, name: string): RootSource {
     vfs,
     saved: tree,
     walk: async () => (await call<{ files: WalkedFile[] }>("folder_walk", { tree })).files,
-    async inspect(path, known) {
-      const { fd } = await call<{ fd: number }>("folder_open", { tree, path, write: false });
-      try {
-        return await call<InspectionJson>("inspect_fd", { fd, known: known ?? null });
-      } finally {
-        await call("folder_close", { fd }).catch(() => undefined);
-      }
-    },
+    inspect: (path, known) => call<InspectionJson>("phone_inspect", { tree, path, known: known ?? null }),
     save: async () => {
       throw new TagError("unsupported", t("sources.phoneSaveSoon"));
     },

@@ -254,19 +254,46 @@ fn media_url(roots: State<'_, Roots>, media: State<'_, Media>, root: String, pat
     })
 }
 
-/// A file of a folder the person chose in Android's folder picker (E6b-D9), opened by the app's
-/// plugin and reached as `/proc/self/fd/<fd>`: its size, date, checksums, and tags unless its full
-/// checksum is still `known`. Only a descriptor of the app's own process can be named.
+/// A file of a folder the person chose in Android's folder picker (E6b-D9): opened by the app's
+/// plugin, its descriptor handed to Rust, and read by `jackbird-core` as any file: size, date,
+/// checksums, and its tags unless its full checksum is still `known`. Streamed.
 #[cfg(target_os = "android")]
 #[tauri::command]
-async fn inspect_fd(fd: i32, known: Option<String>) -> Answer<InspectionJson> {
-    if fd < 0 {
-        return Err(failure("io", "no file"));
+async fn phone_inspect(app: AppHandle, tree: String, path: String, known: Option<String>) -> Answer<InspectionJson> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let file = phone::take(
+            tauri_plugin_jackbird_player::open_file(&app, &tree, &path, false).map_err(|error| failure("io", error))?,
+        )?;
+        jackbird_core::inspect_open(file, &path, known.as_deref()).map_err(Failure::from)
+    })
+    .await
+    .map_err(|error| failure("io", error.to_string()))?
+    .map(Into::into)
+}
+
+/// The one place the app takes a file descriptor it did not open itself (E6b-D9; the second unsafe
+/// code the workspace allows, after `crates/tags-wasm`'s exports: see AGENTS.md).
+#[cfg(target_os = "android")]
+mod phone {
+    use std::fs::File;
+    use std::os::fd::FromRawFd;
+
+    use jackbird_api::{Failure, failure};
+
+    /// The file behind a descriptor the plugin opened and gave up for Rust alone
+    /// (`tauri_plugin_jackbird_player::open_file`, whose number never comes from the page): owned
+    /// here, closed when the file is dropped.
+    pub fn take(fd: i32) -> Result<File, Failure> {
+        if fd < 0 {
+            return Err(failure("io", "Android opened no file"));
+        }
+        // SAFETY: `fd` was opened by Android's document provider and detached from its
+        // ParcelFileDescriptor (`detachFd`) for this call alone, so it is open and owned by nothing
+        // else; the `File` takes it over and is its only owner.
+        #[allow(unsafe_code)]
+        let file = unsafe { File::from_raw_fd(fd) };
+        Ok(file)
     }
-    let path = std::path::PathBuf::from(format!("/proc/self/fd/{fd}"));
-    blocking(move || jackbird_core::inspect_file(&path, known.as_deref()))
-        .await
-        .map(Into::into)
 }
 
 /// The unattended check's folder, when the app runs it (`JACKBIRD_CHECK_FOLDER`, `desktop.yml`).
@@ -354,7 +381,7 @@ pub fn run() {
     #[cfg(target_os = "android")]
     let builder = builder
         .plugin(tauri_plugin_jackbird_player::init())
-        .invoke_handler(commands![inspect_fd]);
+        .invoke_handler(commands![phone_inspect]);
     #[cfg(target_os = "ios")]
     let builder = builder
         .plugin(tauri_plugin_jackbird_player::init())

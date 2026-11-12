@@ -100,11 +100,6 @@ class TreeOpenArgs {
 }
 
 @InvokeArg
-class FdArgs {
-  var fd: Int = -1
-}
-
-@InvokeArg
 class OutputArgs {
   var bitPerfect: Boolean = false
 }
@@ -406,20 +401,17 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
-  /** Opens a file for Rust's tag engine, which reaches it as `/proc/self/fd/<fd>`; closed with `folder_close`. */
+  /**
+   * Opens a file for Rust's tag engine, and gives up the descriptor to it: Rust owns it and closes it.
+   * Called by Rust alone (`tauri_plugin_jackbird_player::open_file`), never by the page: it is not
+   * among the plugin's permissions, so a descriptor's number never comes from the page.
+   */
   @Command
-  fun folderOpen(invoke: Invoke) {
+  fun folderDetach(invoke: Invoke) {
     val args = invoke.parseArgs(TreeOpenArgs::class.java)
     work(invoke) {
-      invoke.resolve(JSObject().apply { put("fd", folders.openFile(Uri.parse(args.tree), args.path, args.write)) })
+      invoke.resolve(JSObject().apply { put("fd", folders.detachFile(Uri.parse(args.tree), args.path, args.write)) })
     }
-  }
-
-  @Command
-  fun folderClose(invoke: Invoke) {
-    val args = invoke.parseArgs(FdArgs::class.java)
-    folders.closeFile(args.fd)
-    invoke.resolve()
   }
 
   /** The person's output setting (E6b-D10): bit-perfect to a USB DAC, from the next song. */

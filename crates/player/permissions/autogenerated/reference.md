@@ -24,8 +24,6 @@ Every command of the phone's player, and its events.
 - `allow-folder-rename`
 - `allow-folder-mkdir`
 - `allow-folder-address`
-- `allow-folder-open`
-- `allow-folder-close`
 - `allow-safe-area`
 - `allow-register-listener`
 - `allow-remove-listener`
@@ -87,32 +85,6 @@ Enables the folder_check command without any pre-configured scope.
 <td>
 
 Denies the folder_check command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`jackbird-player:allow-folder-close`
-
-</td>
-<td>
-
-Enables the folder_close command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`jackbird-player:deny-folder-close`
-
-</td>
-<td>
-
-Denies the folder_close command without any pre-configured scope.
 
 </td>
 </tr>
@@ -191,32 +163,6 @@ Enables the folder_mkdir command without any pre-configured scope.
 <td>
 
 Denies the folder_mkdir command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`jackbird-player:allow-folder-open`
-
-</td>
-<td>
-
-Enables the folder_open command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`jackbird-player:deny-folder-open`
-
-</td>
-<td>
-
-Denies the folder_open command without any pre-configured scope.
 
 </td>
 </tr>

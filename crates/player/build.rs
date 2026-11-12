@@ -26,8 +26,6 @@ const COMMANDS: &[&str] = &[
     "folder_rename",
     "folder_mkdir",
     "folder_address",
-    "folder_open",
-    "folder_close",
     "safe_area",
     "register_listener",
     "remove_listener",

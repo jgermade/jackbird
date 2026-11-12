@@ -173,17 +173,13 @@ fn inspect_gives_each_fixtures_checksums_and_tags() {
     }
 }
 
-/// A file reached through a descriptor's own path, as the phone's folders are (E6b-D9): the same
-/// inspection as by its root.
-#[cfg(target_os = "linux")]
+/// A file already open, as a phone's folders hand theirs over (E6b-D9): the same inspection as by its root.
 #[test]
-fn inspect_file_reads_a_file_through_its_descriptor() {
-    use std::os::fd::AsRawFd;
+fn inspect_open_reads_a_file_already_open() {
     let (folder, root) = fixture_root();
     for case in cases() {
         let file = fs::File::open(folder.join(&case.file)).unwrap();
-        let through = PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd()));
-        let found = inspect_file(&through, None).unwrap();
+        let found = inspect_open(file, &case.file, None).unwrap();
         let expected = inspect(&root, &case.file, None).unwrap();
         assert_eq!(found.full_checksum, expected.full_checksum, "{}", case.name);
         assert_eq!(found.audio_checksum, expected.audio_checksum, "{}", case.name);

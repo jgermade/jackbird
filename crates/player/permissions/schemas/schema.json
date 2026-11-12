@@ -319,18 +319,6 @@
           "markdownDescription": "Denies the folder_check command without any pre-configured scope."
         },
         {
-          "description": "Enables the folder_close command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-folder-close",
-          "markdownDescription": "Enables the folder_close command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the folder_close command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-folder-close",
-          "markdownDescription": "Denies the folder_close command without any pre-configured scope."
-        },
-        {
           "description": "Enables the folder_delete command without any pre-configured scope.",
           "type": "string",
           "const": "allow-folder-delete",
@@ -365,18 +353,6 @@
           "type": "string",
           "const": "deny-folder-mkdir",
           "markdownDescription": "Denies the folder_mkdir command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the folder_open command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-folder-open",
-          "markdownDescription": "Enables the folder_open command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the folder_open command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-folder-open",
-          "markdownDescription": "Denies the folder_open command without any pre-configured scope."
         },
         {
           "description": "Enables the folder_read command without any pre-configured scope.",
@@ -595,10 +571,10 @@
           "markdownDescription": "Denies the stop command without any pre-configured scope."
         },
         {
-          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-folder-open`\n- `allow-folder-close`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`",
+          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-folder-open`\n- `allow-folder-close`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`"
+          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`"
         }
       ]
     }

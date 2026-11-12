@@ -23,8 +23,6 @@ permissions = [
   "allow-folder-rename",
   "allow-folder-mkdir",
   "allow-folder-address",
-  "allow-folder-open",
-  "allow-folder-close",
   "allow-safe-area",
   "allow-register-listener",
   "allow-remove-listener",

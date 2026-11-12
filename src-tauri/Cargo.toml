@@ -22,8 +22,15 @@ tauri-plugin-dialog = "=2.8.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "=1.0.145"
 
-[lints]
-workspace = true
+# The workspace's lints, but `unsafe_code` is "deny", not "forbid": on Android, one function takes a
+# file descriptor Android's document provider opened (E6b-D9, `phone::take` in src/lib.rs) and
+# allows it alone.
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
 
 # The native output (E5) is the desktop app's: phones (E6) do not build it.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
