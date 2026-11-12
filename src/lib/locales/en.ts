@@ -71,6 +71,8 @@ export const en = {
   "faceplate.transport": "Transport",
   "faceplate.play": "Play",
   "faceplate.pause": "Pause",
+  "faceplate.showFormat": "Show the song's format",
+  "faceplate.showSpectrum": "Show the spectrum",
   "faceplate.state.stopped": "Stop",
   "faceplate.state.playing": "Play",
   "faceplate.state.paused": "Pause",

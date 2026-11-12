@@ -25,7 +25,7 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum } = await import("../lib/player")
-  const { soundingBadge, soundingText } = await import("../lib/output")
+  const { soundingParts, soundingText } = await import("../lib/output")
   const { closeRoot, selectRoot } = await import("../lib/roots")
   const { chooseTab, openAdding, shownTab, sourcesHere, tabsHere } = await import("../lib/adding")
   const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
@@ -35,6 +35,35 @@
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
 
   $: current = nowPlaying.value
+  // The display's left, while the music plays: the spectrum, or the song's format and how it
+  // reaches the device ("24/96" over "bit-perfect"). A click or a tap turns from one to the other;
+  // each song starts on its format for two seconds, then turns to the spectrum.
+  let markView: "format" | "spectrum" = "spectrum"
+  const markParts = () => soundingParts(current?.relativePath)
+  const mark = (() => {
+    const FORMAT_FIRST = 2000
+    let timer = 0
+    let song: string | null = null
+    return {
+      song(key: string | null) {
+        if (key === song) return
+        song = key
+        window.clearTimeout(timer)
+        if (!key) return
+        markView = "format"
+        timer = window.setTimeout(() => {
+          markView = "spectrum"
+        }, FORMAT_FIRST)
+      },
+      toggle() {
+        window.clearTimeout(timer)
+        markView = markView === "format" ? "spectrum" : "format"
+      },
+      stop: () => window.clearTimeout(timer)
+    }
+  })()
+  $: mark.song(current?.key ?? null)
+  $destroyed(() => mark.stop())
   // While the music plays, the spectrum takes the logo's place at the display's left: 16 bands
   // above 640px, 6 below.
   const WIDE = matchMedia("(min-width: 641px)")
@@ -92,10 +121,18 @@
     <div class="screen">
       <Display live>
         <div class="lcd">
-          <!-- The logo, lit; while the music plays, the spectrum in its place. -->
-          <span class="lcd-mark" :class.playing="playback.playing" aria-hidden="true">
-            <span :if="playback.playing" class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
-            <span :else class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
+          <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
+          <button :if="playback.playing" type="button" class="lcd-mark playing"
+                  :aria-label="markView === 'format' ? t('faceplate.showSpectrum') : t('faceplate.showFormat')"
+                  :title="soundingText()" @click="mark.toggle()">
+            <span :if="markView === 'format' && markParts()" class="lcd-format">
+              <span class="format">{{ markParts()?.format }}</span>
+              <span :if="markParts()?.quality" class="quality">{{ markParts()?.quality }}</span>
+            </span>
+            <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
+          </button>
+          <span :else class="lcd-mark" aria-hidden="true">
+            <span class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
           </span>
           <div class="lcd-main">
             <div class="lcd-lines">
@@ -108,7 +145,6 @@
                 </span>
                 <span class="now">
                   <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
-                  <span :if="soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
                 </span>
               </div>
               <!-- Where the song is, on two lines too: its minutes, and under them its seconds; nothing with no song loaded. -->
@@ -190,17 +226,6 @@
   /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
   .pane-pick { display: none; }
 
-  /* What reaches the device in a native output (E5, E6b-D10): "24/96 bit-perfect", "16/44.1 DAC", on the artist's line. */
-  .route {
-    flex: none;
-    padding-right: var(--mm-space-2);
-    font-family: var(--mm-font-label);
-    font-size: var(--mm-text-xs);
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    opacity: .8;
-  }
   /* Each of the display's text lines: the state glyph and the title, or the artist and the badge; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .state {
@@ -224,8 +249,38 @@
   .lcd-mark { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; align-self: center; }
   .lcd-spectrum { display: block; width: 100%; height: 100%; }
   /* While the music plays, the spectrum stands as tall as the display's lines and meter together,
-     taller than the logo it replaces. */
-  .lcd-mark.playing { align-self: stretch; height: auto; min-height: 3rem; }
+     taller than the logo it replaces. It is a key with no keycap: a click turns it to the format. */
+  .lcd-mark.playing {
+    align-self: stretch;
+    height: auto;
+    min-height: 3rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    container-type: inline-size;
+  }
+  .lcd-mark.playing:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
+  /* The song's format in the spectrum's place: "24/96" in large dots, how it reaches the device under it. */
+  .lcd-format { display: grid; place-content: center; justify-items: center; gap: var(--mm-space-1); width: 100%; height: 100%; }
+  .lcd-format .format {
+    font-family: var(--mm-font-display);
+    font-weight: 700;
+    font-size: clamp(.875rem, 24cqw, 1.875rem);
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .lcd-format .quality {
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-size: clamp(.5rem, 9cqw, var(--mm-text-xs));
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    opacity: .85;
+  }
   .lcd-logo {
     display: block;
     width: 100%;
@@ -282,6 +337,7 @@
   /* Phones: a smaller mark, so the title keeps its room. */
   @media (max-width: 640px) {
     .lcd-mark { width: 2.5rem; height: 2.5rem; }
+    .lcd-mark.playing { width: 4.5rem; }
   }
   @media (min-width: 901px) and (max-width: 1024px) {
     .wordmark { display: none; }

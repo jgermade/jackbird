@@ -62,3 +62,10 @@ export function fileUrl(root: string, path: string): string {
   const names = `${root.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`.split("/");
   return `file://${names.map((name) => encodeURIComponent(name)).join("/")}`;
 }
+
+/** A file's kind as a display shows it, from its name: "MP3", "FLAC"; empty without an extension. */
+export function fileKind(path: string): string {
+  const name = path.split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot + 1).toUpperCase() : "";
+}

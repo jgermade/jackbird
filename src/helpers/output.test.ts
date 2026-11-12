@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_OUTPUT, describeFormat, devicesFor, fileUrl, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo } from "./output.ts";
+import { DEFAULT_OUTPUT, describeFormat, devicesFor, fileKind, fileUrl, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo } from "./output.ts";
 
 const devices: DeviceInfo[] = [
   { id: "coreaudio:dac", name: "USB DAC", default: true, modes: ["shared", "exclusive"] },
@@ -53,5 +53,17 @@ describe("output", () => {
   it("leaves out a depth that is not known", () => {
     assert.equal(describeFormat("AAC", { rate: 44100, channels: 2, bits: 0 }), "AAC · 44.1 kHz");
     assert.equal(shortFormat("AAC", { rate: 44100, channels: 2, bits: 0 }), "AAC");
+  });
+});
+
+describe("fileKind", () => {
+  it("names a file's kind from its extension", () => {
+    assert.equal(fileKind("Artist/Album/01 Song.mp3"), "MP3");
+    assert.equal(fileKind("song.Flac"), "FLAC");
+  });
+  it("is empty without an extension, or for a hidden file's name", () => {
+    assert.equal(fileKind("Artist/README"), "");
+    assert.equal(fileKind(".hidden"), "");
+    assert.equal(fileKind(""), "");
   });
 });

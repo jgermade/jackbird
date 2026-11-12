@@ -7,7 +7,7 @@
 
 import { $reactive } from "jq79";
 import { invoke } from "@tauri-apps/api/core";
-import { describeFormat, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo, type OutputKind } from "../helpers/output";
+import { describeFormat, fileKind, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo, type OutputKind } from "../helpers/output";
 import { t } from "./i18n";
 import type { Sounding } from "./native-audio";
 import { isDesktop, isPhone } from "./platform";
@@ -96,16 +96,24 @@ export function soundingText(): string {
   });
 }
 
-/** The display's short line: "24/96 bit-perfect"; empty in the embedded output. */
-export function soundingBadge(): string {
+/**
+ * What the display shows of the song's format, in two parts: the format ("24/96", "MP3") and how
+ * it reaches the device ("bit-perfect", "DAC", "native"; empty when there is nothing to say). In a
+ * native output, what it reports; in the embedded one (the browser's), the file's kind alone, from
+ * `relativePath`. Null with neither.
+ */
+export function soundingParts(relativePath?: string): { format: string; quality: string } | null {
   const sounding = output.sounding;
-  if (!sounding) return "";
+  if (!sounding) {
+    const kind = relativePath ? fileKind(relativePath) : "";
+    return kind ? { format: kind, quality: "" } : null;
+  }
   const format = shortFormat(sounding.codec, sounding.format);
   // On a phone (E6b-D10): bit-perfect to a DAC, through Android's mixer to a USB DAC ("DAC"), or the
   // format alone to the phone's own output.
   if (output.phone) {
-    if (sounding.route.fidelity === "bit-perfect") return `${format} ${t("output.badge.bit-perfect")}`;
-    return sounding.route.device !== "Android" ? `${format} ${t("output.badge.dac")}` : format;
+    if (sounding.route.fidelity === "bit-perfect") return { format, quality: t("output.badge.bit-perfect") };
+    return { format, quality: sounding.route.device !== "Android" ? t("output.badge.dac") : "" };
   }
-  return `${format} ${t(`output.badge.${sounding.route.fidelity}`)}`;
+  return { format, quality: t(`output.badge.${sounding.route.fidelity}`) };
 }
