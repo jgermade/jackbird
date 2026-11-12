@@ -110,8 +110,8 @@
               </div>
               <!-- Where the song is, on two lines too: its minutes, and under them its seconds. -->
               <div class="lcd-time" :aria-label="positionText">
-                <Counter>{{ minutes }}</Counter>
-                <Counter>{{ seconds }}</Counter>
+                <span class="minutes"><Counter>{{ minutes }}</Counter></span>
+                <span class="seconds"><Counter>{{ seconds }}</Counter></span>
               </div>
             </div>
             <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
@@ -249,6 +249,8 @@
   .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
   .lcd-text { display: grid; flex: 1 1 auto; gap: var(--mm-space-1); min-width: 0; }
   .lcd-time { display: grid; flex: none; justify-items: end; gap: 0; line-height: 1; }
+  /* The seconds told from the minutes, subtly: dimmer. */
+  .lcd-time .seconds { opacity: .6; }
   @media (min-width: 641px) {
     .lcd-mark { width: 7rem; }
   }
