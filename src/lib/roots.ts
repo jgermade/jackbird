@@ -3,6 +3,7 @@
 // They write the `library` store; the views read it.
 
 import { $toRaw } from "jq79";
+import type { SampleList } from "../helpers/samples";
 import { emptyMetadata } from "../helpers/metadata";
 import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
@@ -314,6 +315,21 @@ export async function openFolder(server?: ServiceClient): Promise<void> {
     if (source) {
       await hydrateRoot(source, {});
     }
+  } catch (error) {
+    library.errorMessage = error instanceof Error ? error.message : t("message.scanFailed");
+  } finally {
+    library.loading = false;
+  }
+}
+
+/** Opens the demo's sample music (lib/sources/samples.ts) as a folder. */
+export async function openSamples(list: SampleList): Promise<void> {
+  library.loading = true;
+  library.errorMessage = null;
+  library.infoMessage = null;
+  try {
+    const { openSampleSource } = await import("./sources/samples");
+    await hydrateRoot(await openSampleSource(list), {});
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : t("message.scanFailed");
   } finally {

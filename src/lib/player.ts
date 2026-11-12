@@ -9,7 +9,7 @@
 // the app's native output (E5, lib/native-audio.ts); on a phone, through the phone's native player
 // (E6b, lib/phone-audio.ts), handed the queue's next tracks ahead so it goes on in the background.
 
-import { $computed, $toRaw } from "jq79";
+import { $computed, $reactive, $toRaw } from "jq79";
 import {
   addTo,
   clearUpcoming as clearAfterCurrent,
@@ -23,7 +23,8 @@ import {
 import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
-import { spectrumBands } from "../helpers/spectrum";
+import { SPECTRUM_DECIBELS, SPECTRUM_RANGE, SPECTRUM_TILT, spectrumBands } from "../helpers/spectrum";
+import { streamInfo, streamInfoNeeds, type StreamInfo } from "../helpers/stream-info";
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
 import { PhoneAudio, phoneAudioAvailable, type PhoneSong } from "./phone-audio";
@@ -217,6 +218,9 @@ function routeThroughAnalyser(element: HTMLAudioElement): void {
       const node = made.createAnalyser();
       node.fftSize = 1024;
       node.smoothingTimeConstant = 0.8;
+      // Headroom for the bass (see SPECTRUM_DECIBELS); crates/audio's spectrum spans the same.
+      node.minDecibels = SPECTRUM_DECIBELS.min;
+      node.maxDecibels = SPECTRUM_DECIBELS.max;
       made.createMediaElementSource(element).connect(node);
       node.connect(made.destination);
       context = made;
@@ -242,13 +246,13 @@ export function readSpectrum(bands: number): number[] | null {
   }
   if (native && audio === native) {
     const heard = native.spectrum();
-    return heard ? spectrumBands(heard.bins, bands, heard.rate) : null;
+    return heard ? spectrumBands(heard.bins, bands, heard.rate, SPECTRUM_RANGE, SPECTRUM_TILT) : null;
   }
   if (!analyser || !bins || !context) {
     return null;
   }
   analyser.getByteFrequencyData(bins);
-  return spectrumBands(bins, bands, context.sampleRate);
+  return spectrumBands(bins, bands, context.sampleRate, SPECTRUM_RANGE, SPECTRUM_TILT);
 }
 
 function release(): void {
@@ -308,6 +312,51 @@ async function refresh(force = false): Promise<void> {
  * Gives the loaded track's media to the element that is to play it: the native player for a
  * desktop folder's track (unless the embedded output is chosen), else the embedded element.
  */
+/**
+ * What the loaded track's audio is (codec, rate, depth or bitrate), read from the start of its
+ * file once it is loaded: the display shows it with the song (the faceplate's format). `key` is
+ * the track it was read for; `info` stays null until it is read, or when it cannot be.
+ */
+export const stream = $reactive({ key: null as string | null, info: null as StreamInfo | null });
+
+/** The most a file is read for it: an MP3's tag with a large cover in front of its audio. */
+const STREAM_HEAD_MAX = 16 * 1024 * 1024;
+
+/** Reads the start of the track at `url`, as much as streamInfo needs, and keeps what it says. */
+async function learnStream(key: string, url: string): Promise<void> {
+  stream.key = key;
+  stream.info = null;
+  try {
+    const reader = (await fetch(url)).body?.getReader();
+    if (!reader) return;
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    let need = 10;
+    while (length < need) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      chunks.push(value);
+      length += value.length;
+      if (need === 10 && length >= 10) need = Math.min(STREAM_HEAD_MAX, streamInfoNeeds(join(chunks, length)));
+    }
+    void reader.cancel().catch(() => undefined);
+    if (stream.key === key) stream.info = streamInfo(join(chunks, length));
+  } catch {
+    // Not readable from here (a phone's file:// URL): the native player says what it plays.
+  }
+}
+
+function join(chunks: Uint8Array[], length: number): Uint8Array {
+  if (chunks.length === 1) return chunks[0];
+  const all = new Uint8Array(length);
+  let at = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, at);
+    at += chunk.length;
+  }
+  return all;
+}
+
 function setSource(opened: MediaHandle, key: string): void {
   const target = phone ?? (native && opened.native && output.kind !== "embedded" ? native : embedded);
   if (!target) return;
@@ -326,6 +375,7 @@ function setSource(opened: MediaHandle, key: string): void {
     embedded.src = opened.url;
   }
   output.sounding = null;
+  if (stream.key !== key) void learnStream(key, opened.url);
 }
 
 /** A track as the phone's player takes it: its media URL, and what the lock screen shows. */

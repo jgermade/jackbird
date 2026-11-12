@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>jackbird — your library, right where it is</title>
+  <meta name="description" content="jackbird plays your MP3 and FLAC collection and fixes its tags and covers, straight in your files. In the browser, on the desktop, on a phone, or on a home server.">
+  <meta name="theme-color" content="#1f2022">
+  <link rel="icon" href="./brand/jackbird-metal.svg" type="image/svg+xml">
+  <!-- The tone before the first paint: the one chosen here last time, else the system's. -->
+  <script>
+    try {
+      const saved = localStorage.getItem("jackbird-landing-tone");
+      const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    } catch { document.documentElement.dataset.theme = "dark"; }
+  </script>
+  <link rel="stylesheet" href="./theme/fonts.css">
+  <link rel="stylesheet" href="./theme/tokens.css">
+  <link rel="stylesheet" href="./landing.css">
+  <script src="./landing.js" defer></script>
+</head>
+<body>
+  <!-- The faceplate: the name in raised chrome, the way round, the tone switch. -->
+  <header class="faceplate">
+    <a class="wordmark" href="#top" data-label="Jackbird" aria-label="jackbird, top of the page">Jackbird</a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#platforms">Get it</a>
+      <a href="./design/">Design system</a>
+      <a href="https://github.com/jgermade/jackbird">Source</a>
+    </nav>
+    <button class="key tone" type="button" aria-label="Switch between Silver and Graphite">
+      <span class="led" aria-hidden="true"></span>
+      <span class="tone-name">Graphite</span>
+    </button>
+  </header>
+
+  <main id="top">
+    <!-- The hero: the pitch at the left, the deck at the right, lit and playing. -->
+    <section class="hero">
+      <div class="pitch">
+        <p class="eyebrow"><span class="led on" aria-hidden="true"></span> MP3 · FLAC · No upload, ever</p>
+        <h1>Your library, <em>right where it is.</em></h1>
+        <p class="lede">
+          jackbird plays your music collection and fixes its tags and covers, one track or a hundred at
+          once. Every change goes straight into your files. There is no cloud in between.
+        </p>
+        <div class="actions">
+          <a class="key primary" href="./demo/">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
+            Try the demo
+          </a>
+          <a class="key" href="https://github.com/jgermade/jackbird/releases/latest">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m-3.5-3.5L8 10l3.5-3.5M3 13h10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            Download
+          </a>
+        </div>
+        <p class="note">The demo runs in Chrome, Edge, Brave or Opera on a desktop: it opens a folder of yours, and nothing leaves your computer.</p>
+      </div>
+
+      <!-- The app's real faceplate, captured from it (scripts/screenshots.cjs), as a unit's front. -->
+      <figure class="unit">
+        <img class="only-light" src="./screenshots/faceplate-silver.png" alt="jackbird's faceplate in Silver: the display playing a track, its spectrum lit, and the transport keys" width="2880" height="252">
+        <img class="only-dark" src="./screenshots/faceplate-graphite.png" alt="jackbird's faceplate in Graphite: the display glowing, a track playing, and the transport keys" width="2880" height="252">
+        <div class="stripes" aria-hidden="true"><span></span><span></span><span></span></div>
+      </figure>
+    </section>
+
+    <!-- The app itself, in the tone the page is in. -->
+    <section class="shot">
+      <figure class="window">
+        <div class="window-bar"><span></span><span></span><span></span></div>
+        <img class="only-light" src="./screenshots/library-silver.png" alt="jackbird's library in Silver, with a track playing" loading="lazy">
+        <img class="only-dark" src="./screenshots/library-graphite.png" alt="A two-disc album in jackbird's Graphite tone, with a track playing" loading="lazy">
+      </figure>
+      <p class="caption">Silver or Graphite: the switch at the top of this page turns both. <span>Albums, artists and covers made up.</span></p>
+    </section>
+
+    <section class="features" id="features">
+      <h2 class="section-label">What it does</h2>
+      <div class="modules">
+        <article class="module">
+          <header><span class="led on ok"></span><span class="label">Play</span></header>
+          <h3>Your folder, laid out as albums</h3>
+          <p>Open a folder of MP3 and FLAC files and it shows your albums with their covers, discs and tracks, and plays them gaplessly from where they lie.</p>
+        </article>
+        <article class="module">
+          <header><span class="led on"></span><span class="label">Edit</span></header>
+          <h3>Tags, one track or many</h3>
+          <p>Title, artist, album, year, track numbers. Select three tracks or thirty and fix what they share in one go. It writes ID3 and Vorbis comments itself.</p>
+        </article>
+        <article class="module">
+          <header><span class="led on warn"></span><span class="label">Covers</span></header>
+          <h3>Artwork that sticks</h3>
+          <p>Drop an image on an album and it goes into every file of it, so the cover follows the music to any player.</p>
+        </article>
+        <article class="module">
+          <header><span class="led on ok"></span><span class="label">Private</span></header>
+          <h3>Nothing is uploaded</h3>
+          <p>No account, no server, no sync. The browser asks once for permission to edit the folder; your files never leave it.</p>
+        </article>
+        <article class="module">
+          <header><span class="led on"></span><span class="label">Deck</span></header>
+          <h3>Built like the gear you miss</h3>
+          <p>Keys that travel, a dot-matrix display, labels printed on the faceplate, lettering in chrome. Two tones: Silver and Graphite.</p>
+        </article>
+        <article class="module">
+          <header><span class="led on warn"></span><span class="label">Family</span></header>
+          <h3>One library for the house</h3>
+          <p>Run it as a service on a NAS or a Raspberry Pi: people, roles, sign-in by email and passkeys, and every browser at home as its front panel.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="phone">
+      <img src="./screenshots/phone.png" alt="jackbird on a phone, playing a track" loading="lazy">
+      <div>
+        <h2 class="section-label">In your pocket</h2>
+        <p class="statement">The same deck on a phone, with the queue playing in the background, screen off.</p>
+        <p>On Android it is an app that opens a folder on the phone and plays it natively. Everywhere else, the web app scales to the width of your hand.</p>
+      </div>
+    </section>
+
+    <section class="design" id="design">
+      <div>
+        <h2 class="section-label">The design system</h2>
+        <p class="statement">Deck: every key, LED, display and tone, on one sheet.</p>
+        <p>jackbird's interface is drawn from one theme's tokens and components. Its specimen sheet is live: press the keys, switch the tones.</p>
+        <a class="key big" href="./design/">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v5H2zm7 0h5v5H9zM2 9h5v5H2zm7 0h5v5H9z"/></svg>
+          Open the design system
+        </a>
+      </div>
+      <a class="swatches" href="./design/" aria-label="Open the design system">
+        <span style="--c: var(--mm-chassis)"></span>
+        <span style="--c: var(--mm-display-bg)"></span>
+        <span style="--c: var(--mm-display-fg)"></span>
+        <span style="--c: var(--mm-stripe-1)"></span>
+        <span style="--c: var(--mm-stripe-2)"></span>
+        <span style="--c: var(--mm-stripe-3)"></span>
+        <span style="--c: var(--mm-fg)"></span>
+        <span style="--c: var(--mm-accent)"></span>
+      </a>
+    </section>
+
+    <section class="platforms" id="platforms">
+      <h2 class="section-label">Get it</h2>
+      <div class="bays">
+        <a class="bay" href="./demo/">
+          <span class="label">Browser</span>
+          <strong>Try it now</strong>
+          <span>Chromium-based browsers on a desktop. No install.</span>
+        </a>
+        <a class="bay" href="https://github.com/jgermade/jackbird/releases/latest">
+          <span class="label">Desktop</span>
+          <strong>macOS · Windows · Linux</strong>
+          <span>A native app with its own audio output.</span>
+        </a>
+        <a class="bay" href="https://github.com/jgermade/jackbird/blob/main/docs/install.md">
+          <span class="label">Service</span>
+          <strong>Docker · NAS · Raspberry Pi</strong>
+          <span>One binary with the web inside, for the whole family.</span>
+        </a>
+        <a class="bay" href="https://github.com/jgermade/jackbird/releases/latest">
+          <span class="label">Phone</span>
+          <strong>Android</strong>
+          <span>An APK on every release.</span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="stripes"><span></span><span></span><span></span></div>
+    <p>
+      <span class="wordmark small" data-label="Jackbird">Jackbird</span>
+      Open source, on <a href="https://github.com/jgermade/jackbird">GitHub</a>.
+    </p>
+  </footer>
+</body>
+</html>

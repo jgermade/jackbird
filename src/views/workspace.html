@@ -19,11 +19,13 @@
   const SourcesPanel = await import("./sources-panel.html")
   const { t } = await import("../lib/i18n")
   const { tabsHere } = await import("../lib/adding")
+  const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   // The welcome: no folder open, none coming back, and something to offer.
   const welcome = (): boolean => !library.restoring && library.roots.length === 0 && tabsHere().length > 0
   const { parseViewState } = await import("../helpers/session")
   const { library } = await import("../lib/library")
-  const { SESSION_KEYS, readSession, writeSession } = await import("../lib/storage")
+  const { SESSION_KEYS, STORAGE_KEYS, readSession, readStored, writeSession, writeStored } = await import("../lib/storage")
+  const { SPLIT, clampSplit, parseSplit, splitByKey } = await import("../helpers/split")
   const { ui } = await import("../lib/ui")
   const { clearSelection } = await import("../lib/workspace")
 
@@ -42,6 +44,62 @@
   }
   window.addEventListener("keydown", escape)
   $destroyed(() => window.removeEventListener("keydown", escape))
+
+  // The split between the panes, on wider screens: the library's width in rem, dragged by the
+  // separator on the line between them (or moved with its keys: the arrows a rem, Home and End to
+  // the ends; a double click goes back to the first width). Kept for the next visit. The CSS keeps
+  // it within the window's room as the window changes; this keeps the stored value there too.
+  // While dragging, the width is written straight on the element, from this closure: a top-level
+  // `let` would be a store field written on every move.
+  let splitWidth: number = parseSplit(readStored(STORAGE_KEYS.splitWidth)) ?? SPLIT.initial
+  let splitting = false
+  const split = (() => {
+    let start: { x: number; width: number; id: number } | null = null
+    let live = splitWidth
+    const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+    const panes = () => $self(".panes") as HTMLElement | null
+    const total = () => (panes()?.clientWidth ?? 0) / rem()
+    const current = () => clampSplit(splitWidth, total())
+    const show = (width: number) => panes()?.style.setProperty("--split", `${width}rem`)
+    const keep = (width: number) => {
+      splitWidth = Math.round(width * 100) / 100
+      writeStored(STORAGE_KEYS.splitWidth, String(splitWidth))
+    }
+    return {
+      most: () => clampSplit(Number.POSITIVE_INFINITY, total()),
+      down(event: PointerEvent) {
+        if (event.button !== 0) return
+        event.preventDefault()
+        start = { x: event.clientX, width: current(), id: event.pointerId }
+        live = start.width
+        ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+        splitting = true
+      },
+      move(event: PointerEvent) {
+        if (!start || event.pointerId !== start.id) return
+        live = clampSplit(start.width + (event.clientX - start.x) / rem(), total())
+        show(live)
+      },
+      up(event: PointerEvent) {
+        if (!start || event.pointerId !== start.id) return
+        start = null
+        splitting = false
+        keep(live)
+      },
+      key(event: KeyboardEvent) {
+        const width = splitByKey(event.key, current(), total())
+        if (width === null) return
+        event.preventDefault()
+        show(width)
+        keep(width)
+      },
+      reset() {
+        show(SPLIT.initial)
+        splitWidth = SPLIT.initial
+        writeStored(STORAGE_KEYS.splitWidth, "")
+      }
+    }
+  })()
 
   // Which pane is in view, once a swipe (or a scroll started here) ends: on
   // `scrollend`, so a smooth scroll does not set it back half-way. Phones
@@ -104,13 +162,22 @@
          roots' bar's tab offers, a folder or a server (views/sources-panel.html). -->
     <section :if="welcome()" class="welcome" :aria-label="t('sources.eyebrow')">
       <div class="welcome-body">
+        <img class="welcome-logo" :src="logoUrl" alt="" width="1152" height="1061" />
         <p class="welcome-lead">{{ t("sources.welcome") }}</p>
         <SourcesPanel />
       </div>
     </section>
-    <div :else class="panes" @scrollend="settle($event)">
+    <div :else class="panes" :class.splitting="splitting" :style="`--split: ${splitWidth}rem`" @scrollend="settle($event)">
       <div class="pane tree-pane"><Library /></div>
       <div class="pane sheet-pane"><AlbumSheet /></div>
+      <!-- The separator between them, wider screens only: drag it, or move it with its keys. -->
+      <div :if="!narrow" class="splitter" :class.dragging="splitting" role="separator" tabindex="0"
+           aria-orientation="vertical" :aria-label="t('workspace.split')"
+           :aria-valuenow="String(Math.round(splitWidth))" :aria-valuemin="String(SPLIT.minLibrary)" :aria-valuemax="String(Math.round(split.most()))"
+           @pointerdown="split.down($event)" @pointermove="split.move($event)" @pointerup="split.up($event)" @pointercancel="split.up($event)"
+           @keydown="split.key($event)" @dblclick="split.reset()">
+        <span class="grip" aria-hidden="true"></span>
+      </div>
     </div>
     <QueuePanel :if="narrow && ui.queueOpen" />
   </div>
@@ -131,14 +198,92 @@
   .footbar { display: none; }
   /* The welcome: one space, its content centred in a readable column. */
   .welcome { display: flex; flex: 1 1 auto; justify-content: center; min-height: 0; overflow: auto; padding: var(--mm-space-6) var(--mm-space-4); background: var(--mm-sheet); }
-  .welcome-body { display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; }
+  /* A container the sources' panel lays its options out by (two columns where there is room). */
+  .welcome-body { container: welcome / inline-size; display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; }
+  /* Desktops and tablets: wider, for the options side by side. */
+  @media (min-width: 641px) {
+    .welcome-body { max-width: 46rem; }
+  }
   .welcome-lead { margin: 0; font-size: var(--mm-text-md); color: var(--mm-fg); }
+  /* With the options side by side, the question over them spans both: its size follows the
+     welcome's width (English fills the line; a longer translation takes two, balanced). */
+  @container welcome (min-width: 36rem) {
+    .welcome-lead { padding-block: var(--mm-space-2) var(--mm-space-4); font-size: 3.2cqi; line-height: 1.25; text-wrap: balance; }
+  }
+  /* The brand's own logo, in its metal, centred over what the welcome offers. */
+  .welcome-logo { display: block; justify-self: center; width: 9rem; height: auto; aspect-ratio: 1152 / 1061; margin-bottom: var(--mm-space-4); }
+  /* Phones: smaller, so what the welcome offers stays in view under it. */
+  @media (max-width: 480px) {
+    .welcome-logo { width: 6.5rem; margin-bottom: var(--mm-space-2); }
+  }
   .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   .panes {
+    /* The library's width as chosen (--split, in rem), within the room: at least 16rem, leaving the
+       sheet at least 20rem (src/helpers/split.ts keeps the same bounds). */
+    --split-at: clamp(16rem, var(--split, 23.75rem), calc(100% - 20rem));
+    position: relative;
     display: grid;
     flex: 1 1 auto;
-    grid-template-columns: minmax(16rem, 23.75rem) minmax(0, 1fr);
+    grid-template-columns: var(--split-at) minmax(0, 1fr);
     min-height: 0;
+  }
+  .panes.splitting { cursor: col-resize; user-select: none; }
+
+  /* The separator: a strip over the line between the panes, wide enough for a finger, with a grip
+     in its middle (a small key with ridges) that says it can be dragged. The line lights up while
+     it is pointed at, dragged or focused. */
+  .splitter {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--split-at) - .625rem);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+  .splitter::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 1px);
+    width: 2px;
+    background: transparent;
+    transition: background var(--mm-duration) var(--mm-ease);
+  }
+  .grip {
+    position: relative;
+    width: .625rem;
+    height: 2.75rem;
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: var(--mm-radius-full);
+    background: linear-gradient(90deg, var(--mm-key-top), var(--mm-key-bottom));
+    box-shadow: var(--mm-key-shadow);
+    transition: border-color var(--mm-duration) var(--mm-ease), background var(--mm-duration) var(--mm-ease);
+  }
+  /* Its ridges, printed across it. */
+  .grip::after {
+    content: "";
+    position: absolute;
+    inset: .875rem .125rem;
+    background: repeating-linear-gradient(180deg, var(--mm-fg-subtle) 0 1px, transparent 1px .25rem);
+  }
+  @media (hover: hover) {
+    .splitter:hover::before { background: var(--mm-accent); }
+    .splitter:hover .grip { border-color: var(--mm-accent); }
+  }
+  .splitter:active::before, .splitter.dragging::before, .splitter:focus-visible::before { background: var(--mm-accent); }
+  .splitter:active .grip, .splitter.dragging .grip, .splitter:focus-visible .grip {
+    border-color: var(--mm-accent);
+    background: linear-gradient(90deg, var(--mm-accent), var(--mm-accent-hover));
+  }
+  .splitter:active .grip::after, .splitter.dragging .grip::after, .splitter:focus-visible .grip::after {
+    background: repeating-linear-gradient(180deg, var(--mm-on-accent-key) 0 1px, transparent 1px .25rem);
   }
   .pane { min-height: 0; overflow: auto; }
   .tree-pane { border-right: var(--mm-border-width) solid var(--mm-border); background: var(--mm-surface); }

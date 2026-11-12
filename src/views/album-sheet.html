@@ -35,6 +35,8 @@
   }
 
   const titleOf = (track: Track): string => track.metadata.title || track.name
+  // A disc's number column, only when one of its tracks has a number; a track without one leaves it blank.
+  const discNumbered = (disc: { tracks: Track[] }): boolean => disc.tracks.some((track) => !!track.metadata.trackNumber?.trim())
 
   // Over the heading: what is shown, by the library's view (a folder, a
   // playlist, or the view's name).
@@ -97,7 +99,8 @@
 
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">
-      <header class="scope-head">
+      <!-- What is shown, over its albums; not for the whole root, whose name and count its tab shows. -->
+      <header :if="!scope().whole" class="scope-head">
         <span class="mm-legend">{{ eyebrow() }}</span>
         <h2>{{ scope().label }}</h2>
         <p>{{ tn("album.count", albums().length) }}, {{ tn("tracks.count", scope().tracks.length) }}</p>
@@ -141,7 +144,7 @@
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></td>
-                    <td class="mm-num">{{ track.metadata.trackNumber || "-" }}</td>
+                    <td :if="discNumbered(disc)" class="mm-num">{{ track.metadata.trackNumber?.trim() ?? "" }}</td>
                     <td><span class="mm-title">{{ titleOf(track) }}</span></td>
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" />
@@ -188,12 +191,14 @@
   .landing p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); line-height: var(--mm-leading); }
 
 
-  .albums { display: grid; gap: var(--mm-space-5); padding: var(--mm-space-5); }
+  /* Its albums are laid out by the sheet's own width, not the screen's: a narrow pane beside the
+     tree (a tablet upright) stacks them as a phone does. */
+  .albums { display: grid; gap: var(--mm-space-5); padding: var(--mm-space-5); container-type: inline-size; }
   .scope-head { display: grid; gap: var(--mm-space-1); }
   .scope-head h2 { font-size: var(--mm-text-2xl); overflow-wrap: anywhere; }
   .scope-head p { margin: 0; color: var(--mm-fg-muted); }
 
-  /* The cover beside the head and the discs; on phones the discs go under both. */
+  /* The cover beside the head and the discs; in a narrow sheet the discs go under both. */
   .album {
     display: grid;
     grid-template-columns: 8.25rem minmax(0, 1fr);
@@ -243,6 +248,8 @@
 
   @media (max-width: 720px) {
     .albums { padding: var(--mm-space-4); }
+  }
+  @container (max-width: 30rem) {
     .album {
       grid-template-columns: 5.5rem minmax(0, 1fr);
       grid-template-rows: auto auto;

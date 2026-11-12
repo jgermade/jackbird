@@ -1,5 +1,11 @@
-# Deploys a released build to GitHub Pages. It does not rebuild: it publishes the
-# <repo>-vX.Y.Z.zip attached to the release, which is what release.yml tested and built.
+# Deploys a release's GitHub Pages site to GitHub Pages. It builds nothing: it publishes the
+# <repo>-vX.Y.Z-pages.zip attached to the release (release.yml puts it together on the release's own
+# build: the landing page at the root, the app as its demo in /demo/, the design system at /design/,
+# screenshots taken on that build), so what goes live is what was released, landing page included,
+# and deploying an older tag rolls the whole site back to it.
+#
+# A release from before the pages zip (v0.1.13 and earlier) is put together here instead, as it
+# was then: the landing page from this workflow's commit, the release's app zip in /demo/.
 #
 # Needs Settings → Pages → Source: GitHub Actions.
 name: deploy
@@ -39,16 +45,40 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      - name: Download the release build
+      - name: Download the release's site
+        id: site
         env:
           TAG: ${{ inputs.tag }}
         run: |
           if [ -z "$TAG" ] || [ "$TAG" = latest ]; then
             TAG="$(gh release view --json tagName --jq .tagName)"
           fi
-          gh release download "$TAG" --pattern "${GITHUB_REPOSITORY#*/}-*.zip" --dir release
-          unzip -q release/*.zip -d site
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "Deploying \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          if gh release download "$TAG" --pattern "${GITHUB_REPOSITORY#*/}-*-pages.zip" --dir release; then
+            unzip -q release/*-pages.zip -d site
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No pages zip on \`$TAG\`: put together here." >> "$GITHUB_STEP_SUMMARY"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A release from before the pages zip: the landing page from this commit, the app zip in /demo/.
+      - if: steps.site.outputs.found == 'false'
+        uses: actions/checkout@v6
+
+      - if: steps.site.outputs.found == 'false'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Put the site together (older releases)
+        if: steps.site.outputs.found == 'false'
+        run: |
+          node scripts/build-landing.mjs site
+          gh release download "$TAG" --pattern "${GITHUB_REPOSITORY#*/}-v*.zip" --dir app
+          unzip -q "$(ls app/*.zip | grep -v -- -pages.zip | head -n 1)" -d site/demo
+          cp -r samples site/demo/samples
 
       - uses: actions/configure-pages@v5
 

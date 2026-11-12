@@ -9,7 +9,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { t } = await import("../lib/i18n")
-  const { addFrom, addServer, adding, folderSources, recentFolders, reopenRecent, serverName, shownTab } = await import("../lib/adding")
+  const { addFrom, addSamples, addServer, adding, folderSources, recentFolders, reopenRecent, serverName, shownTab } = await import("../lib/adding")
 
   // Each folder source is a key that opens its dialog: the device's own (the system's, Android's
   // folder picker, the browser's), or the server's folder chooser.
@@ -44,6 +44,11 @@
     <div :each="choice in folders()" :key="choice.kind" class="source">
       <p class="hint">{{ choice.hint }}</p>
       <Key :variant="choice.kind === 'device' ? 'primary' : 'secondary'" @click="addFrom(choice.kind)">{{ choice.label }}</Key>
+    </div>
+    <!-- The demo's sample music, where the page has some beside it. -->
+    <div :if="adding.samples" class="source">
+      <p class="hint">{{ t("sources.samplesHint") }}</p>
+      <Key @click="addSamples()">{{ t("sources.samples") }}</Key>
     </div>
   </section>
 
@@ -98,4 +103,17 @@
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
   .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
   .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
+  /* In the welcome on a phone (one column): the keys centred under their hints. */
+  @container welcome (max-width: 35.99rem) {
+    .source { justify-items: center; }
+    .source > .hint { justify-self: stretch; }
+  }
+  /* In the welcome, where it is wide enough (views/workspace.html's container): the options side by
+     side, a line between them; the folders closed lately across both. The dialog keeps one column. */
+  @container welcome (min-width: 36rem) {
+    .tab:has(> .source + .source) { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--mm-space-6); align-items: start; }
+    .tab:has(> .source + .source) > .recent { grid-column: 1 / -1; }
+    .tab:has(> .source + .source) > .source + .source { padding-top: 0; padding-left: var(--mm-space-6); border-top: 0; border-left: var(--mm-border-width) solid var(--mm-border); }
+    .tab:has(> .source + .source) > .recent + .source { padding-top: 0; border-top: 0; }
+  }
 </style>

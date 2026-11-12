@@ -2,8 +2,11 @@
 # the service's binaries (service.yml; static Linux ones and macOS x64 from ship.yml, which also pushes
 # the Docker image to ghcr.io), Android's APK (phone-release.yml, signed with the keystore in the
 # repository's secrets), publishes a GitHub release with the build attached as
-# <repo>-vX.Y.Z.zip and the bundles and binaries beside it, and, if the `deploy` box is ticked,
-# deploys it (deploy.yml).
+# <repo>-vX.Y.Z.zip and the bundles and binaries beside it, then puts the GitHub Pages site together
+# on that build (the landing page, the app as its demo, the design system, and screenshots taken on
+# the build) and attaches it as <repo>-vX.Y.Z-pages.zip, the screenshots also as screenshot-*.png
+# (the README shows the latest release's), and, if the `deploy` box is ticked, deploys it
+# (deploy.yml publishes the pages zip as it is).
 #
 # Pushes and releases made with the workflow token start no other workflow, which is why
 # build.yml and deploy.yml are called here instead of reacting to the push or the release.
@@ -160,9 +163,69 @@ jobs:
           printf '%s\n' "${files[@]}"
           gh release create "$TAG" "$ASSET" "${files[@]}" --title "$TAG" --generate-notes --verify-tag
 
+  # The GitHub Pages site, put together on the release's own build (the `dist` artifact): the landing
+  # page (scripts/build-landing.mjs) with screenshots taken on the build (scripts/screenshots.cjs),
+  # the build as its demo in demo/ with the sample music beside it (samples/), and the design system
+  # in it, which design/ leads to. Attached
+  # as <repo>-vX.Y.Z-pages.zip, for deploy.yml to publish as it is; the screenshots also on their own
+  # (screenshot-*.png), for the README (releases/latest/download/…). After the release, so a
+  # failure here never holds it back.
+  pages:
+    name: Pages site
+    needs: [version, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.version.outputs.tag }}
+      PLAYWRIGHT: 1.63.0
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+
+      - name: Install ffmpeg and Chromium
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg
+          npm install --prefix "$RUNNER_TEMP/pw" --no-save "playwright@$PLAYWRIGHT"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Take the screenshots on the build
+        run: |
+          python3 -m http.server 4173 --directory dist > /dev/null 2>&1 &
+          for _ in $(seq 30); do curl -sf http://localhost:4173/ > /dev/null && break; sleep 1; done
+          NODE_PATH="$RUNNER_TEMP/pw/node_modules" node scripts/screenshots.cjs http://localhost:4173/ shots
+
+      - name: Put the site together
+        run: |
+          node scripts/build-landing.mjs site
+          cp shots/*.png site/screenshots/
+          cp -r dist site/demo
+          # The demo's sample music (samples/), offered beside the app: in the site only, not in the build.
+          cp -r samples site/demo/samples
+          asset="${GITHUB_REPOSITORY#*/}-$TAG-pages.zip"
+          (cd site && zip -qr "../$asset" .)
+          for file in shots/*.png; do mv "$file" "shots/screenshot-${file#shots/}"; done
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+
+      - name: Attach it to the release
+        run: gh release upload "$TAG" "$ASSET" shots/screenshot-*.png --clobber
+
   deploy:
     name: Deploy
-    needs: [version, release]
+    needs: [version, pages]
     if: inputs.deploy
     permissions:
       contents: read

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatBytes, formatTime, formatTrackNumber } from "./format.ts";
+import { clockParts, dimmedLead, formatBytes, formatTime, formatTrackNumber, trackLead } from "./format.ts";
 
 describe("formatBytes", () => {
   it("writes zero as 0 Bytes", () => {
@@ -52,5 +52,50 @@ describe("formatTime", () => {
     assert.equal(formatTime(-3), "00:00");
     assert.equal(formatTime(Number.NaN), "00:00");
     assert.equal(formatTime(Number.POSITIVE_INFINITY), "00:00");
+  });
+});
+
+describe("dimmedLead", () => {
+  it("dims the leading zeros but the last digit", () => {
+    assert.equal(dimmedLead("03"), "0");
+    assert.equal(dimmedLead("003"), "00");
+    assert.equal(dimmedLead("12"), "");
+    assert.equal(dimmedLead("10"), "");
+  });
+  it("dims every digit when all are zeros", () => {
+    assert.equal(dimmedLead("00"), "00");
+    assert.equal(dimmedLead("0"), "0");
+  });
+  it("gives nothing for no digits", () => {
+    assert.equal(dimmedLead(""), "");
+  });
+});
+
+describe("clockParts", () => {
+  it("splits a time into dimmed zeros, lit minutes and seconds", () => {
+    assert.deepEqual(clockParts(192.7), { lead: "0", minutes: "3", seconds: "12" });
+    assert.deepEqual(clockParts(5), { lead: "00", minutes: "", seconds: "05" });
+    assert.deepEqual(clockParts(754), { lead: "", minutes: "12", seconds: "34" });
+    assert.deepEqual(clockParts(6000), { lead: "", minutes: "100", seconds: "00" });
+  });
+  it("shows 0 for a time below zero or not known", () => {
+    assert.deepEqual(clockParts(-3), { lead: "00", minutes: "", seconds: "00" });
+    assert.deepEqual(clockParts(Number.NaN), { lead: "00", minutes: "", seconds: "00" });
+    assert.deepEqual(clockParts(Number.POSITIVE_INFINITY), { lead: "00", minutes: "", seconds: "00" });
+  });
+});
+
+describe("trackLead", () => {
+  it("shows a track's number, without its total", () => {
+    assert.equal(trackLead("03/12", false, true), "03");
+    assert.equal(trackLead("7", true, false), "7");
+  });
+  it("shows … for a number not read yet", () => {
+    assert.equal(trackLead(undefined, true, false), "…");
+  });
+  it("leaves a blank as wide as a number when others have one, and nothing when none has", () => {
+    assert.equal(trackLead(undefined, false, true), "\u00a0");
+    assert.equal(trackLead(" ", false, true), "\u00a0");
+    assert.equal(trackLead(undefined, false, false), "");
   });
 });

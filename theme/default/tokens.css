@@ -10,8 +10,8 @@
    the other tone with `data-tone="dark"` or `data-tone="light"`. Shape, type
    and motion are the same in both.
 
-   Sizes are in rem, so everything scales with the root font size: 16px on
-   a desktop, and on a phone a share of the viewport's width
+   Sizes are in rem, so everything scales with the root font size: 18px on
+   a desktop or a tablet, and on a phone a share of the viewport's width
    (`--mm-root-phone`, near the end), so the whole interface scales
    linearly with the screen. Only hairlines (1-2px borders, focus rings)
    stay in px. */
@@ -85,6 +85,9 @@
   --mm-display-bezel: #2b2e2d;
   /* The hairline around the display window. Same in both tones. */
   --mm-display-rim: #777777;
+  /* The pitch of the display's dot grid, the unit its lettering is measured in (5 dots of capital
+     height for a title, 4 for a line under it). Same in both tones. */
+  --mm-display-dot: .1875rem;
 
   /* The J-card stripes, in the order green, orange, red: the brand mark, the
      active tab, the splash; and one each on the tabs that carry a tone (go,
@@ -114,11 +117,13 @@
   --mm-display-inset: inset 0 2px 6px rgba(0, 0, 0, .35);
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .5);
   --mm-brush: rgba(255, 255, 255, .05);
-  /* Lettering in brushed metal, raised from the chassis: the face's sheen top to bottom, a light
-     edge below and a shadow above (the faceplate's wordmark). */
-  --mm-metal-face: linear-gradient(180deg, #a7acb0 0%, #767c81 32%, #3f4448 52%, #81878c 70%, #b4b9bc 100%);
-  --mm-metal-light: rgba(255, 255, 255, .9);
-  --mm-metal-shadow: rgba(0, 0, 0, .45);
+  /* Lettering in brushed metal, raised from the chassis: the face's sheen top to bottom, its
+     horizon slanted, and a shadow cast below and to the right, barely soft (the faceplate's wordmark). The stops
+     are offsets in em from the middle, not shares of the gradient's length, so slanting it keeps
+     the bands as thin as on level lettering. */
+  --mm-metal-angle: 175deg;
+  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #a7acb0 calc(50% - .575em), #767c81 calc(50% - .21em), #3f4448 calc(50% + .023em), #81878c calc(50% + .23em), #b4b9bc calc(50% + .575em));
+  --mm-metal-shadow: 1px 1px .5px rgba(20, 24, 24, .55);
 
   /* ---- type --------------------------------------------------------------- */
 
@@ -243,9 +248,8 @@
   --mm-display-inset: inset 0 2px 8px rgba(0, 0, 0, .8);
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .1);
   --mm-brush: rgba(255, 255, 255, .025);
-  --mm-metal-face: linear-gradient(180deg, #f6f7f8 0%, #c3c7ca 30%, #6f7479 50%, #aeb3b7 68%, #e3e6e8 100%);
-  --mm-metal-light: rgba(255, 255, 255, .18);
-  --mm-metal-shadow: rgba(0, 0, 0, .85);
+  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #f6f7f8 calc(50% - .575em), #c3c7ca calc(50% - .23em), #6f7479 calc(50% + 0em), #aeb3b7 calc(50% + .207em), #e3e6e8 calc(50% + .575em));
+  --mm-metal-shadow: 1px 1px .5px rgba(0, 0, 0, .95);
 
   color-scheme: dark;
 }
@@ -258,8 +262,9 @@
 @media (max-width: 480px) {
   html { font-size: var(--mm-root-phone); }
 }
-/* Tablets and other touch screens wider than a phone: 18px, for fingers too. */
-@media (pointer: coarse) and (min-width: 481px) {
+/* Wider than a phone, a desktop as a tablet: 18px, rows and keys as easy to hit with a
+   pointer as with a finger. */
+@media (min-width: 481px) {
   html { font-size: 18px; }
 }
 

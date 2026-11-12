@@ -24,3 +24,37 @@ export function formatTime(seconds: number): string {
   const whole = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
   return `${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`;
 }
+
+/**
+ * The zeros a display dims at the left of a counter's digits: the leading ones, never the last
+ * digit, unless every digit is a zero ("00" is all dimmed: no minutes yet). "03" gives "0",
+ * "12" gives "", "00" gives "00".
+ */
+export function dimmedLead(digits: string): string {
+  if (/^0+$/.test(digits)) return digits;
+  return (/^0+/.exec(digits.slice(0, -1)) ?? [""])[0];
+}
+
+/**
+ * A time as a display's clock shows it: its minutes (at least two digits) split into the zeros it
+ * dims (`lead`, see dimmedLead) and the rest it lights, and its seconds (two digits). A time below
+ * zero, or not a number (a song whose length is not known yet), shows as 0.
+ */
+export function clockParts(seconds: number): { lead: string; minutes: string; seconds: string } {
+  const whole = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  const minutes = String(Math.floor(whole / 60)).padStart(2, "0");
+  const lead = dimmedLead(minutes);
+  return { lead, minutes: minutes.slice(lead.length), seconds: String(whole % 60).padStart(2, "0") };
+}
+
+/**
+ * What a list shows before a track's title: its number, or while the tags are still being read
+ * "…". A track with no number shows nothing: a blank as wide as a number when others in the list
+ * have one (so the titles line up), or no column at all when none has (`numbered` false: "").
+ */
+export function trackLead(trackNumber: string | undefined, loading: boolean, numbered: boolean): string {
+  const number = formatTrackNumber(trackNumber);
+  if (number) return number;
+  if (loading) return "…";
+  return numbered ? " " : "";
+}

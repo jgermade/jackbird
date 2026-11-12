@@ -13,7 +13,7 @@
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
 
-  const { formatTrackNumber } = await import("../helpers/format")
+  const { formatTrackNumber, trackLead } = await import("../helpers/format")
   const { t } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
@@ -60,7 +60,9 @@
   }
 
   const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
-  const rowLead = (row: Row): string => (row.kind === "track" ? formatTrackNumber(row.trackNumber) || (isLoading() ? "…" : "—") : "")
+  // A track's number before its title; nothing without one, and no column when no track has one.
+  $: numbered = rows().some((row: Row) => row.kind === "track" && formatTrackNumber(row.trackNumber) !== "")
+  const rowLead = (row: Row): string => (row.kind === "track" ? trackLead(row.trackNumber, isLoading(), numbered) : "")
   const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
   const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey
 

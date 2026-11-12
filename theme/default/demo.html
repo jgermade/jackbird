@@ -7,6 +7,7 @@
   const Checkbox = await import("./components/checkbox.html")
   const Counter = await import("./components/counter.html")
   const Display = await import("./components/display.html")
+  const DisplayIcon = await import("./components/display-icon.html")
   const EqBars = await import("./components/eq-bars.html")
   const Field = await import("./components/field.html")
   const Key = await import("./components/key.html")
@@ -271,6 +272,7 @@
         <Display live>
           <div class="mm-display-row">
             <span class="mm-display-label">{{ playing ? "▶ Play" : "■ Stop" }}</span>
+            <span class="mm-display-label"><DisplayIcon>MP3</DisplayIcon> <DisplayIcon filled>VBR</DisplayIcon></span>
             <span class="mm-display-label">Track <Counter size="sm">{{ track.n }}/05</Counter></span>
           </div>
           <div class="mm-display-row">
