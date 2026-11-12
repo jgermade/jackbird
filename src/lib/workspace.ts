@@ -7,7 +7,8 @@
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
-import { detailScope, type Scope } from "../helpers/scope";
+import { byCaret, followFolder } from "../helpers/follow";
+import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
 import { orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
@@ -27,6 +28,7 @@ type Derived = {
   root: RootWorkspace | null;
   rows: WizardTreeRow[];
   scope: Scope;
+  crumbs: Crumb[];
 };
 
 // The last derivation, keyed on the roots array, the active id and the
@@ -70,7 +72,7 @@ function derive(): Derived {
   }
   const root = roots.find((item) => item.id === id) ?? null;
   const rows = root ? rowsOf(root) : [];
-  const derived = { root, rows, scope: detailScope(root, rows) };
+  const derived = { root, rows, scope: detailScope(root, rows), crumbs: scopeCrumbs(root, rows) };
   cache = { roots, id, language, derived };
   return derived;
 }
@@ -82,6 +84,14 @@ export const treeRows = $computed((): Opaque<WizardTreeRow[]> => new Opaque(deri
 
 /** What the album sheet shows. */
 export const detail = $computed((): Opaque<Scope> => new Opaque(derive().scope));
+
+/** Where the album sheet's scope comes from, as a breadcrumb (helpers/scope.ts). */
+export const detailCrumbs = $computed((): Opaque<Crumb[]> => new Opaque(derive().crumbs));
+
+/** Back to the whole root in the album sheet: no current row. */
+export function showWhole(): void {
+  updateActive((root) => (root.activeRowKey === null ? root : { ...root, activeRowKey: null }));
+}
 
 /** The sheet's tracks as albums and discs, titled in the current language. */
 export const detailAlbums = $computed(
@@ -102,9 +112,13 @@ function current(): RootWorkspace | null {
   return derive().root;
 }
 
-/** A scope's tracks in the order they play: a view's own, else by folder, disc and number. */
+/**
+ * A scope's tracks in the order they play: a view's own, else the album sheet's (its albums by
+ * title, each by disc and number, then file name), so the queue reads as the sheet does.
+ */
 function playOrder(scope: Scope): Track[] {
-  return scope.ordered ? scope.tracks : orderDetailPlaylist(scope.tracks);
+  if (scope.ordered) return scope.tracks;
+  return groupAlbums(scope.tracks, t("album.untitled"), preferences.language).flatMap((album) => album.discs.flatMap((disc) => disc.tracks));
 }
 
 function updateActive(update: (root: RootWorkspace) => RootWorkspace): void {
@@ -197,12 +211,37 @@ export function clearSelection(): void {
 }
 
 export function toggleFolder(folder: string): void {
+  const id = library.activeRootId;
+  if (id) autoOpened.set(id, byCaret(autoOpened.get(id) ?? [], folder));
   updateActive((root) => ({
     ...root,
     expandedAlbums: root.expandedAlbums.includes(folder)
       ? root.expandedAlbums.filter((value) => value !== folder)
       : [...root.expandedAlbums, folder]
   }));
+}
+
+/** The folders of each root a click opened (not their caret): they close as the current row leaves them. */
+const autoOpened = new Map<string, string[]>();
+
+/**
+ * A click on a row on a computer: it becomes current, a folder opens (closing again once the
+ * current row leaves it, unless its caret opened it) and the folders a click opened that do not
+ * hold it close (helpers/follow.ts).
+ */
+export function followRow(rowKey: string): void {
+  const root = current();
+  const rows = derive().rows;
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row) return;
+  const byKey = new Map(rows.map((item) => [item.key, item]));
+  const ancestors: string[] = [];
+  for (let up = row.parentKey ? byKey.get(row.parentKey) : undefined; up; up = up.parentKey ? byKey.get(up.parentKey) : undefined) {
+    if (up.kind === "album") ancestors.push(up.album);
+  }
+  const next = followFolder({ expanded: root.expandedAlbums, auto: autoOpened.get(root.id) ?? [] }, row.kind === "album" ? row.album : null, ancestors);
+  autoOpened.set(root.id, next.auto);
+  updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: next.expanded }));
 }
 
 /** Lists the active root by `view`; the current row stays if the view has it. */
@@ -350,6 +389,16 @@ export function folderTracks(rowKey: string): { label: string; trackIds: string[
 }
 
 /** Queues a folder row's tracks, in the order the folder plays them, next or at the end. */
+/**
+ * What the album sheet shows, queued in the order it plays, its first track loaded paused (nothing
+ * starts by itself): the app embedded in the landing page, ready for its play keys.
+ */
+export function queueWhatIsShown(): void {
+  const { root, scope } = derive();
+  if (!root || scope.tracks.length === 0) return;
+  addToQueue(queueOf(root.id, playOrder(scope).map((track) => track.id), scope.label).items, scope.label);
+}
+
 export function queueFolder(rowKey: string, where: "next" | "end"): void {
   const { root, rows } = derive();
   const row = rows.find((item) => item.key === rowKey);

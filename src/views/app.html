@@ -22,8 +22,49 @@
   const ImportDialog = await import("./import-dialog.html")
   const Compact = await import("./compact.html")
   const { t } = await import("../lib/i18n")
-  const { compact } = await import("../lib/compact")
+  const { compact, compactMarker } = await import("../lib/compact")
+  const { isEmbed } = await import("../lib/platform")
+  // Embedded in the landing page: the app in a window, its compact player in front of it over the
+  // window's bottom left corner, one player behind both; the page itself see-through.
+  const embed: boolean = isEmbed
+  if (embed) {
+    document.documentElement.classList.add("embedded")
+    // See-through, so the landing page shows round the windows; its body is their stage.
+    document.documentElement.style.background = "transparent"
+    document.body.style.background = "transparent"
+    // The body is the windows' stage (its perspective holds them): the whole frame.
+    document.documentElement.style.height = "100%"
+    document.body.style.height = "100%"
+    document.body.style.margin = "0"
+    document.body.style.perspective = "160rem"
+    document.body.style.overflow = "hidden"
+    // The window turns to face the pointer (as the landing page's screenshots do), and back to rest
+    // when it leaves. Smoothed by the window's transition.
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches
+    const tilt = (x: number | null, y: number | null) => {
+      const app = document.querySelector<HTMLElement>(".app.embed")
+      if (!app) return
+      if (x === null || y === null) {
+        app.style.removeProperty("--tilt-x")
+        app.style.removeProperty("--tilt-y")
+        return
+      }
+      app.style.setProperty("--tilt-x", `${((0.5 - y) * 8).toFixed(2)}deg`)
+      app.style.setProperty("--tilt-y", `${((x - 0.5) * 14 - 4).toFixed(2)}deg`)
+    }
+    if (!still) {
+      document.addEventListener("pointermove", (event) => tilt(event.clientX / innerWidth, event.clientY / innerHeight))
+      document.documentElement.addEventListener("pointerleave", () => tilt(null, null))
+    }
+  }
   $: small = compact.mode === "window" || compact.mode === "page"
+
+  // While the window or the page is compact, the root's size follows the window (tokens.css).
+  const scaled = (on: boolean, list: boolean) => {
+    if (on) document.documentElement.setAttribute("data-mm-compact", compactMarker(list))
+    else document.documentElement.removeAttribute("data-mm-compact")
+  }
+  $: scaled(small, compact.list)
 
   const title = (text: string) => {
     document.title = text
@@ -31,9 +72,10 @@
   $: title(t("app.name"))
 </script>
 
-<main class="app" :class.small="small">
+<main class="app" :class.small="small" :class.embed="embed">
   <div :if="small" class="body"><Compact /></div>
   <!-- Hidden, not dropped, while compact: the library keeps its place and its scroll. -->
+  <div :if="embed" class="window-bar" aria-hidden="true"><span></span><span></span><span></span></div>
   <div class="top" :class.gone="small"><Faceplate /></div>
   <div class="body" :class.gone="small"><Workspace /></div>
   <div id="compact-slot" class="slot" hidden><Compact :if="compact.mode === 'pip'" /></div>
@@ -47,6 +89,8 @@
   <SigninDialog />
   <SourcesDialog />
 </main>
+<!-- Embedded: the compact player, outside the window (which turns and clips what it holds). -->
+<div :if="embed" class="mini"><Compact /></div>
 
 <style scoped>
   .app {
@@ -65,4 +109,42 @@
   /* The floating window's body: the compact player, the window's whole height. */
   .slot { height: 100vh; }
   .slot[hidden], .gone { display: none; }
+
+  /* Embedded in the landing page (`?embed`): the page see-through, the app a window turned a little
+     towards the landing page's middle, its compact player a small window in front of it over its
+     bottom left corner; as the landing page draws its screenshots. */
+  .app.embed {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    left: 1.5rem;
+    bottom: 3rem;
+    width: auto;
+    height: auto;
+    overflow: hidden;
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: var(--mm-radius-lg);
+    background: var(--mm-chassis);
+    box-shadow: var(--mm-shadow-lg);
+    transform: rotateY(var(--tilt-y, -9deg)) rotateX(var(--tilt-x, 4deg));
+    transform-origin: 70% 50%;
+    transition: transform .5s cubic-bezier(.2, .7, .2, 1);
+  }
+  .window-bar { display: flex; flex: none; gap: .4rem; padding: .6rem .9rem; border-bottom: var(--mm-border-width) solid var(--mm-border); background: var(--mm-chassis); }
+  .window-bar span { width: .65rem; height: .65rem; border-radius: 50%; }
+  .window-bar span:nth-child(1) { background: var(--mm-stripe-3); }
+  .window-bar span:nth-child(2) { background: var(--mm-stripe-2); }
+  .window-bar span:nth-child(3) { background: var(--mm-stripe-1); }
+  .mini {
+    position: fixed;
+    z-index: 2;
+    left: 6rem;
+    bottom: 1.5rem;
+    width: 22rem;
+    height: 12.5rem;
+    overflow: hidden;
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: var(--mm-radius-lg);
+    box-shadow: 0 2rem 3rem rgba(0, 0, 0, .3), 0 .5rem 1rem rgba(0, 0, 0, .2);
+  }
 </style>

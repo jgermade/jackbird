@@ -70,6 +70,8 @@
   --mm-warn-soft: #f9eed3;
   --mm-bad: #b82424;
   --mm-bad-led: #e53935;
+  /* A fourth LED, blue: a mode apart from the signal's (repeating one track). */
+  --mm-info-led: #2f86eb;
   --mm-bad-soft: #f9e2e0;
   --mm-on-bad: #ffffff;
   --mm-led-off: #a3a9a8;
@@ -122,7 +124,8 @@
      are offsets in em from the middle, not shares of the gradient's length, so slanting it keeps
      the bands as thin as on level lettering. */
   --mm-metal-angle: 175deg;
-  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #a7acb0 calc(50% - .575em), #767c81 calc(50% - .21em), #3f4448 calc(50% + .023em), #81878c calc(50% + .23em), #b4b9bc calc(50% + .575em));
+  /* The metal dark at its edges, a light reflection across its middle. */
+  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #2f3437 calc(50% - .575em), #5a6064 calc(50% - .21em), #a9aeb2 calc(50% + .023em), #63696e calc(50% + .23em), #2a2e31 calc(50% + .575em));
   --mm-metal-shadow: 1px 1px .5px rgba(20, 24, 24, .55);
 
   /* ---- type --------------------------------------------------------------- */
@@ -143,7 +146,9 @@
   --mm-text-xl: 1.25rem;
   --mm-text-2xl: 1.75rem;
   --mm-text-display-sm: 1.0625rem;
+  --mm-text-display-md: 1.5rem;
   --mm-text-display-lg: 1.875rem;
+  --mm-weight-light: 300;
   --mm-weight-regular: 400;
   --mm-weight-medium: 500;
   --mm-weight-bold: 600;
@@ -223,6 +228,7 @@
   --mm-warn-soft: #2b2210;
   --mm-bad: #ff7d73;
   --mm-bad-led: #ff5a4f;
+  --mm-info-led: #4aa3ff;
   --mm-bad-soft: #2e1614;
   --mm-on-bad: #1a0b0a;
   --mm-led-off: #3d4044;
@@ -255,18 +261,28 @@
 }
 
 /* Phones: the root font size follows the viewport's width, and with it
-   every size in rem. 4.5vw is 18px on a 400px-wide screen, a little over
-   the 16px the theme is drawn at, for fingers; a 360px phone gets 16.2px
-   and a 430px one 19.35px. */
+   every size in rem, so the whole interface scales linearly with the screen,
+   as far as the phone's layout goes (720px, where the keys go to the footer).
+   4.5vw is 18px on a 400px-wide screen, a little over the 16px the theme is
+   drawn at, for fingers; a 360px phone gets 16.2px and a 430px one 19.35px. */
 :root { --mm-root-phone: 4.5vw; }
-@media (max-width: 480px) {
+@media (max-width: 720px) {
   html { font-size: var(--mm-root-phone); }
 }
 /* Wider than a phone, a desktop as a tablet: 18px, rows and keys as easy to hit with a
    pointer as with a finger. */
-@media (min-width: 481px) {
+@media (min-width: 721px) {
   html { font-size: 18px; }
 }
+/* The compact player (its window, the floating one, or the page turned compact): the root
+   follows the window's width and its height, the lesser, so the card scales as a picture does
+   and always fits. 4.5vw and 9vh are 18px in its 396 × 198 window. */
+:root { --mm-root-compact: min(4.5vw, 9vh); }
+html[data-mm-compact] { font-size: var(--mm-root-compact); }
+/* With the queue's list under the card, the width alone: the card keeps its size, the list takes
+   what the window grew by. */
+:root { --mm-root-compact-list: 4.5vw; }
+html[data-mm-compact="list"] { font-size: var(--mm-root-compact-list); }
 
 /* Once, here, instead of a media query in every component: every transition
    and animation a component writes takes its time from these. The looping

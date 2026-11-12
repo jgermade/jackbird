@@ -11,7 +11,7 @@ import { account, can, followServer, whenSignedIn } from "./account";
 import { t } from "./i18n";
 import { importing } from "./importing";
 import { library } from "./library";
-import { isDesktop, isPhone, isService } from "./platform";
+import { isDesktop, isEmbed, isPhone, isService } from "./platform";
 import { recent, forgetRecent, type RecentRoot } from "./recent";
 import { hydrateRoot, openFolder, openSamples } from "./roots";
 import { restoreSource } from "./sources";
@@ -83,6 +83,12 @@ export function tabsHere(): ("folder" | "server")[] {
  * for servers. Where there is only one folder to choose and no server (the web), straight to it.
  */
 export function openAdding(): void {
+  // Embedded in the landing page: no folder of the person's here; the landing page asks them to
+  // the demo, where they can open one.
+  if (isEmbed) {
+    window.parent.postMessage({ type: "jackbird:demo" }, location.origin);
+    return;
+  }
   const tabs = tabsHere();
   const folders = folderSources();
   if (tabs.length === 1 && tabs[0] === "folder" && folders.length === 1) {

@@ -57,9 +57,10 @@ export function groupAlbums(tracks: readonly Track[], untitled: string, locale: 
         .sort(([left], [right]) => left - right)
         .map(([number, discTracks]) => ({
           number,
+          // By number; tracks with none (or the same) by file name, as the tree lists them.
           tracks: [...discTracks].sort((left, right) => {
             const difference = trackNumberOrder(left) - trackNumberOrder(right);
-            return Number.isNaN(difference) ? 0 : difference;
+            return (Number.isNaN(difference) ? 0 : difference) || left.name.localeCompare(right.name, locale);
           })
         }))
     }))

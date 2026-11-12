@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { addTo, clearUpcoming, dropItems, moveTo, playNextIn, queueOf, removeAt, restoreQueue, sameItem, type QueuePosition } from "./queue.ts";
+import { addTo, clearPlayed, clearUpcoming, dropItems, isOneAlbum, moveTo, playNextIn, queueOf, removeAt, restoreQueue, sameItem, type QueuePosition } from "./queue.ts";
 
 const item = (rootId: string, trackId: string) => ({ rootId, trackId });
 const ids = (position: QueuePosition): string[] => position.queue?.items.map((one) => `${one.rootId}:${one.trackId}`) ?? [];
@@ -116,6 +116,15 @@ describe("clearUpcoming", () => {
   });
 });
 
+describe("clearPlayed", () => {
+  it("keeps the queue from the current track on", () => {
+    const next = clearPlayed(playing);
+    assert.deepEqual(ids(next), ["music:b", "music:c", "music:d"]);
+    assert.equal(current(next), "music:b");
+    assert.deepEqual(clearPlayed({ queue: null, index: 0 }), { queue: null, index: 0 });
+  });
+});
+
 describe("dropItems", () => {
   const mixed: QueuePosition = { queue: { items: [item("music", "a"), item("talk", "x"), item("music", "b"), item("talk", "y"), item("music", "c")], sourceLabel: "Mix" }, index: 2 };
 
@@ -164,5 +173,22 @@ describe("restoreQueue", () => {
     assert.equal(restoreQueue(mixed, new Set(["talk"])), null);
     assert.equal(restoreQueue({ queue: null, index: 0 }, new Set(["music"])), null);
     assert.equal(restoreQueue({ ...mixed, index: 9 }, new Set(["music"])), null);
+  });
+});
+
+describe("isOneAlbum", () => {
+  const part = (album: string, artist: string, folder = "r/Black Album") => ({ album, artist, folder });
+  it("is a disc when every track is of one named album, by one artist or in one folder", () => {
+    assert.equal(isOneAlbum([part("Metallica", "Metallica"), part("metallica ", "Metallica", "r/other")]), true);
+    // A compilation: several artists, one folder.
+    assert.equal(isOneAlbum([part("Hits", "A"), part("Hits", "B")]), true);
+  });
+  it("is a list otherwise", () => {
+    assert.equal(isOneAlbum([part("Metallica", "Metallica"), part("Load", "Metallica")]), false);
+    assert.equal(isOneAlbum([part("Hits", "A", "r/one"), part("Hits", "B", "r/two")]), false);
+    assert.equal(isOneAlbum([part("", "A"), part("", "A")]), false);
+    assert.equal(isOneAlbum([part("Hits", "A"), null]), false);
+    assert.equal(isOneAlbum([part("Hits", "A")]), false);
+    assert.equal(isOneAlbum([]), false);
   });
 });

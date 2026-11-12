@@ -15,6 +15,7 @@
   const DeckKeys = await import("./deck-keys.html")
   const DeckDisplay = await import("./deck-display.html")
 
+  const { isEmbed } = await import("../lib/platform")
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { importing, openImport } = await import("../lib/importing")
@@ -25,7 +26,7 @@
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
   const { ui } = await import("../lib/ui")
-  // The display's spectrum: 16 bands above 640px, 6 below.
+  // The display's spectrum: 24 bands above 640px, 12 below.
   const WIDE = matchMedia("(min-width: 641px)")
   let wide: boolean = WIDE.matches
   const onWidth = (event: MediaQueryListEvent) => {
@@ -60,7 +61,7 @@
       <span class="wordmark" :data-label="t('app.name')">{{ t("app.name") }}</span>
     </div>
 
-    <div class="screen"><DeckDisplay :bands="wide ? 16 : 6" /></div>
+    <div class="screen"><DeckDisplay :bands="wide ? 24 : 12" /></div>
 
     <div class="controls"><DeckKeys place="header" /></div>
   </div>
@@ -68,7 +69,9 @@
   <!-- While no folder is open: the sources' tabs, a folder or a server (their content is the
        workspace's welcome, views/sources-panel.html), instead of the roots and the key to add one. -->
   <Tabs :if="!hasRoots && !library.restoring && sourceTabs().length > 1" :label="t('sources.tabs')" :items="sourceTabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
-  <Tabs :else :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
+  <!-- The roots' bar: hidden while nothing is open, coming back or to import (the welcome is the
+       page then, and the panes' key has no panes to turn between). -->
+  <Tabs :elseif="hasRoots || library.restoring || (importing.available && can('editor'))" :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" :closable="!isEmbed" compact
         :add-label="folderLabel" :add-disabled="library.loading || sourcesHere().length === 0" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>

@@ -197,9 +197,11 @@
   }
   .footbar { display: none; }
   /* The welcome: one space, its content centred in a readable column. */
-  .welcome { display: flex; flex: 1 1 auto; justify-content: center; min-height: 0; overflow: auto; padding: var(--mm-space-6) var(--mm-space-4); background: var(--mm-sheet); }
+  .welcome { display: flex; flex: 1 1 auto; justify-content: center; min-height: 0; overflow: auto; padding: var(--mm-space-6) var(--mm-space-4) 0; background: var(--mm-sheet); }
   /* A container the sources' panel lays its options out by (two columns where there is room). */
-  .welcome-body { container: welcome / inline-size; display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; }
+  .welcome-body { container: welcome / inline-size; display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; align-self: flex-start; padding-bottom: var(--mm-space-6); }
+  /* The body as tall as what it holds (not stretched to the welcome's height, which what it holds
+     overflowed), and the space under its last option its own, so it scrolls into view with it. */
   /* Desktops and tablets: wider, for the options side by side. */
   @media (min-width: 641px) {
     .welcome-body { max-width: 46rem; }

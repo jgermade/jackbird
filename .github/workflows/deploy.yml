@@ -1,6 +1,6 @@
 # Deploys a release's GitHub Pages site to GitHub Pages. It builds nothing: it publishes the
 # <repo>-vX.Y.Z-pages.zip attached to the release (release.yml puts it together on the release's own
-# build: the landing page at the root, the app as its demo in /demo/, the design system at /design/,
+# build: the landing page at the root, the app as its demo in /demo/, the design system at /theme/default/,
 # screenshots taken on that build), so what goes live is what was released, landing page included,
 # and deploying an older tag rolls the whole site back to it.
 #
@@ -79,6 +79,7 @@ jobs:
           gh release download "$TAG" --pattern "${GITHUB_REPOSITORY#*/}-v*.zip" --dir app
           unzip -q "$(ls app/*.zip | grep -v -- -pages.zip | head -n 1)" -d site/demo
           cp -r samples site/demo/samples
+          node scripts/place-design.mjs site
 
       - uses: actions/configure-pages@v5
 

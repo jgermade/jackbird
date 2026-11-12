@@ -4,8 +4,25 @@
  * RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
  */
 
-/** The compact window's size, and the least it can be made, in rem. */
-export const COMPACT = { width: 34, height: 7, minWidth: 20, minHeight: 6, pipHeight: 8.75 } as const;
+/** The compact window's size, and the least it can be made, in rem: a card, the display over the keys. */
+export const COMPACT = { width: 22, height: 11, minWidth: 18, minHeight: 10, pipHeight: 13, list: 14 } as const;
+
+/**
+ * The root's size in the compact player, as a share of the window's width (tokens.css:
+ * `--mm-root-compact`'s 4.5vw). With the queue's list open the root follows the width alone, so
+ * the card keeps its size and the list takes what the window grows by.
+ */
+export const COMPACT_ROOT_VW = 0.045;
+
+/**
+ * The compact window's height for its width, with the queue's list or without: the card's 11rem
+ * (and the list's 14rem), at the root that width gives. In the same unit as the width.
+ */
+export function compactHeightFor(width: number, list: boolean): number {
+  if (!Number.isFinite(width) || width <= 0) return 0;
+  const root = width * COMPACT_ROOT_VW;
+  return Math.round((COMPACT.height + (list ? COMPACT.list : 0)) * root);
+}
 
 /** A window's place and its whole size (title bar and all), in physical pixels, as the desktop app reports them. */
 export type Bounds = { x: number; y: number; width: number; height: number };
@@ -16,13 +33,15 @@ export type CompactState = {
   on: boolean;
   /** Whether the compact window is kept on top of the others. */
   onTop: boolean;
+  /** Whether the compact player shows the queue's list. */
+  list: boolean;
   /** The compact window's last place and size, once it was moved or sized. */
   compact: Bounds | null;
   /** The full window's place and size before it turned compact. */
   full: (Bounds & { maximized: boolean }) | null;
 };
 
-export const NO_COMPACT: CompactState = { on: false, onTop: false, compact: null, full: null };
+export const NO_COMPACT: CompactState = { on: false, onTop: false, list: false, compact: null, full: null };
 
 /** A size in rem, in pixels at the given root font size (in px), rounded. */
 export function remToPx(rem: number, rootPx: number): number {
@@ -69,6 +88,7 @@ export function parseCompactState(raw: string | null): CompactState {
   return {
     on: saved.on === true,
     onTop: saved.onTop === true,
+    list: saved.list === true,
     compact: bounds(saved.compact),
     full: full ? { ...full, maximized: (saved.full as Record<string, unknown>).maximized === true } : null
   };

@@ -1,12 +1,13 @@
-<script :setup="{ bands = 16 }: Props" lang="ts">
+<script :setup="{ bands = 16, small = false }: Props" lang="ts">
   // The deck's display, as the faceplate and the compact view (views/compact.html) both show it:
   // at its left the logo, lit, or while the music plays the song's format, the spectrum or the DAC
   // (a click turns them); the title and the artist on two lines; the clock (a click turns it); the
   // meter. `bands` is the spectrum's, given by the place that shows it, which knows its own width
-  // (the compact view may be in a window of its own). A view over lib/player.ts and lib/output.ts.
+  // (the compact view may be in a window of its own). `small` draws it as on a phone, whatever the
+  // page's width (the compact player's card). A view over lib/player.ts and lib/output.ts.
   // See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
 
-  type Props = { bands?: number }
+  type Props = { bands?: number; small?: boolean }
 
   const Counter = await import("../../theme/default/components/counter.html")
   const Display = await import("../../theme/default/components/display.html")
@@ -14,9 +15,11 @@
   const Meter = await import("../../theme/default/components/meter.html")
   const Spectrum = await import("../../theme/default/components/spectrum.html")
   const { clockParts, formatTime } = await import("../helpers/format")
-  const { nowPlaying, readSpectrum, stream } = await import("../lib/player")
+  const { nowPlaying, readSpectrum, stream, toggleShuffle, turnRepeat } = await import("../lib/player")
   const { soundingDac, soundingDevice, soundingParts, soundingText } = await import("../lib/output")
   const { playback } = await import("../lib/playback")
+  const { library } = await import("../lib/library")
+  const { activeRoot } = await import("../lib/workspace")
   const { t } = await import("../lib/i18n")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   const mp3Url: string = (await import("../assets/formats/mp3.svg?url")).default
@@ -29,6 +32,13 @@
     VORBIS: { url: oggUrl, ratio: "510 / 340" }
   }
   const markOf = () => CODEC_MARKS[markParts()?.format ?? ""] ?? null
+  // The URLs quoted: a small mark comes inlined by Vite as a data URL with single quotes in it,
+  // which an unquoted url() does not take (the mask is dropped, and the mark shows as a block).
+  const codecStyle = (): string => {
+    const mark = markOf()
+    return mark ? `--codec: url("${mark.url}"); --ratio: ${mark.ratio}` : ""
+  }
+  const logoStyle = `--logo: url("${logoUrl}")`
 
   $: current = nowPlaying.value
   // The display's left, while the music plays: the song's format (the file's), the spectrum, and
@@ -80,8 +90,29 @@
   // it, in place of the song's title and artist.
   $: dacName = markView === "dac" ? (soundingDevice()?.device ?? "") : ""
   $: dacWay = markView === "dac" ? (soundingDevice()?.route ?? "") : ""
-  $: titleLine = dacName || playback.error || (current ? current.title : t("faceplate.idle"))
-  $: artistLine = dacName ? dacWay : playback.error ? "" : (current?.artist ?? "")
+  // Nothing open yet (and nothing coming back): the title's line runs a marquee instead of
+  // "Nothing playing", at a pace by its length.
+  // The artist's line runs one of its own, under it.
+  $: marquee = !current && !playback.error && !library.restoring && library.roots.length === 0 ? t("faceplate.marquee") : ""
+  $: marqueeSub = marquee ? t("faceplate.marqueeSub") : ""
+  const pace = (text: string): string => `--marquee-time: ${Math.max(8, Math.round(text.length * 0.28))}s`
+  // Nothing playing: a remark of the deck's own, a new one every so often (IDLE_LINES of them).
+  const IDLE_LINES = 12
+  let idleLine = 1 + Math.floor(Math.random() * IDLE_LINES)
+  const idleTimer = window.setInterval(() => {
+    if (current) return
+    idleLine = 1 + ((idleLine + Math.floor(Math.random() * (IDLE_LINES - 1))) % IDLE_LINES)
+  }, 20000)
+  $destroyed(() => window.clearInterval(idleTimer))
+  // A folder's tags being read, with nothing playing: the display says so, its meter the progress
+  // (in place of the library's own meter). Read through a function: the root is boxed.
+  const reading = (): { loaded: number; total: number } | null => {
+    const root = activeRoot.value.data
+    return root?.loadingMetadata && root.tracks.length > 0 ? { loaded: root.loadedCount, total: root.tracks.length } : null
+  }
+  $: readingNow = !current && !playback.error ? reading() : null
+  $: titleLine = dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
+  $: artistLine = dacName ? dacWay : playback.error ? "" : current ? (current.artist ?? "") : readingNow ? t("faceplate.readingCount", { loaded: readingNow.loaded, total: readingNow.total }) : ""
   // The clock at the display's right, turned with a click or a tap: where the song is (its minutes
   // over its seconds), its length (the same), or both (where it is over its length, each mm:ss).
   // The minutes' zeros at the left are dimmed: "03" shows its 3 lit, "00" nothing lit.
@@ -93,11 +124,15 @@
   $: elapsedClock = clockParts(playback.position)
   $: totalClock = clockParts(playback.duration)
   $: clock = timeView === "total" ? totalClock : elapsedClock
+  // The play modes, in keys joined to the display's right: shuffle, and repeat (off, all, one).
+  const REPEAT_LABELS = { off: "faceplate.repeatOff", all: "faceplate.repeatAll", one: "faceplate.repeatOne" } as const
+  $: repeatLabel = t(REPEAT_LABELS[playback.repeat])
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
 </script>
 
-  <Display live>
-    <div class="lcd">
+<div class="unit">
+  <Display live joined>
+    <div class="lcd" :class.small="small">
       <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
       <button :if="playback.playing" type="button" class="lcd-mark playing"
               :aria-label="t(MARK_LABELS[nextMarkView()])"
@@ -107,7 +142,7 @@
                (lit in the display's ink, as the logo is), any other as an icon of the display's own. -->
           <span class="icons">
             <span :if="markParts()?.format === 'FLAC'" class="codec-flac">flac</span>
-            <span :elseif="markOf()" class="codec-mark" role="img" :aria-label="markParts()?.format" :style="`--codec: url(${markOf()?.url}); --ratio: ${markOf()?.ratio}`"></span>
+            <span :elseif="markOf()" class="codec-mark" role="img" :aria-label="markParts()?.format" :style="codecStyle()"></span>
             <DisplayIcon :else>{{ markParts()?.format }}</DisplayIcon>
           </span>
           <!-- Its parts one under the other: "24 bit" over "96 kHz"; a varying bitrate marked VBR, lit
@@ -126,7 +161,7 @@
         <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="bands" :active="playback.playing" /></span>
       </button>
       <span :else class="lcd-mark" aria-hidden="true">
-        <span class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
+        <span class="lcd-logo" :style="logoStyle"></span>
       </span>
       <div class="lcd-main">
         <div class="lcd-lines">
@@ -134,10 +169,12 @@
           <div class="lcd-text">
             <span class="now">
               <span class="visually-hidden">{{ stateLabel }}</span>
-              <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+              <span :if="marquee" class="mm-display-title marquee" :style="pace(marquee)"><span class="marquee-run" aria-hidden="true"><span>{{ marquee }}</span><span>{{ marquee }}</span></span><span class="visually-hidden">{{ marquee }}</span></span>
+              <span :else class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
             </span>
             <span class="now">
-              <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
+              <span :if="marqueeSub" class="artist mm-display-title marquee" :style="pace(marqueeSub)"><span class="marquee-run" aria-hidden="true"><span>{{ marqueeSub }}</span><span>{{ marqueeSub }}</span></span><span class="visually-hidden">{{ marqueeSub }}</span></span>
+              <span :else class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
             </span>
           </div>
           <!-- The clock, on two lines too: minutes over seconds (where the song is, or its length), or
@@ -145,21 +182,86 @@
           <button :if="current" type="button" class="lcd-time" :class.both="timeView === 'both'"
                   :aria-label="positionText" :title="t('faceplate.turnTime')" @click="turnTime()">
             <span :if="timeView === 'both'" class="clock-lines">
-              <Counter><span class="lead">{{ elapsedClock.lead }}</span>{{ elapsedClock.minutes }}:{{ elapsedClock.seconds }}</Counter>
-              <Counter><span class="lead">{{ totalClock.lead }}</span>{{ totalClock.minutes }}:{{ totalClock.seconds }}</Counter>
+              <Counter size="md"><span class="lead">{{ elapsedClock.lead }}</span>{{ elapsedClock.minutes }}:{{ elapsedClock.seconds }}</Counter>
+              <Counter size="md"><span class="lead">{{ totalClock.lead }}</span>{{ totalClock.minutes }}:{{ totalClock.seconds }}</Counter>
             </span>
             <span :else class="clock-lines">
-              <Counter><span class="lead">{{ clock.lead }}</span>{{ clock.minutes }}</Counter>
-              <Counter>{{ clock.seconds }}</Counter>
+              <Counter size="md"><span class="lead">{{ clock.lead }}</span>{{ clock.minutes }}</Counter>
+              <Counter size="md">{{ clock.seconds }}</Counter>
             </span>
           </button>
         </div>
-        <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+        <Meter :if="readingNow" variant="display" :segments="40" :pitch=".625" :level="readingNow.loaded" :max="readingNow.total" :label="t('faceplate.reading')" :level-text="t('faceplate.readingCount', { loaded: readingNow.loaded, total: readingNow.total })" />
+        <Meter :else variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
       </div>
     </div>
   </Display>
+  <!-- The play modes, joined to the display's right edge as keys on its bezel. -->
+  <div class="modes" role="group" :aria-label="t('faceplate.modes')">
+    <!-- Keys of the bezel's own: the whole side, one over the other, under the display's edge; their icon in the middle, their LED against the right edge. -->
+    <button type="button" class="mode" :aria-pressed="String(playback.shuffle)" :aria-label="t('faceplate.shuffle')" :title="t('faceplate.shuffle')" @click="toggleShuffle()">
+      <span class="mode-led" :class.on="playback.shuffle" aria-hidden="true"></span>
+      <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1 2.6-2.2M9 6.7c.6-1.2 1.4-2.2 2.5-2.2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
+    </button>
+    <button type="button" class="mode" :aria-pressed="String(playback.repeat !== 'off')" :aria-label="repeatLabel" :title="repeatLabel" @click="turnRepeat()">
+      <span class="mode-led" :class.on="playback.repeat !== 'off'" :class.one="playback.repeat === 'one'" aria-hidden="true"></span>
+      <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h8M11 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H3M5 14l-2-2 2-2" /></svg>
+      <span :if="playback.repeat === 'one'" class="mode-one" aria-hidden="true">1</span>
+    </button>
+  </div>
+</div>
 
 <style scoped>
+  /* The display and its play modes' keys, one unit: the keys on a bezel joined to the display's
+     right edge, one over the other. */
+  .unit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; min-width: 0; }
+  /* (The keys behind the display within the unit, which holds them both.) */
+  /* The display over the keys: they run in under its right edge, so its rounded corners are
+     whole over them, with no seam where its curve meets them. */
+  .unit { position: relative; z-index: 0; }
+  .modes {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    position: relative;
+    z-index: -1;
+    width: 2.25rem;
+    margin-left: -.5rem;
+    border-top: var(--mm-border-width) solid var(--mm-display-rim);
+    border-right: var(--mm-border-width) solid var(--mm-display-rim);
+    border-bottom: var(--mm-border-width) solid var(--mm-display-rim);
+    border-radius: 0 calc(var(--mm-radius-key) + 2px) calc(var(--mm-radius-key) + 2px) 0;
+  }
+  /* Each key the bezel's: the whole width, half the height, a hairline between them; down when pressed. */
+  .mode {
+    position: relative;
+    display: grid;
+    /* The icon in the middle of what shows of the key (its first .5rem is under the display). */
+    place-items: center;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    padding-left: .5rem;
+    background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+    color: var(--mm-fg);
+    cursor: pointer;
+  }
+  .mode + .mode { border-top: var(--mm-border-width) solid var(--mm-display-rim); }
+  /* The column's outer corners, on its keys (it does not clip: the LEDs' glow passes its edge). */
+  .mode:first-child { border-top-right-radius: calc(var(--mm-radius-key) + 1px); }
+  .mode:last-child { border-bottom-right-radius: calc(var(--mm-radius-key) + 1px); }
+  /* Down while pressed, and while on: the theme's pressed key (its inner shadow, its face 1px lower). */
+  .mode:active, .mode[aria-pressed="true"] { background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
+  .mode:active > *, .mode[aria-pressed="true"] > * { transform: translateY(1px); }
+  .mode:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  @media (hover: hover) { .mode:hover { filter: brightness(1.04); } }
+  .mode-icon { width: .875rem; height: .875rem; }
+  /* The LED: a short bar at the top, against the right edge. */
+  .mode-led { position: absolute; top: .2rem; right: 0; width: .3125rem; height: .1875rem; border-radius: 1px 0 0 1px; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
+  /* Lit in the signal's orange (shuffle, repeating the queue); blue repeating one track. */
+  /* Its glow thrown up, a little to the left and down. */
+  .mode-led.on { background: var(--mm-accent); box-shadow: -.05rem -.06rem .35rem .03rem var(--mm-accent); }
+  .mode-led.on.one { background: var(--mm-info-led); box-shadow: -.05rem -.06rem .35rem .03rem var(--mm-info-led); }
+  .mode-one { position: absolute; right: .3rem; bottom: .2rem; font: 700 .5rem / 1 var(--mm-font-label); color: var(--mm-info-led); }
   /* Each of the display's text lines: the title, or the artist; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .visually-hidden {
@@ -244,6 +346,17 @@
     -webkit-mask: var(--logo) center / contain no-repeat;
     mask: var(--logo) center / contain no-repeat;
   }
+  /* The marquee: the text twice in a row, slid left by one copy and round again, so it runs on
+     without a seam; still, cut with an ellipsis, under reduced motion. */
+  .marquee { display: block; text-overflow: clip; }
+  .marquee-run { display: inline-flex; animation: marquee var(--marquee-time, 20s) linear infinite; }
+  .marquee-run > span { padding-right: 3em; }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee { text-overflow: ellipsis; }
+    .marquee-run { animation: none; }
+    .marquee-run > span + span { display: none; }
+  }
   /* The display's second line: the artist, under the title. */
   .artist { font-weight: var(--mm-weight-regular); opacity: .7; }
   /* The display: the mark at the left, the title row and the meter beside it. */
@@ -252,19 +365,19 @@
   .lcd-lines { display: flex; align-items: flex-start; gap: var(--mm-space-3); min-width: 0; }
   /* The title and the artist in two rows as tall as the clock's two lines: the title centred on
      the minutes, the artist on the seconds. Measured in the display's dots: the title's capitals
-     5 dots tall, the artist's 4 (IBM Plex Mono's capitals are .698em; their middle sits .026em
+     4 dots tall, the artist's 3 (IBM Plex Mono's capitals are .698em; their middle sits .026em
      under the line's, nudged back up). */
   .lcd-text {
     --cap: .698;
     display: grid;
     flex: 1 1 auto;
-    grid-template-rows: repeat(2, var(--mm-text-display-lg));
+    grid-template-rows: repeat(2, var(--mm-text-display-md));
     align-items: center;
     min-width: 0;
   }
   .lcd-text .now { line-height: 1; }
-  .lcd-text .mm-display-title { position: relative; top: -.026em; line-height: 1; font-size: calc(5 * var(--mm-display-dot) / var(--cap)); }
-  .lcd-text .artist { font-size: calc(4 * var(--mm-display-dot) / var(--cap)); }
+  .lcd-text .mm-display-title { position: relative; top: -.026em; line-height: 1; font-size: calc(4 * var(--mm-display-dot) / var(--cap)); }
+  .lcd-text .artist { font-size: calc(3 * var(--mm-display-dot) / var(--cap)); }
   /* The clock: a key with no keycap, like the display's left. */
   .lcd-time {
     flex: none;
@@ -283,9 +396,18 @@
   @media (min-width: 641px) {
     .lcd-mark { width: 7rem; }
   }
+  /* A computer: a shorter display, so the faceplate stays low. The clock and the text's rows at the
+     small display size (the Counter reads the token), and the logo and the spectrum as tall as
+     the lines and the meter. */
+  @media (min-width: 721px) {
+    .lcd:not(.small) { --mm-text-display-md: var(--mm-text-display-sm); }
+    .lcd:not(.small) .lcd-mark { height: auto; min-height: 0; align-self: stretch; }
+  }
   /* Phones: a smaller mark, so the title keeps its room. */
   @media (max-width: 640px) {
-    .lcd-mark { width: 2.5rem; height: 2.5rem; }
+    .lcd-mark { width: 3rem; height: 3rem; }
     .lcd-mark.playing { width: 4.5rem; }
   }
+  .small .lcd-mark { width: 3rem; height: 3rem; }
+  .small .lcd-mark.playing { width: 4.5rem; height: auto; }
 </style>

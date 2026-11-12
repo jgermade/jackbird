@@ -9,6 +9,9 @@
 // workflow (release.yml) runs it on each release's own build and attaches the images to the
 // release, where deploy.yml and the README take them from.
 //
+// Among them, the faceplate's deck and the compact player's card (in the page, the floating
+// window's API removed), in both tones, for the landing page's hero.
+//
 // It builds the library in a temporary folder: five invented albums (artists, titles and genres
 // made up; covers drawn on a canvas, abstract shapes; tones and noise from ffmpeg, so the spectrum
 // has something to show), tagged by ffmpeg. Chromium (Playwright) copies it into the page's
@@ -167,6 +170,8 @@ async function openApp(browser, { tone, ...options }) {
   await page.addInitScript(({ files, tone }) => {
     localStorage.setItem("mp3-manager.theme", tone);
     localStorage.setItem("mp3-manager.language", "en");
+    // The compact player in the page itself (not a floating window), so it can be captured.
+    delete window.documentPictureInPicture;
     window.showDirectoryPicker = async () => {
       const root = await navigator.storage.getDirectory();
       await root.removeEntry("Music", { recursive: true }).catch(() => undefined);
@@ -185,7 +190,8 @@ async function openApp(browser, { tone, ...options }) {
   }, { files, tone });
   await page.goto(app);
   await page.waitForSelector(".wordmark, .faceplate");
-  await page.getByText(/choose a folder/i).first().click();
+  // The key, by its role: the display's marquee says "choose a folder" too, and runs.
+  await page.getByRole("button", { name: /choose a folder/i }).first().click();
   await page.getByText("Night Bus Atlas").first().waitFor({ timeout: 60000 });
   await page.waitForTimeout(800);
   return page;
@@ -227,7 +233,20 @@ async function main() {
       await page.waitForTimeout(1000);
       await page.screenshot({ path: path.join(out, "edit-dialog.png") });
       console.log("edit dialog");
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(600);
     }
+    // The compact player, the card, as its window shows it (a little taller), for the landing
+    // page's hero; the track still playing.
+    await page.keyboard.press("Control+Shift+M");
+    await page.setViewportSize({ width: 440, height: 250 });
+    // As the landing page's live player draws it: no key back to the full view (the page's own
+    // way back, which a picture of it on the landing page has nowhere to go to).
+    await page.addStyleTag({ content: ".compact .keys .side:first-child { visibility: hidden; }" });
+    // Past the format the display shows a song's first two seconds: the spectrum.
+    await page.waitForTimeout(3000);
+    await page.locator(".compact").first().screenshot({ path: path.join(out, `compact-${name}.png`) });
+    console.log("compact player in", name);
     await page.close();
   }
 

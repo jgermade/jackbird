@@ -15,6 +15,7 @@
   const Key = await import("../../theme/default/components/key.html")
   const Modal = await import("../../theme/default/components/modal.html")
   const Select = await import("../../theme/default/components/select.html")
+  const Checkbox = await import("../../theme/default/components/checkbox.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
   const CoverDrop = await import("../components/cover-drop.html")
@@ -39,6 +40,7 @@
   const { activeRoot, removeSelectedTracks, selectedTracks } = await import("../lib/workspace")
   const { canRename, renamePlan, renameSelected, renamer, setRenamePattern } = await import("../lib/rename")
   const { RENAME_FIELDS, RENAME_PRESETS } = await import("../helpers/rename")
+  const { nameDiff } = await import("../helpers/namediff")
 
   type Track = {
     id: string
@@ -130,6 +132,11 @@
   }
   const fieldList = (): string => RENAME_FIELDS.map((field: string) => `%${field}%`).join(" ")
   const fileName = (path: string): string => path.split("/").pop() ?? path
+  // The preview's names with what changes marked, when asked for (and when the name changes).
+  let diffShown = false
+  type Plan = { from: string; name: string; status: string }
+  const showsDiff = (plan: Plan): boolean => diffShown && plan.status !== "same" && !!plan.name
+  const diffOf = (plan: Plan) => nameDiff(fileName(plan.from), plan.name)
   const statusLabel = (plan: Plan): string =>
     plan.status === "same" ? t("rename.same") : plan.status === "clash" ? t("rename.clash") : plan.status === "empty" ? t("rename.empty") : ""
   const reading = (): boolean => !!activeRoot.value.data?.loadingMetadata
@@ -266,8 +273,10 @@
         <Field :label="t('rename.presets')" control="rename-preset">
           <Select id="rename-preset" :model="presetValue()" :options="presetOptions()" @change="pickPreset($event.detail)" />
         </Field>
+        <!-- Under the pattern, its fields; under the templates, the diff's checkbox: one line. -->
+        <p class="hint mono">{{ t("rename.fields", { fields: fieldList() }) }}</p>
+        <span class="rename-diff"><Checkbox id="rename-diff" :model="diffShown" @change="diffShown = $event.detail">{{ t("rename.diff") }}</Checkbox></span>
       </div>
-      <p class="hint mono">{{ t("rename.fields", { fields: fieldList() }) }}</p>
       <p :if="reading()" class="failure" role="status">{{ t("rename.loading") }}</p>
       <p :if="library.errorMessage" class="failure" role="alert">{{ library.errorMessage }}</p>
       <div class="mm-table-wrap">
@@ -275,8 +284,10 @@
           <thead><tr><th>{{ t("rename.from") }}</th><th>{{ t("rename.to") }}</th><th></th></tr></thead>
           <tbody>
             <tr :each="plan in plans()" :key="plan.trackId" :class.unchanged="plan.status === 'same'" :class.wrong="plan.status === 'clash' || plan.status === 'empty'">
-              <td class="mono">{{ fileName(plan.from) }}</td>
-              <td class="mono">{{ plan.name || "—" }}</td>
+              <td :if="showsDiff(plan)" class="mono"><span :each="piece in diffOf(plan).before" :class.removed="piece.changed">{{ piece.text }}</span></td>
+              <td :else class="mono">{{ fileName(plan.from) }}</td>
+              <td :if="showsDiff(plan)" class="mono"><span :each="piece in diffOf(plan).after" :class.added="piece.changed">{{ piece.text }}</span></td>
+              <td :else class="mono">{{ plan.name || "—" }}</td>
               <td class="state"><span :if="plan.status !== 'ok'" class="flag">{{ statusLabel(plan) }}</span></td>
             </tr>
           </tbody>
@@ -376,6 +387,11 @@
   /* Rename */
   .rename { display: grid; gap: var(--mm-space-3); }
   .rename-head { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--mm-space-3); }
+  .rename-head .hint { align-self: center; }
+  .rename-diff { display: flex; align-items: center; }
+  /* The diff: what goes struck through in the error's ink, what comes highlighted in the good ink. */
+  .preview .removed { border-radius: 2px; background: var(--mm-bad-soft); color: var(--mm-bad); text-decoration: line-through; }
+  .preview .added { border-radius: 2px; background: var(--mm-ok-soft); color: var(--mm-ok); }
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); overflow-wrap: anywhere; }
   .preview td { overflow-wrap: anywhere; }
   .preview .state { width: 1%; white-space: nowrap; text-align: right; }

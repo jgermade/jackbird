@@ -14,8 +14,37 @@ import { showInLibrary } from "./roots";
 import { ui } from "./ui";
 import { activeRoot, folderTracks, goToGroup, menuTargetCount, menuTargets, playFromTree, queueFolder, queueTracks, setCurrentRow } from "./workspace";
 
-/** An item of a menu, as the theme's `Menu` takes it. */
-export type MenuItem = { id: string; label: string; danger?: boolean; rule?: boolean };
+/** An item of a menu, as the theme's `Menu` takes it: its glyph, and the row it shares (`group`). */
+export type MenuItem = { id: string; label: string; danger?: boolean; rule?: boolean; icon?: string; group?: string; disabled?: boolean };
+
+/** The items' glyphs: SVG paths in a 16-unit box, drawn as strokes by the theme's `Menu`. */
+const ICONS: Record<string, string> = {
+  play: "M5 3v10l8-5z",
+  next: "M2.5 4h7M2.5 8h7M2.5 12h4M10.5 9.5l3.5 2.25-3.5 2.25z",
+  queue: "M2.5 4h11M2.5 8h11M2.5 12h6M12.25 10v4.5M10 12.25h4.5",
+  playlist: "M6 12.5V3.5l6-1.5v3M4.5 14a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M12.5 9v5M10 11.5h5",
+  album: "M8 1.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5zM8 7a1 1 0 1 0 0 2 1 1 0 0 0 0-2z",
+  artist: "M8 2.75a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4",
+  show: "M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z",
+  favourite: "M8 2l1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3l-3.7 2 .8-4.1L2 6.3l4.2-.5z",
+  edit: "M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9zM8.35 4.15l3.5 3.5",
+  info: "M8 1.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5zM8 7.25v4M8 4.75v.01",
+  rename: "M2.5 5.5h7v5h-7zM12 3v10M10.5 3h3M10.5 13h3",
+  remove: "M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.75 9h6.5l.75-9",
+  details: "M3.5 1.75h9v12.5h-9zM5.75 5.25h4.5M5.75 8h4.5M5.75 10.75h3",
+  delete: "M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.75 9h6.5l.75-9",
+  up: "M8 13V3M4 7l4-4 4 4",
+  down: "M8 3v10M4 9l4 4 4-4",
+  out: "M2.5 4h11M2.5 8h11M2.5 12h5M10 12.25h4.5"
+};
+
+/** Pairs that share a row, side by side. */
+const GROUPS: Record<string, string> = { next: "queue", queue: "queue", album: "go", artist: "go", info: "file", rename: "file", up: "move", down: "move" };
+
+/** The items with their glyphs and rows. */
+function styled(items: MenuItem[]): MenuItem[] {
+  return items.map((item) => ({ ...item, icon: ICONS[item.id], group: GROUPS[item.id] }));
+}
 
 /** The items that change the folders: only for editors and up (S3); a listener's menus leave them out. */
 const CHANGES = new Set(["playlist", "edit", "rename", "remove", "delete", "up", "down", "out"]);
@@ -23,9 +52,9 @@ const CHANGES = new Set(["playlist", "edit", "rename", "remove", "delete", "up",
 const LIBRARY_CHANGES = new Set(["rename", "remove"]);
 
 function allowed(items: MenuItem[]): MenuItem[] {
-  if (can("editor")) return items;
+  if (can("editor")) return styled(items);
   const changes = activeRoot.value.data?.source.kind === "library" ? LIBRARY_CHANGES : CHANGES;
-  return items.filter((item) => !changes.has(item.id));
+  return styled(items.filter((item) => !changes.has(item.id)));
 }
 
 /** Where a track's menu is: the tree, or the album sheet (which adds "Show in library"). */
@@ -178,7 +207,7 @@ export function rowMenu(row: WizardTreeRow): MenuItem[] {
   }
   const entry = row.playlist !== undefined && row.playlistIndex !== undefined ? entryItems(row, entryCount(row)) : [];
   if (!row.trackId) {
-    return entry.map((item, at) => (at === 0 ? { ...item, rule: false } : item));
+    return styled(entry.map((item, at) => (at === 0 ? { ...item, rule: false } : item)));
   }
   const items = trackMenu(row.trackId, "tree");
   if (entry.length === 0) {

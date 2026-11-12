@@ -19,6 +19,7 @@ toneKey.addEventListener("click", () => {
   root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
   try { localStorage.setItem(KEY, root.dataset.theme); } catch {}
   showTone();
+  tellTone();
 });
 
 // ---- the tab's icon -----------------------------------------------------------------------
@@ -72,7 +73,139 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) =>
   if (!saved) {
     root.dataset.theme = event.matches ? "dark" : "light";
     showTone();
+    tellTone();
   }
 });
 
 showTone();
+
+// ---- get it: the tabs ---------------------------------------------------------------------
+
+const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+
+function showTab(tab) {
+  for (const one of tabs) {
+    const on = one === tab;
+    one.setAttribute("aria-selected", String(on));
+    one.tabIndex = on ? 0 : -1;
+    document.getElementById(one.getAttribute("aria-controls")).hidden = !on;
+  }
+}
+
+for (const tab of tabs) {
+  tab.addEventListener("click", () => showTab(tab));
+  // Left and right move between the tabs, as a tab list does.
+  tab.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const next = tabs[(tabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+    showTab(next);
+    next.focus();
+    event.preventDefault();
+  });
+}
+if (location.hash === "#server") showTab(tabs[1]);
+
+// ---- get it: this device's download, and the latest release's files -------------------------
+
+/** The system this browser runs on, as the downloads name it; null where there is no app for it. */
+function thisSystem() {
+  const agent = navigator.userAgent;
+  if (/Android/i.test(agent)) return "android";
+  if (/iPhone|iPad|iPod/i.test(agent)) return null;
+  // An iPad asks for the desktop site as a Mac: its touch gives it away.
+  if (/Macintosh|Mac OS X/i.test(agent)) return navigator.maxTouchPoints > 1 ? null : "mac";
+  if (/Windows/i.test(agent)) return "windows";
+  if (/Linux|X11|CrOS/i.test(agent)) return "linux";
+  return null;
+}
+
+const megabytes = (bytes) => `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+
+// This device's first: its first download (an AppImage before a .deb), with a ribbon.
+const system = thisSystem();
+const downloads = document.querySelector(".downloads");
+const mine = system && downloads?.querySelector(`.download[data-os="${system}"]`);
+if (mine) {
+  mine.classList.add("mine");
+  mine.dataset.ribbon = "This device";
+  downloads.prepend(mine);
+}
+
+// The latest release's files, by name: each link to its file, with its size; on any failure the
+// links stay on the release's page.
+fetch("https://api.github.com/repos/jgermade/jackbird/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+  .then((response) => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
+  .then((release) => {
+    const assets = release.assets ?? [];
+    for (const link of document.querySelectorAll("[data-asset]")) {
+      const pattern = new RegExp(link.dataset.asset);
+      const asset = assets.find((one) => pattern.test(one.name));
+      if (!asset) continue;
+      link.href = asset.browser_download_url;
+      const file = link.querySelector(".file");
+      if (file) file.textContent = `${file.textContent} · ${megabytes(asset.size)}`;
+    }
+    const version = document.querySelector(".release");
+    if (version && release.tag_name) version.textContent = `jackbird ${release.tag_name}.`;
+  })
+  .catch(() => {});
+
+// ---- the compact player over the window ------------------------------------------------------
+
+// A release from before the compact player's capture: no such picture; it is left out.
+for (const img of document.querySelectorAll(".mini img")) {
+  img.addEventListener("error", () => img.closest(".mini")?.remove(), { once: true });
+}
+
+// ---- the stage: the window's tilt, and the app itself -------------------------------------------
+
+const stage = document.querySelector(".stage");
+
+/** The tilt for a pointer at (x, y), each 0 to 1 across the stage: the window turns to face it. */
+function tiltFor(x, y) {
+  return { x: `${((0.5 - y) * 8).toFixed(2)}deg`, y: `${((x - 0.5) * 14 - 4).toFixed(2)}deg` };
+}
+
+if (stage && matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  stage.addEventListener("pointermove", (event) => {
+    const box = stage.getBoundingClientRect();
+    const tilt = tiltFor((event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
+    stage.style.setProperty("--tilt-x", tilt.x);
+    stage.style.setProperty("--tilt-y", tilt.y);
+  });
+  // Off the stage, back to rest (the stylesheet's).
+  stage.addEventListener("pointerleave", () => {
+    stage.style.removeProperty("--tilt-x");
+    stage.style.removeProperty("--tilt-y");
+  });
+}
+
+let live = null;
+
+/** The landing page's tone, to the embedded app. */
+function tellTone() {
+  live?.contentWindow?.postMessage({ type: "jackbird:tone", tone: root.dataset.theme === "dark" ? "dark" : "light" }, location.origin);
+}
+
+stage?.querySelector(".live-key")?.addEventListener("click", () => {
+  if (live) return;
+  live = document.createElement("iframe");
+  live.className = "live";
+  live.title = "jackbird, playing the sample music";
+  live.allow = "autoplay";
+  live.src = `./demo/?embed&lang=en&tone=${root.dataset.theme === "dark" ? "dark" : "light"}`;
+  stage.append(live);
+  stage.classList.add("live-on");
+  live.focus();
+});
+
+// The embedded app asked for a folder: the demo is where one opens.
+const invite = stage?.querySelector(".invite");
+window.addEventListener("message", (event) => {
+  if (event.origin !== location.origin || event.data?.type !== "jackbird:demo" || !invite) return;
+  invite.hidden = false;
+  invite.querySelector("a")?.focus();
+});
+invite?.querySelector("[data-close]")?.addEventListener("click", () => {
+  invite.hidden = true;
+});

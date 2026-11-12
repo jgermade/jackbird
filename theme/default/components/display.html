@@ -1,4 +1,4 @@
-<script :setup="{ live = false }: Props" lang="ts">
+<script :setup="{ live = false, joined = false }: Props" lang="ts">
   // The display window, where state is shown: what is playing, counters,
   // progress. An LCD in Silver, a VFD in Graphite. What goes in it is the
   // parent's markup, laid out with the classes in `content.css`
@@ -17,17 +17,19 @@
   //     <Meter variant="display" :level="192" :max="562" label="Position" />
   //   </Display>
   //
-  // `live` announces changes politely to a screen reader.
+  // `live` announces changes politely to a screen reader. `joined`: something
+  // is joined to its right edge (keys on its bezel), so its right corners are
+  // square, filling where they would leave a notch.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
-  type Props = { live?: boolean | "" }
+  type Props = { live?: boolean | ""; joined?: boolean | "" }
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
 </script>
 
-<div class="bezel">
+<div class="bezel" :class.joined="flag(joined)">
   <div class="window" :aria-live="flag(live) ? 'polite' : null"><slot /></div>
 </div>
 
@@ -39,6 +41,8 @@
     border-radius: calc(var(--mm-radius-key) + 2px);
     background: var(--mm-display-rim);
   }
+  .bezel.joined { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .bezel.joined .window { border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .window {
     position: relative;
     display: grid;

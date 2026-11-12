@@ -227,13 +227,14 @@
 
 <header class="mast">
   <div class="wrap mast-row">
-    <div class="brand">
+    <!-- Back to the site's home: the sheet is published at theme/default/ (scripts/place-design.mjs). -->
+    <a class="brand home" href="../../" title="jackbird">
       <Stripes />
       <div>
         <div class="brand-name">jackbird</div>
         <span class="mm-legend">Deck · default theme</span>
       </div>
-    </div>
+    </a>
     <SlideSwitch label="Dark tone (Graphite)" off-legend="Silver" on-legend="Graphite" :model="dark" />
   </div>
 </header>
@@ -719,6 +720,8 @@
     padding-block: var(--mm-space-3);
   }
   .brand { display: flex; align-items: center; gap: var(--mm-space-3); }
+  .brand.home { color: inherit; text-decoration: none; }
+  .brand.home:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 4px; border-radius: var(--mm-radius-key); }
   .brand-column { flex-direction: column; align-items: flex-start; gap: var(--mm-space-2); }
   .brand-name {
     font-family: var(--mm-font-label);

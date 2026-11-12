@@ -14,6 +14,8 @@ type ScopedRoot = {
   label: string;
   tracks: Track[];
   activeRowKey: string | null;
+  /** How the library lists it (Files when not given). */
+  view?: string;
 };
 
 /**
@@ -46,4 +48,29 @@ export function detailScope(root: ScopedRoot | null, rows: readonly WizardTreeRo
     };
   }
   return { label: root.label, tracks: root.tracks, whole: true };
+}
+
+/** One step of the album sheet's breadcrumb: a row of the library to go back to, or the root's top (`key` null). */
+export type Crumb = { key: string | null; label: string };
+
+/**
+ * Where the album sheet's scope comes from, as a breadcrumb: in Files, the root and then each folder
+ * down to the one shown (a track's folder for a track); in the other views, each group down to the
+ * one shown (an artist, then their album). Nothing for a view's whole list. The sheet puts the
+ * view's glyph before it. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 16:45).
+ */
+export function scopeCrumbs(root: ScopedRoot | null, rows: readonly WizardTreeRow[]): Crumb[] {
+  if (!root) return [];
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  const row = root.activeRowKey ? byKey.get(root.activeRowKey) : undefined;
+  const top: Crumb[] = root.view && root.view !== "files" ? [] : [{ key: null, label: root.label }];
+  if (!row) return top;
+  // The row the scope is: a group or folder itself, or a track's group or folder.
+  const shown = row.kind === "album" ? row : row.parentKey ? byKey.get(row.parentKey) : undefined;
+  if (!shown || shown.kind !== "album" || (row.inView && !shown.trackIds)) return top;
+  const chain: Crumb[] = [];
+  for (let step: WizardTreeRow | undefined = shown; step; step = step.parentKey ? byKey.get(step.parentKey) : undefined) {
+    if (step.kind === "album") chain.unshift({ key: step.key, label: step.label });
+  }
+  return [...top, ...chain];
 }

@@ -1,23 +1,18 @@
 # The desktop app (src-tauri/, over crates/core): builds its bundles on Linux, macOS and Windows,
 # runs the unattended check on each (scripts/desktop-check.mjs; Linux under Xvfb) and uploads
 # the bundles. release.yml calls it with the new tag and attaches them to the release.
-# Unsigned: macOS and Windows warn when the bundles are opened.
+# macOS: signed ad hoc (tauri.conf.json, `signingIdentity: "-"`), so Gatekeeper offers "Open
+# Anyway" rather than calling it damaged; no Developer ID nor notarization. Windows: unsigned, it warns.
 # See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4).
 name: desktop
 
 on:
+  # A push runs this only when its last commit's message asks for it: `[ci desktop]`, or
+  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests that are not
+  # drafts (and when one is marked ready), by hand and from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
-    paths:
-      - "src-tauri/**"
-      - "crates/**"
-      - "src/lib/sources/**"
-      - "scripts/desktop-check.mjs"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/desktop.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "src-tauri/**"
       - "crates/**"
@@ -42,6 +37,7 @@ permissions:
 
 jobs:
   app:
+    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name != 'push' && github.event_name != 'pull_request') || contains(github.event.head_commit.message, '[ci desktop]') || contains(github.event.head_commit.message, '[ci all]')
     name: App on ${{ matrix.os }}
     strategy:
       fail-fast: false

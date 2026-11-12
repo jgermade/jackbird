@@ -12,8 +12,9 @@
 // (2026-11-13 06:30).
 
 import { $reactive } from "jq79";
-import { compactSize, isCompactShortcut, parseCompactState, pipSize, type Bounds, type CompactState } from "../helpers/compact";
-import { isDesktop, isPhone } from "./platform";
+import { compactHeightFor, compactSize, isCompactShortcut, parseCompactState, pipSize, type Bounds, type CompactState } from "../helpers/compact";
+import { onSpace } from "./hotkeys";
+import { isDesktop, isEmbed, isPhone } from "./platform";
 import { readStored, STORAGE_KEYS, writeStored } from "./storage";
 
 /** Where the compact view is: not shown, the window, a floating window, or the page. */
@@ -28,12 +29,14 @@ type PipApi = { requestWindow(options: { width: number; height: number }): Promi
 const pipApi = (): PipApi | null =>
   typeof window !== "undefined" && "documentPictureInPicture" in window ? ((window as unknown as { documentPictureInPicture: PipApi }).documentPictureInPicture ?? null) : null;
 
-/** This runtime's place for the compact view. Phones have none: their screen is one deck already. */
-export const compactPlace: CompactPlace | null = isPhone ? null : isDesktop ? "window" : pipApi() ? "pip" : "page";
+/** This runtime's place for the compact view. Phones have none: their screen is one deck already; nor the app embedded in the landing page, which draws it always. */
+export const compactPlace: CompactPlace | null = isPhone || isEmbed ? null : isDesktop ? "window" : pipApi() ? "pip" : "page";
 
 export const compact = $reactive({
   mode: "full" as CompactMode,
   onTop: false,
+  /** The queue's list shown under the card (the window grows for it). */
+  list: false,
   /** A turn under way: the keys wait for it. */
   busy: false
 });
@@ -95,7 +98,7 @@ async function windowCompact(keepFull: boolean): Promise<void> {
   if (saved.compact) {
     await placeAndSize(saved.compact, saved.compact.width, saved.compact.height);
   } else {
-    await win.setSize(new LogicalSize(size.width, size.height));
+    await win.setSize(new LogicalSize(size.width, compact.list ? compactHeightFor(size.width, true) : size.height));
     // At the full window's top left (macOS sizes from the bottom: it would land where the bottom was).
     if (saved.full) await win.setPosition(new PhysicalPosition(saved.full.x, saved.full.y));
   }
@@ -174,7 +177,7 @@ async function followWindow(): Promise<void> {
 export function dragWindow(event: PointerEvent): void {
   if (compact.mode !== "window" || event.button !== 0) return;
   const target = event.target as Element | null;
-  if (target?.closest("button, a, input, select, textarea, [role='slider'], [role='meter'], [role='progressbar']")) return;
+  if (target?.closest("button, a, input, select, textarea, [role='slider'], [role='meter'], [role='progressbar'], [data-no-drag]")) return;
   event.preventDefault();
   void windowApi().then(({ win }) => win.startDragging());
 }
@@ -187,6 +190,35 @@ export async function setOnTop(on: boolean): Promise<void> {
   if (compact.mode === "window") {
     const { win } = await windowApi();
     await win.setAlwaysOnTop(on);
+  }
+}
+
+/** The root's size marker on a compact document: "list" while the list shows (tokens.css). */
+export const compactMarker = (list: boolean): string => (list ? "list" : "")
+
+/**
+ * Shows the queue's list under the card, or hides it. The desktop window and the floating one grow
+ * by the list's height and shrink back, at their width; the page has what it has.
+ */
+export async function setCompactList(on: boolean): Promise<void> {
+  compact.list = on;
+  saved.list = on;
+  save();
+  if (compact.mode === "window") {
+    // It grows (and shrinks) downwards, its top left corner where it is: placeAndSize() keeps the
+    // place, which a plain resize does not on macOS (it sizes a window from its bottom edge).
+    const { win } = await windowApi();
+    const [bounds, factor] = await Promise.all([boundsOf(), win.scaleFactor()]);
+    const height = Math.round(compactHeightFor(bounds.width / factor, on) * factor);
+    await placeAndSize(bounds, bounds.width, height);
+  } else if (compact.mode === "pip" && floating) {
+    const { pip } = floating;
+    pip.document.documentElement.setAttribute("data-mm-compact", compactMarker(on));
+    try {
+      pip.resizeBy(0, compactHeightFor(pip.innerWidth, on) - pip.innerHeight);
+    } catch {
+      // Refused (no activation): the person sizes it.
+    }
   }
 }
 
@@ -237,7 +269,8 @@ function mirrorStyles(target: Document): () => void {
 async function floatOpen(): Promise<void> {
   const api = pipApi();
   if (!api) return;
-  const pip = await api.requestWindow(pipSize(rootPx()));
+  const size = pipSize(rootPx());
+  const pip = await api.requestWindow(compact.list ? { width: size.width, height: compactHeightFor(size.width, true) } : size);
   compact.mode = "pip";
   const slot = document.getElementById(SLOT_ID);
   if (!slot || !(await waitFor(() => slot.childElementCount > 0))) {
@@ -248,10 +281,16 @@ async function floatOpen(): Promise<void> {
   const home = { parent: slot.parentNode as Node, next: slot.nextSibling };
   pip.document.title = document.title;
   const stopStyles = mirrorStyles(pip.document);
+  // Its root's size follows its own size, as the compact window's does (tokens.css).
+  pip.document.documentElement.setAttribute("data-mm-compact", compactMarker(compact.list));
   pip.document.body.style.margin = "0";
   pip.document.body.append(slot);
   slot.hidden = false;
-  const onKey = (event: KeyboardEvent) => onShortcut(event);
+  // The shortcut, and Space (play and pause), in the floating window too.
+  const onKey = (event: KeyboardEvent) => {
+    onShortcut(event);
+    onSpace(event);
+  };
   pip.document.addEventListener("keydown", onKey);
   floating = {
     pip,
@@ -342,6 +381,7 @@ function onShortcut(event: KeyboardEvent): void {
 export function startCompact(): void {
   if (!compactPlace) return;
   compact.onTop = saved.onTop;
+  compact.list = saved.list;
   document.addEventListener("keydown", onShortcut);
   if (compactPlace !== "window") return;
   void followWindow().catch(() => undefined);

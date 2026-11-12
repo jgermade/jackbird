@@ -5,7 +5,9 @@ name: build
 on:
   push:
     branches: [main]
+  # Pull requests not in draft (and when one is marked ready); main; by hand; from the release.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -20,6 +22,7 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: Test and bundle
     runs-on: ubuntu-latest
     steps:

@@ -11,7 +11,7 @@
   const QueueList = await import("./queue-list.html")
 
   const { t } = await import("../lib/i18n")
-  const { queueEntries, queueEyebrow, queueTitle } = await import("../lib/player")
+  const { queueEntries, queueEyebrow, queueIsAlbum, queueTitle } = await import("../lib/player")
   const { openPlaylistDialog } = await import("../lib/playlists")
   const { ui } = await import("../lib/ui")
 </script>
@@ -23,7 +23,8 @@
       <h2 class="title">{{ queueTitle() }}</h2>
     </div>
     <span class="keys">
-      <Key square size="sm" variant="ghost" :label="t('queue.saveAsPlaylist')" :title="t('queue.saveAsPlaylist')" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue' })">
+      <!-- Lists are saved, not discs. -->
+      <Key :if="!queueIsAlbum.value" square size="sm" variant="ghost" :label="t('queue.saveAsPlaylist')" :title="t('queue.saveAsPlaylist')" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue' })">
         <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4h8M2 7.5h8M2 11h5M12 9.5v5M9.5 12h5" /></svg>
       </Key>
       <Key square size="sm" variant="ghost" :label="t('queue.close')" :title="t('queue.close')" @click="ui.queueOpen = false">

@@ -240,8 +240,9 @@ export async function hydrateRoot(
             checksum: fullChecksum,
             fullChecksum,
             audioChecksum,
-            size: file.size,
-            lastModified: file.lastModified,
+            // The file as it was read, which may be newer than the walk saw it (a sample still on its way).
+            size: found.size,
+            lastModified: found.lastModified ?? file.lastModified,
             lastVerifiedAt: nowIso,
             metadata,
             updatedAt: nowIso
@@ -316,6 +317,8 @@ export async function openFolder(server?: ServiceClient): Promise<void> {
       await hydrateRoot(source, {});
     }
   } catch (error) {
+    // The dialog closed with no folder chosen (the browser's picker rejects with AbortError): nothing to say.
+    if (error instanceof DOMException && error.name === "AbortError") return;
     library.errorMessage = error instanceof Error ? error.message : t("message.scanFailed");
   } finally {
     library.loading = false;
@@ -348,6 +351,23 @@ export function selectRoot(rootId: string): void {
 /** Reads a root again if its files changed (songs added to the library, say). */
 export function refreshRoot(rootId: string): Promise<void> {
   return resyncRootIfNeeded(rootId);
+}
+
+/**
+ * Scans a root again, whatever changed: walks its folder and reads the tags of new and changed
+ * files (the library's rescan key). Nothing while it is still being read.
+ */
+export async function rescanRoot(rootId: string): Promise<void> {
+  const root = $toRaw(library).roots.find((item) => item.id === rootId);
+  if (!root || root.loadingMetadata) return;
+  library.errorMessage = null;
+  library.infoMessage = null;
+  await hydrateRoot(root.source, {
+    rootId: root.id,
+    rootLabel: root.label,
+    groupingMode: root.groupingMode,
+    setActive: false
+  });
 }
 
 async function resyncRootIfNeeded(rootId: string): Promise<void> {
