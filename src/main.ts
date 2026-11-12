@@ -19,6 +19,8 @@ import { followActiveRoot, keepSessionSaved, restoreSession } from "./lib/sessio
 import { startVerifier } from "./lib/verifier";
 import App from "./views/app.html";
 
+// The macOS app: its scrollbars as the browser's, shown while pointed at (theme/default/base.css).
+if (isDesktop && !isPhone && /Mac/.test(navigator.platform || navigator.userAgent)) document.documentElement.classList.add("mac-app");
 App.mount("#app");
 keepFaviconLit();
 startCompact();

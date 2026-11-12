@@ -140,6 +140,9 @@
     font: var(--mm-text-sm) / var(--mm-leading-tight) var(--mm-font-sans);
     cursor: pointer;
     user-select: none;
+    /* A row out of view is not laid out or painted (a long tree, the splitter dragged). */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1.75rem;
   }
   /* A row ends in its keys (a small square key's glyph sits .5rem in from its edge): the room
      to the right of its last glyph is about the room to the left of its own. A track's cue (its ▶
@@ -172,6 +175,8 @@
   /* The number in a column of its own, on the title's line: the second line starts where the
      title does. */
   .label.led { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; }
+  /* The number centred on the row's height, beside the box, whether it has one line or two. */
+  .label.led .lead { grid-row: 1 / span 2; align-self: center; }
   .label.led .title { grid-column: 2; grid-row: 1; }
   .label.led .sub { grid-column: 2; grid-row: 2; }
   .two .label { row-gap: .0625rem; padding-block: var(--mm-space-1); }

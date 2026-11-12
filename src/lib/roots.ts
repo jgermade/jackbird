@@ -214,6 +214,8 @@ export async function hydrateRoot(
       }
 
       const READ_CONCURRENCY = 6;
+      const FLUSH_EVERY_MS = 400;
+      let flushedAt = Date.now();
       let cursor = 0;
       let failedCount = 0;
 
@@ -270,7 +272,11 @@ export async function hydrateRoot(
           }
           loadedCount += 1;
 
-          if (loadedCount % 10 === 0 || loadedCount === totalAfterWalk) {
+          // What was read goes to the library a few times a second, not every few files: each
+          // flush lays the library out again (the tree, the albums), and on a large one that was
+          // most of the loading's time, the more so in WebKit (the macOS app).
+          if (loadedCount === totalAfterWalk || Date.now() - flushedAt >= FLUSH_EVERY_MS) {
+            flushedAt = Date.now();
             flush();
           }
         }

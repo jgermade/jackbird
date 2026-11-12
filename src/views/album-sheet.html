@@ -227,6 +227,11 @@
     border: var(--mm-border-width) solid var(--mm-border);
     border-radius: var(--mm-radius-md);
     background: var(--mm-surface);
+    /* An album out of view is not laid out or painted: the whole root is hundreds of them, and
+       each change of the sheet's width (the splitter, the window) would lay them all out again,
+       which WebKit (the macOS app) feels most. It keeps its last height while away. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 14rem;
   }
   .cover { grid-area: cover; width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
   /* On wider screens the cover stays in view while its album's tracks scroll past. */

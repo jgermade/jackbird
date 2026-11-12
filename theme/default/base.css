@@ -23,3 +23,19 @@ body {
   color: var(--mm-fg);
   font: var(--mm-text-md) / var(--mm-leading) var(--mm-font-sans);
 }
+
+/* The macOS app (WKWebView: `html.mac-app`, src/main.ts) draws its scrollbars always, where the
+   browser's come and go. There, thin bars whose thumb shows only while the pointer is over what
+   scrolls; a touch screen, which has no pointer to hover, keeps the system's. */
+@media (hover: hover) {
+  html.mac-app ::-webkit-scrollbar { width: .5rem; height: .5rem; background: transparent; }
+  html.mac-app ::-webkit-scrollbar-corner { background: transparent; }
+  html.mac-app ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: var(--mm-radius-full);
+    background: transparent;
+    background-clip: padding-box;
+  }
+  html.mac-app :hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--mm-fg) 35%, transparent); }
+  html.mac-app ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--mm-fg) 55%, transparent); }
+}
