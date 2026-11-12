@@ -119,7 +119,7 @@
      letters, darker in Silver so it stands off the satin chassis; then its relief, crisp (no blur,
      so small letters stay sharp): a bevel catching the light on top, the letters' sides below and
      the edge of the shadow they cast. */
-  --mm-metal-face: linear-gradient(105deg, #9ba1a6 0%, #6c7277 38%, #3a3f43 49%, #1f2326 51%, #4b5156 70%, #7c8287 100%);
+  --mm-metal-face: linear-gradient(105deg, #8c9297 0%, #6a7075 44%, #2b2f33 49.5%, #1a1d20 50.5%, #565c61 56%, #80868b 100%);
   --mm-metal-relief:
     drop-shadow(0 -1px 0 rgba(255, 255, 255, .95))
     drop-shadow(0 1px 0 #15181a)
@@ -248,7 +248,7 @@
   --mm-display-inset: inset 0 2px 8px rgba(0, 0, 0, .8);
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .1);
   --mm-brush: rgba(255, 255, 255, .025);
-  --mm-metal-face: linear-gradient(105deg, #ffffff 0%, #dfe2e4 36%, #a4a9ad 49%, #5c6166 51%, #858b90 70%, #c8cccf 92%, #f2f3f4 100%);
+  --mm-metal-face: linear-gradient(105deg, #f2f3f4 0%, #c3c7ca 44%, #6c7176 49.5%, #4f5459 50.5%, #b1b6b9 56%, #eceeef 100%);
   --mm-metal-relief:
     drop-shadow(0 -1px 0 rgba(255, 255, 255, .3))
     drop-shadow(0 1px 0 #3a3e42)
