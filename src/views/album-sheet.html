@@ -35,6 +35,8 @@
   }
 
   const titleOf = (track: Track): string => track.metadata.title || track.name
+  // A disc's number column, only when one of its tracks has a number; a track without one leaves it blank.
+  const discNumbered = (disc: { tracks: Track[] }): boolean => disc.tracks.some((track) => !!track.metadata.trackNumber?.trim())
 
   // Over the heading: what is shown, by the library's view (a folder, a
   // playlist, or the view's name).
@@ -142,7 +144,7 @@
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></td>
-                    <td class="mm-num">{{ track.metadata.trackNumber || "-" }}</td>
+                    <td :if="discNumbered(disc)" class="mm-num">{{ track.metadata.trackNumber?.trim() ?? "" }}</td>
                     <td><span class="mm-title">{{ titleOf(track) }}</span></td>
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" />

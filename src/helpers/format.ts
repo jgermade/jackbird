@@ -46,3 +46,15 @@ export function clockParts(seconds: number): { lead: string; minutes: string; se
   const lead = dimmedLead(minutes);
   return { lead, minutes: minutes.slice(lead.length), seconds: String(whole % 60).padStart(2, "0") };
 }
+
+/**
+ * What a list shows before a track's title: its number, or while the tags are still being read
+ * "…". A track with no number shows nothing: a blank as wide as a number when others in the list
+ * have one (so the titles line up), or no column at all when none has (`numbered` false: "").
+ */
+export function trackLead(trackNumber: string | undefined, loading: boolean, numbered: boolean): string {
+  const number = formatTrackNumber(trackNumber);
+  if (number) return number;
+  if (loading) return "…";
+  return numbered ? " " : "";
+}

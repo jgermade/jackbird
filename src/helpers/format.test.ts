@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clockParts, dimmedLead, formatBytes, formatTime, formatTrackNumber } from "./format.ts";
+import { clockParts, dimmedLead, formatBytes, formatTime, formatTrackNumber, trackLead } from "./format.ts";
 
 describe("formatBytes", () => {
   it("writes zero as 0 Bytes", () => {
@@ -82,5 +82,20 @@ describe("clockParts", () => {
     assert.deepEqual(clockParts(-3), { lead: "00", minutes: "", seconds: "00" });
     assert.deepEqual(clockParts(Number.NaN), { lead: "00", minutes: "", seconds: "00" });
     assert.deepEqual(clockParts(Number.POSITIVE_INFINITY), { lead: "00", minutes: "", seconds: "00" });
+  });
+});
+
+describe("trackLead", () => {
+  it("shows a track's number, without its total", () => {
+    assert.equal(trackLead("03/12", false, true), "03");
+    assert.equal(trackLead("7", true, false), "7");
+  });
+  it("shows … for a number not read yet", () => {
+    assert.equal(trackLead(undefined, true, false), "…");
+  });
+  it("leaves a blank as wide as a number when others have one, and nothing when none has", () => {
+    assert.equal(trackLead(undefined, false, true), "\u00a0");
+    assert.equal(trackLead(" ", false, true), "\u00a0");
+    assert.equal(trackLead(undefined, false, false), "");
   });
 });
