@@ -198,14 +198,12 @@
   </Display>
   <!-- The play modes, joined to the display's right edge as keys on its bezel. -->
   <div class="modes" role="group" :aria-label="t('faceplate.modes')">
-    <!-- Keys of the bezel's own: the whole side, one over the other, under the display's edge; their icon in the middle, their LED against the right edge. -->
+    <!-- Keys of the bezel's own: the whole side, one over the other, under the display's edge; their icon in the middle, lit while on. -->
     <button type="button" class="mode" :aria-pressed="String(playback.shuffle)" :aria-label="t('faceplate.shuffle')" :title="t('faceplate.shuffle')" @click="toggleShuffle()">
-      <span class="mode-led" :class.on="playback.shuffle" aria-hidden="true"></span>
-      <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1 2.6-2.2M9 6.7c.6-1.2 1.4-2.2 2.5-2.2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
+      <svg class="mode-icon" :class.on="playback.shuffle" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1 2.6-2.2M9 6.7c.6-1.2 1.4-2.2 2.5-2.2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
     </button>
     <button type="button" class="mode" :aria-pressed="String(playback.repeat !== 'off')" :aria-label="repeatLabel" :title="repeatLabel" @click="turnRepeat()">
-      <span class="mode-led" :class.on="playback.repeat !== 'off'" :class.one="playback.repeat === 'one'" aria-hidden="true"></span>
-      <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h8M11 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H3M5 14l-2-2 2-2" /></svg>
+      <svg class="mode-icon" :class.on="playback.repeat !== 'off'" :class.one="playback.repeat === 'one'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h8M11 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H3M5 14l-2-2 2-2" /></svg>
       <span :if="playback.repeat === 'one'" class="mode-one" aria-hidden="true">1</span>
     </button>
   </div>
@@ -254,13 +252,10 @@
   .mode:active > *, .mode[aria-pressed="true"] > * { transform: translateY(1px); }
   .mode:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   @media (hover: hover) { .mode:hover { filter: brightness(1.04); } }
-  .mode-icon { width: .875rem; height: .875rem; }
-  /* The LED: a short bar at the top, against the right edge. */
-  .mode-led { position: absolute; top: .2rem; right: 0; width: .3125rem; height: .1875rem; border-radius: 1px 0 0 1px; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
-  /* Lit in the signal's orange (shuffle, repeating the queue); blue repeating one track. */
-  /* Its glow thrown up, a little to the left and down. */
-  .mode-led.on { background: var(--mm-accent); box-shadow: -.05rem -.06rem .35rem .03rem var(--mm-accent); }
-  .mode-led.on.one { background: var(--mm-info-led); box-shadow: -.05rem -.06rem .35rem .03rem var(--mm-info-led); }
+  .mode-icon { width: .875rem; height: .875rem; transition: color var(--mm-duration) var(--mm-ease), filter var(--mm-duration) var(--mm-ease); }
+  /* On, the icon itself lights: the accent's, and blue repeating one track (with its 1). */
+  .mode-icon.on { color: var(--mm-accent); filter: drop-shadow(0 0 .2rem var(--mm-accent)); }
+  .mode-icon.on.one { color: var(--mm-info-led); filter: drop-shadow(0 0 .2rem var(--mm-info-led)); }
   .mode-one { position: absolute; right: .3rem; bottom: .2rem; font: 700 .5rem / 1 var(--mm-font-label); color: var(--mm-info-led); }
   /* Each of the display's text lines: the title, or the artist; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
