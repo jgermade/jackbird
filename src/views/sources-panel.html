@@ -103,4 +103,12 @@
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
   .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
   .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
+  /* In the welcome, where it is wide enough (views/workspace.html's container): the options side by
+     side, a line between them; the folders closed lately across both. The dialog keeps one column. */
+  @container welcome (min-width: 36rem) {
+    .tab:has(> .source + .source) { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--mm-space-6); align-items: start; }
+    .tab:has(> .source + .source) > .recent { grid-column: 1 / -1; }
+    .tab:has(> .source + .source) > .source + .source { padding-top: 0; padding-left: var(--mm-space-6); border-top: 0; border-left: var(--mm-border-width) solid var(--mm-border); }
+    .tab:has(> .source + .source) > .recent + .source { padding-top: 0; border-top: 0; }
+  }
 </style>

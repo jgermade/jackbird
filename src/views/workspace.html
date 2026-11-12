@@ -198,10 +198,19 @@
   .footbar { display: none; }
   /* The welcome: one space, its content centred in a readable column. */
   .welcome { display: flex; flex: 1 1 auto; justify-content: center; min-height: 0; overflow: auto; padding: var(--mm-space-6) var(--mm-space-4); background: var(--mm-sheet); }
-  .welcome-body { display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; }
+  /* A container the sources' panel lays its options out by (two columns where there is room). */
+  .welcome-body { container: welcome / inline-size; display: grid; align-content: start; gap: var(--mm-space-4); width: 100%; max-width: 32rem; }
+  /* Desktops and tablets: wider, for the options side by side. */
+  @media (min-width: 641px) {
+    .welcome-body { max-width: 46rem; }
+  }
   .welcome-lead { margin: 0; font-size: var(--mm-text-md); color: var(--mm-fg); }
-  /* The brand's own logo, in its metal, over what the welcome offers. */
-  .welcome-logo { display: block; width: 6rem; height: auto; aspect-ratio: 1152 / 1061; margin-bottom: var(--mm-space-2); }
+  /* The brand's own logo, in its metal, centred over what the welcome offers. */
+  .welcome-logo { display: block; justify-self: center; width: 9rem; height: auto; aspect-ratio: 1152 / 1061; margin-bottom: var(--mm-space-4); }
+  /* Phones: smaller, so what the welcome offers stays in view under it. */
+  @media (max-width: 480px) {
+    .welcome-logo { width: 6.5rem; margin-bottom: var(--mm-space-2); }
+  }
   .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   .panes {
     /* The library's width as chosen (--split, in rem), within the room: at least 16rem, leaving the
