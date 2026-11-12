@@ -18,8 +18,8 @@ export type SourceKind = "device" | "serverFolder" | "server";
 
 export const adding = $reactive({
   open: false,
-  /** Choosing the source, or typing a server's address. */
-  step: "choose" as "choose" | "server",
+  /** The dialog's tab: a folder (of this device, or of the server in front), or a server by its address. */
+  tab: "folder" as "folder" | "server",
   address: "",
   busy: false,
   error: "",
@@ -50,15 +50,39 @@ export function sourcesHere(): SourceKind[] {
   return kinds;
 }
 
-/** "Add to the library…": straight to the only source there is, else the choice. */
+/** The folders this runtime offers now (the "Folder" tab's choices). */
+export const folderSources = (): SourceKind[] => sourcesHere().filter((kind) => kind !== "server");
+
+/**
+ * The dialog's tabs: "Folder" wherever folders are offered, and on a phone, whose own folders come
+ * with Android's folder picker (E6b-D9); "Server" in the apps.
+ */
+export function tabsHere(): ("folder" | "server")[] {
+  const tabs: ("folder" | "server")[] = [];
+  if (folderSources().length > 0 || isPhone) tabs.push("folder");
+  if (sourcesHere().includes("server")) tabs.push("server");
+  return tabs;
+}
+
+/**
+ * "Add to the library…" (the owner's design, 2026-11-12): a dialog with a tab for folders and one
+ * for servers. Where there is only one folder to choose and no server (the web), straight to it.
+ */
 export function openAdding(): void {
-  const kinds = sourcesHere();
-  if (kinds.length === 1 && kinds[0] !== "server") {
-    void addFrom(kinds[0]);
+  const tabs = tabsHere();
+  const folders = folderSources();
+  if (tabs.length === 1 && tabs[0] === "folder" && folders.length === 1) {
+    void addFrom(folders[0]);
     return;
   }
   adding.open = true;
-  adding.step = kinds.length === 1 ? "server" : "choose";
+  adding.tab = folders.length > 0 || !tabs.includes("server") ? "folder" : "server";
+  adding.error = "";
+}
+
+/** Shows a tab of the dialog. */
+export function chooseTab(tab: "folder" | "server"): void {
+  adding.tab = tab;
   adding.error = "";
 }
 
@@ -66,18 +90,10 @@ export function closeAdding(): void {
   if (!adding.busy) adding.open = false;
 }
 
-/** Back from the address to the choice. */
-export function backToChoice(): void {
-  adding.step = "choose";
-  adding.error = "";
-}
-
-/** Adds from a source: a folder at once (its dialog), or the server's address next. */
+/** Adds from a folder source: its own dialog (the browser's, the system's, or the server's folders). */
 export async function addFrom(kind: SourceKind): Promise<void> {
   if (kind === "server") {
-    adding.open = true;
-    adding.step = "server";
-    adding.error = "";
+    chooseTab("server");
     return;
   }
   adding.open = false;
