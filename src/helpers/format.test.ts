@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dimmedLead, formatBytes, formatTime, formatTrackNumber } from "./format.ts";
+import { clockParts, dimmedLead, formatBytes, formatTime, formatTrackNumber } from "./format.ts";
 
 describe("formatBytes", () => {
   it("writes zero as 0 Bytes", () => {
@@ -68,5 +68,19 @@ describe("dimmedLead", () => {
   });
   it("gives nothing for no digits", () => {
     assert.equal(dimmedLead(""), "");
+  });
+});
+
+describe("clockParts", () => {
+  it("splits a time into dimmed zeros, lit minutes and seconds", () => {
+    assert.deepEqual(clockParts(192.7), { lead: "0", minutes: "3", seconds: "12" });
+    assert.deepEqual(clockParts(5), { lead: "00", minutes: "", seconds: "05" });
+    assert.deepEqual(clockParts(754), { lead: "", minutes: "12", seconds: "34" });
+    assert.deepEqual(clockParts(6000), { lead: "", minutes: "100", seconds: "00" });
+  });
+  it("shows 0 for a time below zero or not known", () => {
+    assert.deepEqual(clockParts(-3), { lead: "00", minutes: "", seconds: "00" });
+    assert.deepEqual(clockParts(Number.NaN), { lead: "00", minutes: "", seconds: "00" });
+    assert.deepEqual(clockParts(Number.POSITIVE_INFINITY), { lead: "00", minutes: "", seconds: "00" });
   });
 });

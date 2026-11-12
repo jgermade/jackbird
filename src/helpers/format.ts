@@ -34,3 +34,15 @@ export function dimmedLead(digits: string): string {
   if (/^0+$/.test(digits)) return digits;
   return (/^0+/.exec(digits.slice(0, -1)) ?? [""])[0];
 }
+
+/**
+ * A time as a display's clock shows it: its minutes (at least two digits) split into the zeros it
+ * dims (`lead`, see dimmedLead) and the rest it lights, and its seconds (two digits). A time below
+ * zero, or not a number (a song whose length is not known yet), shows as 0.
+ */
+export function clockParts(seconds: number): { lead: string; minutes: string; seconds: string } {
+  const whole = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  const minutes = String(Math.floor(whole / 60)).padStart(2, "0");
+  const lead = dimmedLead(minutes);
+  return { lead, minutes: minutes.slice(lead.length), seconds: String(whole % 60).padStart(2, "0") };
+}

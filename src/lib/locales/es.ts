@@ -74,6 +74,7 @@ export const es: Record<MessageKey, string> = {
   "faceplate.pause": "Pausar",
   "faceplate.showFormat": "Mostrar el formato de la canción",
   "faceplate.showSpectrum": "Mostrar el espectro",
+  "faceplate.turnTime": "Mostrar el tiempo, la duración o ambos",
   "faceplate.state.stopped": "Parado",
   "faceplate.state.playing": "Sonando",
   "faceplate.state.paused": "Pausa",

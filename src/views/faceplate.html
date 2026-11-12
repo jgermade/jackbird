@@ -18,7 +18,7 @@
   const Tabs = await import("../../theme/default/components/tabs.html")
   const DeckKeys = await import("./deck-keys.html")
 
-  const { dimmedLead, formatTime } = await import("../helpers/format")
+  const { clockParts, formatTime } = await import("../helpers/format")
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { importing, openImport } = await import("../lib/importing")
@@ -97,11 +97,17 @@
   // Two lines: the title (or what went wrong, or that nothing plays), and the artist under it.
   $: titleLine = playback.error || (current ? current.title : t("faceplate.idle"))
   $: artistLine = playback.error ? "" : (current?.artist ?? "")
-  // The position split for the display's two lines: minutes (at least two digits), then seconds.
-  $: minutes = String(Math.floor(Math.max(0, playback.position) / 60)).padStart(2, "0")
-  $: seconds = String(Math.floor(Math.max(0, playback.position) % 60)).padStart(2, "0")
-  // The minutes' zeros at the left, dimmed: "03" shows its 3 lit, "00" nothing lit.
-  $: minutesLead = dimmedLead(minutes)
+  // The clock at the display's right, turned with a click or a tap: where the song is (its minutes
+  // over its seconds), its length (the same), or both (where it is over its length, each mm:ss).
+  // The minutes' zeros at the left are dimmed: "03" shows its 3 lit, "00" nothing lit.
+  const TIME_VIEWS = ["elapsed", "total", "both"] as const
+  let timeView: (typeof TIME_VIEWS)[number] = "elapsed"
+  const turnTime = () => {
+    timeView = TIME_VIEWS[(TIME_VIEWS.indexOf(timeView) + 1) % TIME_VIEWS.length]
+  }
+  $: elapsedClock = clockParts(playback.position)
+  $: totalClock = clockParts(playback.duration)
+  $: clock = timeView === "total" ? totalClock : elapsedClock
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
 
   $: tabs = library.roots.map((root) => ({
@@ -147,11 +153,19 @@
                   <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
                 </span>
               </div>
-              <!-- Where the song is, on two lines too: its minutes, and under them its seconds; nothing with no song loaded. -->
-              <div :if="current" class="lcd-time" :aria-label="positionText">
-                <span class="minutes"><Counter><span class="lead">{{ minutesLead }}</span>{{ minutes.slice(minutesLead.length) }}</Counter></span>
-                <span class="seconds"><Counter>{{ seconds }}</Counter></span>
-              </div>
+              <!-- The clock, on two lines too: minutes over seconds (where the song is, or its length), or
+                   where it is over its length; a click turns it. Nothing with no song loaded. -->
+              <button :if="current" type="button" class="lcd-time" :class.both="timeView === 'both'"
+                      :aria-label="positionText" :title="t('faceplate.turnTime')" @click="turnTime()">
+                <span :if="timeView === 'both'" class="clock-lines">
+                  <Counter><span class="lead">{{ elapsedClock.lead }}</span>{{ elapsedClock.minutes }}:{{ elapsedClock.seconds }}</Counter>
+                  <Counter><span class="lead">{{ totalClock.lead }}</span>{{ totalClock.minutes }}:{{ totalClock.seconds }}</Counter>
+                </span>
+                <span :else class="clock-lines">
+                  <Counter><span class="lead">{{ clock.lead }}</span>{{ clock.minutes }}</Counter>
+                  <Counter>{{ clock.seconds }}</Counter>
+                </span>
+              </button>
             </div>
             <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
           </div>
@@ -328,7 +342,19 @@
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
   .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
   .lcd-text { display: grid; flex: 1 1 auto; gap: var(--mm-space-1); min-width: 0; }
-  .lcd-time { display: grid; flex: none; justify-items: end; gap: 0; line-height: 1; }
+  /* The clock: a key with no keycap, like the display's left. */
+  .lcd-time {
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .lcd-time:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
+  .clock-lines { display: grid; justify-items: end; gap: 0; }
   /* The minutes' zeros at the left, dimmed, so the minutes read at a glance. */
   .lcd-time .lead { opacity: .35; }
   @media (min-width: 641px) {
