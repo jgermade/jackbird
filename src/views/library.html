@@ -23,6 +23,7 @@
   const { rescanRoot } = await import("../lib/roots")
   const {
     activeRoot,
+    followRow,
     navigateTree,
     playFromTree,
     selectTrack,
@@ -89,7 +90,10 @@
 
   const open = (row: Row, event: MouseEvent) => {
     if (event?.detail > 1) return
-    setCurrentRow(row.key)
+    // A computer: the tree follows the click (a folder opens, and closes again as the current row
+    // leaves it, unless its caret opened it).
+    if (phone) setCurrentRow(row.key)
+    else followRow(row.key)
     if (row.kind === "track" && row.trackId) playFromTree(row.key)
     else if (row.kind === "album" && phone) ui.pane = "details"
   }

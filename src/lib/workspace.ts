@@ -7,6 +7,7 @@
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
+import { byCaret, followFolder } from "../helpers/follow";
 import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
 import { orderDetailPlaylist } from "../helpers/tracks";
@@ -206,12 +207,37 @@ export function clearSelection(): void {
 }
 
 export function toggleFolder(folder: string): void {
+  const id = library.activeRootId;
+  if (id) autoOpened.set(id, byCaret(autoOpened.get(id) ?? [], folder));
   updateActive((root) => ({
     ...root,
     expandedAlbums: root.expandedAlbums.includes(folder)
       ? root.expandedAlbums.filter((value) => value !== folder)
       : [...root.expandedAlbums, folder]
   }));
+}
+
+/** The folders of each root a click opened (not their caret): they close as the current row leaves them. */
+const autoOpened = new Map<string, string[]>();
+
+/**
+ * A click on a row on a computer: it becomes current, a folder opens (closing again once the
+ * current row leaves it, unless its caret opened it) and the folders a click opened that do not
+ * hold it close (helpers/follow.ts).
+ */
+export function followRow(rowKey: string): void {
+  const root = current();
+  const rows = derive().rows;
+  const row = rows.find((item) => item.key === rowKey);
+  if (!root || !row) return;
+  const byKey = new Map(rows.map((item) => [item.key, item]));
+  const ancestors: string[] = [];
+  for (let up = row.parentKey ? byKey.get(row.parentKey) : undefined; up; up = up.parentKey ? byKey.get(up.parentKey) : undefined) {
+    if (up.kind === "album") ancestors.push(up.album);
+  }
+  const next = followFolder({ expanded: root.expandedAlbums, auto: autoOpened.get(root.id) ?? [] }, row.kind === "album" ? row.album : null, ancestors);
+  autoOpened.set(root.id, next.auto);
+  updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: next.expanded }));
 }
 
 /** Lists the active root by `view`; the current row stays if the view has it. */
