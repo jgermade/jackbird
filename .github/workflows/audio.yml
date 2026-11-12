@@ -6,7 +6,11 @@
 name: audio
 
 on:
+  # A push runs this only when its last commit's message asks for it: `[ci audio]`, or
+  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests, by hand and
+  # from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
+  pull_request:
     paths:
       - "crates/audio/**"
       - "fixtures/audio/**"
@@ -20,6 +24,7 @@ permissions:
 
 jobs:
   crate:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci audio]') || contains(github.event.head_commit.message, '[ci all]')
     name: crates/audio on ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -44,6 +49,7 @@ jobs:
       - run: cargo test -p jackbird-audio --features device --locked
 
   loopback:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci audio]') || contains(github.event.head_commit.message, '[ci all]')
     name: Through ALSA itself (Linux)
     runs-on: ubuntu-24.04
     steps:

@@ -20,19 +20,17 @@ on:
         type: string
         required: true
   workflow_dispatch:
+  # A push runs this only when its last commit's message asks for it: `[ci phone]`, or
+  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests, by hand and
+  # from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
-    paths:
-      - "crates/player/**"
-      - "src-tauri/**"
-      - "src/**"
-      - "package.json"
-      - ".github/workflows/phone-release.yml"
 
 permissions:
   contents: read
 
 jobs:
   android:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci phone]') || contains(github.event.head_commit.message, '[ci all]')
     name: Android's APK
     runs-on: ubuntu-24.04
     timeout-minutes: 40

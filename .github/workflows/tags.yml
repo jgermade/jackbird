@@ -5,14 +5,10 @@
 name: tags
 
 on:
+  # A push runs this only when its last commit's message asks for it: `[ci tags]`, or
+  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests, by hand and
+  # from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
-    paths:
-      - "crates/**"
-      - "fixtures/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rustfmt.toml"
-      - ".github/workflows/tags.yml"
   pull_request:
     paths:
       - "crates/**"
@@ -28,6 +24,7 @@ permissions:
 
 jobs:
   crates:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci tags]') || contains(github.event.head_commit.message, '[ci all]')
     name: Format, lint and test
     runs-on: ubuntu-latest
     steps:

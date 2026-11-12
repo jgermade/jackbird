@@ -13,21 +13,10 @@
 name: service
 
 on:
+  # A push runs this only when its last commit's message asks for it: `[ci service]`, or
+  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests, by hand and
+  # from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
-    paths:
-      - "crates/**"
-      - "src/**"
-      - "scripts/service-check.cjs"
-      - "scripts/signin-check.cjs"
-      - "scripts/free-port.cjs"
-      - "scripts/library-check.cjs"
-      - "scripts/smtp-sink.mjs"
-      - "scripts/opensubsonic-client-check.py"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/service.yml"
   pull_request:
     paths:
       - "crates/**"
@@ -57,6 +46,7 @@ permissions:
 
 jobs:
   service:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci service]') || contains(github.event.head_commit.message, '[ci all]')
     name: Service on ${{ matrix.os }}
     strategy:
       fail-fast: false

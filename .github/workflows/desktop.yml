@@ -6,17 +6,10 @@
 name: desktop
 
 on:
+  # A push runs this only when its last commit's message asks for it: `[ci desktop]`, or
+  # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests, by hand and
+  # from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
-    paths:
-      - "src-tauri/**"
-      - "crates/**"
-      - "src/lib/sources/**"
-      - "scripts/desktop-check.mjs"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/desktop.yml"
   pull_request:
     paths:
       - "src-tauri/**"
@@ -42,6 +35,7 @@ permissions:
 
 jobs:
   app:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[ci desktop]') || contains(github.event.head_commit.message, '[ci all]')
     name: App on ${{ matrix.os }}
     strategy:
       fail-fast: false
