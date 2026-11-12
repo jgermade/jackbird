@@ -146,8 +146,8 @@
                       :data-playing="String(track.id === playingId())"
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
-                    <td class="pick-cell" @click="pickCell(track, $event)"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></td>
-                    <td :if="discNumbered(disc)" class="mm-num">{{ track.metadata.trackNumber?.trim() ?? "" }}</td>
+                    <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-stack"><span class="pick-box"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></span><span :if="discNumbered(disc)" class="pick-num mm-num">{{ track.metadata.trackNumber?.trim() ?? "" }}</span></span></td>
+                    <td :if="discNumbered(disc)" class="mm-num num-cell">{{ track.metadata.trackNumber?.trim() ?? "" }}</td>
                     <td><span class="mm-title">{{ titleOf(track) }}</span></td>
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" />
@@ -246,6 +246,20 @@
   .mm-table tr { cursor: pointer; user-select: none; }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .mm-table .pick-cell { width: 1%; padding-right: 0; }
+  /* With a pointer (a computer) the box takes the number's place, shown on the row pointed at,
+     chosen or focused, and the number otherwise; on a touch screen both, side by side. */
+  .pick-stack { display: grid; align-items: center; justify-items: start; }
+  .pick-stack > * { grid-area: 1 / 1; }
+  .pick-box { display: grid; }
+  .pick-num { display: none; }
+  @media (hover: hover) {
+    .num-cell { display: none; }
+    .mm-table .pick-cell:has(.pick-num) { padding-right: .5rem; }
+    .pick-num { display: block; }
+    .pick-stack:has(.pick-num) .pick-box { visibility: hidden; }
+    .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-within .pick-box { visibility: visible; }
+    .mm-table tr:hover .pick-num, .mm-table tr[aria-selected="true"] .pick-num, .mm-table tr:focus-within .pick-num { visibility: hidden; }
+  }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   .mm-table .cue-cell { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
   .mm-table .menu-cell { width: 1%; padding-block: 0; padding-left: 0; line-height: 0; }

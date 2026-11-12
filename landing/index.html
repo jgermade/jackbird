@@ -63,10 +63,10 @@
 
     <!-- The app itself, in the tone the page is in. -->
     <section class="shot">
-      <!-- The window and the compact player, as screenshots; "Play with it" puts the app itself in
-           their place (./demo/?embed: both windows over one player, the sample music), on a
-           computer. The tilt follows the pointer (landing.js, and the embedded app). -->
-      <div class="stage" data-rest-x="4" data-rest-y="-9">
+      <!-- The window and the compact player, as screenshots; on a computer the app itself takes
+           their place as the page loads (./demo/?embed: both windows over one player, the sample
+           music). The tilt follows the pointer (landing.js, and the embedded app). -->
+      <div class="stage" data-rest-x="1" data-rest-y="-2">
       <figure class="window">
         <div class="window-bar"><span></span><span></span><span></span></div>
         <img class="only-light" src="./screenshots/library-silver.png" alt="jackbird's library in Silver, with a track playing" loading="lazy">
@@ -79,10 +79,6 @@
         <img class="only-light" src="./screenshots/compact-silver.png" alt="jackbird's compact player in Silver: the display playing a track and the transport keys under it" width="880" height="500">
         <img class="only-dark" src="./screenshots/compact-graphite.png" alt="jackbird's compact player in Graphite: the display glowing, a track playing, and the transport keys under it" width="880" height="500">
       </figure>
-      <button class="key primary big live-key" type="button">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11L13.5 8z"/></svg>
-        Play with it
-      </button>
       <div class="invite" role="dialog" aria-labelledby="invite-title" hidden>
         <p id="invite-title"><strong>Your own music?</strong> The demo opens a folder of yours, and nothing leaves your computer.</p>
         <a class="key primary" href="./demo/">Open the demo</a>
@@ -213,7 +209,9 @@ jackbird-service setup</code></pre>
     </section>
 
     <section class="phone">
-      <img src="./screenshots/phone.png" alt="jackbird on a phone, playing a track" loading="lazy">
+      <!-- The phone's screenshot; on a computer the app itself in its place, as a phone draws it
+           (./demo/?embed=phone, landing.js). -->
+      <figure class="handset"><img src="./screenshots/phone.png" alt="jackbird on a phone, playing a track" loading="lazy"></figure>
       <div>
         <h2 class="section-label">In your pocket</h2>
         <p class="statement">The same deck on a phone, with the queue playing in the background, screen off.</p>

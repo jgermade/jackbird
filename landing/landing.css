@@ -207,10 +207,10 @@ h1 em {
 /* ---- the app's window --------------------------------------------------------------------- */
 
 .shot { display: grid; justify-items: center; gap: var(--mm-space-4); }
-/* The desktop app in a little perspective, turned towards the page's middle, and the compact
+/* The desktop app in a very slight perspective, turned towards the page's middle, and the compact
    player in front of it over its bottom left corner, as two windows on a desk. */
 .stage { position: relative; width: 100%; padding: 0 0 1.5rem 0; perspective: 160rem; }
-.stage .window { transform: rotateY(var(--tilt-y, -9deg)) rotateX(var(--tilt-x, 4deg)); transform-origin: 70% 50%; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+.stage .window { transform: rotateY(var(--tilt-y, -2deg)) rotateX(var(--tilt-x, 1deg)); transform-origin: 70% 50%; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
 .mini {
   position: absolute;
   left: 4.5rem;
@@ -220,18 +220,16 @@ h1 em {
   overflow: hidden;
   border: var(--mm-border-width) solid var(--mm-border-strong);
   border-radius: var(--mm-radius-lg);
-  box-shadow: 0 2rem 3rem rgba(0, 0, 0, .3), 0 .5rem 1rem rgba(0, 0, 0, .2);
-  transform: rotateY(-4deg) translateZ(4rem);
+  /* As the embedded app draws it, where a longer shadow would be cut by the iframe. */
+  box-shadow: 0 .5rem .875rem rgba(0, 0, 0, .3), 0 .125rem .375rem rgba(0, 0, 0, .2);
+  transform: rotateY(-1deg) translateZ(4rem);
   transition: transform .8s cubic-bezier(.2, .7, .2, 1);
 }
 .mini img { display: block; width: 100%; height: auto; }
-/* The app itself, once asked for: an iframe over the stage, the screenshots kept under it for its
-   size. The key that asks for it, over the window's middle; computers only. */
+/* The app itself, loaded with the page on a computer: an iframe over the stage, the screenshots
+   kept under it for its size, and shown until it has loaded. */
 .stage .live { position: absolute; inset: -1.5rem -1.5rem 0; width: calc(100% + 3rem); height: calc(100% + 1.5rem); border: 0; background: transparent; }
 .stage.live-on .window, .stage.live-on .mini { visibility: hidden; }
-.live-key { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); box-shadow: var(--mm-key-shadow-signal), 0 1rem 2rem rgba(0, 0, 0, .25); }
-.stage.live-on .live-key { display: none; }
-@media (max-width: 900px) { .live-key { display: none; } }
 /* The invitation to the demo, when the embedded app is asked for a folder. */
 .invite {
   position: absolute;
@@ -329,13 +327,20 @@ h1 em {
 /* ---- the phone ------------------------------------------------------------------------------ */
 
 .phone { display: grid; grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); align-items: center; gap: 4rem; }
-.phone img {
-  /* A thin bezel, the corners of a phone's screen rather than a pebble's. */
-  border: .25rem solid #0d0e0f;
-  border-radius: 1.25rem;
+/* The phone: its screenshot, or the app itself over it (an iframe as large), in a hairline bezel,
+   turned a little. */
+.handset {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #0d0e0f;
+  border-radius: .75rem;
   box-shadow: var(--mm-shadow-lg), 0 0 0 1px var(--mm-border-strong);
   transform: rotate(-4deg);
 }
+.handset img { display: block; width: 100%; height: auto; }
+.handset .live { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+.handset.live-on img { visibility: hidden; }
 .phone .statement {
   margin: 0 0 var(--mm-space-4);
   font-family: var(--mm-font-label);
@@ -480,7 +485,7 @@ h1 em {
   .tone { margin-left: auto; }
   .modules, .downloads, .ways { grid-template-columns: minmax(0, 1fr); }
   .phone { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2.5rem; }
-  .phone img { max-width: 14rem; }
+  .handset { max-width: 14rem; }
 }
 
 /* Grid items shrink to their track, never to their content. */

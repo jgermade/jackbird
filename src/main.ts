@@ -50,6 +50,15 @@ async function startEmbedded(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   queueWhatIsShown();
+  // The landing page has two of these: the one that starts tells it, and is told to pause when the
+  // other does.
+  const [{ playback }, { togglePlay }] = await Promise.all([import("./lib/playback"), import("./lib/player")]);
+  playback.$on("playing", () => {
+    if (playback.playing) parent.postMessage({ type: "jackbird:playing" }, location.origin);
+  });
+  window.addEventListener("message", (event) => {
+    if (event.origin === location.origin && event.data?.type === "jackbird:pause" && playback.playing) togglePlay();
+  });
 }
 
 function startSession(): void {

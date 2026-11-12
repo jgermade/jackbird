@@ -403,10 +403,12 @@
     .lcd:not(.small) { --mm-text-display-md: var(--mm-text-display-sm); }
     .lcd:not(.small) .lcd-mark { height: auto; min-height: 0; align-self: stretch; }
   }
-  /* Phones: a smaller mark, so the title keeps its room. */
+  /* Phones: a smaller mark, so the title keeps its room; the spectrum, the format and the DAC
+     narrower still, 3.5rem: "BIT-PERFECT", the widest line, fits with its letters a little closer. */
   @media (max-width: 640px) {
     .lcd-mark { width: 3rem; height: 3rem; }
-    .lcd-mark.playing { width: 4.5rem; }
+    .lcd:not(.small) .lcd-mark.playing { width: 3.5rem; }
+    .lcd:not(.small) .lcd-format .route { letter-spacing: .04em; }
   }
   .small .lcd-mark { width: 3rem; height: 3rem; }
   .small .lcd-mark.playing { width: 4.5rem; height: auto; }

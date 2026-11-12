@@ -127,7 +127,7 @@ const downloads = document.querySelector(".downloads");
 const mine = system && downloads?.querySelector(`.download[data-os="${system}"]`);
 if (mine) {
   mine.classList.add("mine");
-  mine.dataset.ribbon = "This device";
+  mine.dataset.ribbon = "Detected";
   downloads.prepend(mine);
 }
 
@@ -163,40 +163,59 @@ const stage = document.querySelector(".stage");
 
 /** The tilt for a pointer at (x, y), each 0 to 1 across the stage: the window turns to face it. */
 function tiltFor(x, y) {
-  return { x: `${((0.5 - y) * 8).toFixed(2)}deg`, y: `${((x - 0.5) * 14 - 4).toFixed(2)}deg` };
+  return { x: `${((0.5 - y) * 2).toFixed(2)}deg`, y: `${((x - 0.5) * 3 - 1.5).toFixed(2)}deg` };
 }
 
-if (stage && matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-  stage.addEventListener("pointermove", (event) => {
-    const box = stage.getBoundingClientRect();
+/** The window turns to face the pointer over the stage, and back to rest (the stylesheet's) when it leaves. */
+function followPointer(area) {
+  area.addEventListener("pointermove", (event) => {
+    const box = area.getBoundingClientRect();
     const tilt = tiltFor((event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
-    stage.style.setProperty("--tilt-x", tilt.x);
-    stage.style.setProperty("--tilt-y", tilt.y);
+    area.style.setProperty("--tilt-x", tilt.x);
+    area.style.setProperty("--tilt-y", tilt.y);
   });
-  // Off the stage, back to rest (the stylesheet's).
-  stage.addEventListener("pointerleave", () => {
-    stage.style.removeProperty("--tilt-x");
-    stage.style.removeProperty("--tilt-y");
+  area.addEventListener("pointerleave", () => {
+    area.style.removeProperty("--tilt-x");
+    area.style.removeProperty("--tilt-y");
   });
 }
 
-let live = null;
+if (matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (stage) followPointer(stage);
+}
 
-/** The landing page's tone, to the embedded app. */
+/** The embedded apps: the windows on the stage, and the phone's. */
+const lives = [];
+
+/** The landing page's tone, to the embedded apps. */
 function tellTone() {
-  live?.contentWindow?.postMessage({ type: "jackbird:tone", tone: root.dataset.theme === "dark" ? "dark" : "light" }, location.origin);
+  for (const live of lives) live.contentWindow?.postMessage({ type: "jackbird:tone", tone: root.dataset.theme === "dark" ? "dark" : "light" }, location.origin);
 }
 
-stage?.querySelector(".live-key")?.addEventListener("click", () => {
-  if (live) return;
-  live = document.createElement("iframe");
+/** The app itself in `place`, over its screenshots, which stay shown until it has loaded (`live-on`). */
+function embedApp(place, kind, title) {
+  const live = document.createElement("iframe");
   live.className = "live";
-  live.title = "jackbird, playing the sample music";
+  live.title = title;
   live.allow = "autoplay";
-  live.src = `./demo/?embed&lang=en&tone=${root.dataset.theme === "dark" ? "dark" : "light"}`;
-  stage.append(live);
-  stage.classList.add("live-on");
-  live.focus();
+  live.src = `./demo/?embed${kind ? `=${kind}` : ""}&lang=en&tone=${root.dataset.theme === "dark" ? "dark" : "light"}`;
+  live.addEventListener("load", () => place.classList.add("live-on"), { once: true });
+  place.append(live);
+  lives.push(live);
+}
+
+// On a computer the app itself takes the screenshots' place as the page loads: the windows on the
+// stage, and the app as a phone draws it in the phone's picture. A phone keeps the screenshots.
+if (matchMedia("(min-width: 901px)").matches) {
+  if (stage) embedApp(stage, "", "jackbird, with the sample music");
+  const handset = document.querySelector(".handset");
+  if (handset) embedApp(handset, "phone", "jackbird on a phone, with the sample music");
+}
+
+// One of them at a time plays: the one that starts pauses the other.
+window.addEventListener("message", (event) => {
+  if (event.origin !== location.origin || event.data?.type !== "jackbird:playing") return;
+  for (const live of lives) if (live.contentWindow !== event.source) live.contentWindow?.postMessage({ type: "jackbird:pause" }, location.origin);
 });
 
 // The embedded app asked for a folder: the demo is where one opens.

@@ -71,9 +71,9 @@ Hover states live only inside `@media (hover: hover)`: a touch screen has none, 
 hover reveals (a row's keys, its ▶) is always shown under `(hover: none)`. `npm test` fails on a
 `:hover` rule outside that media query.
 
-Sizes are in `rem`, never in `px`, so the interface scales with the root font size: 18px on a
-desktop or a tablet and `4.5vw` on a phone (`theme/default/tokens.css`), which scales every component
-linearly with the screen. Only hairlines (1–2px borders, focus rings) stay in `px`. Setup scripts are written in
+Sizes are in `rem`, never in `px`, so the interface scales with the root font size: 18px down to 421px wide (no `vw` from 421px
+to 720px), and from 420px down `18px × width / 421px` (`theme/default/tokens.css`), which shrinks
+every component linearly from its size at 421px. Only hairlines (1–2px borders, focus rings) stay in `px`. Setup scripts are written in
 TypeScript (`lang="ts"`); since templates are not type-checked, keep them thin and put the logic
 in helpers and `lib/`.
 

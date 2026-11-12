@@ -23,10 +23,11 @@
   const Compact = await import("./compact.html")
   const { t } = await import("../lib/i18n")
   const { compact, compactMarker } = await import("../lib/compact")
-  const { isEmbed } = await import("../lib/platform")
+  const { embedKind } = await import("../lib/platform")
   // Embedded in the landing page: the app in a window, its compact player in front of it over the
-  // window's bottom left corner, one player behind both; the page itself see-through.
-  const embed: boolean = isEmbed
+  // window's bottom left corner, one player behind both; the page itself see-through. As the
+  // landing page's phone (`?embed=phone`), the app alone, as a phone draws it, filling the frame.
+  const embed: boolean = embedKind === "windows"
   if (embed) {
     document.documentElement.classList.add("embedded")
     // See-through, so the landing page shows round the windows; its body is their stage.
@@ -49,8 +50,8 @@
         app.style.removeProperty("--tilt-y")
         return
       }
-      app.style.setProperty("--tilt-x", `${((0.5 - y) * 8).toFixed(2)}deg`)
-      app.style.setProperty("--tilt-y", `${((x - 0.5) * 14 - 4).toFixed(2)}deg`)
+      app.style.setProperty("--tilt-x", `${((0.5 - y) * 2).toFixed(2)}deg`)
+      app.style.setProperty("--tilt-y", `${((x - 0.5) * 3 - 1.5).toFixed(2)}deg`)
     }
     if (!still) {
       document.addEventListener("pointermove", (event) => tilt(event.clientX / innerWidth, event.clientY / innerHeight))
@@ -125,8 +126,9 @@
     border: var(--mm-border-width) solid var(--mm-border-strong);
     border-radius: var(--mm-radius-lg);
     background: var(--mm-chassis);
-    box-shadow: var(--mm-shadow-lg);
-    transform: rotateY(var(--tilt-y, -9deg)) rotateX(var(--tilt-x, 4deg));
+    /* Within the frame's 3rem below it: a shadow that reaches further is cut by the iframe. */
+    box-shadow: 0 .75rem 1.5rem rgba(0, 0, 0, .3), 0 .25rem .5rem rgba(0, 0, 0, .2);
+    transform: rotateY(var(--tilt-y, -2deg)) rotateX(var(--tilt-x, 1deg));
     transform-origin: 70% 50%;
     transition: transform .5s cubic-bezier(.2, .7, .2, 1);
   }
@@ -145,6 +147,7 @@
     overflow: hidden;
     border: var(--mm-border-width) solid var(--mm-border-strong);
     border-radius: var(--mm-radius-lg);
-    box-shadow: 0 2rem 3rem rgba(0, 0, 0, .3), 0 .5rem 1rem rgba(0, 0, 0, .2);
+    /* Within the frame's 1.5rem below it, or the iframe cuts it. */
+    box-shadow: 0 .5rem .875rem rgba(0, 0, 0, .3), 0 .125rem .375rem rgba(0, 0, 0, .2);
   }
 </style>
