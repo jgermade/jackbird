@@ -17,6 +17,8 @@ describe("detailScope", () => {
   it("is the whole root without an active row, or with one not shown", () => {
     assert.equal(detailScope(root(null), rows).label, "Music");
     assert.deepEqual(ids(detailScope(root(null), rows)), ["t1", "t2", "t3", "t4"]);
+    assert.equal(detailScope(root(null), rows).whole, true);
+    assert.equal(detailScope(root("folder:Jazz"), rows).whole, undefined);
     assert.deepEqual(ids(detailScope(root("folder:Gone"), rows)), ["t1", "t2", "t3", "t4"]);
   });
 
@@ -53,6 +55,6 @@ describe("detailScope in the views", () => {
   });
 
   it("shows the view's tracks for a track without a group", () => {
-    assert.deepEqual(detailScope(root("track:A/1.mp3"), rows), { label: "Music", tracks: [b, a], ordered: true });
+    assert.deepEqual(detailScope(root("track:A/1.mp3"), rows), { label: "Music", tracks: [b, a], ordered: true, whole: true });
   });
 });

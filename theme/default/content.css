@@ -74,6 +74,8 @@
   color: var(--mm-fg-muted);
 }
 .mm-table td { padding: .4375rem .5rem; border-bottom: var(--mm-border-width) solid var(--mm-border); }
+/* The last row's line closes the table, faintly: it separates no row from the next. */
+.mm-table tbody tr:last-child td { border-bottom-color: color-mix(in srgb, var(--mm-border) 40%, transparent); }
 @media (hover: hover) { .mm-table tbody tr:hover td { background: var(--mm-hover); } }
 .mm-table tr[aria-selected="true"] td { background: var(--mm-accent-soft); }
 .mm-table tr[aria-selected="true"] td:first-child { box-shadow: inset .1875rem 0 0 var(--mm-accent); }

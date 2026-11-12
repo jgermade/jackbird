@@ -6,6 +6,8 @@ export type Scope = {
   tracks: Track[];
   /** Whether `tracks` are in the order to play (a view's group, a playlist), not to be sorted by folder and number. */
   ordered?: boolean;
+  /** Whether it is the whole root: its label is then the root's, which its tab already shows. */
+  whole?: boolean;
 };
 
 type ScopedRoot = {
@@ -34,7 +36,7 @@ export function detailScope(root: ScopedRoot | null, rows: readonly WizardTreeRo
     if (group?.trackIds) {
       return { label: group.label, tracks: tracksOf(group.trackIds), ordered: true };
     }
-    return { label: root.label, tracks: tracksOf(rows.flatMap((candidate) => (candidate.trackId ? [candidate.trackId] : []))), ordered: true };
+    return { label: root.label, tracks: tracksOf(rows.flatMap((candidate) => (candidate.trackId ? [candidate.trackId] : []))), ordered: true, whole: true };
   }
   if (row && (row.kind === "album" || (row.kind === "track" && row.album))) {
     const prefix = `${row.album}/`;
@@ -43,5 +45,5 @@ export function detailScope(root: ScopedRoot | null, rows: readonly WizardTreeRo
       tracks: root.tracks.filter((track) => track.relativePath.startsWith(prefix))
     };
   }
-  return { label: root.label, tracks: root.tracks };
+  return { label: root.label, tracks: root.tracks, whole: true };
 }

@@ -97,7 +97,8 @@
 
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">
-      <header class="scope-head">
+      <!-- What is shown, over its albums; not for the whole root, whose name and count its tab shows. -->
+      <header :if="!scope().whole" class="scope-head">
         <span class="mm-legend">{{ eyebrow() }}</span>
         <h2>{{ scope().label }}</h2>
         <p>{{ tn("album.count", albums().length) }}, {{ tn("tracks.count", scope().tracks.length) }}</p>
