@@ -8,8 +8,11 @@
   // Its key's `size` and `variant` are Key's (small and ghost by default), and
   // an `icon` slot draws another glyph in place of the dots.
   //
-  // An item is `{ id, label, danger?, rule?, disabled? }`: `danger` prints it in the
-  // error ink, `rule` draws a line above it, `disabled` shows it unavailable. A choice closes the menu and
+  // An item is `{ id, label, danger?, rule?, disabled?, icon?, group? }`: `danger` prints it in the
+  // error ink, `rule` draws a line above it (above its row), `disabled` shows it unavailable,
+  // `icon` is a glyph before its label (an SVG path's `d` in a 16-unit box,
+  // drawn as a 1.5 stroke), and items next to each other with the same `group`
+  // share a row, side by side. A choice closes the menu and
   // emits `select` with the item's id. The list opens in the top layer (a
   // manual popover), under the key, or above it when there is no room below;
   // at 720px and below it is a sheet at the bottom of the screen over a
@@ -22,7 +25,17 @@
   // `tokens.css`. See `RECORD/2026-11-04.github-actions-workflows.WIP.md`
   // (23:32, W4).
 
-  type Item = { id: string; label: string; danger?: boolean; rule?: boolean; disabled?: boolean }
+  type Item = { id: string; label: string; danger?: boolean; rule?: boolean; disabled?: boolean; icon?: string; group?: string }
+  // The items in rows: one each, or side by side where they share a group.
+  const rows = (): { key: string; rule: boolean; items: Item[] }[] => {
+    const out: { key: string; rule: boolean; items: Item[] }[] = []
+    for (const item of items as Item[]) {
+      const last = out[out.length - 1]
+      if (item.group && last && last.items[0].group === item.group) last.items.push(item)
+      else out.push({ key: item.id, rule: !!item.rule, items: [item] })
+    }
+    return out
+  }
   type Props = { items?: Item[]; label?: string; disabled?: boolean | ""; size?: "sm" | "md" | "lg"; variant?: string }
 
   const Key = await import("./key.html")
@@ -116,8 +129,10 @@
     <svg :else class="dots" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.25" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="12.75" r="1.4" /></svg>
   </Key>
   <div class="list" popover="manual" role="menu" :aria-label="label || null">
-    <button :each="item in items" :key="item.id" type="button" role="menuitem" tabindex="-1" class="item"
-            :class.danger="!!item.danger" :class.rule="!!item.rule" :disabled="!!item.disabled" @click="choose(item)">{{ item.label }}</button>
+    <div :each="row in rows()" :key="row.key" class="row" :class.rule="row.rule" :class.shared="row.items.length > 1">
+      <button :each="item in row.items" :key="item.id" type="button" role="menuitem" tabindex="-1" class="item"
+              :class.danger="!!item.danger" :disabled="!!item.disabled" @click="choose(item)"><svg :if="item.icon" class="glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="item.icon" /></svg>{{ item.label }}</button>
+    </div>
   </div>
 </span>
 
@@ -142,6 +157,7 @@
   }
   .item {
     display: flex;
+    gap: 0;
     align-items: center;
     width: 100%;
     min-height: 2.25rem;
@@ -154,7 +170,13 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .item.rule { margin-top: var(--mm-space-1); box-shadow: inset 0 var(--mm-border-width) 0 var(--mm-border); }
+  .row { display: flex; }
+  .row.rule { margin-top: var(--mm-space-1); box-shadow: inset 0 var(--mm-border-width) 0 var(--mm-border); }
+  /* Items sharing a row: equal parts, a hairline between them. */
+  .row.shared .item { flex: 1 1 0; min-width: 0; }
+  .row.shared .item + .item { box-shadow: inset var(--mm-border-width) 0 0 var(--mm-border); }
+  .glyph { flex: none; width: 1rem; height: 1rem; margin-right: var(--mm-space-3); color: var(--mm-fg-muted); }
+  .item:disabled .glyph { color: inherit; }
   .item.danger { color: var(--mm-bad); }
   .item:disabled { color: var(--mm-fg-subtle); cursor: default; }
   .item:focus { outline: none; background: var(--mm-hover); }
