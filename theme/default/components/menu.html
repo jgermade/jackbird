@@ -175,6 +175,10 @@
   /* Items sharing a row: equal parts, a hairline between them. */
   .row.shared .item { flex: 1 1 0; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
   .row.shared .item + .item { box-shadow: inset var(--mm-border-width) 0 0 var(--mm-border); }
+  /* A shared row is set off by hairlines above (unless it opens the menu) and below (unless it ends it). */
+  .row.shared:not(:last-child) { border-bottom: var(--mm-border-width) solid var(--mm-border); }
+  .row.shared:not(:first-child):not(.rule) { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .row.shared + .row.rule { box-shadow: none; }
   .glyph { flex: none; width: 1rem; height: 1rem; margin-right: var(--mm-space-3); color: var(--mm-fg-muted); }
   .item:disabled .glyph, .item.danger .glyph { color: inherit; }
   .item.danger { color: var(--mm-bad); }

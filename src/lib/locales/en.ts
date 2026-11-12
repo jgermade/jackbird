@@ -124,6 +124,7 @@ export const en = {
   "message.renamed.other": "{count} files renamed.",
   "message.renameFailed": "Could not rename {name}: {reason}.",
   "views.label": "Library views",
+  "crumbs.label": "Where this is",
   "views.files": "Files",
   "views.playlists": "Playlists",
   "views.artists": "Artists",

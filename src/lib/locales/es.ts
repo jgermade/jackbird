@@ -125,6 +125,7 @@ export const es: Record<MessageKey, string> = {
   "message.renamed.other": "{count} archivos renombrados.",
   "message.renameFailed": "No se pudo renombrar {name}: {reason}.",
   "views.label": "Vistas de la biblioteca",
+  "crumbs.label": "Dónde estás",
   "views.files": "Archivos",
   "views.playlists": "Listas de reproducción",
   "views.artists": "Artistas",

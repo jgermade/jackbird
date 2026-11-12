@@ -7,7 +7,7 @@
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
-import { detailScope, type Scope } from "../helpers/scope";
+import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
 import { orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
@@ -27,6 +27,7 @@ type Derived = {
   root: RootWorkspace | null;
   rows: WizardTreeRow[];
   scope: Scope;
+  crumbs: Crumb[];
 };
 
 // The last derivation, keyed on the roots array, the active id and the
@@ -70,7 +71,7 @@ function derive(): Derived {
   }
   const root = roots.find((item) => item.id === id) ?? null;
   const rows = root ? rowsOf(root) : [];
-  const derived = { root, rows, scope: detailScope(root, rows) };
+  const derived = { root, rows, scope: detailScope(root, rows), crumbs: scopeCrumbs(root, rows) };
   cache = { roots, id, language, derived };
   return derived;
 }
@@ -82,6 +83,14 @@ export const treeRows = $computed((): Opaque<WizardTreeRow[]> => new Opaque(deri
 
 /** What the album sheet shows. */
 export const detail = $computed((): Opaque<Scope> => new Opaque(derive().scope));
+
+/** Where the album sheet's scope comes from, as a breadcrumb (helpers/scope.ts). */
+export const detailCrumbs = $computed((): Opaque<Crumb[]> => new Opaque(derive().crumbs));
+
+/** Back to the whole root in the album sheet: no current row. */
+export function showWhole(): void {
+  updateActive((root) => (root.activeRowKey === null ? root : { ...root, activeRowKey: null }));
+}
 
 /** The sheet's tracks as albums and discs, titled in the current language. */
 export const detailAlbums = $computed(
