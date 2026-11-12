@@ -19,7 +19,7 @@
 
   const { t } = await import("../lib/i18n")
   const { playback } = await import("../lib/playback")
-  const { clearPlayed, clearQueue, clearUpcoming, nowPlaying, next, previous, queueEntries, togglePlay } = await import("../lib/player")
+  const { clearPlayed, clearQueue, clearUpcoming, nowPlaying, next, previous, queueEntries, queueIsAlbum, togglePlay } = await import("../lib/player")
   const { openPlaylistDialog } = await import("../lib/playlists")
   const { ui } = await import("../lib/ui")
   const { compact, compactKeys, compactPlace, toggleCompact } = await import("../lib/compact")
@@ -44,8 +44,9 @@
     return [
       { id: "new", label: t("queue.new"), disabled: empty },
       { id: "save", label: t("queue.saveAsPlaylist"), disabled: empty },
-      { id: "upcoming", label: t("queue.clearUpcoming"), disabled: nothingAfter(), rule: true },
-      { id: "played", label: t("queue.clearPlayed"), disabled: nothingBefore() }
+      // A disc plays whole: nothing to clear from it.
+      { id: "upcoming", label: t("queue.clearUpcoming"), disabled: nothingAfter() || queueIsAlbum.value, rule: true },
+      { id: "played", label: t("queue.clearPlayed"), disabled: nothingBefore() || queueIsAlbum.value }
     ]
   }
   const onQueueMenu = (id: string) => {

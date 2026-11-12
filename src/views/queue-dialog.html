@@ -16,7 +16,7 @@
   const PlaylistKeys = await import("./playlist-keys.html")
 
   const { t } = await import("../lib/i18n")
-  const { clearUpcoming, queueEntries, queueEyebrow, queueTitle } = await import("../lib/player")
+  const { clearUpcoming, queueEntries, queueEyebrow, queueIsAlbum, queueTitle } = await import("../lib/player")
   const { closePlaylistDialog, openPlaylistDialog } = await import("../lib/playlists")
   const { ui } = await import("../lib/ui")
 
@@ -51,7 +51,7 @@
     <template :slot.foot>
       <span class="foot">
         <Key variant="ghost" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue', sub: true })">{{ t("queue.saveAsPlaylist") }}</Key>
-        <Key variant="ghost" :disabled="nothingAfter()" @click="clearUpcoming()">{{ t("queue.clearUpcoming") }}</Key>
+        <Key variant="ghost" :disabled="nothingAfter() || queueIsAlbum.value" @click="clearUpcoming()">{{ t("queue.clearUpcoming") }}</Key>
       </span>
     </template>
   </Modal>

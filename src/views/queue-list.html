@@ -5,7 +5,8 @@
   // bars. A click (or Enter) plays a track, the current one pauses or
   // resumes. A track's grip (⠿) drags it to another place (mouse, pen or
   // touch), but not the current one, which has no grip (its larger cover takes
-  // the grip's place, its right edge on the others'); × removes it (not the current one). Up, Down, Home and End move
+  // the grip's place, its right edge on the others'); × removes it (not the current one).
+  // A disc (queueIsAlbum) plays whole, in its order: no grips, no ×, and no keys move or remove. Up, Down, Home and End move
   // between tracks, Alt with Up or Down moves the track, Delete removes it.
   // A view over the queue's actions in lib/player.ts. See
   // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3;
@@ -53,6 +54,8 @@
     playAt(entry.index)
   }
   const move = (from: number, to: number) => {
+    // A disc plays in its own order, whole: nothing in it moves.
+    if (queueIsAlbum.value) return
     if (to < 0 || to >= entries().length || from === to) return
     // The track playing is not moved (the others move around it).
     if (entries()[from]?.state === "current") return
@@ -60,7 +63,7 @@
     focusOn(to)
   }
   const remove = (entry: Entry) => {
-    if (entry.state === "current") return
+    if (entry.state === "current" || queueIsAlbum.value) return
     removeFromQueue(entry.index)
     focusOn(entry.index)
   }
@@ -184,14 +187,14 @@
 
 <div class="queue-list">
   <p :if="entries().length === 0" class="none">{{ t("queue.empty") }}</p>
-  <ol :else class="queue" role="listbox" tabindex="0" :aria-label="t('queue.title')"
+  <ol :else class="queue" :class.album="queueIsAlbum.value" role="listbox" tabindex="0" :aria-label="t('queue.title')"
       :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
     <li :each="entry in entries()" :key="entry.index" :id="itemId(entry.index)" role="option" class="item"
         :class.played="entry.state === 'played' && !queueIsAlbum.value" :class.current="entry.state === 'current'"
         :class.missing="entry.missing" :class.focused="entry.index === focused"
         :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
       <!-- The one playing stays where it is: no grip; its larger cover takes the grip's place. -->
-      <span :if="entry.state !== 'current'" class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
+      <span :if="entry.state !== 'current' && !queueIsAlbum.value" class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
             @pointerdown="drag.start(entry.index, $event)" @click.stop="null">
         <svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="8" r="1.2" /><circle cx="7" cy="8" r="1.2" /><circle cx="3" cy="13" r="1.2" /><circle cx="7" cy="13" r="1.2" /></svg>
       </span>
@@ -204,7 +207,7 @@
         <span class="sub">{{ subtitle(entry) }}</span>
       </span>
       <span class="cue"><EqBars :if="entry.state === 'current'" :active="playback.playing" /></span>
-      <span class="keys" @click.stop="null">
+      <span :if="!queueIsAlbum.value" class="keys" @click.stop="null">
         <Key square size="sm" variant="ghost" :label="t('queue.remove', { title: entry.title })" :title="t('queue.remove', { title: entry.title })"
              :disabled="entry.state === 'current'" @click="remove(entry)">
           <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
@@ -258,6 +261,11 @@
   .art { display: block; width: 2.25rem; aspect-ratio: 1; overflow: hidden; border-radius: 3px; box-shadow: var(--mm-shadow-sm, 0 1px 2px rgb(0 0 0 / .15)); }
   /* The one playing, larger, in the grip's column and the cover's, its right edge on the others'. */
   .current .art { grid-column: 1 / 3; justify-self: end; width: 3.25rem; }
+  /* A disc: no grips and no keys to remove; the covers in one column as wide as the larger one,
+     their right edges together, and nothing at the row's end but the bars. */
+  .album .item { grid-template-columns: 3.25rem minmax(0, 1fr) 1.25rem; }
+  .album .art { justify-self: end; }
+  .album .current .art { grid-column: auto; }
   .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .no-cover { position: relative; display: block; height: 100%; background: var(--mm-display-bezel); }
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 16%; }
