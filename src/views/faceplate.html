@@ -185,7 +185,8 @@
               <!-- Two lines: the state and the title, then the artist (and what reaches the device). -->
               <div class="lcd-text">
                 <span class="now">
-                  <span class="state" aria-hidden="true">{{ stateGlyph }}</span>
+                  <!-- The state's glyph; not while the lines name the DAC, which is not the song. -->
+                  <span :if="!dacName" class="state" aria-hidden="true">{{ stateGlyph }}</span>
                   <span class="visually-hidden">{{ stateLabel }}</span>
                   <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
                 </span>
