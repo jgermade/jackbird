@@ -50,7 +50,7 @@
     </SubModal>
     <template :slot.foot>
       <span class="foot">
-        <Key variant="ghost" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue', sub: true })">{{ t("queue.saveAsPlaylist") }}</Key>
+        <Key variant="ghost" :disabled="queueEntries.value.data.length === 0 || queueIsAlbum.value" @click="openPlaylistDialog({ mode: 'queue', sub: true })">{{ t("queue.saveAsPlaylist") }}</Key>
         <Key variant="ghost" :disabled="nothingAfter() || queueIsAlbum.value" @click="clearUpcoming()">{{ t("queue.clearUpcoming") }}</Key>
       </span>
     </template>
