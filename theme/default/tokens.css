@@ -10,10 +10,10 @@
    the other tone with `data-tone="dark"` or `data-tone="light"`. Shape, type
    and motion are the same in both.
 
-   Sizes are in rem, so everything scales with the root font size: 18px on
-   a desktop or a tablet, and on a phone a share of the viewport's width
-   (`--mm-root-phone`, near the end), so the whole interface scales
-   linearly with the screen. Only hairlines (1-2px borders, focus rings)
+   Sizes are in rem, so everything scales with the root font size: 18px
+   down to 421px wide, and from 420px down a share of the viewport's width
+   (`--mm-root-phone`, near the end), so the whole interface shrinks
+   linearly from its size at 421px. Only hairlines (1-2px borders, focus rings)
    stay in px. */
 
 :root, [data-tone="light"] {
@@ -260,19 +260,14 @@
   color-scheme: dark;
 }
 
-/* Phones: the root font size follows the viewport's width, and with it
-   every size in rem, so the whole interface scales linearly with the screen,
-   as far as the phone's layout goes (720px, where the keys go to the footer).
-   4.5vw is 18px on a 400px-wide screen, a little over the 16px the theme is
-   drawn at, for fingers; a 360px phone gets 16.2px and a 430px one 19.35px. */
-:root { --mm-root-phone: 4.5vw; }
-@media (max-width: 720px) {
+/* The root is 18px down to 421px wide, a desktop, a tablet and a wide phone alike: rows and keys
+   as easy to hit with a pointer as with a finger. Narrower, from 420px down, it follows the
+   viewport's width, and with it every size in rem, so the whole interface shrinks linearly from
+   the size it has at 421px: 18px × width / 421px (17.96px at 420px, 15.39px at 360px). */
+:root { --mm-root-phone: calc(100vw * 18 / 421); }
+html { font-size: 18px; }
+@media (max-width: 420px) {
   html { font-size: var(--mm-root-phone); }
-}
-/* Wider than a phone, a desktop as a tablet: 18px, rows and keys as easy to hit with a
-   pointer as with a finger. */
-@media (min-width: 721px) {
-  html { font-size: 18px; }
 }
 /* The compact player (its window, the floating one, or the page turned compact): the root
    follows the window's width and its height, the lesser, so the card scales as a picture does
