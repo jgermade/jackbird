@@ -205,6 +205,11 @@
     .welcome-body { max-width: 46rem; }
   }
   .welcome-lead { margin: 0; font-size: var(--mm-text-md); color: var(--mm-fg); }
+  /* With the options side by side, the question over them spans both: its size follows the
+     welcome's width (English fills the line; a longer translation takes two, balanced). */
+  @container welcome (min-width: 36rem) {
+    .welcome-lead { font-size: 3.45cqi; line-height: 1.25; text-wrap: balance; }
+  }
   /* The brand's own logo, in its metal, centred over what the welcome offers. */
   .welcome-logo { display: block; justify-self: center; width: 9rem; height: auto; aspect-ratio: 1152 / 1061; margin-bottom: var(--mm-space-4); }
   /* Phones: smaller, so what the welcome offers stays in view under it. */
