@@ -12,6 +12,12 @@ html, body { background: var(--mm-bg); }
 /* A touch draws no browser highlight of its own: every control shows its :active state instead. */
 html { -webkit-tap-highlight-color: transparent; }
 
+/* Two quick taps are two taps, not a zoom: pressing "next" twice, ticking two rows. Scrolling and
+   pinching still work. No specificity, so what a component sets for itself (a drag handle's
+   `touch-action: none`) wins. Applied to every element, as it is not inherited and each scrolling
+   pane starts it afresh. */
+:where(*) { touch-action: manipulation; }
+
 body {
   margin: 0;
   color: var(--mm-fg);
