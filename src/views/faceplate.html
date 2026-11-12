@@ -26,7 +26,7 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum, stream } = await import("../lib/player")
-  const { soundingParts, soundingText } = await import("../lib/output")
+  const { soundingDac, soundingParts, soundingText } = await import("../lib/output")
   const { closeRoot, selectRoot } = await import("../lib/roots")
   const { chooseTab, openAdding, shownTab, sourcesHere, tabsHere } = await import("../lib/adding")
   const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
@@ -157,7 +157,11 @@
               </span>
               <span :if="markParts()?.route" class="quality route">{{ markParts()?.route }}</span>
             </span>
-            <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
+            <span :else class="lcd-meter">
+              <span class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
+              <!-- Under it, lit while the music goes to a DAC. -->
+              <span :if="soundingDac()" class="dac"><DisplayIcon filled>DAC</DisplayIcon></span>
+            </span>
           </button>
           <span :else class="lcd-mark" aria-hidden="true">
             <span class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
@@ -284,6 +288,10 @@
   /* The display's left: the logo, lit in the display's own ink (its shape as a mask), or the spectrum while the music plays. */
   .lcd-mark { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; align-self: center; }
   .lcd-spectrum { display: block; width: 100%; height: 100%; }
+  /* The spectrum and, under it, the DAC mark when there is one. */
+  .lcd-meter { display: flex; flex-direction: column; align-items: center; gap: .1875rem; width: 100%; height: 100%; }
+  .lcd-meter .lcd-spectrum { flex: 1 1 auto; min-height: 0; }
+  .dac { display: inline-flex; flex: none; font-size: .5rem; }
   /* While the music plays, the spectrum stands as tall as the display's lines and meter together,
      taller than the logo it replaces. It is a key with no keycap: a click turns it to the format. */
   .lcd-mark.playing {
@@ -296,13 +304,15 @@
     color: inherit;
     font: inherit;
     cursor: pointer;
-    container-type: inline-size;
+    /* Its size, not its content's: the display keeps its height whatever it shows (the format's
+       three lines, the spectrum and the DAC mark). */
+    container-type: size;
   }
   .lcd-mark.playing:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
   /* The song's format in the spectrum's place: the codec (FLAC in its lettering, MP3 by its mark,
      others as a framed icon), its quality under it ("24 bit" over "96 kHz"), and in a native output how it reaches the
      device. */
-  .lcd-format { display: grid; place-content: center; justify-items: center; gap: var(--mm-space-1); width: 100%; height: 100%; }
+  .lcd-format { display: grid; place-content: center; justify-items: center; gap: .125rem; width: 100%; height: 100%; line-height: 1.15; }
   .lcd-format .icons {
     display: flex;
     align-items: center;
