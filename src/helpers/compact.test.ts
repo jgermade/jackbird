@@ -11,10 +11,10 @@ test("remToPx turns rem into pixels at the root's size, and falls back to 16px",
 });
 
 test("compactSize and pipSize follow the root's font size", () => {
-  assert.deepEqual(compactSize(18), { width: 612, height: 126, minWidth: 360, minHeight: 108 });
-  assert.deepEqual(compactSize(16), { width: 544, height: 112, minWidth: 320, minHeight: 96 });
-  assert.deepEqual(pipSize(18), { width: 612, height: 158 });
-  assert.equal(COMPACT.pipHeight, 8.75);
+  assert.deepEqual(compactSize(18), { width: 396, height: 198, minWidth: 324, minHeight: 180 });
+  assert.deepEqual(compactSize(16), { width: 352, height: 176, minWidth: 288, minHeight: 160 });
+  assert.deepEqual(pipSize(18), { width: 396, height: 234 });
+  assert.equal(COMPACT.pipHeight, 13);
 });
 
 test("parseCompactState keeps what is well formed and defaults the rest", () => {

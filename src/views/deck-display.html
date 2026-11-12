@@ -1,12 +1,13 @@
-<script :setup="{ bands = 16 }: Props" lang="ts">
+<script :setup="{ bands = 16, small = false }: Props" lang="ts">
   // The deck's display, as the faceplate and the compact view (views/compact.html) both show it:
   // at its left the logo, lit, or while the music plays the song's format, the spectrum or the DAC
   // (a click turns them); the title and the artist on two lines; the clock (a click turns it); the
   // meter. `bands` is the spectrum's, given by the place that shows it, which knows its own width
-  // (the compact view may be in a window of its own). A view over lib/player.ts and lib/output.ts.
+  // (the compact view may be in a window of its own). `small` draws it as on a phone, whatever the
+  // page's width (the compact player's card). A view over lib/player.ts and lib/output.ts.
   // See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
 
-  type Props = { bands?: number }
+  type Props = { bands?: number; small?: boolean }
 
   const Counter = await import("../../theme/default/components/counter.html")
   const Display = await import("../../theme/default/components/display.html")
@@ -29,6 +30,13 @@
     VORBIS: { url: oggUrl, ratio: "510 / 340" }
   }
   const markOf = () => CODEC_MARKS[markParts()?.format ?? ""] ?? null
+  // The URLs quoted: a small mark comes inlined by Vite as a data URL with single quotes in it,
+  // which an unquoted url() does not take (the mask is dropped, and the mark shows as a block).
+  const codecStyle = (): string => {
+    const mark = markOf()
+    return mark ? `--codec: url("${mark.url}"); --ratio: ${mark.ratio}` : ""
+  }
+  const logoStyle = `--logo: url("${logoUrl}")`
 
   $: current = nowPlaying.value
   // The display's left, while the music plays: the song's format (the file's), the spectrum, and
@@ -97,7 +105,7 @@
 </script>
 
   <Display live>
-    <div class="lcd">
+    <div class="lcd" :class.small="small">
       <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
       <button :if="playback.playing" type="button" class="lcd-mark playing"
               :aria-label="t(MARK_LABELS[nextMarkView()])"
@@ -107,7 +115,7 @@
                (lit in the display's ink, as the logo is), any other as an icon of the display's own. -->
           <span class="icons">
             <span :if="markParts()?.format === 'FLAC'" class="codec-flac">flac</span>
-            <span :elseif="markOf()" class="codec-mark" role="img" :aria-label="markParts()?.format" :style="`--codec: url(${markOf()?.url}); --ratio: ${markOf()?.ratio}`"></span>
+            <span :elseif="markOf()" class="codec-mark" role="img" :aria-label="markParts()?.format" :style="codecStyle()"></span>
             <DisplayIcon :else>{{ markParts()?.format }}</DisplayIcon>
           </span>
           <!-- Its parts one under the other: "24 bit" over "96 kHz"; a varying bitrate marked VBR, lit
@@ -126,7 +134,7 @@
         <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="bands" :active="playback.playing" /></span>
       </button>
       <span :else class="lcd-mark" aria-hidden="true">
-        <span class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
+        <span class="lcd-logo" :style="logoStyle"></span>
       </span>
       <div class="lcd-main">
         <div class="lcd-lines">
@@ -154,7 +162,7 @@
             </span>
           </button>
         </div>
-        <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+        <Meter variant="display" :segments="40" :pitch=".625" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
       </div>
     </div>
   </Display>
@@ -288,4 +296,6 @@
     .lcd-mark { width: 2.5rem; height: 2.5rem; }
     .lcd-mark.playing { width: 4.5rem; }
   }
+  .small .lcd-mark { width: 2.5rem; height: 2.5rem; }
+  .small .lcd-mark.playing { width: 4.5rem; height: auto; }
 </style>

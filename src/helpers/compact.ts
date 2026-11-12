@@ -4,8 +4,8 @@
  * RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
  */
 
-/** The compact window's size, and the least it can be made, in rem. */
-export const COMPACT = { width: 34, height: 7, minWidth: 20, minHeight: 6, pipHeight: 8.75 } as const;
+/** The compact window's size, and the least it can be made, in rem: a card, the display over the keys. */
+export const COMPACT = { width: 22, height: 11, minWidth: 18, minHeight: 10, pipHeight: 13 } as const;
 
 /** A window's place and its whole size (title bar and all), in physical pixels, as the desktop app reports them. */
 export type Bounds = { x: number; y: number; width: number; height: number };

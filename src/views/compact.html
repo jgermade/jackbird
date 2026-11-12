@@ -1,8 +1,9 @@
 <script :setup lang="ts">
-  // The compact player: the deck alone, like a hi-fi unit on the desk. The faceplate's display
-  // (DeckDisplay, the same view, so it follows every change to it), the transport keys, and the
-  // mode's keys: "on top" (in the desktop app's window) and back to the full view. Under them, where
-  // there is room (a container query on its height), the queue's next track. In the desktop app a
+  // The compact player: a card, like a phone's deck. The faceplate's display drawn as on a phone
+  // (DeckDisplay `small`, the same view, so it follows every change to it), and under it the
+  // transport keys between the mode's keys: "on top" (in the desktop app's window) and back to the
+  // full view. Under them, where there is room (a container query on its height), the queue's next
+  // track. In the desktop app a
   // press on its chassis, off the keys, moves the window. A view over lib/compact.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
 
@@ -24,34 +25,37 @@
   $: backTitle = t("compact.withKeys", { action: backLabel, keys: compactKeys })
 </script>
 
-<section class="compact" :class.window="compact.mode === 'window'" :aria-label="t('compact.label')" @pointerdown="dragWindow($event)">
-  <div class="deck">
-    <div class="screen"><DeckDisplay :bands="10" /></div>
-    <div class="transport"><DeckKeys place="compact" /></div>
-    <div class="mode">
-      <Key :if="compact.mode === 'window'" size="sm" square led :pressed="compact.onTop" :label="t('compact.onTop')" :title="t('compact.onTop')" @click="setOnTop(!compact.onTop)">
-        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h5l-.75 4 2.25 2.25H4L6.25 6.5z" /><path d="M8 8.75v4.75" /></svg>
-      </Key>
-      <Key size="sm" square :label="backLabel" :title="backTitle" :disabled="compact.busy" @click="leaveCompact()">
-        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" /></svg>
-      </Key>
+<section class="compact" :class.window="compact.mode === 'window'" :class.page="compact.mode === 'page'" :aria-label="t('compact.label')" @pointerdown="dragWindow($event)">
+  <div class="card">
+    <div class="screen"><DeckDisplay small :bands="6" /></div>
+    <div class="keys">
+      <div class="side">
+        <Key :if="compact.mode === 'window'" size="sm" square led :pressed="compact.onTop" :label="t('compact.onTop')" :title="t('compact.onTop')" @click="setOnTop(!compact.onTop)">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h5l-.75 4 2.25 2.25H4L6.25 6.5z" /><path d="M8 8.75v4.75" /></svg>
+        </Key>
+      </div>
+      <DeckKeys place="compact" />
+      <div class="side end">
+        <Key size="sm" square :label="backLabel" :title="backTitle" :disabled="compact.busy" @click="leaveCompact()">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" /></svg>
+        </Key>
+      </div>
     </div>
+    <p :if="upNext()" class="next" :title="upNext()">{{ t("compact.next", { title: upNext() }) }}</p>
   </div>
-  <p :if="upNext()" class="next" :title="upNext()">{{ t("compact.next", { title: upNext() }) }}</p>
 </section>
 
 <style scoped>
-  /* The chassis fills whatever holds it (the window, the floating window, the page), its deck in
-     the middle. */
+  /* The chassis fills whatever holds it (the window, the floating window, the page); the card in
+     its middle: the display as a phone shows it, and the keys under it. */
   .compact {
     container: compact / size;
     display: grid;
-    align-content: center;
-    gap: var(--mm-space-1);
+    place-items: center;
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    padding: var(--mm-space-2) var(--mm-space-3);
+    padding: var(--mm-space-3);
     background:
       repeating-linear-gradient(90deg, var(--mm-brush) 0 1px, transparent 1px 3px),
       linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
@@ -62,38 +66,38 @@
   }
   /* In the desktop app's window the chassis is what the window is moved by. */
   .compact.window { cursor: grab; }
-  .deck {
+  .card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
     gap: var(--mm-space-3);
     width: 100%;
-    max-width: 48rem;
-    justify-self: center;
+    max-width: 26rem;
   }
   .screen { min-width: 0; }
-  .transport { display: flex; }
-  /* The mode's keys, one over the other. */
-  .mode { display: grid; gap: var(--mm-space-1); }
+  /* The keys under the display: the transport in the middle, the mode's keys at the sides. */
+  .keys {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--mm-space-2);
+  }
+  .side { display: flex; }
+  .side.end { justify-content: flex-end; }
   .icon { width: .875rem; height: .875rem; }
-  /* The next track, printed small on the chassis under the deck, where there is room for it (the
-     floating window has it; the desktop window, at 7rem, has not until it is made taller). */
+  /* The next track, printed small on the chassis under the keys, where there is room for it. */
   .next {
     display: none;
     margin: 0;
-    width: 100%;
-    max-width: 48rem;
-    justify-self: center;
     overflow: hidden;
     font-family: var(--mm-font-label);
     font-stretch: var(--mm-stretch-label);
     font-size: var(--mm-text-xs);
     letter-spacing: .06em;
+    text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--mm-fg-subtle);
   }
-  @container compact (min-height: 6.75rem) {
+  @container compact (min-height: 11.5rem) {
     .next { display: block; }
   }
 </style>
