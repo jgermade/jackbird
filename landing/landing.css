@@ -327,15 +327,20 @@ h1 em {
 /* ---- the phone ------------------------------------------------------------------------------ */
 
 .phone { display: grid; grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); align-items: center; gap: 4rem; }
-.phone img {
-  /* A hairline bezel, the corners of a phone's screen rather than a pebble's. */
+/* The phone: its screenshot, or the app itself over it (an iframe as large), in a hairline bezel,
+   turned a little. */
+.handset {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
   border: 1px solid #0d0e0f;
   border-radius: .75rem;
   box-shadow: var(--mm-shadow-lg), 0 0 0 1px var(--mm-border-strong);
-  /* Turned a little, and to the pointer over its section as the window above (landing.js). */
-  transform: perspective(80rem) rotateY(var(--tilt-y, -2deg)) rotateX(var(--tilt-x, 1deg)) rotate(-4deg);
-  transition: transform .5s cubic-bezier(.2, .7, .2, 1);
+  transform: rotate(-4deg);
 }
+.handset img { display: block; width: 100%; height: auto; }
+.handset .live { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+.handset.live-on img { visibility: hidden; }
 .phone .statement {
   margin: 0 0 var(--mm-space-4);
   font-family: var(--mm-font-label);
@@ -480,7 +485,7 @@ h1 em {
   .tone { margin-left: auto; }
   .modules, .downloads, .ways { grid-template-columns: minmax(0, 1fr); }
   .phone { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2.5rem; }
-  .phone img { max-width: 14rem; }
+  .handset { max-width: 14rem; }
 }
 
 /* Grid items shrink to their track, never to their content. */

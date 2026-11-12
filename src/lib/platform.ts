@@ -19,6 +19,13 @@ export const isPhone: boolean = isDesktop && typeof navigator !== "undefined" &&
  */
 export const isEmbed: boolean = !isDesktop && typeof location !== "undefined" && new URLSearchParams(location.search).has("embed");
 
+/**
+ * How the embedded app is drawn: "windows", its window and its compact player (`?embed`), or
+ * "phone", the app alone filling the frame as a phone draws it (`?embed=phone`, the landing page's
+ * phone); null when not embedded.
+ */
+export const embedKind: "windows" | "phone" | null = isEmbed ? (new URLSearchParams(location.search).get("embed") === "phone" ? "phone" : "windows") : null;
+
 let served: Promise<boolean> | null = null;
 
 /**

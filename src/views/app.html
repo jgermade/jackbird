@@ -23,10 +23,11 @@
   const Compact = await import("./compact.html")
   const { t } = await import("../lib/i18n")
   const { compact, compactMarker } = await import("../lib/compact")
-  const { isEmbed } = await import("../lib/platform")
+  const { embedKind } = await import("../lib/platform")
   // Embedded in the landing page: the app in a window, its compact player in front of it over the
-  // window's bottom left corner, one player behind both; the page itself see-through.
-  const embed: boolean = isEmbed
+  // window's bottom left corner, one player behind both; the page itself see-through. As the
+  // landing page's phone (`?embed=phone`), the app alone, as a phone draws it, filling the frame.
+  const embed: boolean = embedKind === "windows"
   if (embed) {
     document.documentElement.classList.add("embedded")
     // See-through, so the landing page shows round the windows; its body is their stage.
