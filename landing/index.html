@@ -82,39 +82,39 @@
       <!-- Two tabs: the app for each device (the one this browser runs on first; the links come
            from the latest release, landing.js), and how to install the server. -->
       <div class="tabs" role="tablist" aria-label="Get it">
-        <button class="tab" type="button" role="tab" id="tab-downloads" aria-controls="downloads" aria-selected="true">Downloads</button>
-        <button class="tab" type="button" role="tab" id="tab-server" aria-controls="server" aria-selected="false" tabindex="-1">Server</button>
+        <button class="tab" type="button" role="tab" id="tab-downloads" aria-controls="downloads" aria-selected="true"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5v10M5.5 8.5 10 13l4.5-4.5M3 17h14"/></svg>Downloads</button>
+        <button class="tab" type="button" role="tab" id="tab-server" aria-controls="server" aria-selected="false" tabindex="-1"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 3h15v5h-15zM2.5 12h15v5h-15zM5.5 5.5h.01M5.5 14.5h.01"/></svg>Server</button>
       </div>
 
       <div class="panel" role="tabpanel" id="downloads" aria-labelledby="tab-downloads">
         <div class="downloads">
           <a class="download" data-os="mac" data-asset="_aarch64\.dmg$" href="https://github.com/jgermade/jackbird/releases/latest">
-            <span class="label">macOS</span>
+            <span class="label"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 4h13v8.5h-13zM1.5 15.5h17l-1.5-3h-14z"/></svg>macOS</span>
             <strong>Mac with Apple silicon</strong>
             <span class="file">.dmg</span>
           </a>
           <a class="download" data-os="windows" data-asset="_x64-setup\.exe$" href="https://github.com/jgermade/jackbird/releases/latest">
-            <span class="label">Windows</span>
+            <span class="label"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 3.5h16v10H2zM7 16.5h6M10 13.5v3"/><path d="M2 6.5h16"/></svg>Windows</span>
             <strong>Windows 10 and 11, x64</strong>
             <span class="file">installer, .exe</span>
           </a>
           <a class="download" data-os="linux" data-asset="\.AppImage$" href="https://github.com/jgermade/jackbird/releases/latest">
-            <span class="label">Linux</span>
+            <span class="label"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 3.5h16v13H2zM5.5 8l2.5 2-2.5 2M10 12h4"/></svg>Linux</span>
             <strong>AppImage, x64</strong>
             <span class="file">any distribution</span>
           </a>
           <a class="download" data-os="linux" data-asset="_amd64\.deb$" href="https://github.com/jgermade/jackbird/releases/latest">
-            <span class="label">Linux</span>
+            <span class="label"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 17.5 6v8L10 18l-7.5-4V6zM2.5 6 10 10l7.5-4M10 10v8"/></svg>Linux</span>
             <strong>Debian and Ubuntu, x64</strong>
             <span class="file">.deb</span>
           </a>
           <a class="download" data-os="android" data-asset="android.*\.apk$" href="https://github.com/jgermade/jackbird/releases/latest">
-            <span class="label">Android</span>
+            <span class="label"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 1.75h9v16.5h-9zM8.5 15.5h3"/></svg>Android</span>
             <strong>Android phone</strong>
             <span class="file">.apk</span>
           </a>
           <a class="download" data-os="browser" href="./demo/">
-            <span class="label">Browser</span>
+            <span class="label"><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM2 10h16M10 2c2.2 2.2 3.2 5 3.2 8s-1 5.8-3.2 8c-2.2-2.2-3.2-5-3.2-8s1-5.8 3.2-8z"/></svg>Browser</span>
             <strong>Try it now</strong>
             <span class="file">Chromium-based browsers on a desktop. No install.</span>
           </a>
@@ -127,7 +127,7 @@
         <div class="ways">
           <article class="way">
             <span class="label">A home server, a NAS, a Raspberry Pi</span>
-            <h3>Docker Compose</h3>
+            <h3><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 18 6l-8 4-8-4zM2 10l8 4 8-4M2 14l8 4 8-4"/></svg>Docker Compose</h3>
             <pre><code>mkdir jackbird &amp;&amp; cd jackbird
 curl -fsSLO https://raw.githubusercontent.com/jgermade/jackbird/main/deploy/compose.yaml
 curl -fsSL -o .env https://raw.githubusercontent.com/jgermade/jackbird/main/deploy/.env.example
@@ -138,7 +138,7 @@ docker compose up -d</code></pre>
           </article>
           <article class="way">
             <span class="label">Any Linux, or macOS</span>
-            <h3>A binary</h3>
+            <h3><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 3.5h16v13H2zM5.5 8l2.5 2-2.5 2M10 12h4"/></svg>A binary</h3>
             <p class="files">
               <a class="file-link" data-asset="^jackbird-service-linux-x64-static$" href="https://github.com/jgermade/jackbird/releases/latest">Linux x64</a>
               <a class="file-link" data-asset="^jackbird-service-linux-arm64-static$" href="https://github.com/jgermade/jackbird/releases/latest">Linux arm64</a>
@@ -153,7 +153,7 @@ jackbird-service setup</code></pre>
           </article>
           <article class="way">
             <span class="label">The computer you use</span>
-            <h3>The desktop app</h3>
+            <h3><svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 4h13v8.5h-13zM1.5 15.5h17l-1.5-3h-14z"/></svg>The desktop app</h3>
             <p>Install the app from the Downloads; in <em>Preferences</em>, <em>Service</em>, <em>Install</em> starts the server when you log in (or <em>Install with the system</em>, with administrator rights once). The app is then its interface.</p>
           </article>
         </div>
