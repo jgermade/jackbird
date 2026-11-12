@@ -85,6 +85,9 @@
   --mm-display-bezel: #2b2e2d;
   /* The hairline around the display window. Same in both tones. */
   --mm-display-rim: #777777;
+  /* The pitch of the display's dot grid, the unit its lettering is measured in (5 dots of capital
+     height for a title, 4 for a line under it). Same in both tones. */
+  --mm-display-dot: .1875rem;
 
   /* The J-card stripes, in the order green, orange, red: the brand mark, the
      active tab, the splash; and one each on the tabs that carry a tone (go,

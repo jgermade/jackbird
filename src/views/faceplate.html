@@ -363,7 +363,7 @@
     mask: var(--logo) center / contain no-repeat;
   }
   /* The display's second line: the artist, under the title. */
-  .artist { font-weight: var(--mm-weight-regular); font-size: var(--mm-text-sm); opacity: .85; }
+  .artist { font-weight: var(--mm-weight-regular); opacity: .7; }
   /* The name in brushed metal, raised, as the lettering on a hi-fi deck's front panel: the text
      itself draws only the shadow it casts (below and to the right), and a copy of it on
      top carries the metal's sheen. No filter: a filter rasterises the text and blurs it. */
@@ -399,9 +399,22 @@
      From 901 to 1024px the wordmark goes, so the display keeps its room. */
   .lcd { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--mm-space-3); min-width: 0; }
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
-  .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
-  /* The title and the artist, centred against the clock. */
-  .lcd-text { display: grid; flex: 1 1 auto; align-self: center; gap: var(--mm-space-1); min-width: 0; }
+  .lcd-lines { display: flex; align-items: flex-start; gap: var(--mm-space-3); min-width: 0; }
+  /* The title and the artist in two rows as tall as the clock's two lines: the title centred on
+     the minutes, the artist on the seconds. Measured in the display's dots: the title's capitals
+     5 dots tall, the artist's 4 (IBM Plex Mono's capitals are .698em; their middle sits .026em
+     under the line's, nudged back up). */
+  .lcd-text {
+    --cap: .698;
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-rows: repeat(2, var(--mm-text-display-lg));
+    align-items: center;
+    min-width: 0;
+  }
+  .lcd-text .now { line-height: 1; }
+  .lcd-text .mm-display-title { position: relative; top: -.026em; line-height: 1; font-size: calc(5 * var(--mm-display-dot) / var(--cap)); }
+  .lcd-text .artist { font-size: calc(4 * var(--mm-display-dot) / var(--cap)); }
   /* The clock: a key with no keycap, like the display's left. */
   .lcd-time {
     flex: none;
@@ -419,14 +432,9 @@
   .lcd-time .lead { opacity: .35; }
   @media (min-width: 641px) {
     .lcd-mark { width: 7rem; }
-    /* A tablet's or a desktop's display is wide: its lines a size up from a phone's. */
-    .lcd-text .mm-display-title { font-size: var(--mm-text-lg); }
-    .lcd-text .artist { font-size: var(--mm-text-md); }
   }
-  /* Phones: a smaller mark, so the title keeps its room; the lines a little under the top rather
-     than centred against the clock, which would sit them low. */
+  /* Phones: a smaller mark, so the title keeps its room. */
   @media (max-width: 640px) {
-    .lcd-text { align-self: flex-start; padding-top: .25rem; }
     .lcd-mark { width: 2.5rem; height: 2.5rem; }
     .lcd-mark.playing { width: 4.5rem; }
   }
