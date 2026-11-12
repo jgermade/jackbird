@@ -40,7 +40,7 @@ img { display: block; max-width: 100%; height: auto; }
   display: flex;
   align-items: center;
   gap: var(--mm-space-6);
-  padding: var(--mm-space-3) max(1rem, calc((100vw - 72rem) / 2));
+  padding: var(--mm-space-3) max(1rem, calc((100vw - 1024px) / 2));
   border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
   background:
     repeating-linear-gradient(90deg, var(--mm-brush) 0 1px, transparent 1px 3px),
@@ -157,7 +157,7 @@ img { display: block; max-width: 100%; height: auto; }
 
 /* ---- the hero --------------------------------------------------------------------------- */
 
-main { display: grid; gap: 7rem; padding: 4rem max(1rem, calc((100vw - 72rem) / 2)) 6rem; }
+main { display: grid; gap: 7rem; padding: 4rem max(1rem, calc((100vw - 1024px) / 2)) 6rem; }
 
 .hero { display: grid; gap: 4rem; }
 .pitch { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); column-gap: 4rem; align-items: end; }
@@ -482,7 +482,7 @@ h1 em {
 .footer { border-top: var(--mm-border-width) solid var(--mm-chassis-lo); background: var(--mm-chassis); }
 .footer p {
   margin: 0;
-  padding: var(--mm-space-6) max(1rem, calc((100vw - 72rem) / 2));
+  padding: var(--mm-space-6) max(1rem, calc((100vw - 1024px) / 2));
   font-size: var(--mm-text-sm);
   color: var(--mm-fg-muted);
 }
