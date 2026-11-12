@@ -12,6 +12,7 @@
   const DeckDisplay = await import("./deck-display.html")
   const DeckKeys = await import("./deck-keys.html")
   const QueueList = await import("./queue-list.html")
+  const Stripes = await import("../../theme/default/components/stripes.html")
 
   const { t } = await import("../lib/i18n")
   const { compact, compactKeys, dragWindow, leaveCompact, setCompactList, setOnTop } = await import("../lib/compact")
@@ -50,6 +51,8 @@
     <p :if="upNext() && !compact.list" class="next" :title="upNext()">{{ t("compact.next", { title: upNext() }) }}</p>
   </div>
   <div :if="compact.list" class="list" data-no-drag><QueueList /></div>
+  <!-- The brand's three stripes along the bottom edge, as on a J-card. -->
+  <div class="stripes"><Stripes width="100%" /></div>
 </section>
 
 <style scoped>
@@ -62,7 +65,9 @@
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    padding: var(--mm-space-3);
+    /* Room at the bottom for the stripes (three .1875rem bars and their 2px gaps). One shorthand:
+       a longhand after a shorthand with var() is lost when the rules are copied as text. */
+    padding: var(--mm-space-3) var(--mm-space-3) calc(var(--mm-space-3) + .75rem);
     background:
       repeating-linear-gradient(90deg, var(--mm-brush) 0 1px, transparent 1px 3px),
       linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
@@ -70,7 +75,9 @@
     font-family: var(--mm-font-sans);
     overflow: hidden;
     user-select: none;
+    position: relative;
   }
+  .stripes { position: absolute; right: 0; bottom: 0; left: 0; display: grid; }
   /* With the queue's list: the card at the top, the list under it filling the rest, scrolling. */
   .compact.listed { grid-template-rows: auto minmax(0, 1fr); place-items: stretch; align-content: stretch; gap: var(--mm-space-3); }
   .listed .card { justify-self: center; }
@@ -115,7 +122,7 @@
     white-space: nowrap;
     color: var(--mm-fg-subtle);
   }
-  @container compact (min-height: 11.5rem) {
+  @container compact (min-height: 10.75rem) {
     .next { display: block; }
   }
 </style>
