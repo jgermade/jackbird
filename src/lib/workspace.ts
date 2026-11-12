@@ -112,9 +112,13 @@ function current(): RootWorkspace | null {
   return derive().root;
 }
 
-/** A scope's tracks in the order they play: a view's own, else by folder, disc and number. */
+/**
+ * A scope's tracks in the order they play: a view's own, else the album sheet's (its albums by
+ * title, each by disc and number, then file name), so the queue reads as the sheet does.
+ */
 function playOrder(scope: Scope): Track[] {
-  return scope.ordered ? scope.tracks : orderDetailPlaylist(scope.tracks);
+  if (scope.ordered) return scope.tracks;
+  return groupAlbums(scope.tracks, t("album.untitled"), preferences.language).flatMap((album) => album.discs.flatMap((disc) => disc.tracks));
 }
 
 function updateActive(update: (root: RootWorkspace) => RootWorkspace): void {
