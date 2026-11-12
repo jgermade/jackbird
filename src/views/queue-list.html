@@ -35,17 +35,28 @@
   }
   const itemId = (index: number): string => `queue-item-${index}`
 
+  // The list is drawn a window at a time (jq79's `:window`): only the tracks in view, and a few
+  // around them. Its rows are all ROW rem tall (the one playing too), which `:window` takes in
+  // pixels; the list's `$scrollTo(index)` brings a track into view, drawing it.
+  const ROW = 3.5
+  const rootPx = (): number => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  const rowPx = (): number => ROW * rootPx()
+  const reveal = (index: number, block: "nearest" | "center") => {
+    const list = $self("ol.queue") as (HTMLElement & { $scrollTo?: (index: number, options?: { block?: string }) => void }) | null
+    list?.$scrollTo?.(index, { block })
+  }
+
   // The track the keyboard is on.
   let focused = -1
   const focusOn = (index: number) => {
     focused = Math.max(0, Math.min(entries().length - 1, index))
-    requestAnimationFrame(() => document.getElementById(itemId(focused))?.scrollIntoView({ block: "nearest" }))
+    requestAnimationFrame(() => reveal(focused, "nearest"))
   }
   // On opening: the current track in view, and the keyboard on it.
   const opened = (open: boolean) => {
     if (!open) return
     focused = Math.max(0, current())
-    requestAnimationFrame(() => document.getElementById(itemId(focused))?.scrollIntoView({ block: "center" }))
+    requestAnimationFrame(() => reveal(focused, "center"))
   }
   $: opened(ui.queueOpen)
 
@@ -90,6 +101,8 @@
   // Dragging a track by its grip. Its state lives in this closure, not in the
   // component's store: it changes on every pointer move, and the rows are
   // moved and marked straight on the page; the queue changes once, on release.
+  // Where it lands is worked out from how far it went, in rows (they are all one
+  // height): the list draws only the rows in view, so they cannot be counted.
   const drag = (() => {
     const EDGE = 40
     let from = -1
@@ -97,9 +110,12 @@
     let startY = 0
     let lastY = 0
     let startScroll = 0
-    let rows: HTMLElement[] = []
+    let total = 0
+    let height = 0
     let scroller: HTMLElement | null = null
     let frame = 0
+    // A row as drawn now, if it is (by its index in the queue).
+    const rowAt = (index: number): HTMLElement | null => document.getElementById(itemId(index))
 
     const scrollParent = (element: HTMLElement | null): HTMLElement | null => {
       for (let node = element?.parentElement ?? null; node; node = node.parentElement) {
@@ -108,20 +124,20 @@
       }
       return null
     }
-    const unmark = () => rows.forEach((row) => row.classList.remove("drop-before", "drop-after"))
-    // Where the track would land: after every other track whose middle is above the pointer.
+    const unmark = () => $self("ol.queue")?.querySelectorAll(".drop-before, .drop-after").forEach((row) => row.classList.remove("drop-before", "drop-after"))
+    // Where the track would land: as many rows from where it was as the pointer went.
     const update = () => {
-      const others = rows.filter((_, index) => index !== from)
-      to = others.filter((row) => {
-        const box = row.getBoundingClientRect()
-        return box.top + box.height / 2 < lastY
-      }).length
-      const lifted = rows[from]
-      if (lifted) lifted.style.transform = `translateY(${lastY - startY + (scroller ? scroller.scrollTop - startScroll : 0)}px)`
+      const moved = lastY - startY + (scroller ? scroller.scrollTop - startScroll : 0)
+      to = Math.max(0, Math.min(total - 1, from + Math.round(moved / height)))
+      const lifted = rowAt(from)
+      if (lifted) {
+        lifted.classList.add("dragging")
+        lifted.style.transform = `translateY(${moved}px)`
+      }
       unmark()
       if (to === from) return
-      if (to < others.length) others[to].classList.add("drop-before")
-      else others[others.length - 1]?.classList.add("drop-after")
+      // The line goes before the track it lands on (moving up), or after it (moving down).
+      rowAt(to)?.classList.add(to < from ? "drop-before" : "drop-after")
     }
     // Near the list's top or bottom edge, it scrolls.
     const tick = () => {
@@ -147,7 +163,7 @@
       grip.removeEventListener("pointerup", release)
       grip.removeEventListener("pointercancel", cancel)
       cancelAnimationFrame(frame)
-      const lifted = rows[from]
+      const lifted = rowAt(from)
       if (lifted) {
         lifted.style.transform = ""
         lifted.classList.remove("dragging")
@@ -155,7 +171,6 @@
       unmark()
       const [moved, target] = [from, to]
       from = -1
-      rows = []
       if (drop && target >= 0 && target !== moved) move(moved, target)
     }
     const release = (event: PointerEvent) => end(event, true)
@@ -167,13 +182,14 @@
       const list = grip.closest(".queue")
       if (!list) return
       event.preventDefault()
-      rows = Array.from(list.querySelectorAll<HTMLElement>(".item"))
+      total = entries().length
+      height = rowPx()
       from = index
       to = index
       startY = lastY = event.clientY
       scroller = scrollParent(list as HTMLElement)
       startScroll = scroller?.scrollTop ?? 0
-      rows[from]?.classList.add("dragging")
+      rowAt(from)?.classList.add("dragging")
       grip.setPointerCapture(event.pointerId)
       grip.addEventListener("pointermove", moveTo)
       grip.addEventListener("pointerup", release)
@@ -189,7 +205,7 @@
   <p :if="entries().length === 0" class="none">{{ t("queue.empty") }}</p>
   <ol :else class="queue" :class.album="queueIsAlbum.value" role="listbox" tabindex="0" :aria-label="t('queue.title')"
       :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
-    <li :each="entry in entries()" :key="entry.index" :id="itemId(entry.index)" role="option" class="item"
+    <li :each="entry in entries()" :key="entry.index" :window="rowPx()" :id="itemId(entry.index)" role="option" class="item"
         :class.played="entry.state === 'played' && !queueIsAlbum.value" :class.current="entry.state === 'current'"
         :class.missing="entry.missing" :class.focused="entry.index === focused"
         :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
@@ -228,7 +244,9 @@
     grid-template-columns: 1.25rem 2.25rem minmax(0, 1fr) 1.25rem auto;
     align-items: center;
     gap: var(--mm-space-3);
-    min-height: 3rem;
+    /* One height for every row, the one playing too (see ROW): the list is drawn a window at a time. */
+    box-sizing: border-box;
+    height: 3.5rem;
     padding: var(--mm-space-1) var(--mm-space-2) var(--mm-space-1) var(--mm-space-1);
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     border-left: .1875rem solid transparent;
@@ -238,7 +256,7 @@
   }
   @media (hover: hover) { .item:hover { background: var(--mm-hover); } }
   .item:active { background: var(--mm-sunken); }
-  .item.current { padding-block: var(--mm-space-2); background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
+  .item.current { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
   .item.played .text, .item.played .art { opacity: .55; }
   .item.missing .sub { color: var(--mm-bad); }
 
@@ -260,10 +278,10 @@
 
   .art { display: block; width: 2.25rem; aspect-ratio: 1; overflow: hidden; border-radius: 3px; box-shadow: var(--mm-shadow-sm, 0 1px 2px rgb(0 0 0 / .15)); }
   /* The one playing, larger, in the grip's column and the cover's, its right edge on the others'. */
-  .current .art { grid-column: 1 / 3; justify-self: end; width: 3.25rem; }
+  .current .art { grid-column: 1 / 3; justify-self: end; width: 3rem; }
   /* A disc: no grips and no keys to remove; the covers in one column as wide as the larger one,
      their right edges together, and nothing at the row's end but the bars. */
-  .album .item { grid-template-columns: 3.25rem minmax(0, 1fr) 1.25rem; }
+  .album .item { grid-template-columns: 3rem minmax(0, 1fr) 1.25rem; }
   .album .art { justify-self: end; }
   .album .current .art { grid-column: auto; }
   .art img { display: block; width: 100%; height: 100%; object-fit: cover; }

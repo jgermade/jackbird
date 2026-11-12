@@ -55,6 +55,11 @@
 
   // The views, as keys in the head: the open one is down.
   const view = (): string => root()?.view ?? "files"
+  // The songs view, one row per track and nothing else: drawn a window at a time (jq79's
+  // `:window`), its rows all SONG_ROW rem tall. `:window` takes the height in pixels.
+  const SONG_ROW = 2.25
+  const windowed = (): boolean => view() === "songs"
+  const rowPx = (): number => (windowed() ? SONG_ROW * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) : 0)
   // A track's artist goes under its title (`sub`), not at the row's end.
   const rowSub = (row: Row): string => (row.kind === "track" && row.trackId ? (row.artist ?? "") : "")
   const rowMeta = (row: Row): string => (rowSub(row) && row.meta === row.artist ? "" : (row.meta ?? ""))
@@ -120,6 +125,10 @@
     if (!navigateTree(event.key, event.shiftKey, phone)) return
     event.preventDefault()
     requestAnimationFrame(() => {
+      // A windowed list draws the current row on the way (it may not be drawn yet).
+      const tree = $self(".tree") as (HTMLElement & { $scrollTo?: (index: number) => void }) | null
+      const at = listed().findIndex((row) => row.key === root()?.activeRowKey)
+      if (windowed() && tree?.$scrollTo && at >= 0) tree.$scrollTo(at)
       const id = activeId()
       if (id) document.getElementById(id)?.scrollIntoView({ block: "nearest" })
     })
@@ -189,6 +198,8 @@
     </div>
     <ListRow :each="row in listed()"
              :key="row.key"
+             :window="rowPx()"
+             :height="windowed() ? SONG_ROW : 0"
              :kind="row.kind === 'album' ? 'folder' : 'item'"
              :depth="phone ? 0 : row.depth"
              :label="rowLabel(row)"

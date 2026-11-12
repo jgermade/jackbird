@@ -11,6 +11,7 @@
   current = false,
   muted = false,
   noToggle = false,
+  height = 0,
   rowId = '',
   lead = '',
   label = '',
@@ -43,7 +44,8 @@
   // tree's `aria-activedescendant`. `muted` dims a row that stands for
   // something missing. `no-toggle`: a folder's glyph is part of the row
   // (its click is `select` too), for a list that opens folders its own way
-  // (a phone's levels). `sub` is
+  // (a phone's levels). `height` (in rem) makes every row that tall, for a list drawn a
+  // window at a time (jq79's `:window`, which needs rows of one height). `sub` is
   // a second line under the label, smaller and lighter (a track's artist). `lead` is a small mono prefix (a track number). The `action` slot is a key at the row's end (after the cue),
   // shown on hover, on the current, chosen and playing rows, and always where
   // there is no hover (a touch screen); give it `@click.stop` so it does not
@@ -65,6 +67,7 @@
     current?: boolean | ""
     muted?: boolean | ""
     noToggle?: boolean | ""
+    height?: number
     sub?: string
     rowId?: string
     lead?: string | number
@@ -104,7 +107,7 @@
      :aria-expanded="isFolder ? String(flag(expanded)) : null"
      :aria-selected="String(flag(chosen))"
      :tabindex="flag(focusable) ? 0 : -1"
-     :style="`--depth: ${level}`"
+     :style="`--depth: ${level}` + (Number(height) > 0 ? `; height: ${Number(height)}rem; min-height: 0` : '')"
      @click="$emit('select', $event)"
      @dblclick="$emit('activate', $event)">
   <span class="icon" :class.pick="isPickable" :class.toggle="toggles" @click="glyph($event)">
