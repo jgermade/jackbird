@@ -142,6 +142,9 @@
     user-select: none;
   }
   .row.flat { grid-template-columns: 1.125rem minmax(0, 1fr) auto; }
+  /* A folder ends in its keys (a small square key's glyph sits .5rem in from its edge): the room
+     to the right of its last glyph matches the room to the left of its caret (1.125rem). */
+  .row.folder { padding-right: calc(1.125rem - .5rem); }
   @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row:active { background: var(--mm-sunken); }
   .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
