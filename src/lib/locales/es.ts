@@ -108,6 +108,7 @@ export const es: Record<MessageKey, string> = {
   "rename.pattern": "Patrón",
   "rename.presets": "Plantillas",
   "rename.custom": "El tuyo",
+  "rename.diff": "Mostrar los cambios",
   "rename.fields": "Campos: {fields}",
   "rename.from": "Ahora",
   "rename.to": "Renombrado",

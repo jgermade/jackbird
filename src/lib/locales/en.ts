@@ -107,6 +107,7 @@ export const en = {
   "rename.pattern": "Pattern",
   "rename.presets": "Presets",
   "rename.custom": "Your own",
+  "rename.diff": "Show what changes",
   "rename.fields": "Fields: {fields}",
   "rename.from": "Now",
   "rename.to": "Renamed",
