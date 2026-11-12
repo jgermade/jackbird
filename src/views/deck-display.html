@@ -10,12 +10,13 @@
   type Props = { bands?: number; small?: boolean }
 
   const Counter = await import("../../theme/default/components/counter.html")
+  const Key = await import("../../theme/default/components/key.html")
   const Display = await import("../../theme/default/components/display.html")
   const DisplayIcon = await import("../../theme/default/components/display-icon.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Spectrum = await import("../../theme/default/components/spectrum.html")
   const { clockParts, formatTime } = await import("../helpers/format")
-  const { nowPlaying, readSpectrum, stream } = await import("../lib/player")
+  const { nowPlaying, readSpectrum, stream, toggleShuffle, turnRepeat } = await import("../lib/player")
   const { soundingDac, soundingDevice, soundingParts, soundingText } = await import("../lib/output")
   const { playback } = await import("../lib/playback")
   const { library } = await import("../lib/library")
@@ -124,9 +125,13 @@
   $: elapsedClock = clockParts(playback.position)
   $: totalClock = clockParts(playback.duration)
   $: clock = timeView === "total" ? totalClock : elapsedClock
+  // The play modes, in keys joined to the display's right: shuffle, and repeat (off, all, one).
+  const REPEAT_LABELS = { off: "faceplate.repeatOff", all: "faceplate.repeatAll", one: "faceplate.repeatOne" } as const
+  $: repeatLabel = t(REPEAT_LABELS[playback.repeat])
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
 </script>
 
+<div class="unit">
   <Display live>
     <div class="lcd" :class.small="small">
       <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
@@ -192,8 +197,36 @@
       </div>
     </div>
   </Display>
+  <!-- The play modes, joined to the display's right edge as keys on its bezel. -->
+  <div class="modes" role="group" :aria-label="t('faceplate.modes')">
+    <Key size="sm" square led :pressed="playback.shuffle" :label="t('faceplate.shuffle')" :title="t('faceplate.shuffle')" @click="toggleShuffle()">
+      <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3 0 4 7 7 7H14M2 11.5h2.5c1.2 0 2-1 2.6-2.2M9 6.7c.6-1.2 1.4-2.2 2.5-2.2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
+    </Key>
+    <Key size="sm" square led :pressed="playback.repeat !== 'off'" :label="repeatLabel" :title="repeatLabel" @click="turnRepeat()">
+      <svg class="mode-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h8M11 2l2 2-2 2M13 9v1a2 2 0 0 1-2 2H3M5 14l-2-2 2-2" /><text :if="playback.repeat === 'one'" x="8" y="10.4" text-anchor="middle" font-size="5.5" font-weight="700" fill="currentColor" stroke="none">1</text></svg>
+    </Key>
+  </div>
+</div>
 
 <style scoped>
+  /* The display and its play modes' keys, one unit: the keys on a bezel joined to the display's
+     right edge, one over the other. */
+  .unit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; min-width: 0; }
+  .modes {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    align-items: center;
+    gap: 2px;
+    margin-left: -1px;
+    padding: 0 .25rem;
+    border-top: var(--mm-border-width) solid var(--mm-display-rim);
+    border-right: var(--mm-border-width) solid var(--mm-display-rim);
+    border-bottom: var(--mm-border-width) solid var(--mm-display-rim);
+    border-radius: 0 calc(var(--mm-radius-key) + 2px) calc(var(--mm-radius-key) + 2px) 0;
+    background: var(--mm-sunken);
+    box-shadow: var(--mm-well-shadow);
+  }
+  .mode-icon { width: .875rem; height: .875rem; }
   /* Each of the display's text lines: the title, or the artist; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .visually-hidden {

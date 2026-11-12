@@ -23,6 +23,7 @@ import {
   type QueuePosition
 } from "../helpers/queue";
 import { bufferedTo, rangesOf } from "../helpers/buffered";
+import { isOrderOf, nextIndex, nextRepeat, previousIndex, shuffledOrder, upcoming as upcomingIndices, type PlayMode } from "../helpers/order";
 import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
@@ -419,7 +420,7 @@ function songOf(opened: MediaHandle, key: string): PhoneSong {
 async function openAhead(count: number): Promise<Ahead[] | null> {
   const { queue, index } = $toRaw(playback);
   const roots = $toRaw(library).roots;
-  const items = queue?.items.slice(index + 1, index + 1 + count) ?? [];
+  const items = queue ? upcomingIndices(index, queue.items.length, playMode()).slice(0, count).map((at) => queue.items[at]) : [];
   const opened = await Promise.all(
     items.map(async (item): Promise<Ahead | null> => {
       const root = roots.find((one) => one.id === item.rootId);
@@ -450,7 +451,8 @@ async function sendNext(): Promise<void> {
   }
   if (!native) return;
   const { queue, index } = $toRaw(playback);
-  const item = queue?.items[index + 1];
+  const after = queue ? upcomingIndices(index, queue.items.length, playMode())[0] : undefined;
+  const item = after === undefined ? undefined : queue?.items[after];
   const root = item ? $toRaw(library).roots.find((one) => one.id === item.rootId) : undefined;
   const track = item ? root?.tracks.find((one) => one.id === item.trackId) : undefined;
   if (audio !== native || !item || !root || !track) {
@@ -556,8 +558,16 @@ function wire(element: HTMLAudioElement | NativeAudio | PhoneAudio): void {
   });
   element.addEventListener("ended", () => {
     if (element !== audio) return;
+    // Repeating one (or the whole of a queue of one): the same track again, from its start.
+    const total = $toRaw(playback).queue?.items.length ?? 0;
+    const after = nextIndex(playback.index, total, playMode());
+    if (after === playback.index && (playback.repeat === "one" || (playback.repeat === "all" && total > 0))) {
+      element.currentTime = 0;
+      void element.play().catch(() => undefined);
+      return;
+    }
     playback.playing = false;
-    next();
+    if (after !== playback.index) playback.index = after;
   });
   element.addEventListener("timeupdate", () => {
     if (element !== audio) return;
@@ -612,7 +622,7 @@ function wireNative(element: NativeAudio | PhoneAudio): void {
   element.addEventListener("advance", (event) => {
     const key = (event as CustomEvent<string>).detail;
     const { queue, index } = $toRaw(playback);
-    const at = queue ? queue.items.findIndex((item, place) => place > index && keyOf(item) === key) : -1;
+    const at = queue ? (upcomingIndices(index, queue.items.length, playMode()).find((place) => keyOf(queue.items[place]) === key) ?? -1) : -1;
     const taken = upcoming.findIndex((one) => one.key === key);
     if (element !== audio || taken < 0 || at < 0) return;
     const next = upcoming[taken];
@@ -856,13 +866,54 @@ export function togglePlay(): void {
   }
 }
 
+/**
+ * The order the queue plays in now: repeat, and shuffle with its order, made again (the track
+ * playing first) when the queue has changed under it.
+ */
+function playMode(): PlayMode {
+  const total = $toRaw(playback).queue?.items.length ?? 0;
+  if (playback.shuffle && !isOrderOf($toRaw(playback).order, total)) playback.order = shuffledOrder(total, playback.index);
+  return { repeat: playback.repeat, shuffle: playback.shuffle, order: $toRaw(playback).order };
+}
+
+/** The keys' next and previous: a track always changes (repeating one, they go round as repeating all does). */
+function keyMode(): PlayMode {
+  const mode = playMode();
+  return mode.repeat === "one" ? { ...mode, repeat: "all" } : mode;
+}
+
 export function next(): void {
-  const total = $toRaw(nowPlaying).value?.total ?? 0;
-  playback.index = Math.max(0, Math.min(total - 1, playback.index + 1));
+  const total = $toRaw(playback).queue?.items.length ?? 0;
+  playback.index = nextIndex(playback.index, total, keyMode());
 }
 
 export function previous(): void {
-  playback.index = Math.max(0, playback.index - 1);
+  const total = $toRaw(playback).queue?.items.length ?? 0;
+  playback.index = previousIndex(playback.index, total, keyMode());
+}
+
+/** Whether the next key has a track to go to, and the previous one. */
+export function hasNext(): boolean {
+  const total = playback.queue?.items.length ?? 0;
+  return total > 0 && nextIndex(playback.index, total, keyMode()) !== playback.index;
+}
+export function hasPrevious(): boolean {
+  const total = playback.queue?.items.length ?? 0;
+  return total > 0 && previousIndex(playback.index, total, keyMode()) !== playback.index;
+}
+
+/** The repeat key: off, the whole queue, one track. What a native player was handed ahead follows. */
+export function turnRepeat(): void {
+  playback.repeat = nextRepeat(playback.repeat);
+  void sendNext();
+}
+
+/** The shuffle key: a new shuffled order, the track playing first; off, the queue's own order. */
+export function toggleShuffle(): void {
+  playback.shuffle = !playback.shuffle;
+  const total = $toRaw(playback).queue?.items.length ?? 0;
+  playback.order = playback.shuffle ? shuffledOrder(total, playback.index) : [];
+  void sendNext();
 }
 
 /** The music as it is now, for this tab to come back to after a reload. */
