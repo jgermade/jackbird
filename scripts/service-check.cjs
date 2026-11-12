@@ -24,7 +24,9 @@ const { chromium } = require("playwright");
 
 const binary = path.resolve(process.argv[2] ?? "target/release/jackbird-service");
 const extra = process.argv.slice(3);
-const port = 4646 + Math.floor(Math.random() * 1000);
+const { freePort } = require("./free-port.cjs");
+// Free on both loopbacks (scripts/free-port.cjs), not picked at random.
+const port = freePort();
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "jackbird-service-check-"));
 const external = process.env.JACKBIRD_CHECK_URL;
 const music = process.env.JACKBIRD_CHECK_MUSIC ?? path.join(home, "Music");
