@@ -35,6 +35,15 @@
   const { ui } = await import("../lib/ui")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   const mp3Url: string = (await import("../assets/formats/mp3.svg?url")).default
+  const oggUrl: string = (await import("../assets/formats/ogg.svg?url")).default
+  // The codecs drawn by their marks (lit in the display's ink, as the logo is): each mark and its
+  // proportions. Ogg's stands for its Vorbis too.
+  const CODEC_MARKS: Record<string, { url: string; ratio: string }> = {
+    MP3: { url: mp3Url, ratio: "917 / 463" },
+    OGG: { url: oggUrl, ratio: "510 / 340" },
+    VORBIS: { url: oggUrl, ratio: "510 / 340" }
+  }
+  const markOf = () => CODEC_MARKS[markParts()?.format ?? ""] ?? null
 
   $: current = nowPlaying.value
   // The display's left, while the music plays: the spectrum, or the song's format and how it
@@ -134,11 +143,11 @@
                   :aria-label="markView === 'format' ? t('faceplate.showSpectrum') : t('faceplate.showFormat')"
                   :title="soundingText()" @click="mark.toggle()">
             <span :if="markView === 'format' && markParts()" class="lcd-format">
-              <!-- The codec: FLAC in the heavy lower case of its own lettering, MP3 by its mark (lit in the
-                   display's ink, as the logo is), any other as an icon of the display's own. -->
+              <!-- The codec: FLAC in the heavy lower case of its own lettering, MP3 and Ogg by their marks
+                   (lit in the display's ink, as the logo is), any other as an icon of the display's own. -->
               <span class="icons">
                 <span :if="markParts()?.format === 'FLAC'" class="codec-flac">flac</span>
-                <span :elseif="markParts()?.format === 'MP3'" class="codec-mark" role="img" aria-label="MP3" :style="`--codec: url(${mp3Url})`"></span>
+                <span :elseif="markOf()" class="codec-mark" role="img" :aria-label="markParts()?.format" :style="`--codec: url(${markOf()?.url}); --ratio: ${markOf()?.ratio}`"></span>
                 <DisplayIcon :else>{{ markParts()?.format }}</DisplayIcon>
               </span>
               <!-- Its parts one under the other: "24 bit" over "96 kHz"; a varying bitrate marked VBR, lit
@@ -304,7 +313,7 @@
   .codec-mark {
     display: block;
     height: 1.9em;
-    aspect-ratio: 917 / 463;
+    aspect-ratio: var(--ratio);
     background: currentColor;
     -webkit-mask: var(--codec) center / contain no-repeat;
     mask: var(--codec) center / contain no-repeat;
