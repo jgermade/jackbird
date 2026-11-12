@@ -77,10 +77,21 @@
   // another one, or a double click would play and then pause. A track's box
   // selects it. A folder's ❯ key shows it in the album sheet and brings that
   // panel into view on a phone (`ui.pane`).
+  // A phone (the panes one at a time): a folder's row, but for its caret and its ⋮, opens it in
+  // Details, and its ❯ key is not needed.
+  const PHONE = matchMedia("(max-width: 720px)")
+  let phone: boolean = PHONE.matches
+  const onPhone = (event: MediaQueryListEvent) => {
+    phone = event.matches
+  }
+  PHONE.addEventListener("change", onPhone)
+  $destroyed(() => PHONE.removeEventListener("change", onPhone))
+
   const open = (row: Row, event: MouseEvent) => {
     if (event?.detail > 1) return
     setCurrentRow(row.key)
     if (row.kind === "track" && row.trackId) playFromTree(row.key)
+    else if (row.kind === "album" && phone) ui.pane = "details"
   }
   const pick = (row: Row, event: MouseEvent) => {
     if (!row.trackId) return
@@ -164,12 +175,13 @@
              :playable="row.kind === 'track' && !!row.trackId"
              :muted="!!row.missing"
              :flat="flat()"
+             :caret-only="phone"
              @select="open(row, $event.detail)"
              @pick="pick(row, $event.detail)"
              @toggle="toggleFolder(row.album)">
       <template :slot.action>
         <span class="row-keys" @click.stop="null">
-          <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
+          <Key :if="row.kind === 'album' && !phone" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
           <Menu :if="row.kind === 'album' || row.trackId || row.playlist" :label="t(row.kind === 'album' ? 'menu.folder' : 'menu.track', { title: rowLabel(row) })" :items="rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
