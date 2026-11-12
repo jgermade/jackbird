@@ -147,3 +147,10 @@ fetch("https://api.github.com/repos/jgermade/jackbird/releases/latest", { header
     if (version && release.tag_name) version.textContent = `jackbird ${release.tag_name}.`;
   })
   .catch(() => {});
+
+// ---- the compact player over the window ------------------------------------------------------
+
+// A release from before the compact player's capture: no such picture; it is left out.
+for (const img of document.querySelectorAll(".mini img")) {
+  img.addEventListener("error", () => img.closest(".mini")?.remove(), { once: true });
+}
