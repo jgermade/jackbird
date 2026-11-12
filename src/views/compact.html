@@ -1,8 +1,8 @@
 <script :setup lang="ts">
   // The compact player: a card, like a phone's deck. The faceplate's display drawn as on a phone
   // (DeckDisplay `small`, the same view, so it follows every change to it), and under it the
-  // transport keys between the mode's keys: "on top" (in the desktop app's window) and back to the
-  // full view; and the list key, which shows the queue's list (QueueList) under the card, the window
+  // transport keys between the mode's keys: back to the full view and "on top" (in the desktop
+  // app's window) at the left, and at the right the list key, which shows the queue's list (QueueList) under the card, the window
   // growing for it. Without the list, where there is room (a container query on its height), the
   // queue's next track under the keys. In the desktop app a
   // press on its chassis, off the keys, moves the window. A view over lib/compact.ts. See
@@ -33,8 +33,8 @@
     <div class="screen"><DeckDisplay small :bands="6" /></div>
     <div class="keys">
       <div class="side">
-        <Key size="sm" square :pressed="compact.list" :disabled="!playback.queue && !compact.list" :label="t('compact.list')" :title="t('compact.list')" @click="setCompactList(!compact.list)">
-          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
+        <Key size="sm" square :label="backLabel" :title="backTitle" :disabled="compact.busy" @click="leaveCompact()">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" /></svg>
         </Key>
         <Key :if="compact.mode === 'window'" size="sm" square led :pressed="compact.onTop" :label="t('compact.onTop')" :title="t('compact.onTop')" @click="setOnTop(!compact.onTop)">
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h5l-.75 4 2.25 2.25H4L6.25 6.5z" /><path d="M8 8.75v4.75" /></svg>
@@ -42,8 +42,8 @@
       </div>
       <DeckKeys place="compact" />
       <div class="side end">
-        <Key size="sm" square :label="backLabel" :title="backTitle" :disabled="compact.busy" @click="leaveCompact()">
-          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" /></svg>
+        <Key size="sm" square :pressed="compact.list" :disabled="!playback.queue && !compact.list" :label="t('compact.list')" :title="t('compact.list')" @click="setCompactList(!compact.list)">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
         </Key>
       </div>
     </div>
