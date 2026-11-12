@@ -236,11 +236,8 @@ if (matchMedia("(min-width: 901px)").matches) {
   if (handset) embedApp(handset, "phone", "jackbird on a phone, with the sample music");
 }
 
-// One of them at a time plays: the one that starts pauses the other.
-window.addEventListener("message", (event) => {
-  if (event.origin !== location.origin || event.data?.type !== "jackbird:playing") return;
-  for (const live of lives) if (live.contentWindow !== event.source) live.contentWindow?.postMessage({ type: "jackbird:pause" }, location.origin);
-});
+// The two are one player: the phone follows the windows' (src/lib/mirror.ts), so nothing here
+// needs to keep them apart.
 
 // The embedded app asked for a folder: the demo is where one opens.
 const invite = stage?.querySelector(".invite");

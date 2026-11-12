@@ -332,7 +332,8 @@ export async function openSamples(list: SampleList): Promise<void> {
   library.infoMessage = null;
   try {
     const { openSampleSource } = await import("./sources/samples");
-    await hydrateRoot(await openSampleSource(list), {});
+    // One id wherever it is opened: the landing page's two frames name its tracks alike (lib/mirror.ts).
+    await hydrateRoot(await openSampleSource(list), { rootId: "samples" });
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : t("message.scanFailed");
   } finally {

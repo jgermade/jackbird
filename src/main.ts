@@ -14,7 +14,7 @@ import { startHotkeys } from "./lib/hotkeys";
 import { loadRecent } from "./lib/recent";
 import { loadFavourites, startMine } from "./lib/mine";
 import { keepPlaybackSaved, restorePlayback } from "./lib/player";
-import { isDesktop, isEmbed, isPhone } from "./lib/platform";
+import { embedKind, isDesktop, isEmbed, isPhone } from "./lib/platform";
 import { followActiveRoot, keepSessionSaved, restoreSession } from "./lib/session";
 import { startVerifier } from "./lib/verifier";
 import App from "./views/app.html";
@@ -31,18 +31,25 @@ if (isEmbed) {
   startSession();
 }
 
-/** The app embedded in the landing page: nothing to restore; the sample music, queued paused. */
+/**
+ * The app embedded in the landing page: nothing to restore; the sample music. Its windows queue it,
+ * paused, and play it; its phone follows their player (lib/mirror.ts), and queues it itself only
+ * when there are no windows to follow.
+ */
 async function startEmbedded(): Promise<void> {
-  const [{ library }, { sampleList }, { openSamples }, { queueWhatIsShown }] = await Promise.all([
+  const [{ library }, { sampleList }, { openSamples }, { queueWhatIsShown }, { startMirror }] = await Promise.all([
     import("./lib/library"),
     import("./lib/sources/samples"),
     import("./lib/roots"),
-    import("./lib/workspace")
+    import("./lib/workspace"),
+    import("./lib/mirror")
   ]);
+  const following = startMirror();
   library.restoring = false;
   const list = await sampleList();
   if (!list) return;
   await openSamples(list);
+  if (await following.then((joined) => joined && embedKind === "phone")) return;
   // Its tracks come with the folder's walk (the first time, their copies too): queued once read.
   for (let waited = 0; waited < 120; waited += 1) {
     const root = library.roots.find((one) => one.id === library.activeRootId);
@@ -50,15 +57,6 @@ async function startEmbedded(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   queueWhatIsShown();
-  // The landing page has two of these: the one that starts tells it, and is told to pause when the
-  // other does.
-  const [{ playback }, { togglePlay }] = await Promise.all([import("./lib/playback"), import("./lib/player")]);
-  playback.$on("playing", () => {
-    if (playback.playing) parent.postMessage({ type: "jackbird:playing" }, location.origin);
-  });
-  window.addEventListener("message", (event) => {
-    if (event.origin === location.origin && event.data?.type === "jackbird:pause" && playback.playing) togglePlay();
-  });
 }
 
 function startSession(): void {
