@@ -9,7 +9,9 @@ export const STORAGE_KEYS = {
   output: "mp3-manager.output",
   outputDevice: "mp3-manager.outputDevice",
   /** An Android phone's "Bit-perfect to a USB DAC" (E6b-D10). */
-  phoneBitPerfect: "jackbird.phoneBitPerfect"
+  phoneBitPerfect: "jackbird.phoneBitPerfect",
+  /** The library pane's width beside the album sheet, in rem (src/helpers/split.ts). */
+  splitWidth: "jackbird.splitWidth"
 } as const;
 
 /**

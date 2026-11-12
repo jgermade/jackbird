@@ -74,6 +74,7 @@ export const en = {
   "faceplate.showFormat": "Show the song's format",
   "faceplate.showSpectrum": "Show the spectrum",
   "faceplate.turnTime": "Show the time, the length, or both",
+  "workspace.split": "Width of the library and the details",
   "faceplate.state.stopped": "Stop",
   "faceplate.state.playing": "Play",
   "faceplate.state.paused": "Pause",
