@@ -144,7 +144,7 @@
               <!-- Its parts one under the other: "24 bit" over "96 kHz"; a varying bitrate marked VBR, lit
                    solid, before it. -->
               <span :if="markParts()?.quality" class="quality">
-                <span :each="(part, at) in markParts()?.quality.split(' · ') ?? []" class="quality-line"><DisplayIcon :if="at === 0 && markParts()?.vbr" filled>VBR</DisplayIcon>{{ part }}</span>
+                <span :each="(part, at) in markParts()?.quality.split(' · ') ?? []" class="quality-line"><span :if="at === 0 && markParts()?.vbr" class="vbr"><DisplayIcon filled>VBR</DisplayIcon></span>{{ part }}</span>
               </span>
               <span :if="markParts()?.route" class="quality route">{{ markParts()?.route }}</span>
             </span>
@@ -332,7 +332,8 @@
   .lcd-format .quality:not(.route) { display: grid; justify-items: center; text-transform: none; letter-spacing: .02em; }
   .lcd-format .route { opacity: .6; }
   .quality-line { display: flex; align-items: center; gap: .35em; }
-  .quality-line > :first-child:not(:only-child) { font-size: .8em; }
+  /* The VBR mark, small beside the figure it qualifies (the icon is sized in em). */
+  .vbr { display: inline-flex; font-size: .62em; }
   .lcd-logo {
     display: block;
     width: 100%;
