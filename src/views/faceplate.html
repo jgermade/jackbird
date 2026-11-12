@@ -86,7 +86,7 @@
 <header class="faceplate">
   <div class="deck">
     <div class="brand-mark">
-      <span class="wordmark">{{ t("app.name") }}</span>
+      <span class="wordmark" :data-label="t('app.name')">{{ t("app.name") }}</span>
     </div>
 
     <div class="screen">
@@ -233,22 +233,31 @@
   }
   /* The display's second line: the artist, under the title. */
   .artist { font-weight: var(--mm-weight-regular); font-size: var(--mm-text-sm); opacity: .85; }
-  /* The name in polished metal, raised from the faceplate as the lettering on a hi-fi receiver's
-     front panel: the chrome through the letters, and their relief around them. */
+  /* The name in brushed metal, raised, as the lettering on a hi-fi deck's front panel: the text
+     itself draws only the relief (a light edge under it, a shadow over it), and a copy of it on
+     top carries the metal's sheen. No filter: a filter rasterises the text and blurs it. */
   .wordmark {
-    background-image: var(--mm-metal-face);
-    -webkit-background-clip: text;
-    background-clip: text;
+    position: relative;
     color: transparent;
-    filter: var(--mm-metal-relief);
+    text-shadow: 0 1px 0 var(--mm-metal-light), 0 -1px 0 var(--mm-metal-shadow);
     font-family: var(--mm-font-label);
     font-stretch: var(--mm-stretch-label);
     font-weight: 800;
-    font-size: var(--mm-text-xl);
+    font-size: var(--mm-text-lg);
     letter-spacing: .08em;
     line-height: var(--mm-leading-tight);
     text-transform: uppercase;
     white-space: nowrap;
+  }
+  .wordmark::after {
+    content: attr(data-label);
+    content: attr(data-label) / "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--mm-metal-face);
+    -webkit-background-clip: text;
+    background-clip: text;
+    text-shadow: none;
   }
   .icon { width: .875rem; height: .875rem; }
   /* While no root is open, opening one is the thing to do: its glyph is printed in orange. */
