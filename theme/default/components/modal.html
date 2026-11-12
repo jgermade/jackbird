@@ -107,8 +107,10 @@
   }
   $: sync(isOpen)
 
-  // Escape: the browser would close the dialog on its own; the owner decides.
+  // Escape: the browser would close the dialog on its own; the owner decides. Only the dialog's
+  // own: a file input inside it fires a `cancel` that bubbles when its picker is dismissed.
   const cancel = (event: Event) => {
+    if (event.target !== event.currentTarget) return
     event.preventDefault()
     $emit("close")
   }
