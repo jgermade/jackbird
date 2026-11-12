@@ -119,13 +119,13 @@ function thisSystem() {
 
 const megabytes = (bytes) => `${Math.max(1, Math.round(bytes / 1e6))} MB`;
 
-// This device's first: its first download (an AppImage before a .deb), the whole first row.
+// This device's first: its first download (an AppImage before a .deb), with a ribbon.
 const system = thisSystem();
 const downloads = document.querySelector(".downloads");
 const mine = system && downloads?.querySelector(`.download[data-os="${system}"]`);
 if (mine) {
   mine.classList.add("mine");
-  mine.dataset.action = "Download";
+  mine.dataset.ribbon = "This device";
   downloads.prepend(mine);
 }
 
@@ -142,7 +142,6 @@ fetch("https://api.github.com/repos/jgermade/jackbird/releases/latest", { header
       link.href = asset.browser_download_url;
       const file = link.querySelector(".file");
       if (file) file.textContent = `${file.textContent} · ${megabytes(asset.size)}`;
-      if (link === mine) mine.dataset.action = `Download · ${megabytes(asset.size)}`;
     }
     const version = document.querySelector(".release");
     if (version && release.tag_name) version.textContent = `jackbird ${release.tag_name}.`;

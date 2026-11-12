@@ -315,7 +315,6 @@ h1 em {
 .glyph { flex: none; width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .tab, .download .label, .way h3 { display: inline-flex; align-items: center; gap: .6em; }
 .download .label .glyph { width: 1.5rem; height: 1.5rem; color: var(--mm-fg); }
-.download.mine .label .glyph { width: 2.25rem; height: 2.25rem; color: var(--mm-accent-ink); }
 
 /* Get it: two tabs, the downloads (this device's first, larger) and the server. */
 .tabs { display: flex; gap: var(--mm-space-2); margin-bottom: var(--mm-space-5); }
@@ -354,31 +353,26 @@ h1 em {
 .download .file { color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
 .download:active { transform: translateY(1px); background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
 .download:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
-/* This device's: the whole first row, the signal's colour, a key that says so. */
-.download.mine {
-  grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: var(--mm-space-5);
-  padding: var(--mm-space-6);
-  border-color: var(--mm-accent);
-}
-.download.mine > * { grid-column: 1; }
-.download.mine strong { font-size: clamp(1.4rem, 2.6vw, 2rem); }
+/* This device's: first, the signal's colour, and a ribbon across its corner that says so. */
+.download { position: relative; overflow: hidden; }
+.download.mine { border-color: var(--mm-accent); }
+.download.mine .label .glyph { color: var(--mm-accent-ink); }
 .download.mine::after {
-  content: attr(data-action);
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  padding: var(--mm-space-3) var(--mm-space-6);
-  border-radius: var(--mm-radius-key);
+  content: attr(data-ribbon);
+  position: absolute;
+  top: 1.6rem;
+  right: -3.4rem;
+  width: 12rem;
+  padding: .3rem 0;
+  transform: rotate(45deg);
   background: var(--mm-accent);
-  box-shadow: var(--mm-key-shadow-signal);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
   color: var(--mm-on-accent-key, #fff);
-  font: 700 var(--mm-text-md) / 1.2 var(--mm-font-label);
+  font: 700 .625rem / 1 var(--mm-font-label);
   font-stretch: var(--mm-stretch-label);
-  letter-spacing: .1em;
+  letter-spacing: .12em;
+  text-align: center;
   text-transform: uppercase;
-  white-space: nowrap;
 }
 @media (hover: hover) {
   .download:hover { border-color: var(--mm-accent); }
@@ -446,8 +440,6 @@ h1 em {
   .nav { display: none; }
   .tone { margin-left: auto; }
   .modules, .downloads, .ways { grid-template-columns: minmax(0, 1fr); }
-  .download.mine { grid-template-columns: minmax(0, 1fr); }
-  .download.mine::after { grid-column: 1; grid-row: auto; justify-self: start; margin-top: var(--mm-space-3); }
   .phone { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2.5rem; }
   .phone img { max-width: 14rem; }
 }
