@@ -332,7 +332,9 @@ h1 em {
   border: 1px solid #0d0e0f;
   border-radius: .75rem;
   box-shadow: var(--mm-shadow-lg), 0 0 0 1px var(--mm-border-strong);
-  transform: rotate(-4deg);
+  /* Turned a little, and to the pointer over its section as the window above (landing.js). */
+  transform: perspective(80rem) rotateY(var(--tilt-y, -2deg)) rotateX(var(--tilt-x, 1deg)) rotate(-4deg);
+  transition: transform .5s cubic-bezier(.2, .7, .2, 1);
 }
 .phone .statement {
   margin: 0 0 var(--mm-space-4);

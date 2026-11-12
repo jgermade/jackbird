@@ -166,18 +166,22 @@ function tiltFor(x, y) {
   return { x: `${((0.5 - y) * 2).toFixed(2)}deg`, y: `${((x - 0.5) * 3 - 1.5).toFixed(2)}deg` };
 }
 
-if (stage && matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-  stage.addEventListener("pointermove", (event) => {
-    const box = stage.getBoundingClientRect();
+/** The window and the phone turn to face the pointer over them, and back to rest (the stylesheet's) when it leaves. */
+function followPointer(area) {
+  area.addEventListener("pointermove", (event) => {
+    const box = area.getBoundingClientRect();
     const tilt = tiltFor((event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
-    stage.style.setProperty("--tilt-x", tilt.x);
-    stage.style.setProperty("--tilt-y", tilt.y);
+    area.style.setProperty("--tilt-x", tilt.x);
+    area.style.setProperty("--tilt-y", tilt.y);
   });
-  // Off the stage, back to rest (the stylesheet's).
-  stage.addEventListener("pointerleave", () => {
-    stage.style.removeProperty("--tilt-x");
-    stage.style.removeProperty("--tilt-y");
+  area.addEventListener("pointerleave", () => {
+    area.style.removeProperty("--tilt-x");
+    area.style.removeProperty("--tilt-y");
   });
+}
+
+if (matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  for (const area of [stage, document.querySelector(".phone")]) if (area) followPointer(area);
 }
 
 let live = null;
