@@ -105,14 +105,13 @@
   // Read through a function: the active root is boxed (see Opaque in lib/workspace.ts).
   const selectedCount = (): number => activeRoot.value.data?.selectedTrackIds.length ?? 0
 
-  // The state, as a glyph before the title and in words for screen readers.
+  // The state, in words for screen readers (the play key shows it, lit while it plays).
   $: stateLabel =
     playback.error ? t("faceplate.state.error")
     : playback.loading ? t("faceplate.state.loading")
     : playback.playing ? t("faceplate.state.playing")
     : current ? t("faceplate.state.paused")
     : t("faceplate.state.stopped")
-  $: stateGlyph = playback.error ? "■" : playback.playing || playback.loading ? "▶" : current ? "❚❚" : "■"
   // Two lines: the title (or what went wrong, or that nothing plays), and the artist under it.
   // While the display's left shows the DAC, its two lines say which one and how the music reaches
   // it, in place of the song's title and artist.
@@ -185,8 +184,6 @@
               <!-- Two lines: the state and the title, then the artist (and what reaches the device). -->
               <div class="lcd-text">
                 <span class="now">
-                  <!-- The state's glyph; not while the lines name the DAC, which is not the song. -->
-                  <span :if="!dacName" class="state" aria-hidden="true">{{ stateGlyph }}</span>
                   <span class="visually-hidden">{{ stateLabel }}</span>
                   <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
                 </span>
@@ -281,16 +278,8 @@
   /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
   .pane-pick { display: none; }
 
-  /* Each of the display's text lines: the state glyph and the title, or the artist and the badge; the text ellipsises. */
+  /* Each of the display's text lines: the title, or the artist; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
-  .state {
-    flex: none;
-    min-width: 1.1em;
-    font-family: var(--mm-font-label);
-    font-size: var(--mm-text-md);
-    letter-spacing: -.1em;
-    text-align: center;
-  }
   .visually-hidden {
     position: absolute;
     width: 1px;
