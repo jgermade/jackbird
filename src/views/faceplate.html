@@ -135,11 +135,13 @@
                   :title="soundingText()" @click="mark.toggle()">
             <span :if="markView === 'format' && markParts()" class="lcd-format">
               <!-- The codec: FLAC in the heavy lower case of its own lettering, MP3 by its mark (lit in the
-                   display's ink, as the logo is), any other as an icon of the display's own. -->
+                   display's ink, as the logo is), any other as an icon of the display's own; and a VBR
+                   badge beside it when the bitrate varies. -->
               <span class="icons">
                 <span :if="markParts()?.format === 'FLAC'" class="codec-flac">flac</span>
                 <span :elseif="markParts()?.format === 'MP3'" class="codec-mark" role="img" aria-label="MP3" :style="`--codec: url(${mp3Url})`"></span>
                 <DisplayIcon :else>{{ markParts()?.format }}</DisplayIcon>
+                <DisplayIcon :if="markParts()?.vbr">VBR</DisplayIcon>
               </span>
               <!-- Its parts one under the other: "24 bit" over "96 kHz". -->
               <span :if="markParts()?.quality" class="quality">

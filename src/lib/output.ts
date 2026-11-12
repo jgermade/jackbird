@@ -102,14 +102,19 @@ export function soundingText(): string {
  * quality ("24 bit · 96 kHz", "320 kbps · 44.1 kHz") and how it reaches the device ("bit-perfect",
  * "DAC", "native"; empty in the browser, or when there is nothing to say). The quality is the
  * file's own (`info`, read from it), else what a native output reports it decodes; with neither,
- * the file's kind alone, from `relativePath`. Null when there is nothing at all.
+ * the file's kind alone, from `relativePath`. `vbr` when the file's bitrate varies (the display's
+ * VBR badge). Null when there is nothing at all.
  */
-export function soundingParts(info: StreamInfo | null, relativePath?: string): { format: string; quality: string; route: string } | null {
+export function soundingParts(
+  info: StreamInfo | null,
+  relativePath?: string
+): { format: string; quality: string; route: string; vbr: boolean } | null {
   const sounding = output.sounding;
+  const vbr = info?.codec === "MP3" && info.vbr;
   if (!sounding) {
-    if (info) return { format: info.codec, quality: streamQuality(info), route: "" };
+    if (info) return { format: info.codec, quality: streamQuality(info), route: "", vbr };
     const kind = relativePath ? fileKind(relativePath) : "";
-    return kind ? { format: kind, quality: "", route: "" } : null;
+    return kind ? { format: kind, quality: "", route: "", vbr: false } : null;
   }
   const rate = `${kilohertz(sounding.format.rate)} kHz`;
   const quality = info ? streamQuality(info) : sounding.format.bits > 0 ? `${sounding.format.bits} bit · ${rate}` : rate;
@@ -122,5 +127,5 @@ export function soundingParts(info: StreamInfo | null, relativePath?: string): {
         ? t("output.badge.dac")
         : ""
     : t(`output.badge.${sounding.route.fidelity}`);
-  return { format: sounding.codec, quality, route };
+  return { format: sounding.codec, quality, route, vbr };
 }

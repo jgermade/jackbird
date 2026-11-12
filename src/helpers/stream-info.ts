@@ -111,9 +111,12 @@ export function kilohertz(rate: number): string {
   return String(Number(kilo.toFixed(3)));
 }
 
-/** The quality line: "24 bit · 96 kHz", "320 kbps · 44.1 kHz", "VBR 245 kbps · 44.1 kHz". */
+/**
+ * The quality line: "24 bit · 96 kHz", "320 kbps · 44.1 kHz"; a VBR file's mean bitrate, its being
+ * variable shown apart (the display's VBR badge).
+ */
 export function streamQuality(info: StreamInfo): string {
   const rate = `${kilohertz(info.rate)} kHz`;
   if (info.codec === "FLAC") return `${info.bits} bit · ${rate}`;
-  return `${info.vbr ? "VBR " : ""}${info.kbps} kbps · ${rate}`;
+  return `${info.kbps} kbps · ${rate}`;
 }

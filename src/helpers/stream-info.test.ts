@@ -91,7 +91,7 @@ describe("streamQuality", () => {
   it("writes a FLAC's depth and rate, an MP3's bitrate and rate", () => {
     assert.equal(streamQuality({ codec: "FLAC", rate: 96000, bits: 24, channels: 2 }), "24 bit · 96 kHz");
     assert.equal(streamQuality({ codec: "MP3", rate: 44100, kbps: 320, vbr: false, channels: 2 }), "320 kbps · 44.1 kHz");
-    assert.equal(streamQuality({ codec: "MP3", rate: 48000, kbps: 245, vbr: true, channels: 2 }), "VBR 245 kbps · 48 kHz");
+    assert.equal(streamQuality({ codec: "MP3", rate: 48000, kbps: 245, vbr: true, channels: 2 }), "245 kbps · 48 kHz");
   });
   it("writes kHz with the decimals a rate has", () => {
     assert.equal(kilohertz(44100), "44.1");
