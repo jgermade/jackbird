@@ -70,6 +70,8 @@
   --mm-warn-soft: #f9eed3;
   --mm-bad: #b82424;
   --mm-bad-led: #e53935;
+  /* A fourth LED, blue: a mode apart from the signal's (repeating one track). */
+  --mm-info-led: #2f86eb;
   --mm-bad-soft: #f9e2e0;
   --mm-on-bad: #ffffff;
   --mm-led-off: #a3a9a8;
@@ -226,6 +228,7 @@
   --mm-warn-soft: #2b2210;
   --mm-bad: #ff7d73;
   --mm-bad-led: #ff5a4f;
+  --mm-info-led: #4aa3ff;
   --mm-bad-soft: #2e1614;
   --mm-on-bad: #1a0b0a;
   --mm-led-off: #3d4044;
