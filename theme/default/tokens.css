@@ -115,13 +115,12 @@
   --mm-thumb-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .5);
   --mm-brush: rgba(255, 255, 255, .05);
   /* Lettering in brushed metal, raised from the chassis: the face's sheen top to bottom, its
-     horizon slanted, a light edge below and a shadow above (the faceplate's wordmark). The stops
+     horizon slanted, and a light edge below (the faceplate's wordmark). The stops
      are offsets in em from the middle, not shares of the gradient's length, so slanting it keeps
      the bands as thin as on level lettering. */
   --mm-metal-angle: 175deg;
   --mm-metal-face: linear-gradient(var(--mm-metal-angle), #a7acb0 calc(50% - .575em), #767c81 calc(50% - .21em), #3f4448 calc(50% + .023em), #81878c calc(50% + .23em), #b4b9bc calc(50% + .575em));
   --mm-metal-light: rgba(255, 255, 255, .9);
-  --mm-metal-shadow: rgba(0, 0, 0, .45);
 
   /* ---- type --------------------------------------------------------------- */
 
@@ -248,7 +247,6 @@
   --mm-brush: rgba(255, 255, 255, .025);
   --mm-metal-face: linear-gradient(var(--mm-metal-angle), #f6f7f8 calc(50% - .575em), #c3c7ca calc(50% - .23em), #6f7479 calc(50% + 0em), #aeb3b7 calc(50% + .207em), #e3e6e8 calc(50% + .575em));
   --mm-metal-light: rgba(255, 255, 255, .18);
-  --mm-metal-shadow: rgba(0, 0, 0, .85);
 
   color-scheme: dark;
 }

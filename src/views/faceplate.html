@@ -234,12 +234,12 @@
   /* The display's second line: the artist, under the title. */
   .artist { font-weight: var(--mm-weight-regular); font-size: var(--mm-text-sm); opacity: .85; }
   /* The name in brushed metal, raised, as the lettering on a hi-fi deck's front panel: the text
-     itself draws only the relief (a light edge under it, a shadow over it), and a copy of it on
+     itself draws only the relief (a light edge under it), and a copy of it on
      top carries the metal's sheen. No filter: a filter rasterises the text and blurs it. */
   .wordmark {
     position: relative;
     color: transparent;
-    text-shadow: 0 1px 0 var(--mm-metal-light), 0 -1px 0 var(--mm-metal-shadow);
+    text-shadow: 0 1px 0 var(--mm-metal-light);
     font-family: var(--mm-font-label);
     font-stretch: var(--mm-stretch-label);
     font-weight: 800;
