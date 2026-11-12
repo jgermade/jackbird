@@ -150,6 +150,11 @@
 
 <style scoped>
   .sheet { color: var(--mm-fg); }
+  /* On a computer the sheet's content is at most 960px wide (53.33rem at the 18px root), in the
+     middle of its pane. */
+  @media (min-width: 721px) {
+    .sheet { max-width: 53.33rem; margin-inline: auto; }
+  }
   .icon { width: .875rem; height: .875rem; }
   /* Orange only as the glyph: the key itself stays a chassis key, like the rest of the deck. */
   .icon.signal { color: var(--mm-accent-ink); }
