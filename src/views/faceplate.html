@@ -18,7 +18,7 @@
   const Tabs = await import("../../theme/default/components/tabs.html")
   const DeckKeys = await import("./deck-keys.html")
 
-  const { formatTime } = await import("../helpers/format")
+  const { dimmedLead, formatTime } = await import("../helpers/format")
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { importing, openImport } = await import("../lib/importing")
@@ -71,8 +71,8 @@
   // The position split for the display's two lines: minutes (at least two digits), then seconds.
   $: minutes = String(Math.floor(Math.max(0, playback.position) / 60)).padStart(2, "0")
   $: seconds = String(Math.floor(Math.max(0, playback.position) % 60)).padStart(2, "0")
-  // The minutes' zeros at the left (never the last digit), dimmed: "03" shows its 3 lit.
-  $: minutesLead = (/^0+/.exec(minutes.slice(0, -1)) ?? [""])[0]
+  // The minutes' zeros at the left, dimmed: "03" shows its 3 lit, "00" nothing lit.
+  $: minutesLead = dimmedLead(minutes)
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
 
   $: tabs = library.roots.map((root) => ({
@@ -93,7 +93,7 @@
       <Display live>
         <div class="lcd">
           <!-- The logo, lit; while the music plays, the spectrum in its place. -->
-          <span class="lcd-mark" aria-hidden="true">
+          <span class="lcd-mark" :class.playing="playback.playing" aria-hidden="true">
             <span :if="playback.playing" class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
             <span :else class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
           </span>
@@ -223,6 +223,9 @@
   /* The display's left: the logo, lit in the display's own ink (its shape as a mask), or the spectrum while the music plays. */
   .lcd-mark { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; align-self: center; }
   .lcd-spectrum { display: block; width: 100%; height: 100%; }
+  /* While the music plays, the spectrum stands as tall as the display's lines and meter together,
+     taller than the logo it replaces. */
+  .lcd-mark.playing { align-self: stretch; height: auto; min-height: 3rem; }
   .lcd-logo {
     display: block;
     width: 100%;

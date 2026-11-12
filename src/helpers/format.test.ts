@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatBytes, formatTime, formatTrackNumber } from "./format.ts";
+import { dimmedLead, formatBytes, formatTime, formatTrackNumber } from "./format.ts";
 
 describe("formatBytes", () => {
   it("writes zero as 0 Bytes", () => {
@@ -52,5 +52,21 @@ describe("formatTime", () => {
     assert.equal(formatTime(-3), "00:00");
     assert.equal(formatTime(Number.NaN), "00:00");
     assert.equal(formatTime(Number.POSITIVE_INFINITY), "00:00");
+  });
+});
+
+describe("dimmedLead", () => {
+  it("dims the leading zeros but the last digit", () => {
+    assert.equal(dimmedLead("03"), "0");
+    assert.equal(dimmedLead("003"), "00");
+    assert.equal(dimmedLead("12"), "");
+    assert.equal(dimmedLead("10"), "");
+  });
+  it("dims every digit when all are zeros", () => {
+    assert.equal(dimmedLead("00"), "00");
+    assert.equal(dimmedLead("0"), "0");
+  });
+  it("gives nothing for no digits", () => {
+    assert.equal(dimmedLead(""), "");
   });
 });

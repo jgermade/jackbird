@@ -24,3 +24,13 @@ export function formatTime(seconds: number): string {
   const whole = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
   return `${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`;
 }
+
+/**
+ * The zeros a display dims at the left of a counter's digits: the leading ones, never the last
+ * digit, unless every digit is a zero ("00" is all dimmed: no minutes yet). "03" gives "0",
+ * "12" gives "", "00" gives "00".
+ */
+export function dimmedLead(digits: string): string {
+  if (/^0+$/.test(digits)) return digits;
+  return (/^0+/.exec(digits.slice(0, -1)) ?? [""])[0];
+}
