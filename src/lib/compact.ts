@@ -63,11 +63,21 @@ let windowModule: ReturnType<typeof loadWindowApi> | null = null;
 /** Tauri's window API, loaded once (at the start in the desktop app, so a drag starts at once). */
 const windowApi = () => (windowModule ??= loadWindowApi());
 
+/**
+ * The whole window's size; where the system reports none (0 × 0: X with no window manager, as on
+ * a CI runner, draws no frame), its inside, which is then the whole of it.
+ */
+async function wholeSize(): Promise<{ width: number; height: number }> {
+  const { win } = await windowApi();
+  const [inner, outer] = await Promise.all([win.innerSize(), win.outerSize()]);
+  return outer.width > 0 && outer.height > 0 ? outer : inner;
+}
+
 async function boundsOf(): Promise<Bounds> {
   const { win } = await windowApi();
   // The whole window's size, title bar and all: the inside is not the same measure before and after
   // the title bar comes and goes (on macOS it grew by the bar, and past the screen).
-  const [place, size] = await Promise.all([win.outerPosition(), win.outerSize()]);
+  const [place, size] = await Promise.all([win.outerPosition(), wholeSize()]);
   return { x: place.x, y: place.y, width: size.width, height: size.height };
 }
 
@@ -104,18 +114,18 @@ async function placeAndSize(place: { x: number; y: number }, width: number, heig
   const { win, PhysicalPosition, PhysicalSize } = await windowApi();
   const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const right = async () => {
-    const outer = await win.outerSize();
-    return Math.abs(outer.width - width) <= 1 && Math.abs(outer.height - height) <= 1;
+    const whole = await wholeSize();
+    return Math.abs(whole.width - width) <= 1 && Math.abs(whole.height - height) <= 1;
   };
   let last = "";
   for (const wait of [100, 300, 600, 1000]) {
-    const [inner, outer] = await Promise.all([win.innerSize(), win.outerSize()]);
+    const [inner, outer] = await Promise.all([win.innerSize(), wholeSize()]);
     if (isMac()) await win.setPosition(new PhysicalPosition(place.x, place.y + Math.max(0, height - outer.height)));
     await win.setSize(new PhysicalSize(width - (outer.width - inner.width), height - (outer.height - inner.height)));
     await win.setPosition(new PhysicalPosition(place.x, place.y));
     await pause(wait);
     if (!(await right())) {
-      const now = await win.outerSize();
+      const now = await wholeSize();
       const seen = `${now.width}x${now.height}`;
       if (seen === last) return;
       last = seen;

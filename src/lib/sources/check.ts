@@ -103,8 +103,9 @@ async function checkCompact(): Promise<Record<string, unknown>> {
     return {
       width: Math.round(size.width / scale),
       height: Math.round(size.height / scale),
-      outerWidth: Math.round(outer.width / scale),
-      outerHeight: Math.round(outer.height / scale),
+      // X with no window manager (the Linux runner) reports no frame: the inside is the whole window.
+      outerWidth: Math.round((outer.width > 0 ? outer.width : size.width) / scale),
+      outerHeight: Math.round((outer.height > 0 ? outer.height : size.height) / scale),
       decorated,
       onTop,
       workHeight: work ? Math.round(work.height / scale) : null
