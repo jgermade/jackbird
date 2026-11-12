@@ -123,7 +123,7 @@
      the bands as thin as on level lettering. */
   --mm-metal-angle: 175deg;
   /* The metal dark at its edges, a light reflection across its middle. */
-  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #2f3437 calc(50% - .575em), #5d6368 calc(50% - .21em), #d4d8db calc(50% + .023em), #6a7075 calc(50% + .23em), #2a2e31 calc(50% + .575em));
+  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #2f3437 calc(50% - .575em), #5a6064 calc(50% - .21em), #a9aeb2 calc(50% + .023em), #63696e calc(50% + .23em), #2a2e31 calc(50% + .575em));
   --mm-metal-shadow: 1px 1px .5px rgba(20, 24, 24, .55);
 
   /* ---- type --------------------------------------------------------------- */

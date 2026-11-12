@@ -91,8 +91,10 @@
   $: dacWay = markView === "dac" ? (soundingDevice()?.route ?? "") : ""
   // Nothing open yet (and nothing coming back): the title's line runs a marquee instead of
   // "Nothing playing", at a pace by its length.
+  // The artist's line runs one of its own, under it.
   $: marquee = !current && !playback.error && !library.restoring && library.roots.length === 0 ? t("faceplate.marquee") : ""
-  $: marqueePace = `--marquee-time: ${Math.max(8, Math.round(marquee.length * 0.28))}s`
+  $: marqueeSub = marquee ? t("faceplate.marqueeSub") : ""
+  const pace = (text: string): string => `--marquee-time: ${Math.max(8, Math.round(text.length * 0.28))}s`
   $: titleLine = dacName || playback.error || (current ? current.title : t("faceplate.idle"))
   $: artistLine = dacName ? dacWay : playback.error ? "" : (current?.artist ?? "")
   // The clock at the display's right, turned with a click or a tap: where the song is (its minutes
@@ -147,11 +149,12 @@
           <div class="lcd-text">
             <span class="now">
               <span class="visually-hidden">{{ stateLabel }}</span>
-              <span :if="marquee" class="mm-display-title marquee" :style="marqueePace"><span class="marquee-run" aria-hidden="true"><span>{{ marquee }}</span><span>{{ marquee }}</span></span><span class="visually-hidden">{{ marquee }}</span></span>
+              <span :if="marquee" class="mm-display-title marquee" :style="pace(marquee)"><span class="marquee-run" aria-hidden="true"><span>{{ marquee }}</span><span>{{ marquee }}</span></span><span class="visually-hidden">{{ marquee }}</span></span>
               <span :else class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
             </span>
             <span class="now">
-              <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
+              <span :if="marqueeSub" class="artist mm-display-title marquee" :style="pace(marqueeSub)"><span class="marquee-run" aria-hidden="true"><span>{{ marqueeSub }}</span><span>{{ marqueeSub }}</span></span><span class="visually-hidden">{{ marqueeSub }}</span></span>
+              <span :else class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
             </span>
           </div>
           <!-- The clock, on two lines too: minutes over seconds (where the song is, or its length), or
@@ -317,9 +320,9 @@
   }
   /* Phones: a smaller mark, so the title keeps its room. */
   @media (max-width: 640px) {
-    .lcd-mark { width: 2.5rem; height: 2.5rem; }
+    .lcd-mark { width: 3rem; height: 3rem; }
     .lcd-mark.playing { width: 4.5rem; }
   }
-  .small .lcd-mark { width: 2.5rem; height: 2.5rem; }
+  .small .lcd-mark { width: 3rem; height: 3rem; }
   .small .lcd-mark.playing { width: 4.5rem; height: auto; }
 </style>
