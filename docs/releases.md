@@ -83,7 +83,10 @@ released, and deploying an older tag rolls the whole site back to it. The site h
   look at it locally, run `node scripts/build-landing.mjs` and serve `.tmp/landing/` (with the
   screenshots in `docs/screenshots/`, made by `node scripts/screenshots.cjs` against the dev
   server).
-- **The app, as the demo**, at `/demo/`: the release's build.
+- **The app, as the demo**, at `/demo/`: the release's build, with the sample music beside it
+  (`samples/`: four tracks and their `index.json`). The demo's welcome offers it ("Try the sample
+  music"): it is copied into the browser's own storage and opened as a folder. The dev server
+  serves `samples/` too, so it shows there as well; a release's build and the apps never carry it.
 - **The design system**, at `/design/`: a redirect to the Deck theme's specimen sheet, which
   every build carries (`/demo/theme/default/`).
 

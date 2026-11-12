@@ -78,6 +78,7 @@ jobs:
           node scripts/build-landing.mjs site
           gh release download "$TAG" --pattern "${GITHUB_REPOSITORY#*/}-v*.zip" --dir app
           unzip -q "$(ls app/*.zip | grep -v -- -pages.zip | head -n 1)" -d site/demo
+          cp -r samples site/demo/samples
 
       - uses: actions/configure-pages@v5
 

@@ -250,6 +250,8 @@ export const es: Record<MessageKey, string> = {
   "sources.tabs": "De dónde viene la música",
   "sources.folderTab": "Carpeta",
   "sources.serverTab": "Servidor",
+  "sources.samples": "Probar con la música de ejemplo",
+  "sources.samplesHint": "¿Sin música a mano? Cuatro temas para probar jackbird: se copian en el almacenamiento propio de este navegador, y no se abre nada tuyo.",
   "sources.chooseFolder": "Elegir una carpeta…",
   "sources.chooseFolderHint": "Se abre el diálogo de tu dispositivo; jackbird entra en la carpeta que elijas, y en nada más.",
   "sources.chooseServerFolder": "Elegir una carpeta de {server}…",

@@ -6,13 +6,14 @@
 
 import { $reactive, $toRaw } from "jq79";
 import { normaliseAddress } from "../helpers/instance";
+import type { SampleList } from "../helpers/samples";
 import { account, can, followServer, whenSignedIn } from "./account";
 import { t } from "./i18n";
 import { importing } from "./importing";
 import { library } from "./library";
 import { isDesktop, isPhone, isService } from "./platform";
 import { recent, forgetRecent, type RecentRoot } from "./recent";
-import { hydrateRoot, openFolder } from "./roots";
+import { hydrateRoot, openFolder, openSamples } from "./roots";
 import { restoreSource } from "./sources";
 import { currentServer, homeServer, serviceAt, serviceRoots } from "./sources/service";
 
@@ -26,10 +27,23 @@ export const adding = $reactive({
   busy: false,
   error: "",
   /** Whether a service serves the page (asked once): then its folders are the server's, not the device's. */
-  served: null as boolean | null
+  served: null as boolean | null,
+  /** The demo's sample music, where the page has some beside it (GitHub Pages, the dev server). */
+  samples: null as SampleList | null
 });
 
-void isService().then((answer) => (adding.served = answer));
+void isService().then((answer) => {
+  adding.served = answer;
+  // In the browser, with no service: the sample music, if any is served beside the app.
+  if (!answer && !isDesktop) void import("./sources/samples").then((samples) => samples.sampleList()).then((list) => (adding.samples = list));
+});
+
+/** Opens the sample music, closing the dialog. */
+export function addSamples(): void {
+  if (!adding.samples) return;
+  adding.open = false;
+  void openSamples(adding.samples);
+}
 
 /** The server spoken to now, as the person reads it: its address, or "this server" for the page's own. */
 export function serverName(): string {

@@ -249,6 +249,8 @@ export const en = {
   "sources.tabs": "Where the music comes from",
   "sources.folderTab": "Folder",
   "sources.serverTab": "Server",
+  "sources.samples": "Try the sample music",
+  "sources.samplesHint": "No music at hand? Four tracks to try jackbird with: they are copied into this browser's own storage, and nothing of yours is opened.",
   "sources.chooseFolder": "Choose a folder…",
   "sources.chooseFolderHint": "Your device's own dialog opens; jackbird reaches the folder you choose, and nothing else.",
   "sources.chooseServerFolder": "Choose a folder of {server}…",

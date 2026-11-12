@@ -9,7 +9,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { t } = await import("../lib/i18n")
-  const { addFrom, addServer, adding, folderSources, recentFolders, reopenRecent, serverName, shownTab } = await import("../lib/adding")
+  const { addFrom, addSamples, addServer, adding, folderSources, recentFolders, reopenRecent, serverName, shownTab } = await import("../lib/adding")
 
   // Each folder source is a key that opens its dialog: the device's own (the system's, Android's
   // folder picker, the browser's), or the server's folder chooser.
@@ -44,6 +44,11 @@
     <div :each="choice in folders()" :key="choice.kind" class="source">
       <p class="hint">{{ choice.hint }}</p>
       <Key :variant="choice.kind === 'device' ? 'primary' : 'secondary'" @click="addFrom(choice.kind)">{{ choice.label }}</Key>
+    </div>
+    <!-- The demo's sample music, where the page has some beside it. -->
+    <div :if="adding.samples" class="source">
+      <p class="hint">{{ t("sources.samplesHint") }}</p>
+      <Key @click="addSamples()">{{ t("sources.samples") }}</Key>
     </div>
   </section>
 
