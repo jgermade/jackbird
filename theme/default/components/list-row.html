@@ -31,7 +31,8 @@
   // instead of `select`. An open folder draws an open folder. A `selectable` item shows a
   // `SelectBox` in place of its glyph, for a list whose click does something
   // else (plays): a click on the box emits `pick` (the native event as
-  // `$event.detail`) instead of `select`. A `playable` item ends in a cue: a
+  // `$event.detail`) instead of `select`. With a pointer (a computer) the box shows only on
+  // the row pointed at, chosen, or with the keyboard's focus. A `playable` item ends in a cue: a
   // ▶ shown on hover, to say a click plays it, and the moving bars on the
   // row being played (`playing`; still unless `playing-active`). The cue is
   // decorative: the click on the row is what plays. `focusable` puts it in
@@ -187,18 +188,18 @@
   .icon .box { display: grid; place-items: center; transform: scale(.75); opacity: .55; transition: opacity var(--mm-duration) var(--mm-ease); }
   .row[aria-selected="true"] .icon .box, .row.current .icon .box { opacity: 1; }
   @media (hover: hover) { .row:hover .icon .box { opacity: 1; } }
-  /* The number in the box's place: only with a pointer (a computer), where the box shows on the
-     row pointed at, chosen or current, and the number otherwise. On a touch screen the box is
-     always there and the number beside it, in the label. */
+  /* With a pointer (a computer) the box shows only on the row pointed at (and on a chosen one,
+     and where the keyboard's focus is), and the number, if the row has one, sits in its place
+     otherwise. On a touch screen the box is always there and the number beside it, in the label. */
   .slot-lead { display: none; }
   @media (hover: hover) {
     .numbered .slot-lead { display: block; font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; line-height: 1; color: var(--mm-fg-subtle); }
     .numbered .label .lead { display: none; }
     .numbered .label.led { grid-template-columns: minmax(0, 1fr); }
     .numbered .label.led .title, .numbered .label.led .sub { grid-column: 1; }
-    .numbered .icon .box { visibility: hidden; }
-    .numbered:hover .icon .box, .numbered[aria-selected="true"] .icon .box, .numbered.current .icon .box, .numbered:focus-within .icon .box { visibility: visible; }
-    .numbered:hover .slot-lead, .numbered[aria-selected="true"] .slot-lead, .numbered.current .slot-lead, .numbered:focus-within .slot-lead { visibility: hidden; }
+    .icon .box { visibility: hidden; }
+    .row:hover .icon .box, .row[aria-selected="true"] .icon .box, .row:focus-visible .icon .box, .row:has(:focus-visible) .icon .box { visibility: visible; }
+    .numbered:hover .slot-lead, .numbered[aria-selected="true"] .slot-lead, .numbered:focus-visible .slot-lead, .numbered:has(:focus-visible) .slot-lead { visibility: hidden; }
   }
   .title, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The second line: smaller and lighter than the label, in the subtle ink. */
