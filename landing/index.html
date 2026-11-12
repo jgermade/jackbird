@@ -21,7 +21,7 @@
   <script src="./landing.js" defer></script>
 </head>
 <body>
-  <!-- The faceplate: the name in raised chrome, the way round, the tone switch. -->
+  <!-- The faceplate: the name in raised chrome, the way round, the tone's selector. -->
   <header class="faceplate">
     <a class="wordmark" href="#top" data-label="Jackbird" aria-label="jackbird, top of the page">Jackbird</a>
     <nav class="nav" aria-label="Sections">
@@ -30,10 +30,18 @@
       <a href="./demo/">Demo</a>
       <a href="https://github.com/jgermade/jackbird">Source</a>
     </nav>
-    <button class="key tone" type="button" aria-label="Switch between Silver and Graphite">
-      <span class="led" aria-hidden="true"></span>
-      <span class="tone-name">Graphite</span>
-    </button>
+    <!-- The tone: the system's, Silver (light) or Graphite (dark). One key is down (landing.js). -->
+    <div class="tones" role="radiogroup" aria-label="Tone">
+      <button class="key tone" type="button" role="radio" data-choice="auto" aria-checked="true" aria-label="Automatic: the system's tone" title="Automatic">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" /><path class="solid" d="M8 2.5a5.5 5.5 0 0 1 0 11z" /></svg>
+      </button>
+      <button class="key tone" type="button" role="radio" data-choice="light" aria-checked="false" tabindex="-1" aria-label="Silver, the light tone" title="Silver (light)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.75" /><path d="M8 1.25v1.5M8 13.25v1.5M1.25 8h1.5M13.25 8h1.5M3.25 3.25l1.05 1.05M11.7 11.7l1.05 1.05M3.25 12.75l1.05-1.05M11.7 4.3l1.05-1.05" /></svg>
+      </button>
+      <button class="key tone" type="button" role="radio" data-choice="dark" aria-checked="false" tabindex="-1" aria-label="Graphite, the dark tone" title="Graphite (dark)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.25 9.6A5.6 5.6 0 1 1 6.4 2.75a4.4 4.4 0 0 0 6.85 6.85z" /></svg>
+      </button>
+    </div>
   </header>
 
   <main id="top">
