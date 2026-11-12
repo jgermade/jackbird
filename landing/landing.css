@@ -151,13 +151,14 @@ img { display: block; max-width: 100%; height: auto; }
 
 main { display: grid; gap: 7rem; padding: 4rem max(1rem, calc((100vw - 72rem) / 2)) 6rem; }
 
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  align-items: center;
-  gap: 4rem;
-  min-height: calc(100vh - 12rem);
-}
+.hero { display: grid; gap: 4rem; }
+.pitch { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); column-gap: 4rem; align-items: end; }
+.pitch > .eyebrow, .pitch > h1 { grid-column: 1; justify-self: start; }
+.pitch > .lede, .pitch > .actions, .pitch > .note { grid-column: 2; }
+.pitch > .lede { grid-row: 2; align-self: start; margin-top: 0; }
+.pitch > .actions { grid-row: 3; margin-top: var(--mm-space-6); }
+.pitch > .note { grid-row: 4; }
+.pitch > h1 { grid-row: 2 / span 3; align-self: start; }
 
 .eyebrow {
   display: inline-flex;
@@ -195,103 +196,31 @@ h1 em {
 .actions .key { min-height: 3rem; padding: 0 var(--mm-space-6); font-size: var(--mm-text-md); }
 .note { max-width: 30rem; margin: var(--mm-space-4) 0 0; font-size: var(--mm-text-xs); color: var(--mm-fg-subtle); }
 
-/* The unit: a slab of the deck, tilted towards the reader, its display lit and playing. */
+/* The unit: the app's real faceplate, leaning back like the front of a hi-fi unit on a shelf. */
 .unit {
-  perspective: 80rem;
-  filter: drop-shadow(0 2.5rem 3rem rgba(0, 0, 0, .28));
+  margin: 0;
+  perspective: 90rem;
+  filter: drop-shadow(0 2.5rem 2.5rem rgba(0, 0, 0, .25));
 }
-.unit-face {
-  display: grid;
-  gap: var(--mm-space-4);
-  padding: var(--mm-space-5);
+.unit img {
+  width: 100%;
   border: var(--mm-border-width) solid var(--mm-chassis-lo);
   border-radius: var(--mm-radius-lg) var(--mm-radius-lg) 0 0;
-  background:
-    repeating-linear-gradient(90deg, var(--mm-brush) 0 1px, transparent 1px 3px),
-    linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
-  box-shadow: inset 0 1px 0 var(--mm-chassis-hi);
-  transform: rotateY(-14deg) rotateX(6deg);
-  transform-origin: left center;
+  transform: rotateX(14deg);
+  transform-origin: bottom center;
   transition: transform .6s cubic-bezier(.2, .7, .2, 1);
 }
 @media (hover: hover) {
-  .unit:hover .unit-face { transform: rotateY(-4deg) rotateX(2deg); }
+  .unit:hover img { transform: rotateX(4deg); }
 }
-
-.vfd {
-  display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr);
-  align-items: center;
-  gap: var(--mm-space-4);
-  padding: var(--mm-space-4);
-  border: .3rem solid var(--mm-display-bezel);
-  border-radius: var(--mm-radius-md);
-  outline: var(--mm-border-width) solid var(--mm-display-rim);
-  background:
-    radial-gradient(circle, var(--mm-display-dim) 1px, transparent 1.3px) 0 0 / 4px 4px,
-    var(--mm-display-bg);
-  box-shadow: var(--mm-display-inset);
-  color: var(--mm-display-fg);
-  font-family: var(--mm-font-display);
-  text-shadow: var(--mm-display-glow);
-}
-/* The logo lit in the display's ink: its shape as a mask. */
-.vfd-logo {
-  width: 100%;
-  aspect-ratio: 1152 / 1061;
-  background: currentColor;
-  -webkit-mask: url("./brand/jackbird-metal.svg") center / contain no-repeat;
-  mask: url("./brand/jackbird-metal.svg") center / contain no-repeat;
-  filter: drop-shadow(var(--vfd-glow, 0 0 0 transparent));
-}
-:root[data-theme="dark"] .vfd-logo { --vfd-glow: 0 0 .3rem var(--mm-display-fg); }
-.vfd-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); min-width: 0; }
-.vfd-row { display: flex; align-items: center; gap: var(--mm-space-3); font-size: var(--mm-text-display-sm); font-weight: 700; }
-.vfd-status { animation: blink 1.6s steps(1) infinite; }
-.vfd-time { margin-left: auto; }
-.vfd-marquee { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
-.vfd-text { display: inline-block; padding-left: 100%; animation: marquee 14s linear infinite; }
-
-/* The spectrum: bands of dot-matrix blocks, rising and falling (landing.js builds them). */
-.spectrum { display: flex; min-width: 0; align-items: flex-end; gap: 3px; height: 4.5rem; }
-.spectrum i {
-  flex: 1;
-  height: 100%;
-  background: repeating-linear-gradient(0deg, currentColor 0 3px, transparent 3px 5px);
-  box-shadow: none;
-  transform-origin: bottom;
-  transform: scaleY(var(--level, .2));
-  transition: transform .12s linear;
-  filter: drop-shadow(var(--vfd-glow, 0 0 0 transparent));
-}
-:root[data-theme="dark"] .spectrum i { --vfd-glow: 0 0 .25rem var(--mm-display-fg); }
-
-.unit-row { display: flex; align-items: center; gap: var(--mm-space-4); }
-.bank {
-  display: flex;
-  gap: var(--mm-space-1);
-  padding: var(--mm-space-1);
-  border-radius: var(--mm-radius-md);
-  background: var(--mm-sunken);
-  box-shadow: var(--mm-well-shadow);
-}
-.key.mini { min-height: 2.25rem; width: 2.75rem; padding: 0; cursor: default; }
-.leds { display: flex; gap: var(--mm-space-2); margin-left: auto; }
 
 /* The J-card stripes, under the unit and over the footer. */
-.stripes { display: grid; grid-template-rows: repeat(3, .375rem); transform: rotateY(-14deg) rotateX(6deg); transform-origin: left center; }
-.footer .stripes { transform: none; }
+.stripes { display: grid; grid-template-rows: repeat(3, .375rem); }
 .stripes span:nth-child(1) { background: var(--mm-stripe-1); }
 .stripes span:nth-child(2) { background: var(--mm-stripe-2); }
 .stripes span:nth-child(3) { background: var(--mm-stripe-3); border-radius: 0 0 var(--mm-radius-md) var(--mm-radius-md); }
 .footer .stripes span:nth-child(3) { border-radius: 0; }
 
-@keyframes marquee { to { transform: translateX(-100%); } }
-@keyframes blink { 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) {
-  .vfd-text { animation: none; padding-left: 0; }
-  .vfd-status { animation: none; }
-}
 
 /* ---- the app's window --------------------------------------------------------------------- */
 
@@ -417,8 +346,9 @@ h1 em {
 /* ---- narrower screens ----------------------------------------------------------------------- */
 
 @media (max-width: 960px) {
-  .hero { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 3rem; }
-  .unit-face, .stripes { transform: none; }
+  .pitch { grid-template-columns: minmax(0, 1fr); }
+  .pitch > * { grid-column: 1 !important; grid-row: auto !important; }
+  .pitch > .lede { margin-top: var(--mm-space-6); }
   .modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bays { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -429,9 +359,6 @@ h1 em {
   .modules, .bays { grid-template-columns: minmax(0, 1fr); }
   .phone { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2.5rem; }
   .phone img { max-width: 14rem; }
-  .vfd { grid-template-columns: 3.5rem minmax(0, 1fr); padding: var(--mm-space-3); }
-  .spectrum { height: 3rem; }
-  .unit-row .label { display: none; }
 }
 
 /* ---- the design system ---------------------------------------------------------------------- */
@@ -473,5 +400,5 @@ h1 em {
   .design { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
 }
 
-/* Grid items shrink to their track, never to their content (the marquee's long line). */
-.hero > *, .unit-face > *, .vfd { min-width: 0; }
+/* Grid items shrink to their track, never to their content. */
+.hero > *, .pitch > * { min-width: 0; }

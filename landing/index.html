@@ -59,31 +59,12 @@
         <p class="note">The demo runs in Chrome, Edge, Brave or Opera on a desktop: it opens a folder of yours, and nothing leaves your computer.</p>
       </div>
 
-      <div class="unit" aria-hidden="true">
-        <div class="unit-face">
-          <div class="vfd">
-            <span class="vfd-logo"></span>
-            <div class="vfd-main">
-              <div class="vfd-row">
-                <span class="vfd-status">▶</span>
-                <span class="vfd-marquee"><span class="vfd-text">NOW PLAYING · YOUR OWN MUSIC · STRAIGHT FROM YOUR DISK · </span></span>
-                <span class="vfd-time">03:14</span>
-              </div>
-              <div class="spectrum"></div>
-            </div>
-          </div>
-          <div class="unit-row">
-            <span class="label">Deck</span>
-            <div class="bank">
-              <span class="key mini"><svg viewBox="0 0 16 16"><path d="M3 3v10M13 3 5 8l8 5z"/></svg></span>
-              <span class="key mini down"><svg viewBox="0 0 16 16"><path d="M5 3h2v10H5zm4 0h2v10H9z"/></svg></span>
-              <span class="key mini"><svg viewBox="0 0 16 16"><path d="M13 3v10M3 3l8 5-8 5z"/></svg></span>
-            </div>
-            <span class="leds"><span class="led on ok"></span><span class="led on"></span><span class="led"></span></span>
-          </div>
-        </div>
-        <div class="stripes"><span></span><span></span><span></span></div>
-      </div>
+      <!-- The app's real faceplate, captured from it (scripts/screenshots.cjs), as a unit's front. -->
+      <figure class="unit">
+        <img class="only-light" src="./screenshots/faceplate-silver.png" alt="jackbird's faceplate in Silver: the display playing a track, its spectrum lit, and the transport keys" width="2880" height="224">
+        <img class="only-dark" src="./screenshots/faceplate-graphite.png" alt="jackbird's faceplate in Graphite: the display glowing, a track playing, and the transport keys" width="2880" height="224">
+        <div class="stripes" aria-hidden="true"><span></span><span></span><span></span></div>
+      </figure>
     </section>
 
     <!-- The app itself, in the tone the page is in. -->

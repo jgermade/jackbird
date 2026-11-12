@@ -1,5 +1,5 @@
-// The landing's few moving parts: the tone switch (Silver / Graphite, remembered), the display's
-// spectrum dancing, and the tab's icon lit like the display, as in the app (src/lib/favicon.ts).
+// The landing's few moving parts: the tone switch (Silver / Graphite, remembered; the page's
+// screenshots follow it) and the tab's icon lit like the display, as in the app (src/lib/favicon.ts).
 
 const root = document.documentElement;
 const KEY = "jackbird-landing-tone";
@@ -20,32 +20,6 @@ toneKey.addEventListener("click", () => {
   try { localStorage.setItem(KEY, root.dataset.theme); } catch {}
   showTone();
 });
-
-// ---- the spectrum -------------------------------------------------------------------------
-
-const spectrum = document.querySelector(".spectrum");
-const BANDS = 24;
-const bars = Array.from({ length: BANDS }, () => spectrum.appendChild(document.createElement("i")));
-const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let t = 0;
-
-function dance() {
-  t += 1;
-  bars.forEach((bar, i) => {
-    // Louder in the low bands, a beat every so often, and some noise.
-    const tilt = 1 - i / BANDS * .55;
-    const beat = Math.max(0, Math.sin(t / 3.2)) ** 6 * .35;
-    const wave = (Math.sin(t / 5 + i * .7) + 1) / 2 * .45;
-    const level = Math.min(1, Math.max(.06, (wave + beat + Math.random() * .25) * tilt));
-    bar.style.setProperty("--level", level.toFixed(3));
-  });
-}
-if (still) {
-  bars.forEach((bar, i) => bar.style.setProperty("--level", (.75 - i / BANDS * .5).toFixed(3)));
-} else {
-  dance();
-  setInterval(dance, 110);
-}
 
 // ---- the tab's icon -----------------------------------------------------------------------
 
