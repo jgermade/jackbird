@@ -37,7 +37,11 @@
     box-shadow: var(--mm-display-glow);
   }
   /* Lit solid: the word in the window's own ground, cut out of the ink. */
+  /* No rim drawn around the solid one (it is the same ink), and a little less room round the
+     word: the rectangle a touch smaller than a framed icon of the same size, the letters the same. */
   .filled {
+    padding: .14em .34em .1em;
+    border-width: 0;
     background: currentColor;
     text-shadow: none;
     -webkit-text-fill-color: var(--mm-display-bg);
