@@ -163,7 +163,7 @@ const stage = document.querySelector(".stage");
 
 /** The tilt for a pointer at (x, y), each 0 to 1 across the stage: the window turns to face it. */
 function tiltFor(x, y) {
-  return { x: `${((0.5 - y) * 8).toFixed(2)}deg`, y: `${((x - 0.5) * 14 - 4).toFixed(2)}deg` };
+  return { x: `${((0.5 - y) * 2).toFixed(2)}deg`, y: `${((x - 0.5) * 3 - 1.5).toFixed(2)}deg` };
 }
 
 if (stage && matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -187,17 +187,17 @@ function tellTone() {
   live?.contentWindow?.postMessage({ type: "jackbird:tone", tone: root.dataset.theme === "dark" ? "dark" : "light" }, location.origin);
 }
 
-stage?.querySelector(".live-key")?.addEventListener("click", () => {
-  if (live) return;
+// On a computer the app itself takes the screenshots' place as the page loads; they stay shown
+// until it has loaded. A phone keeps the screenshots.
+if (stage && matchMedia("(min-width: 901px)").matches) {
   live = document.createElement("iframe");
   live.className = "live";
-  live.title = "jackbird, playing the sample music";
+  live.title = "jackbird, with the sample music";
   live.allow = "autoplay";
   live.src = `./demo/?embed&lang=en&tone=${root.dataset.theme === "dark" ? "dark" : "light"}`;
+  live.addEventListener("load", () => stage.classList.add("live-on"), { once: true });
   stage.append(live);
-  stage.classList.add("live-on");
-  live.focus();
-});
+}
 
 // The embedded app asked for a folder: the demo is where one opens.
 const invite = stage?.querySelector(".invite");

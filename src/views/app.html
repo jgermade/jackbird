@@ -49,8 +49,8 @@
         app.style.removeProperty("--tilt-y")
         return
       }
-      app.style.setProperty("--tilt-x", `${((0.5 - y) * 8).toFixed(2)}deg`)
-      app.style.setProperty("--tilt-y", `${((x - 0.5) * 14 - 4).toFixed(2)}deg`)
+      app.style.setProperty("--tilt-x", `${((0.5 - y) * 2).toFixed(2)}deg`)
+      app.style.setProperty("--tilt-y", `${((x - 0.5) * 3 - 1.5).toFixed(2)}deg`)
     }
     if (!still) {
       document.addEventListener("pointermove", (event) => tilt(event.clientX / innerWidth, event.clientY / innerHeight))
@@ -126,7 +126,7 @@
     border-radius: var(--mm-radius-lg);
     background: var(--mm-chassis);
     box-shadow: var(--mm-shadow-lg);
-    transform: rotateY(var(--tilt-y, -9deg)) rotateX(var(--tilt-x, 4deg));
+    transform: rotateY(var(--tilt-y, -2deg)) rotateX(var(--tilt-x, 1deg));
     transform-origin: 70% 50%;
     transition: transform .5s cubic-bezier(.2, .7, .2, 1);
   }
