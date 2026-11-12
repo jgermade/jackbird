@@ -226,7 +226,6 @@
     z-index: -1;
     width: 2.25rem;
     margin-left: -.5rem;
-    overflow: hidden;
     border-top: var(--mm-border-width) solid var(--mm-display-rim);
     border-right: var(--mm-border-width) solid var(--mm-display-rim);
     border-bottom: var(--mm-border-width) solid var(--mm-display-rim);
@@ -247,16 +246,20 @@
     cursor: pointer;
   }
   .mode + .mode { border-top: var(--mm-border-width) solid var(--mm-display-rim); }
+  /* The column's outer corners, on its keys (it does not clip: the LEDs' glow passes its edge). */
+  .mode:first-child { border-top-right-radius: calc(var(--mm-radius-key) + 1px); }
+  .mode:last-child { border-bottom-right-radius: calc(var(--mm-radius-key) + 1px); }
   .mode:active { background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
   .mode[aria-pressed="true"] { background: var(--mm-key-down); }
   .mode:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   @media (hover: hover) { .mode:hover { filter: brightness(1.04); } }
   .mode-icon { width: .875rem; height: .875rem; }
-  /* The LED: a small bar at the top, against the right edge. */
-  .mode-led { position: absolute; top: .3rem; right: 0; width: .5rem; height: .1875rem; border-radius: 1px 0 0 1px; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
+  /* The LED: a short bar at the top, against the right edge. */
+  .mode-led { position: absolute; top: .3rem; right: 0; width: .3125rem; height: .1875rem; border-radius: 1px 0 0 1px; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
   /* Lit in the signal's orange (shuffle, repeating the queue); blue repeating one track. */
-  .mode-led.on { background: var(--mm-accent); box-shadow: 0 0 .3rem var(--mm-accent); }
-  .mode-led.on.one { background: var(--mm-info-led); box-shadow: 0 0 .3rem var(--mm-info-led); }
+  /* Its glow thrown to the right, past the key's edge. */
+  .mode-led.on { background: var(--mm-accent); box-shadow: .2rem 0 .3rem var(--mm-accent); }
+  .mode-led.on.one { background: var(--mm-info-led); box-shadow: .2rem 0 .3rem var(--mm-info-led); }
   .mode-one { position: absolute; right: .3rem; bottom: .2rem; font: 700 .5rem / 1 var(--mm-font-label); color: var(--mm-info-led); }
   /* Each of the display's text lines: the title, or the artist; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
