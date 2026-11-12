@@ -3,7 +3,7 @@
   // the queue, and stays down while it is open), and the preferences key. In
   // the phones' footer, while the queue is open, the preferences key gives
   // way to the queue's menu (a new queue, save it as a playlist, clear what
-  // comes next or what was played). In the faceplate's header (`place="header"`):
+  // comes next or what was played); for a disc, to the key that saves it as a playlist. In the faceplate's header (`place="header"`):
   // transport, list, preferences. In the phones' footer (`place="footer"`):
   // preferences, transport, list, spread across the bar. The markup follows
   // the order, so the keyboard does too. In the compact view (`place="compact"`): the transport
@@ -68,7 +68,11 @@
 
 <div class="deck-keys" :class.footer="place === 'footer'" :class.compact="place === 'compact'">
   <!-- While the queue is open, the footer's first key is the queue's menu (it opens up, as a sheet). -->
-  <Menu :if="place === 'footer' && ui.queueOpen" size="md" variant="secondary" :label="t('queue.menu')" :items="queueMenu()" @select="onQueueMenu($event.detail)">
+  <!-- A disc (nothing to clear from it): the key that saves it as a playlist, in the menu's place. -->
+  <Key :if="place === 'footer' && ui.queueOpen && queueIsAlbum.value" square :label="t('queue.saveAsPlaylist')" :title="t('queue.saveAsPlaylist')" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue' })">
+    <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="ICONS.save" /></svg>
+  </Key>
+  <Menu :elseif="place === 'footer' && ui.queueOpen" size="md" variant="secondary" :label="t('queue.menu')" :items="queueMenu()" @select="onQueueMenu($event.detail)">
     <template :slot.icon>
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h5.5M11 11.5l1.75 1.75 1.75-1.75" /></svg>
     </template>
