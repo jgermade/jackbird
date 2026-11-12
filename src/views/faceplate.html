@@ -107,7 +107,7 @@
                 </span>
                 <span class="now">
                   <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
-                  <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
+                  <span :if="soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
                 </span>
               </div>
               <!-- Where the song is, on two lines too: its minutes, and under them its seconds; nothing with no song loaded. -->
@@ -186,7 +186,7 @@
   /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
   .pane-pick { display: none; }
 
-  /* What reaches the device in the native output (E5): "24/96 bit-perfect", before the time. */
+  /* What reaches the device in a native output (E5, E6b-D10): "24/96 bit-perfect", "16/44.1 DAC", on the artist's line. */
   .route {
     flex: none;
     padding-right: var(--mm-space-2);
@@ -197,7 +197,7 @@
     white-space: nowrap;
     opacity: .8;
   }
-  /* The display's one text row: the state glyph, then the title, which ellipsises. */
+  /* Each of the display's text lines: the state glyph and the title, or the artist and the badge; the text ellipsises. */
   .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .state {
     flex: none;

@@ -274,6 +274,7 @@ export const en = {
   "output.badge.bit-perfect": "bit-perfect",
   "output.badge.mixer": "native",
   "output.badge.converted": "converted",
+  "output.badge.dac": "DAC",
   "output.phoneAbout": "How this phone plays: its own player, which goes on with the screen off.",
   "output.bitPerfect": "Bit-perfect to a USB DAC",
   "output.bitPerfectHint": "With a USB DAC connected, each song goes to it untouched, at its own rate and depth: the system's sounds are not mixed in meanwhile, and the volume is the DAC's. A song the DAC cannot take as it is plays through Android's mixer. From the next song.",

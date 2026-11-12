@@ -99,5 +99,13 @@ export function soundingText(): string {
 /** The display's short line: "24/96 bit-perfect"; empty in the embedded output. */
 export function soundingBadge(): string {
   const sounding = output.sounding;
-  return sounding ? `${shortFormat(sounding.codec, sounding.format)} ${t(`output.badge.${sounding.route.fidelity}`)}` : "";
+  if (!sounding) return "";
+  const format = shortFormat(sounding.codec, sounding.format);
+  // On a phone (E6b-D10): bit-perfect to a DAC, through Android's mixer to a USB DAC ("DAC"), or the
+  // format alone to the phone's own output.
+  if (output.phone) {
+    if (sounding.route.fidelity === "bit-perfect") return `${format} ${t("output.badge.bit-perfect")}`;
+    return sounding.route.device !== "Android" ? `${format} ${t("output.badge.dac")}` : format;
+  }
+  return `${format} ${t(`output.badge.${sounding.route.fidelity}`)}`;
 }

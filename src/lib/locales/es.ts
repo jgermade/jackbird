@@ -275,6 +275,7 @@ export const es: Record<MessageKey, string> = {
   "output.badge.bit-perfect": "bit-perfect",
   "output.badge.mixer": "nativa",
   "output.badge.converted": "convertida",
+  "output.badge.dac": "DAC",
   "output.phoneAbout": "Cómo reproduce este teléfono: con su propio reproductor, que sigue con la pantalla apagada.",
   "output.bitPerfect": "Bit-perfect a un DAC USB",
   "output.bitPerfectHint": "Con un DAC USB conectado, cada canción le llega intacta, a su frecuencia y profundidad: mientras tanto no se mezclan los sonidos del sistema, y el volumen es el del DAC. Una canción que el DAC no admite tal cual suena por el mezclador de Android. Desde la siguiente canción.",
