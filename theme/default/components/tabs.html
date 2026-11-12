@@ -1,7 +1,7 @@
 <script :setup="{ items = [], model = null, label = '', closable = false, compact = false, plain = false, addLabel = '', addDisabled = false }: Props" lang="ts">
   // Tabs on the chassis: the open folders. The open one joins the panel
-  // below, carries the stripes and has its LED lit. Arrow keys, Home and End
-  // move between tabs and open them as they go.
+  // below and carries the stripes. Arrow keys, Home and End move between
+  // tabs and open them as they go.
   //
   //   <Tabs label="Open folders" :model="active" closable :items="roots" @close="closeRoot($event.detail)" />
   //
@@ -24,7 +24,7 @@
   // tab one stripe colour on top, green, orange or red, instead of the three
   // stripes: a hairline while closed, the stripes' height while open.
   //
-  // **Part of the default theme**: imports `Led`, and draws only with
+  // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
   type Item = { id: string; label: string; meta?: string | number; closeLabel?: string; tone?: "go" | "edit" | "danger" }
@@ -41,8 +41,6 @@
 
   // The value of the drop-down's "add" option. Ids are not expected to start with "+".
   const ADD = "+add"
-
-  const Led = await import("./led.html")
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: canClose = flag(closable)
@@ -121,7 +119,6 @@
             :tabindex="item.id === focusable ? 0 : -1"
             @click="choose(item.id)"
             @keydown="key($event, item)">
-      <Led :on="item.id === model" />
       <span>{{ item.label }}</span>
       <span :if="item.meta !== undefined && item.meta !== null && item.meta !== ''" class="meta">{{ item.meta }}</span>
     </button>
@@ -143,7 +140,6 @@
           <svg class="pick-caret" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         <option :each="item in items" :key="item.id" class="pick-option" :value="item.id" :selected="item.id === model">
-          <Led :on="item.id === model" />
           <span class="pick-label">{{ item.label }}</span>
           <span :if="hasMeta(item)" class="meta">{{ item.meta }}</span>
           <span :if="canClose && item.id === model" class="pick-close" :title="item.closeLabel || null" @click="closeChosen($event)">
