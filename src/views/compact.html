@@ -2,17 +2,20 @@
   // The compact player: a card, like a phone's deck. The faceplate's display drawn as on a phone
   // (DeckDisplay `small`, the same view, so it follows every change to it), and under it the
   // transport keys between the mode's keys: "on top" (in the desktop app's window) and back to the
-  // full view. Under them, where there is room (a container query on its height), the queue's next
-  // track. In the desktop app a
+  // full view; and the list key, which shows the queue's list (QueueList) under the card, the window
+  // growing for it. Without the list, where there is room (a container query on its height), the
+  // queue's next track under the keys. In the desktop app a
   // press on its chassis, off the keys, moves the window. A view over lib/compact.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
 
   const Key = await import("../../theme/default/components/key.html")
   const DeckDisplay = await import("./deck-display.html")
   const DeckKeys = await import("./deck-keys.html")
+  const QueueList = await import("./queue-list.html")
 
   const { t } = await import("../lib/i18n")
-  const { compact, compactKeys, dragWindow, leaveCompact, setOnTop } = await import("../lib/compact")
+  const { compact, compactKeys, dragWindow, leaveCompact, setCompactList, setOnTop } = await import("../lib/compact")
+  const { playback } = await import("../lib/playback")
   const { queueEntries } = await import("../lib/player")
 
   // Read through a function: the entries are boxed (see Opaque).
@@ -25,11 +28,14 @@
   $: backTitle = t("compact.withKeys", { action: backLabel, keys: compactKeys })
 </script>
 
-<section class="compact" :class.window="compact.mode === 'window'" :class.page="compact.mode === 'page'" :aria-label="t('compact.label')" @pointerdown="dragWindow($event)">
+<section class="compact" :class.window="compact.mode === 'window'" :class.page="compact.mode === 'page'" :class.listed="compact.list" :aria-label="t('compact.label')" @pointerdown="dragWindow($event)">
   <div class="card">
     <div class="screen"><DeckDisplay small :bands="6" /></div>
     <div class="keys">
       <div class="side">
+        <Key size="sm" square :pressed="compact.list" :disabled="!playback.queue && !compact.list" :label="t('compact.list')" :title="t('compact.list')" @click="setCompactList(!compact.list)">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" /></svg>
+        </Key>
         <Key :if="compact.mode === 'window'" size="sm" square led :pressed="compact.onTop" :label="t('compact.onTop')" :title="t('compact.onTop')" @click="setOnTop(!compact.onTop)">
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h5l-.75 4 2.25 2.25H4L6.25 6.5z" /><path d="M8 8.75v4.75" /></svg>
         </Key>
@@ -41,8 +47,9 @@
         </Key>
       </div>
     </div>
-    <p :if="upNext()" class="next" :title="upNext()">{{ t("compact.next", { title: upNext() }) }}</p>
+    <p :if="upNext() && !compact.list" class="next" :title="upNext()">{{ t("compact.next", { title: upNext() }) }}</p>
   </div>
+  <div :if="compact.list" class="list" data-no-drag><QueueList /></div>
 </section>
 
 <style scoped>
@@ -64,6 +71,17 @@
     overflow: hidden;
     user-select: none;
   }
+  /* With the queue's list: the card at the top, the list under it filling the rest, scrolling. */
+  .compact.listed { grid-template-rows: auto minmax(0, 1fr); place-items: stretch; align-content: stretch; gap: var(--mm-space-3); }
+  .listed .card { justify-self: center; }
+  .list {
+    min-height: 0;
+    overflow: auto;
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-surface);
+    box-shadow: var(--mm-well-shadow);
+    cursor: auto;
+  }
   /* In the desktop app's window the chassis is what the window is moved by. */
   .compact.window { cursor: grab; }
   .card {
@@ -80,7 +98,7 @@
     align-items: center;
     gap: var(--mm-space-2);
   }
-  .side { display: flex; }
+  .side { display: flex; gap: var(--mm-space-2); }
   .side.end { justify-content: flex-end; }
   .icon { width: .875rem; height: .875rem; }
   /* The next track, printed small on the chassis under the keys, where there is room for it. */

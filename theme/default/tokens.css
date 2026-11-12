@@ -275,6 +275,10 @@
    and always fits. 4.5vw and 9vh are 18px in its 396 × 198 window. */
 :root { --mm-root-compact: min(4.5vw, 9vh); }
 html[data-mm-compact] { font-size: var(--mm-root-compact); }
+/* With the queue's list under the card, the width alone: the card keeps its size, the list takes
+   what the window grew by. */
+:root { --mm-root-compact-list: 4.5vw; }
+html[data-mm-compact="list"] { font-size: var(--mm-root-compact-list); }
 
 /* Once, here, instead of a media query in every component: every transition
    and animation a component writes takes its time from these. The looping

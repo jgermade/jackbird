@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { COMPACT, compactSize, isCompactShortcut, NO_COMPACT, parseCompactState, pipSize, remToPx } from "./compact.ts";
+import { COMPACT, compactHeightFor, compactSize, isCompactShortcut, NO_COMPACT, parseCompactState, pipSize, remToPx } from "./compact.ts";
 
 test("remToPx turns rem into pixels at the root's size, and falls back to 16px", () => {
   assert.equal(remToPx(30, 18), 540);
@@ -17,6 +17,15 @@ test("compactSize and pipSize follow the root's font size", () => {
   assert.equal(COMPACT.pipHeight, 13);
 });
 
+test("compactHeightFor gives the card's height for a width, and the list's on top", () => {
+  // 400px wide: an 18px root; the card 11rem, the list 14rem more.
+  assert.equal(compactHeightFor(400, false), 198);
+  assert.equal(compactHeightFor(400, true), 450);
+  assert.equal(compactHeightFor(800, true), 900);
+  assert.equal(compactHeightFor(0, true), 0);
+  assert.equal(compactHeightFor(Number.NaN, false), 0);
+});
+
 test("parseCompactState keeps what is well formed and defaults the rest", () => {
   assert.deepEqual(parseCompactState(null), NO_COMPACT);
   assert.deepEqual(parseCompactState(""), NO_COMPACT);
@@ -27,11 +36,13 @@ test("parseCompactState keeps what is well formed and defaults the rest", () => 
   assert.deepEqual(parseCompactState(JSON.stringify({ on: true, onTop: true, compact: { x: -5, y: 3, width: 540, height: 126 }, full })), {
     on: true,
     onTop: true,
+    list: false,
     compact: { x: -5, y: 3, width: 540, height: 126 },
     full: { x: 10, y: 20, width: 1280, height: 800, maximized: true }
   });
+  assert.equal(parseCompactState(JSON.stringify({ list: true })).list, true);
   // Truthy but not true is not on; bad bounds are dropped.
-  assert.deepEqual(parseCompactState(JSON.stringify({ on: 1, onTop: "yes", compact: { x: 1, y: 2, width: 0, height: 5 }, full: { x: 1, y: 2, width: "3", height: 4 } })), NO_COMPACT);
+  assert.deepEqual(parseCompactState(JSON.stringify({ on: 1, onTop: "yes", list: "yes", compact: { x: 1, y: 2, width: 0, height: 5 }, full: { x: 1, y: 2, width: "3", height: 4 } })), NO_COMPACT);
   assert.deepEqual(parseCompactState(JSON.stringify({ compact: "here", full: { x: 0, y: 0, width: 10, height: 10 } })), {
     ...NO_COMPACT,
     full: { x: 0, y: 0, width: 10, height: 10, maximized: false }

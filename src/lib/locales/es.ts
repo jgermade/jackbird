@@ -90,6 +90,7 @@ export const es: Record<MessageKey, string> = {
   "compact.backPage": "Volver a la biblioteca",
   "compact.onTop": "Siempre encima",
   "compact.next": "Después: {title}",
+  "compact.list": "Mostrar u ocultar la cola",
   "compact.label": "Reproductor compacto",
   "compact.withKeys": "{action} ({keys})",
   "faceplate.position": "Posición",

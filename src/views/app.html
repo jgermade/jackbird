@@ -22,14 +22,15 @@
   const ImportDialog = await import("./import-dialog.html")
   const Compact = await import("./compact.html")
   const { t } = await import("../lib/i18n")
-  const { compact } = await import("../lib/compact")
+  const { compact, compactMarker } = await import("../lib/compact")
   $: small = compact.mode === "window" || compact.mode === "page"
 
   // While the window or the page is compact, the root's size follows the window (tokens.css).
-  const scaled = (on: boolean) => {
-    document.documentElement.toggleAttribute("data-mm-compact", on)
+  const scaled = (on: boolean, list: boolean) => {
+    if (on) document.documentElement.setAttribute("data-mm-compact", compactMarker(list))
+    else document.documentElement.removeAttribute("data-mm-compact")
   }
-  $: scaled(small)
+  $: scaled(small, compact.list)
 
   const title = (text: string) => {
     document.title = text
