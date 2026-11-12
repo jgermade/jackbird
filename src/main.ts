@@ -8,6 +8,7 @@ import "../theme/default/tokens.css";
 import "../theme/default/content.css";
 import "../theme/default/base.css";
 import { startAccount } from "./lib/account";
+import { startCompact } from "./lib/compact";
 import { keepFaviconLit } from "./lib/favicon";
 import { loadRecent } from "./lib/recent";
 import { loadFavourites, startMine } from "./lib/mine";
@@ -19,6 +20,7 @@ import App from "./views/app.html";
 
 App.mount("#app");
 keepFaviconLit();
+startCompact();
 void loadRecent();
 keepSessionSaved();
 startVerifier();

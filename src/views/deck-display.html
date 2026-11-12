@@ -1,0 +1,291 @@
+<script :setup="{ bands = 16 }: Props" lang="ts">
+  // The deck's display, as the faceplate and the compact view (views/compact.html) both show it:
+  // at its left the logo, lit, or while the music plays the song's format, the spectrum or the DAC
+  // (a click turns them); the title and the artist on two lines; the clock (a click turns it); the
+  // meter. `bands` is the spectrum's, given by the place that shows it, which knows its own width
+  // (the compact view may be in a window of its own). A view over lib/player.ts and lib/output.ts.
+  // See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
+
+  type Props = { bands?: number }
+
+  const Counter = await import("../../theme/default/components/counter.html")
+  const Display = await import("../../theme/default/components/display.html")
+  const DisplayIcon = await import("../../theme/default/components/display-icon.html")
+  const Meter = await import("../../theme/default/components/meter.html")
+  const Spectrum = await import("../../theme/default/components/spectrum.html")
+  const { clockParts, formatTime } = await import("../helpers/format")
+  const { nowPlaying, readSpectrum, stream } = await import("../lib/player")
+  const { soundingDac, soundingDevice, soundingParts, soundingText } = await import("../lib/output")
+  const { playback } = await import("../lib/playback")
+  const { t } = await import("../lib/i18n")
+  const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
+  const mp3Url: string = (await import("../assets/formats/mp3.svg?url")).default
+  const oggUrl: string = (await import("../assets/formats/ogg.svg?url")).default
+  // The codecs drawn by their marks (lit in the display's ink, as the logo is): each mark and its
+  // proportions. Ogg's stands for its Vorbis too.
+  const CODEC_MARKS: Record<string, { url: string; ratio: string }> = {
+    MP3: { url: mp3Url, ratio: "917 / 463" },
+    OGG: { url: oggUrl, ratio: "510 / 340" },
+    VORBIS: { url: oggUrl, ratio: "510 / 340" }
+  }
+  const markOf = () => CODEC_MARKS[markParts()?.format ?? ""] ?? null
+
+  $: current = nowPlaying.value
+  // The display's left, while the music plays: the song's format (the file's), the spectrum, and
+  // while the music goes to a DAC, the DAC (its name, and the depth and rate it runs at). A click or
+  // a tap turns from one to the next; each song starts on its format for two seconds, then turns to
+  // the spectrum.
+  type MarkView = "format" | "spectrum" | "dac"
+  let markView: MarkView = "spectrum"
+  const markViews = (): MarkView[] => (soundingDac() ? ["format", "spectrum", "dac"] : ["format", "spectrum"])
+  const nextMarkView = (): MarkView => {
+    const views = markViews()
+    return views[(views.indexOf(markView) + 1) % views.length]
+  }
+  const MARK_LABELS: Record<MarkView, string> = { format: "faceplate.showFormat", spectrum: "faceplate.showSpectrum", dac: "faceplate.showDac" }
+  const markParts = () => soundingParts(stream.key === current?.key ? stream.info : null, current?.relativePath)
+  const mark = (() => {
+    const FORMAT_FIRST = 2000
+    let timer = 0
+    let song: string | null = null
+    return {
+      song(key: string | null) {
+        if (key === song) return
+        song = key
+        window.clearTimeout(timer)
+        if (!key) return
+        markView = "format"
+        timer = window.setTimeout(() => {
+          markView = "spectrum"
+        }, FORMAT_FIRST)
+      },
+      toggle() {
+        window.clearTimeout(timer)
+        markView = nextMarkView()
+      },
+      stop: () => window.clearTimeout(timer)
+    }
+  })()
+  $: mark.song(current?.key ?? null)
+  $destroyed(() => mark.stop())
+  // The state, in words for screen readers (the play key shows it, lit while it plays).
+  $: stateLabel =
+    playback.error ? t("faceplate.state.error")
+    : playback.loading ? t("faceplate.state.loading")
+    : playback.playing ? t("faceplate.state.playing")
+    : current ? t("faceplate.state.paused")
+    : t("faceplate.state.stopped")
+  // Two lines: the title (or what went wrong, or that nothing plays), and the artist under it.
+  // While the display's left shows the DAC, its two lines say which one and how the music reaches
+  // it, in place of the song's title and artist.
+  $: dacName = markView === "dac" ? (soundingDevice()?.device ?? "") : ""
+  $: dacWay = markView === "dac" ? (soundingDevice()?.route ?? "") : ""
+  $: titleLine = dacName || playback.error || (current ? current.title : t("faceplate.idle"))
+  $: artistLine = dacName ? dacWay : playback.error ? "" : (current?.artist ?? "")
+  // The clock at the display's right, turned with a click or a tap: where the song is (its minutes
+  // over its seconds), its length (the same), or both (where it is over its length, each mm:ss).
+  // The minutes' zeros at the left are dimmed: "03" shows its 3 lit, "00" nothing lit.
+  const TIME_VIEWS = ["elapsed", "total", "both"] as const
+  let timeView: (typeof TIME_VIEWS)[number] = "elapsed"
+  const turnTime = () => {
+    timeView = TIME_VIEWS[(TIME_VIEWS.indexOf(timeView) + 1) % TIME_VIEWS.length]
+  }
+  $: elapsedClock = clockParts(playback.position)
+  $: totalClock = clockParts(playback.duration)
+  $: clock = timeView === "total" ? totalClock : elapsedClock
+  $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
+</script>
+
+  <Display live>
+    <div class="lcd">
+      <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
+      <button :if="playback.playing" type="button" class="lcd-mark playing"
+              :aria-label="t(MARK_LABELS[nextMarkView()])"
+              :title="soundingText()" @click="mark.toggle()">
+        <span :if="markView === 'format' && markParts()" class="lcd-format">
+          <!-- The codec: FLAC in the heavy lower case of its own lettering, MP3 and Ogg by their marks
+               (lit in the display's ink, as the logo is), any other as an icon of the display's own. -->
+          <span class="icons">
+            <span :if="markParts()?.format === 'FLAC'" class="codec-flac">flac</span>
+            <span :elseif="markOf()" class="codec-mark" role="img" :aria-label="markParts()?.format" :style="`--codec: url(${markOf()?.url}); --ratio: ${markOf()?.ratio}`"></span>
+            <DisplayIcon :else>{{ markParts()?.format }}</DisplayIcon>
+          </span>
+          <!-- Its parts one under the other: "24 bit" over "96 kHz"; a varying bitrate marked VBR, lit
+               solid, before it. -->
+          <span :if="markParts()?.quality" class="quality">
+            <span :each="(part, at) in markParts()?.quality.split(' · ') ?? []" class="quality-line"><span :if="at === 0 && markParts()?.vbr" class="vbr"><DisplayIcon filled>VBR</DisplayIcon></span>{{ part }}</span>
+          </span>
+          <span :if="markParts()?.route" class="quality route">{{ markParts()?.route }}</span>
+        </span>
+        <!-- The DAC: its mark and the depth and rate it runs at; its name and the way take the title's
+             and the artist's lines meanwhile. -->
+        <span :elseif="markView === 'dac' && soundingDevice()" class="lcd-format">
+          <span class="icons"><DisplayIcon filled>DAC</DisplayIcon></span>
+          <span :if="soundingDevice()?.quality" class="quality"><span :each="part in soundingDevice()?.quality.split(' · ') ?? []">{{ part }}</span></span>
+        </span>
+        <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="bands" :active="playback.playing" /></span>
+      </button>
+      <span :else class="lcd-mark" aria-hidden="true">
+        <span class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
+      </span>
+      <div class="lcd-main">
+        <div class="lcd-lines">
+          <!-- Two lines: the state and the title, then the artist (and what reaches the device). -->
+          <div class="lcd-text">
+            <span class="now">
+              <span class="visually-hidden">{{ stateLabel }}</span>
+              <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+            </span>
+            <span class="now">
+              <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
+            </span>
+          </div>
+          <!-- The clock, on two lines too: minutes over seconds (where the song is, or its length), or
+               where it is over its length; a click turns it. Nothing with no song loaded. -->
+          <button :if="current" type="button" class="lcd-time" :class.both="timeView === 'both'"
+                  :aria-label="positionText" :title="t('faceplate.turnTime')" @click="turnTime()">
+            <span :if="timeView === 'both'" class="clock-lines">
+              <Counter><span class="lead">{{ elapsedClock.lead }}</span>{{ elapsedClock.minutes }}:{{ elapsedClock.seconds }}</Counter>
+              <Counter><span class="lead">{{ totalClock.lead }}</span>{{ totalClock.minutes }}:{{ totalClock.seconds }}</Counter>
+            </span>
+            <span :else class="clock-lines">
+              <Counter><span class="lead">{{ clock.lead }}</span>{{ clock.minutes }}</Counter>
+              <Counter>{{ clock.seconds }}</Counter>
+            </span>
+          </button>
+        </div>
+        <Meter variant="display" :segments="40" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+      </div>
+    </div>
+  </Display>
+
+<style scoped>
+  /* Each of the display's text lines: the title, or the artist; the text ellipsises. */
+  .now { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The display's left: the logo, lit in the display's own ink (its shape as a mask), or the spectrum while the music plays. */
+  .lcd-mark { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; align-self: center; }
+  .lcd-spectrum { display: block; width: 100%; height: 100%; }
+
+  /* While the music plays, the spectrum stands as tall as the display's lines and meter together,
+     taller than the logo it replaces. It is a key with no keycap: a click turns it to the format. */
+  .lcd-mark.playing {
+    align-self: stretch;
+    height: auto;
+    min-height: 3rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    /* Its size, not its content's: the display keeps its height whatever it shows (the format's
+       three lines, the spectrum and the DAC mark). */
+    container-type: size;
+  }
+  .lcd-mark.playing:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
+  /* The song's format in the spectrum's place: the codec (FLAC in its lettering, MP3 by its mark,
+     others as a framed icon), its quality under it ("24 bit" over "96 kHz"), and in a native output how it reaches the
+     device. */
+  .lcd-format { display: grid; grid-template-columns: minmax(0, 1fr); place-content: center; justify-items: center; gap: .125rem; width: 100%; height: 100%; line-height: 1.15; }
+  .lcd-format .icons {
+    display: flex;
+    align-items: center;
+    gap: .3em;
+    font-size: clamp(.5625rem, 12cqw, .9375rem);
+  }
+  /* A codec's mark, its shape lit in the display's ink. */
+  .codec-mark {
+    display: block;
+    height: 1.9em;
+    aspect-ratio: var(--ratio);
+    background: currentColor;
+    -webkit-mask: var(--codec) center / contain no-repeat;
+    mask: var(--codec) center / contain no-repeat;
+  }
+  /* FLAC as its lettering is: lower case, at the label face's heaviest and its normal width, tight. */
+  .codec-flac {
+    font-family: var(--mm-font-label);
+    font-stretch: 100%;
+    font-weight: 900;
+    font-size: 1.9em;
+    line-height: .85;
+    letter-spacing: -.045em;
+    text-shadow: var(--mm-display-glow);
+  }
+  .lcd-format .quality {
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-size: clamp(.5rem, 9cqw, var(--mm-text-xs));
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    opacity: .85;
+  }
+  /* The quality keeps its units' case ("kHz", "kbps"); the route is a printed label. */
+  .lcd-format .quality:not(.route) { display: grid; justify-items: center; text-transform: none; letter-spacing: .02em; }
+  .lcd-format .route { opacity: .6; }
+  .quality-line { display: flex; align-items: center; gap: .35em; }
+  /* The VBR mark, small beside the figure it qualifies (the icon is sized in em). */
+  .vbr { display: inline-flex; font-size: .62em; }
+  .lcd-logo {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: currentColor;
+    -webkit-mask: var(--logo) center / contain no-repeat;
+    mask: var(--logo) center / contain no-repeat;
+  }
+  /* The display's second line: the artist, under the title. */
+  .artist { font-weight: var(--mm-weight-regular); opacity: .7; }
+  /* The display: the mark at the left, the title row and the meter beside it. */
+  .lcd { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--mm-space-3); min-width: 0; }
+  .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
+  .lcd-lines { display: flex; align-items: flex-start; gap: var(--mm-space-3); min-width: 0; }
+  /* The title and the artist in two rows as tall as the clock's two lines: the title centred on
+     the minutes, the artist on the seconds. Measured in the display's dots: the title's capitals
+     5 dots tall, the artist's 4 (IBM Plex Mono's capitals are .698em; their middle sits .026em
+     under the line's, nudged back up). */
+  .lcd-text {
+    --cap: .698;
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-rows: repeat(2, var(--mm-text-display-lg));
+    align-items: center;
+    min-width: 0;
+  }
+  .lcd-text .now { line-height: 1; }
+  .lcd-text .mm-display-title { position: relative; top: -.026em; line-height: 1; font-size: calc(5 * var(--mm-display-dot) / var(--cap)); }
+  .lcd-text .artist { font-size: calc(4 * var(--mm-display-dot) / var(--cap)); }
+  /* The clock: a key with no keycap, like the display's left. */
+  .lcd-time {
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .lcd-time:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
+  .clock-lines { display: grid; justify-items: end; gap: 0; }
+  /* The minutes' zeros at the left, dimmed, so the minutes read at a glance. */
+  .lcd-time .lead { opacity: .35; }
+  @media (min-width: 641px) {
+    .lcd-mark { width: 7rem; }
+  }
+  /* Phones: a smaller mark, so the title keeps its room. */
+  @media (max-width: 640px) {
+    .lcd-mark { width: 2.5rem; height: 2.5rem; }
+    .lcd-mark.playing { width: 4.5rem; }
+  }
+</style>

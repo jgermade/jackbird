@@ -64,6 +64,13 @@ const shown = (holding) => (holding ?? []).find((root) => root.path === folder);
 const kind = process.env.JACKBIRD_CHECK_KIND ?? "desktop";
 if (shown(report.library)?.kind !== kind) problems.push(`the root is ${shown(report.library)?.kind}, not ${kind}`);
 if (shown(report.library)?.tracks !== audio.length) problems.push(`the library shows ${JSON.stringify(report.library)}`);
+// The compact mode (C2): the window turned small and bare, and back to its size and its title bar.
+const compact = report.compact ?? {};
+if (compact.error) problems.push(`compact mode: ${compact.error}`);
+else if (!(compact.during?.mode === "window" && compact.during?.drawn && compact.during?.decorated === false && compact.during?.width < compact.before?.width && compact.during?.height < 200))
+  problems.push(`the window did not turn compact: ${JSON.stringify(compact)}`);
+else if (!(compact.after?.mode === "full" && compact.after?.decorated && Math.abs(compact.after.width - compact.before.width) <= 2 && Math.abs(compact.after.height - compact.before.height) <= 2))
+  problems.push(`the window did not come back from compact: ${JSON.stringify(compact)}`);
 if (shown(restored.restored)?.tracks !== audio.length) problems.push(`after a restart: ${JSON.stringify(restored.restored)}`);
 if (problems.length > 0) {
   console.error(`desktop-check: ${problems.join("; ")}`);

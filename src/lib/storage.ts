@@ -11,7 +11,9 @@ export const STORAGE_KEYS = {
   /** An Android phone's "Bit-perfect to a USB DAC" (E6b-D10). */
   phoneBitPerfect: "jackbird.phoneBitPerfect",
   /** The library pane's width beside the album sheet, in rem (src/helpers/split.ts). */
-  splitWidth: "jackbird.splitWidth"
+  splitWidth: "jackbird.splitWidth",
+  /** The compact mode's state (src/helpers/compact.ts): whether it was on, its place, "on top". */
+  compact: "jackbird.compact"
 } as const;
 
 /**
