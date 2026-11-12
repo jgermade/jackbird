@@ -23,7 +23,7 @@ import {
 import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
-import { spectrumBands } from "../helpers/spectrum";
+import { SPECTRUM_DECIBELS, SPECTRUM_RANGE, SPECTRUM_TILT, spectrumBands } from "../helpers/spectrum";
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
 import { PhoneAudio, phoneAudioAvailable, type PhoneSong } from "./phone-audio";
@@ -217,6 +217,9 @@ function routeThroughAnalyser(element: HTMLAudioElement): void {
       const node = made.createAnalyser();
       node.fftSize = 1024;
       node.smoothingTimeConstant = 0.8;
+      // Headroom for the bass (see SPECTRUM_DECIBELS); crates/audio's spectrum spans the same.
+      node.minDecibels = SPECTRUM_DECIBELS.min;
+      node.maxDecibels = SPECTRUM_DECIBELS.max;
       made.createMediaElementSource(element).connect(node);
       node.connect(made.destination);
       context = made;
@@ -242,13 +245,13 @@ export function readSpectrum(bands: number): number[] | null {
   }
   if (native && audio === native) {
     const heard = native.spectrum();
-    return heard ? spectrumBands(heard.bins, bands, heard.rate) : null;
+    return heard ? spectrumBands(heard.bins, bands, heard.rate, SPECTRUM_RANGE, SPECTRUM_TILT) : null;
   }
   if (!analyser || !bins || !context) {
     return null;
   }
   analyser.getByteFrequencyData(bins);
-  return spectrumBands(bins, bands, context.sampleRate);
+  return spectrumBands(bins, bands, context.sampleRate, SPECTRUM_RANGE, SPECTRUM_TILT);
 }
 
 function release(): void {

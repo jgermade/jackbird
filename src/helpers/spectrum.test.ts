@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { SPECTRUM_RANGE, spectrumBands } from "./spectrum.ts";
+import { SPECTRUM_DECIBELS, SPECTRUM_RANGE, SPECTRUM_TILT, spectrumBands } from "./spectrum.ts";
 
 // An analyser's 512 bins (fftSize 1024) at the two usual rates.
 const BINS = 512;
@@ -69,5 +69,32 @@ describe("spectrumBands", () => {
     assert.deepEqual(spectrumBands([], 16, 48000), []);
     assert.deepEqual(spectrumBands([255], 0, 48000), []);
     assert.deepEqual(spectrumBands([255], 16, 0), []);
+  });
+
+  it("with a tilt, shows a spectrum falling by it as level", () => {
+    // Bins falling 3 dB an octave from 40 Hz (byte 200 there), over -100 to -10 dB.
+    const rate = 48000;
+    const binHz = rate / 2 / BINS;
+    const span = SPECTRUM_DECIBELS.max - SPECTRUM_DECIBELS.min;
+    const bins = Uint8Array.from({ length: BINS }, (_, k) =>
+      k === 0 ? 0 : Math.max(0, Math.round(200 - (SPECTRUM_TILT * Math.log2((k * binHz) / 40) * 255) / span))
+    );
+    const flat = spectrumBands(bins, 16, rate, SPECTRUM_RANGE, SPECTRUM_TILT);
+    const spread = Math.max(...flat) - Math.min(...flat);
+    assert.ok(spread < 0.08, `levels ${flat.map((level) => level.toFixed(2)).join(" ")}`);
+    // Without it, the same bins fall from the bass to the treble.
+    const falling = spectrumBands(bins, 16, rate);
+    assert.ok(falling[0] - falling[15] > 0.2);
+  });
+
+  it("with a tilt, lowers the bass, raises the treble, and keeps silence dark", () => {
+    const half = new Uint8Array(BINS).fill(128);
+    const levels = spectrumBands(half, 16, 48000, SPECTRUM_RANGE, SPECTRUM_TILT);
+    assert.ok(levels[0] < 128 / 255 && levels[15] > 128 / 255);
+    assert.ok(spectrumBands(new Uint8Array(BINS), 16, 48000, SPECTRUM_RANGE, SPECTRUM_TILT).every((level) => level === 0));
+    // Never past 0 or 1.
+    const loud = spectrumBands(new Uint8Array(BINS).fill(255), 16, 48000, SPECTRUM_RANGE, 30);
+    const faint = spectrumBands(new Uint8Array(BINS).fill(1), 16, 48000, SPECTRUM_RANGE, 30);
+    assert.ok(loud.every((level) => level <= 1) && faint.every((level) => level >= 0));
   });
 });
