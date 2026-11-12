@@ -1,7 +1,8 @@
 # The desktop app (src-tauri/, over crates/core): builds its bundles on Linux, macOS and Windows,
 # runs the unattended check on each (scripts/desktop-check.mjs; Linux under Xvfb) and uploads
 # the bundles. release.yml calls it with the new tag and attaches them to the release.
-# Unsigned: macOS and Windows warn when the bundles are opened.
+# macOS: signed ad hoc (tauri.conf.json, `signingIdentity: "-"`), so Gatekeeper offers "Open
+# Anyway" rather than calling it damaged; no Developer ID nor notarization. Windows: unsigned, it warns.
 # See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4).
 name: desktop
 

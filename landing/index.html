@@ -27,7 +27,7 @@
     <nav class="nav" aria-label="Sections">
       <a href="#features">Features</a>
       <a href="#platforms">Get it</a>
-      <a href="./design/">Design system</a>
+      <a href="./demo/">Demo</a>
       <a href="https://github.com/jgermade/jackbird">Source</a>
     </nav>
     <button class="key tone" type="button" aria-label="Switch between Silver and Graphite">
@@ -77,6 +77,32 @@
       <p class="caption">Silver or Graphite: the switch at the top of this page turns both. <span>Albums, artists and covers made up.</span></p>
     </section>
 
+    <section class="platforms" id="platforms">
+      <h2 class="section-label">Get it</h2>
+      <div class="bays">
+        <a class="bay" href="./demo/">
+          <span class="label">Browser</span>
+          <strong>Try it now</strong>
+          <span>Chromium-based browsers on a desktop. No install.</span>
+        </a>
+        <a class="bay" href="https://github.com/jgermade/jackbird/releases/latest">
+          <span class="label">Desktop</span>
+          <strong>macOS · Windows · Linux</strong>
+          <span>A native app with its own audio output.</span>
+        </a>
+        <a class="bay" href="https://github.com/jgermade/jackbird/blob/main/docs/install.md">
+          <span class="label">Service</span>
+          <strong>Docker · NAS · Raspberry Pi</strong>
+          <span>One binary with the web inside, for the whole family.</span>
+        </a>
+        <a class="bay" href="https://github.com/jgermade/jackbird/releases/latest">
+          <span class="label">Phone</span>
+          <strong>Android</strong>
+          <span>An APK on every release.</span>
+        </a>
+      </div>
+    </section>
+
     <section class="features" id="features">
       <h2 class="section-label">What it does</h2>
       <div class="modules">
@@ -122,60 +148,14 @@
       </div>
     </section>
 
-    <section class="design" id="design">
-      <div>
-        <h2 class="section-label">The design system</h2>
-        <p class="statement">Deck: every key, LED, display and tone, on one sheet.</p>
-        <p>jackbird's interface is drawn from one theme's tokens and components. Its specimen sheet is live: press the keys, switch the tones.</p>
-        <a class="key big" href="./design/">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v5H2zm7 0h5v5H9zM2 9h5v5H2zm7 0h5v5H9z"/></svg>
-          Open the design system
-        </a>
-      </div>
-      <a class="swatches" href="./design/" aria-label="Open the design system">
-        <span style="--c: var(--mm-chassis)"></span>
-        <span style="--c: var(--mm-display-bg)"></span>
-        <span style="--c: var(--mm-display-fg)"></span>
-        <span style="--c: var(--mm-stripe-1)"></span>
-        <span style="--c: var(--mm-stripe-2)"></span>
-        <span style="--c: var(--mm-stripe-3)"></span>
-        <span style="--c: var(--mm-fg)"></span>
-        <span style="--c: var(--mm-accent)"></span>
-      </a>
-    </section>
-
-    <section class="platforms" id="platforms">
-      <h2 class="section-label">Get it</h2>
-      <div class="bays">
-        <a class="bay" href="./demo/">
-          <span class="label">Browser</span>
-          <strong>Try it now</strong>
-          <span>Chromium-based browsers on a desktop. No install.</span>
-        </a>
-        <a class="bay" href="https://github.com/jgermade/jackbird/releases/latest">
-          <span class="label">Desktop</span>
-          <strong>macOS · Windows · Linux</strong>
-          <span>A native app with its own audio output.</span>
-        </a>
-        <a class="bay" href="https://github.com/jgermade/jackbird/blob/main/docs/install.md">
-          <span class="label">Service</span>
-          <strong>Docker · NAS · Raspberry Pi</strong>
-          <span>One binary with the web inside, for the whole family.</span>
-        </a>
-        <a class="bay" href="https://github.com/jgermade/jackbird/releases/latest">
-          <span class="label">Phone</span>
-          <strong>Android</strong>
-          <span>An APK on every release.</span>
-        </a>
-      </div>
-    </section>
   </main>
 
   <footer class="footer">
     <div class="stripes"><span></span><span></span><span></span></div>
     <p>
       <span class="wordmark small" data-label="Jackbird">Jackbird</span>
-      Open source, on <a href="https://github.com/jgermade/jackbird">GitHub</a>.
+      Open source, on <a href="https://github.com/jgermade/jackbird">GitHub</a>. Drawn with
+      <a href="./theme/default/">Deck</a>, its design system.
     </p>
   </footer>
 </body>

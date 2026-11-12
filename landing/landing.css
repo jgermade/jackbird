@@ -361,44 +361,5 @@ h1 em {
   .phone img { max-width: 14rem; }
 }
 
-/* ---- the design system ---------------------------------------------------------------------- */
-
-.design { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 4rem; }
-.design .statement {
-  margin: 0 0 var(--mm-space-4);
-  font-family: var(--mm-font-label);
-  font-stretch: var(--mm-stretch-heading);
-  font-weight: 700;
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
-  line-height: 1.1;
-}
-.design p { max-width: 34rem; color: var(--mm-fg-muted); }
-.design .key { margin-top: var(--mm-space-3); }
-/* The palette as chips on a card: the tokens themselves, so they follow the tone. */
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--mm-space-3);
-  padding: var(--mm-space-5);
-  border: var(--mm-border-width) solid var(--mm-border);
-  border-radius: var(--mm-radius-lg);
-  background: var(--mm-surface);
-  box-shadow: var(--mm-shadow-md);
-  transform: rotate(2deg);
-  transition: transform .3s;
-}
-.swatches span {
-  aspect-ratio: 1;
-  border-radius: var(--mm-radius-md);
-  background: var(--c);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12), var(--mm-key-shadow);
-}
-@media (hover: hover) {
-  .swatches:hover { transform: rotate(0deg) scale(1.02); }
-}
-@media (max-width: 640px) {
-  .design { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
-}
-
 /* Grid items shrink to their track, never to their content. */
 .hero > *, .pitch > * { min-width: 0; }

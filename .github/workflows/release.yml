@@ -166,7 +166,7 @@ jobs:
   # The GitHub Pages site, put together on the release's own build (the `dist` artifact): the landing
   # page (scripts/build-landing.mjs) with screenshots taken on the build (scripts/screenshots.cjs),
   # the build as its demo in demo/ with the sample music beside it (samples/), and the design system
-  # in it, which design/ leads to. Attached
+  # at theme/default/ (scripts/place-design.mjs; design/ leads there too). Attached
   # as <repo>-vX.Y.Z-pages.zip, for deploy.yml to publish as it is; the screenshots also on their own
   # (screenshot-*.png), for the README (releases/latest/download/…). After the release, so a
   # failure here never holds it back.
@@ -213,6 +213,8 @@ jobs:
           node scripts/build-landing.mjs site
           cp shots/*.png site/screenshots/
           cp -r dist site/demo
+          # The design system at theme/default/, from the build in demo/.
+          node scripts/place-design.mjs site
           # The demo's sample music (samples/), offered beside the app: in the site only, not in the build.
           cp -r samples site/demo/samples
           asset="${GITHUB_REPOSITORY#*/}-$TAG-pages.zip"

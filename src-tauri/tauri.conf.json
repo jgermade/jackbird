@@ -38,6 +38,9 @@
     "shortDescription": "Your library, right where it is.",
     "externalBin": [
       "binaries/jackbird-service"
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }

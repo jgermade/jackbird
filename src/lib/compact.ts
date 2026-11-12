@@ -13,6 +13,7 @@
 
 import { $reactive } from "jq79";
 import { compactHeightFor, compactSize, isCompactShortcut, parseCompactState, pipSize, type Bounds, type CompactState } from "../helpers/compact";
+import { onSpace } from "./hotkeys";
 import { isDesktop, isPhone } from "./platform";
 import { readStored, STORAGE_KEYS, writeStored } from "./storage";
 
@@ -283,7 +284,11 @@ async function floatOpen(): Promise<void> {
   pip.document.body.style.margin = "0";
   pip.document.body.append(slot);
   slot.hidden = false;
-  const onKey = (event: KeyboardEvent) => onShortcut(event);
+  // The shortcut, and Space (play and pause), in the floating window too.
+  const onKey = (event: KeyboardEvent) => {
+    onShortcut(event);
+    onSpace(event);
+  };
   pip.document.addEventListener("keydown", onKey);
   floating = {
     pip,
