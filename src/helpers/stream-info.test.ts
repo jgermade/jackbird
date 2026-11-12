@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { audioStart, kilohertz, streamInfo, streamInfoNeeds, streamQuality } from "./stream-info.ts";
+import { audioStart, isHighResolution, kilohertz, streamInfo, streamInfoNeeds, streamQuality } from "./stream-info.ts";
 
 const fixture = (name: string) => new Uint8Array(readFileSync(new URL(`../../fixtures/tags/${name}`, import.meta.url)));
 
@@ -98,5 +98,18 @@ describe("streamQuality", () => {
     assert.equal(kilohertz(22050), "22.05");
     assert.equal(kilohertz(11025), "11.025");
     assert.equal(kilohertz(192000), "192");
+  });
+});
+
+describe("isHighResolution", () => {
+  it("is past a CD's 16 bit and 48 kHz, deeper or faster", () => {
+    assert.equal(isHighResolution("FLAC", 24, 96000), true);
+    assert.equal(isHighResolution("FLAC", 24, 44100), true);
+    assert.equal(isHighResolution("FLAC", 16, 88200), true);
+    assert.equal(isHighResolution("FLAC", 16, 44100), false);
+    assert.equal(isHighResolution("FLAC", 16, 48000), false);
+  });
+  it("is never a lossy MP3", () => {
+    assert.equal(isHighResolution("MP3", 32, 96000), false);
   });
 });

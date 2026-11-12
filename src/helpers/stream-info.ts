@@ -117,3 +117,12 @@ export function streamQuality(info: StreamInfo): string {
   if (info.codec === "FLAC") return `${info.bits} bit · ${rate}`;
   return `${info.vbr ? "VBR " : ""}${info.kbps} kbps · ${rate}`;
 }
+
+/**
+ * Whether audio is past a CD's resolution (16 bit, 44.1 or 48 kHz): deeper or faster, as a
+ * display's "HD" badge says. Never for a lossy codec (MP3), whatever it decodes to.
+ */
+export function isHighResolution(codec: string, bits: number, rate: number): boolean {
+  if (codec === "MP3") return false;
+  return bits > 16 || rate > 48000;
+}

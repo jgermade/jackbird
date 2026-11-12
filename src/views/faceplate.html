@@ -11,6 +11,7 @@
 
   const Counter = await import("../../theme/default/components/counter.html")
   const Display = await import("../../theme/default/components/display.html")
+  const DisplayIcon = await import("../../theme/default/components/display-icon.html")
   const Key = await import("../../theme/default/components/key.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
@@ -132,7 +133,11 @@
                   :aria-label="markView === 'format' ? t('faceplate.showSpectrum') : t('faceplate.showFormat')"
                   :title="soundingText()" @click="mark.toggle()">
             <span :if="markView === 'format' && markParts()" class="lcd-format">
-              <span class="format">{{ markParts()?.format }}</span>
+              <!-- The codec as an icon of the display's own (no format's logo), and HD past a CD's resolution. -->
+              <span class="icons">
+                <DisplayIcon>{{ markParts()?.format }}</DisplayIcon>
+                <DisplayIcon :if="markParts()?.hd" filled>HD</DisplayIcon>
+              </span>
               <!-- Its parts one under the other: "24 bit" over "96 kHz". -->
               <span :if="markParts()?.quality" class="quality">
                 <span :each="part in markParts()?.quality.split(' · ') ?? []">{{ part }}</span>
@@ -281,15 +286,15 @@
     container-type: inline-size;
   }
   .lcd-mark.playing:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
-  /* The song's format in the spectrum's place: the codec in large dots, its quality under it
-     ("24 bit · 96 kHz"), and in a native output how it reaches the device. */
+  /* The song's format in the spectrum's place: the codec as a framed icon (and HD lit solid past a
+     CD's resolution), its quality under it ("24 bit" over "96 kHz"), and in a native output how it
+     reaches the device. */
   .lcd-format { display: grid; place-content: center; justify-items: center; gap: var(--mm-space-1); width: 100%; height: 100%; }
-  .lcd-format .format {
-    font-family: var(--mm-font-display);
-    font-weight: 700;
-    font-size: clamp(.875rem, 24cqw, 1.875rem);
-    line-height: 1;
-    white-space: nowrap;
+  .lcd-format .icons {
+    display: flex;
+    align-items: center;
+    gap: .3em;
+    font-size: clamp(.5625rem, 12cqw, .9375rem);
   }
   .lcd-format .quality {
     font-family: var(--mm-font-label);

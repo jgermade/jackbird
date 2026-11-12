@@ -7,7 +7,7 @@
 
 import { $reactive } from "jq79";
 import { invoke } from "@tauri-apps/api/core";
-import { kilohertz, streamQuality, type StreamInfo } from "../helpers/stream-info";
+import { isHighResolution, kilohertz, streamQuality, type StreamInfo } from "../helpers/stream-info";
 import { describeFormat, fileKind, formatRate, parseOutputKind, settingsFor, type DeviceInfo, type OutputKind } from "../helpers/output";
 import { t } from "./i18n";
 import type { Sounding } from "./native-audio";
@@ -102,14 +102,20 @@ export function soundingText(): string {
  * quality ("24 bit · 96 kHz", "320 kbps · 44.1 kHz") and how it reaches the device ("bit-perfect",
  * "DAC", "native"; empty in the browser, or when there is nothing to say). The quality is the
  * file's own (`info`, read from it), else what a native output reports it decodes; with neither,
- * the file's kind alone, from `relativePath`. Null when there is nothing at all.
+ * the file's kind alone, from `relativePath`. `hd` when it is past a CD's resolution (the
+ * display's HD badge). Null when there is nothing at all.
  */
-export function soundingParts(info: StreamInfo | null, relativePath?: string): { format: string; quality: string; route: string } | null {
+export function soundingParts(
+  info: StreamInfo | null,
+  relativePath?: string
+): { format: string; quality: string; route: string; hd: boolean } | null {
   const sounding = output.sounding;
+  const hd = (codec: string, bits: number, rate: number) => isHighResolution(codec, bits, rate);
+  const infoHd = info ? hd(info.codec, info.codec === "FLAC" ? info.bits : 0, info.rate) : false;
   if (!sounding) {
-    if (info) return { format: info.codec, quality: streamQuality(info), route: "" };
+    if (info) return { format: info.codec, quality: streamQuality(info), route: "", hd: infoHd };
     const kind = relativePath ? fileKind(relativePath) : "";
-    return kind ? { format: kind, quality: "", route: "" } : null;
+    return kind ? { format: kind, quality: "", route: "", hd: false } : null;
   }
   const rate = `${kilohertz(sounding.format.rate)} kHz`;
   const quality = info ? streamQuality(info) : sounding.format.bits > 0 ? `${sounding.format.bits} bit · ${rate}` : rate;
@@ -122,5 +128,5 @@ export function soundingParts(info: StreamInfo | null, relativePath?: string): {
         ? t("output.badge.dac")
         : ""
     : t(`output.badge.${sounding.route.fidelity}`);
-  return { format: sounding.codec, quality, route };
+  return { format: sounding.codec, quality, route, hd: info ? infoHd : hd(sounding.codec, sounding.format.bits, sounding.format.rate) };
 }
