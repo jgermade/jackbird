@@ -8,6 +8,7 @@ import "../theme/default/tokens.css";
 import "../theme/default/content.css";
 import "../theme/default/base.css";
 import { startAccount } from "./lib/account";
+import { loadRecent } from "./lib/recent";
 import { loadFavourites, startMine } from "./lib/mine";
 import { keepPlaybackSaved, restorePlayback } from "./lib/player";
 import { isDesktop, isPhone } from "./lib/platform";
@@ -16,6 +17,7 @@ import { startVerifier } from "./lib/verifier";
 import App from "./views/app.html";
 
 App.mount("#app");
+void loadRecent();
 keepSessionSaved();
 startVerifier();
 // The folders come back once someone is in (the service's people, S3); the

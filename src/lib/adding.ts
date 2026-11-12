@@ -11,7 +11,9 @@ import { t } from "./i18n";
 import { importing } from "./importing";
 import { library } from "./library";
 import { isDesktop, isPhone, isService } from "./platform";
+import { recent, forgetRecent, type RecentRoot } from "./recent";
 import { hydrateRoot, openFolder } from "./roots";
+import { restoreSource } from "./sources";
 import { currentServer, homeServer, serviceAt, serviceRoots } from "./sources/service";
 
 export type SourceKind = "device" | "serverFolder" | "server";
@@ -57,7 +59,7 @@ export const folderSources = (): SourceKind[] => sourcesHere().filter((kind) => 
 /** The dialog's tabs: "Folder" wherever folders are offered; "Server" in the apps. */
 export function tabsHere(): ("folder" | "server")[] {
   const tabs: ("folder" | "server")[] = [];
-  if (folderSources().length > 0) tabs.push("folder");
+  if (folderSources().length > 0 || recent.list.length > 0) tabs.push("folder");
   if (sourcesHere().includes("server")) tabs.push("server");
   return tabs;
 }
@@ -76,6 +78,12 @@ export function openAdding(): void {
   adding.open = true;
   adding.tab = folders.length > 0 || !tabs.includes("server") ? "folder" : "server";
   adding.error = "";
+}
+
+/** The tab shown: the one chosen, if this runtime has it, else its first. */
+export function shownTab(): "folder" | "server" {
+  const tabs = tabsHere();
+  return tabs.includes(adding.tab) ? adding.tab : (tabs[0] ?? "folder");
 }
 
 /** Shows a tab of the dialog. */
@@ -139,3 +147,24 @@ export async function addServer(typed: string): Promise<void> {
     adding.busy = false;
   }
 }
+
+/** Opens again a folder closed lately (its source asked as after a restart); says so when it cannot. */
+export async function reopenRecent(entry: RecentRoot): Promise<void> {
+  adding.open = false;
+  library.loading = true;
+  library.errorMessage = null;
+  try {
+    const source = await restoreSource(entry.saved).catch(() => null);
+    if (!source) {
+      forgetRecent(entry.saved);
+      library.errorMessage = t("sources.recentGone", { name: entry.label });
+      return;
+    }
+    await hydrateRoot(source, { rootLabel: entry.label });
+  } finally {
+    library.loading = false;
+  }
+}
+
+/** The folders closed lately, for the Folder tab. */
+export const recentFolders = (): RecentRoot[] => recent.list;

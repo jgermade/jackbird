@@ -14,6 +14,7 @@ import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
 import { dropFromQueue } from "./player";
 import { loadPlaylists } from "./playlists";
+import { forgetRecent, rememberClosed } from "./recent";
 import { pickSource } from "./sources";
 import type { ServiceClient } from "./sources/service";
 
@@ -40,6 +41,8 @@ export async function hydrateRoot(
     view?: LibraryView;
   }
 ): Promise<void> {
+  // Open again: no longer offered among the folders closed lately.
+  forgetRecent(source.saved);
   const vfs = source.vfs;
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const rootLabel = options.rootLabel ?? (vfs.name || t("roots.fallbackName", { number: $toRaw(library).roots.length + 1 }));
@@ -373,6 +376,8 @@ export function closeRoot(rootId: string): void {
 
   dropFromQueue((item) => item.rootId === rootId);
   roots[index].source.close();
+  // Offered again in "Add to the library…"'s Folder tab.
+  rememberClosed({ label: roots[index].label, saved: roots[index].source.saved });
 
   const nextRoots = roots.filter((root) => root.id !== rootId);
   library.roots = nextRoots;

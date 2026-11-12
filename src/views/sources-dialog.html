@@ -1,68 +1,29 @@
 <script :setup lang="ts">
   // "Add to the library…" (E6b-D11, as the owner drew it on 2026-11-12): a tab for a folder (of this
-  // device, or of the server in front) and one for a jackbird server by its address. A view over
-  // lib/adding.ts. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-11 22:47).
+  // device, of the server in front, or one closed lately) and one for a jackbird server, in a dialog
+  // once a folder is open (while none is, they are in the roots' bar and the library's place).
+  // Its tabs' content is views/sources-panel.html. A view over lib/adding.ts. See
+  // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-11 22:47 and after).
 
-  const Field = await import("../../theme/default/components/field.html")
-  const Key = await import("../../theme/default/components/key.html")
   const Modal = await import("../../theme/default/components/modal.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
-  const TextInput = await import("../../theme/default/components/text-input.html")
+  const SourcesPanel = await import("./sources-panel.html")
 
   const { t } = await import("../lib/i18n")
-  const { addFrom, addServer, adding, chooseTab, closeAdding, folderSources, serverName, tabsHere } = await import("../lib/adding")
+  const { adding, chooseTab, closeAdding, shownTab, tabsHere } = await import("../lib/adding")
 
   const tabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
-
-  // Each folder source is a key that opens its dialog: the device's own (the system's, Android's
-  // folder picker, the browser's), or the server's folder chooser.
-  type Choice = { kind: "device" | "serverFolder" | "server"; label: string; hint: string }
-  const folders = (): Choice[] =>
-    folderSources().map((kind) => ({
-      kind,
-      label: kind === "device" ? t("sources.chooseFolder") : t("sources.chooseServerFolder", { server: serverName() }),
-      hint: kind === "device" ? t("sources.chooseFolderHint") : t("sources.serverFolderHint")
-    }))
-
-  let address: string = ""
-  const submit = (event: Event) => {
-    event.preventDefault()
-    void addServer(address)
-  }
 </script>
 
 <div class="sources-dialog">
-  <Modal :open="adding.open" :eyebrow="t('sources.eyebrow')" :title="adding.tab === 'server' ? t('sources.server') : t('sources.folderTab')" size="sm" :close-label="t('sources.close')" @close="closeAdding()">
+  <Modal :open="adding.open" :eyebrow="t('sources.eyebrow')" :title="shownTab() === 'server' ? t('sources.server') : t('sources.folderTab')" size="sm" :close-label="t('sources.close')" @close="closeAdding()">
     <template :slot.nav>
-      <Tabs :if="tabs().length > 1" plain :label="t('sources.tabs')" :items="tabs()" :model="adding.tab" @change="chooseTab($event.detail)" />
+      <Tabs :if="tabs().length > 1" plain :label="t('sources.tabs')" :items="tabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
     </template>
-
-    <section :if="adding.tab === 'folder'" class="tab">
-      <div :each="choice in folders()" :key="choice.kind" class="source">
-        <p class="hint">{{ choice.hint }}</p>
-        <Key :variant="choice.kind === 'device' ? 'primary' : 'secondary'" @click="addFrom(choice.kind)">{{ choice.label }}</Key>
-      </div>
-    </section>
-
-    <form :if="adding.tab === 'server'" class="tab form" @submit="submit($event)">
-      <p class="hint">{{ t("sources.serverHint") }}</p>
-      <Field :label="t('instance.address')" control="server-address" :hint="t('instance.addressHint')">
-        <TextInput id="server-address" type="url" inputmode="url" autocomplete="url" :model="address" @input="address = $event.detail" />
-      </Field>
-      <p :if="adding.error" class="failure">{{ adding.error }}</p>
-      <div class="keys">
-        <Key type="submit" variant="primary" :disabled="adding.busy || !address.trim()">{{ t("instance.connect") }}</Key>
-      </div>
-    </form>
+    <SourcesPanel />
   </Modal>
 </div>
 
 <style scoped>
   .sources-dialog { display: contents; }
-  .tab { display: grid; gap: var(--mm-space-3); }
-  .source { display: grid; justify-items: start; gap: var(--mm-space-2); }
-  .source + .source { padding-top: var(--mm-space-3); border-top: var(--mm-border-width) solid var(--mm-border); }
-  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
-  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
-  .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
 </style>
