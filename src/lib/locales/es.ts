@@ -75,7 +75,7 @@ export const es: Record<MessageKey, string> = {
   "faceplate.showFormat": "Mostrar el formato de la canción",
   "faceplate.showSpectrum": "Mostrar el espectro",
   "faceplate.showDac": "Mostrar el DAC",
-  "faceplate.turnTime": "Mostrar el tiempo, la duración o ambos",
+  "faceplate.turnTime": "Mostrar el tiempo o la duración",
   "workspace.split": "Ancho de la biblioteca y los detalles",
   "faceplate.state.stopped": "Parado",
   "faceplate.state.playing": "Sonando",
