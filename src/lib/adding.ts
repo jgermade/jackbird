@@ -39,7 +39,7 @@ export function sourcesHere(): SourceKind[] {
   const kinds: SourceKind[] = [];
   // The browser's folders when no service serves the page; the desktop's. A phone's own folders wait
   // for Android's folder picker (E6b-D9, 2026-11-11 23:33): the app never asks for all files.
-  if ((isDesktop && !isPhone) || adding.served === false) kinds.push("device");
+  if ((isDesktop && !isPhone) || (!isDesktop && adding.served === false)) kinds.push("device");
   // A folder of the server in front, for its owners: the page's own server, or one the app added
   // (the desktop's installed service is its "device" already).
   const server = currentServer();

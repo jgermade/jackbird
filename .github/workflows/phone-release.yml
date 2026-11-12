@@ -24,6 +24,8 @@ on:
     paths:
       - "crates/player/**"
       - "src-tauri/**"
+      - "src/**"
+      - "package.json"
       - ".github/workflows/phone-release.yml"
 
 permissions:
