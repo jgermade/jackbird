@@ -2,7 +2,12 @@
 // The screenshots of the README (docs/screenshots/) and of the landing page, taken from the real
 // app over a made-up library, so they always show the interface as it is.
 //
-//   node scripts/screenshots.cjs [app URL]     (default: http://localhost:8666/, `npm run dev`)
+//   node scripts/screenshots.cjs [app URL] [out]
+//
+// The app URL defaults to the dev server (http://localhost:8666/, `npm run dev`); a build served
+// anywhere does as well. The images go to `out`, docs/screenshots/ by default. The release
+// workflow (release.yml) runs it on each release's own build and attaches the images to the
+// release, where deploy.yml and the README take them from.
 //
 // It builds the library in a temporary folder: five invented albums (artists, titles and genres
 // made up; covers drawn on a canvas, abstract shapes; tones and noise from ffmpeg, so the spectrum
@@ -20,7 +25,7 @@ const path = require("node:path");
 const { chromium } = require("playwright");
 
 const app = process.argv[2] ?? "http://localhost:8666/";
-const out = path.resolve(__dirname, "../docs/screenshots");
+const out = path.resolve(process.argv[3] ?? path.join(__dirname, "../docs/screenshots"));
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "jackbird-shots-"));
 const library = path.join(work, "Music");
 
