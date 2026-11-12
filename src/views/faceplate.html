@@ -108,8 +108,8 @@
                   <span :if="wide && soundingBadge()" class="route" :title="soundingText()">{{ soundingBadge() }}</span>
                 </span>
               </div>
-              <!-- Where the song is, on two lines too: its minutes, and under them its seconds. -->
-              <div class="lcd-time" :aria-label="positionText">
+              <!-- Where the song is, on two lines too: its minutes, and under them its seconds; nothing with no song loaded. -->
+              <div :if="current" class="lcd-time" :aria-label="positionText">
                 <span class="minutes"><Counter>{{ minutes }}</Counter></span>
                 <span class="seconds"><Counter>{{ seconds }}</Counter></span>
               </div>
