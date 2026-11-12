@@ -249,8 +249,9 @@
   /* The column's outer corners, on its keys (it does not clip: the LEDs' glow passes its edge). */
   .mode:first-child { border-top-right-radius: calc(var(--mm-radius-key) + 1px); }
   .mode:last-child { border-bottom-right-radius: calc(var(--mm-radius-key) + 1px); }
-  .mode:active { background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
-  .mode[aria-pressed="true"] { background: var(--mm-key-down); }
+  /* Down while pressed, and while on: the theme's pressed key (its inner shadow, its face 1px lower). */
+  .mode:active, .mode[aria-pressed="true"] { background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
+  .mode:active > *, .mode[aria-pressed="true"] > * { transform: translateY(1px); }
   .mode:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   @media (hover: hover) { .mode:hover { filter: brightness(1.04); } }
   .mode-icon { width: .875rem; height: .875rem; }
