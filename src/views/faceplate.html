@@ -70,6 +70,8 @@
   // The position split for the display's two lines: minutes (at least two digits), then seconds.
   $: minutes = String(Math.floor(Math.max(0, playback.position) / 60)).padStart(2, "0")
   $: seconds = String(Math.floor(Math.max(0, playback.position) % 60)).padStart(2, "0")
+  // The minutes' zeros at the left (never the last digit), dimmed: "03" shows its 3 lit.
+  $: minutesLead = (/^0+/.exec(minutes.slice(0, -1)) ?? [""])[0]
   $: positionText = t("faceplate.positionText", { position: formatTime(playback.position), duration: formatTime(playback.duration) })
 
   $: tabs = library.roots.map((root) => ({
@@ -110,7 +112,7 @@
               </div>
               <!-- Where the song is, on two lines too: its minutes, and under them its seconds; nothing with no song loaded. -->
               <div :if="current" class="lcd-time" :aria-label="positionText">
-                <span class="minutes"><Counter>{{ minutes }}</Counter></span>
+                <span class="minutes"><Counter><span class="lead">{{ minutesLead }}</span>{{ minutes.slice(minutesLead.length) }}</Counter></span>
                 <span class="seconds"><Counter>{{ seconds }}</Counter></span>
               </div>
             </div>
@@ -249,8 +251,8 @@
   .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
   .lcd-text { display: grid; flex: 1 1 auto; gap: var(--mm-space-1); min-width: 0; }
   .lcd-time { display: grid; flex: none; justify-items: end; gap: 0; line-height: 1; }
-  /* The seconds told from the minutes, subtly: dimmer. */
-  .lcd-time .seconds { opacity: .6; }
+  /* The minutes' zeros at the left, dimmed, so the minutes read at a glance. */
+  .lcd-time .lead { opacity: .35; }
   @media (min-width: 641px) {
     .lcd-mark { width: 7rem; }
   }
