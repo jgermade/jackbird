@@ -69,3 +69,16 @@ export function fileKind(path: string): string {
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(dot + 1).toUpperCase() : "";
 }
+
+/**
+ * The depth a device takes its samples at, as a display writes it, from what an output reports:
+ * the desktop's sample formats ("i16", "i24", "i24high", "i32", "f32") and Android's ("16-bit",
+ * "24-bit", "32-bit", "float"). "24 bit", "32 bit float"; empty for one it does not know.
+ */
+export function sampleDepth(sample: string): string {
+  const name = sample.trim().toLowerCase();
+  if (name === "f32" || name === "float") return "32 bit float";
+  const bits = /^(?:i(\d+)(?:high)?|(\d+)-bit)$/.exec(name);
+  const depth = bits?.[1] ?? bits?.[2];
+  return depth ? `${depth} bit` : "";
+}

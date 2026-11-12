@@ -8,7 +8,7 @@
 import { $reactive } from "jq79";
 import { invoke } from "@tauri-apps/api/core";
 import { kilohertz, streamQuality, type StreamInfo } from "../helpers/stream-info";
-import { describeFormat, fileKind, formatRate, parseOutputKind, settingsFor, type DeviceInfo, type OutputKind } from "../helpers/output";
+import { describeFormat, fileKind, formatRate, parseOutputKind, sampleDepth, settingsFor, type DeviceInfo, type OutputKind } from "../helpers/output";
 import { t } from "./i18n";
 import type { Sounding } from "./native-audio";
 import { isDesktop, isPhone } from "./platform";
@@ -127,7 +127,8 @@ export function soundingParts(
         ? t("output.badge.dac")
         : ""
     : t(`output.badge.${sounding.route.fidelity}`);
-  return { format: sounding.codec, quality, route, vbr };
+  // With a DAC, how the music reaches it is the DAC's own view (soundingDevice).
+  return { format: sounding.codec, quality, route: soundingDac() ? "" : route, vbr };
 }
 
 /**
@@ -141,4 +142,18 @@ export function soundingDac(): boolean {
   if (!sounding) return false;
   if (output.phone) return sounding.route.device !== "Android";
   return output.device !== null;
+}
+
+/**
+ * What the display shows of the DAC the music goes to, when it goes to one (soundingDac): its
+ * name, the depth and rate it runs at ("24 bit · 96 kHz": the output's, which can differ from the
+ * file's when a mixer resamples it), and how faithful the way is ("bit-perfect"). Null otherwise.
+ */
+export function soundingDevice(): { device: string; quality: string; route: string } | null {
+  const sounding = output.sounding;
+  if (!sounding || !soundingDac()) return null;
+  const { device, rate, sample, fidelity } = sounding.route;
+  const quality = [sampleDepth(sample), rate > 0 ? `${kilohertz(rate)} kHz` : ""].filter(Boolean).join(" · ");
+  // Through a mixer, said so: the depth and rate above are then the mixer's, not the file's.
+  return { device, quality, route: fidelity === "mixer" ? t("output.way.mixer") : t(`output.badge.${fidelity}`) };
 }

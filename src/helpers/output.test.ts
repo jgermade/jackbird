@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_OUTPUT, describeFormat, devicesFor, fileKind, fileUrl, formatRate, parseOutputKind, settingsFor, shortFormat, type DeviceInfo } from "./output.ts";
+import { DEFAULT_OUTPUT, describeFormat, devicesFor, fileKind, fileUrl, formatRate, parseOutputKind, sampleDepth, settingsFor, shortFormat, type DeviceInfo } from "./output.ts";
 
 const devices: DeviceInfo[] = [
   { id: "coreaudio:dac", name: "USB DAC", default: true, modes: ["shared", "exclusive"] },
@@ -65,5 +65,24 @@ describe("fileKind", () => {
     assert.equal(fileKind("Artist/README"), "");
     assert.equal(fileKind(".hidden"), "");
     assert.equal(fileKind(""), "");
+  });
+});
+
+describe("sampleDepth", () => {
+  it("writes the desktop's sample formats", () => {
+    assert.equal(sampleDepth("i16"), "16 bit");
+    assert.equal(sampleDepth("i24"), "24 bit");
+    assert.equal(sampleDepth("i24high"), "24 bit");
+    assert.equal(sampleDepth("i32"), "32 bit");
+    assert.equal(sampleDepth("f32"), "32 bit float");
+  });
+  it("writes Android's", () => {
+    assert.equal(sampleDepth("16-bit"), "16 bit");
+    assert.equal(sampleDepth("24-bit"), "24 bit");
+    assert.equal(sampleDepth("float"), "32 bit float");
+  });
+  it("is empty for one it does not know", () => {
+    assert.equal(sampleDepth(""), "");
+    assert.equal(sampleDepth("encoding 22"), "");
   });
 });

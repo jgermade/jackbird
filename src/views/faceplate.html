@@ -26,7 +26,7 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum, stream } = await import("../lib/player")
-  const { soundingDac, soundingParts, soundingText } = await import("../lib/output")
+  const { soundingDac, soundingDevice, soundingParts, soundingText } = await import("../lib/output")
   const { closeRoot, selectRoot } = await import("../lib/roots")
   const { chooseTab, openAdding, shownTab, sourcesHere, tabsHere } = await import("../lib/adding")
   const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
@@ -46,10 +46,18 @@
   const markOf = () => CODEC_MARKS[markParts()?.format ?? ""] ?? null
 
   $: current = nowPlaying.value
-  // The display's left, while the music plays: the spectrum, or the song's format and how it
-  // reaches the device ("24/96" over "bit-perfect"). A click or a tap turns from one to the other;
-  // each song starts on its format for two seconds, then turns to the spectrum.
-  let markView: "format" | "spectrum" = "spectrum"
+  // The display's left, while the music plays: the song's format (the file's), the spectrum, and
+  // while the music goes to a DAC, the DAC (its name, and the depth and rate it runs at). A click or
+  // a tap turns from one to the next; each song starts on its format for two seconds, then turns to
+  // the spectrum.
+  type MarkView = "format" | "spectrum" | "dac"
+  let markView: MarkView = "spectrum"
+  const markViews = (): MarkView[] => (soundingDac() ? ["format", "spectrum", "dac"] : ["format", "spectrum"])
+  const nextMarkView = (): MarkView => {
+    const views = markViews()
+    return views[(views.indexOf(markView) + 1) % views.length]
+  }
+  const MARK_LABELS: Record<MarkView, string> = { format: "faceplate.showFormat", spectrum: "faceplate.showSpectrum", dac: "faceplate.showDac" }
   const markParts = () => soundingParts(stream.key === current?.key ? stream.info : null, current?.relativePath)
   const mark = (() => {
     const FORMAT_FIRST = 2000
@@ -68,7 +76,7 @@
       },
       toggle() {
         window.clearTimeout(timer)
-        markView = markView === "format" ? "spectrum" : "format"
+        markView = nextMarkView()
       },
       stop: () => window.clearTimeout(timer)
     }
@@ -140,7 +148,7 @@
         <div class="lcd">
           <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
           <button :if="playback.playing" type="button" class="lcd-mark playing"
-                  :aria-label="markView === 'format' ? t('faceplate.showSpectrum') : t('faceplate.showFormat')"
+                  :aria-label="t(MARK_LABELS[nextMarkView()])"
                   :title="soundingText()" @click="mark.toggle()">
             <span :if="markView === 'format' && markParts()" class="lcd-format">
               <!-- The codec: FLAC in the heavy lower case of its own lettering, MP3 and Ogg by their marks
@@ -157,11 +165,14 @@
               </span>
               <span :if="markParts()?.route" class="quality route">{{ markParts()?.route }}</span>
             </span>
-            <span :else class="lcd-meter">
-              <span class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
-              <!-- Under it, lit while the music goes to a DAC. -->
-              <span :if="soundingDac()" class="dac"><DisplayIcon filled>DAC</DisplayIcon></span>
+            <!-- The DAC: its mark, its name, the depth and rate it runs at, and how faithful the way is. -->
+            <span :elseif="markView === 'dac' && soundingDevice()" class="lcd-format">
+              <span class="icons"><DisplayIcon filled>DAC</DisplayIcon></span>
+              <span class="quality device">{{ soundingDevice()?.device }}</span>
+              <span :if="soundingDevice()?.quality" class="quality"><span :each="part in soundingDevice()?.quality.split(' · ') ?? []">{{ part }}</span></span>
+              <span :if="soundingDevice()?.route" class="quality route">{{ soundingDevice()?.route }}</span>
             </span>
+            <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="wide ? 16 : 6" :active="playback.playing" /></span>
           </button>
           <span :else class="lcd-mark" aria-hidden="true">
             <span class="lcd-logo" :style="`--logo: url(${logoUrl})`"></span>
@@ -288,10 +299,7 @@
   /* The display's left: the logo, lit in the display's own ink (its shape as a mask), or the spectrum while the music plays. */
   .lcd-mark { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; align-self: center; }
   .lcd-spectrum { display: block; width: 100%; height: 100%; }
-  /* The spectrum and, under it, the DAC mark when there is one. */
-  .lcd-meter { display: flex; flex-direction: column; align-items: center; gap: .1875rem; width: 100%; height: 100%; }
-  .lcd-meter .lcd-spectrum { flex: 1 1 auto; min-height: 0; }
-  .dac { display: inline-flex; flex: none; font-size: .5rem; }
+
   /* While the music plays, the spectrum stands as tall as the display's lines and meter together,
      taller than the logo it replaces. It is a key with no keycap: a click turns it to the format. */
   .lcd-mark.playing {
@@ -312,7 +320,7 @@
   /* The song's format in the spectrum's place: the codec (FLAC in its lettering, MP3 by its mark,
      others as a framed icon), its quality under it ("24 bit" over "96 kHz"), and in a native output how it reaches the
      device. */
-  .lcd-format { display: grid; place-content: center; justify-items: center; gap: .125rem; width: 100%; height: 100%; line-height: 1.15; }
+  .lcd-format { display: grid; grid-template-columns: minmax(0, 1fr); place-content: center; justify-items: center; gap: .125rem; width: 100%; height: 100%; line-height: 1.15; }
   .lcd-format .icons {
     display: flex;
     align-items: center;
@@ -350,6 +358,8 @@
   /* The quality keeps its units' case ("kHz", "kbps"); the route is a printed label. */
   .lcd-format .quality:not(.route) { display: grid; justify-items: center; text-transform: none; letter-spacing: .02em; }
   .lcd-format .route { opacity: .6; }
+  /* The DAC's name, as long as the window lets it be. */
+  .lcd-format .quality.device { display: block; width: 100%; min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; text-transform: none; letter-spacing: .02em; }
   .quality-line { display: flex; align-items: center; gap: .35em; }
   /* The VBR mark, small beside the figure it qualifies (the icon is sized in em). */
   .vbr { display: inline-flex; font-size: .62em; }
@@ -399,7 +409,8 @@
   .lcd { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--mm-space-3); min-width: 0; }
   .lcd-main { display: grid; gap: var(--mm-space-1); min-width: 0; }
   .lcd-lines { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
-  .lcd-text { display: grid; flex: 1 1 auto; gap: var(--mm-space-1); min-width: 0; }
+  /* The title and the artist from the top, level with the clock's first line, not centred against it. */
+  .lcd-text { display: grid; flex: 1 1 auto; align-self: flex-start; gap: var(--mm-space-1); min-width: 0; }
   /* The clock: a key with no keycap, like the display's left. */
   .lcd-time {
     flex: none;
