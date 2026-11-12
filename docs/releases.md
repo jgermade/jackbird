@@ -1,7 +1,8 @@
 # Releases and deployment
 
 Three GitHub Actions workflows, in [`.github/workflows/`](../.github/workflows/), build, release
-and deploy jackbird. Deployment goes to GitHub Pages, at <https://jgermade.github.io/jackbird/>.
+and deploy jackbird. Deployment goes to GitHub Pages: a landing page at
+<https://jgermade.github.io/jackbird/>, and the app's demo at <https://jgermade.github.io/jackbird/demo/>.
 
 ## `build.yml`: test and bundle
 
@@ -68,13 +69,24 @@ Run it by hand from **Actions → deploy → Run workflow**, with one input:
 | --- | --- | --- |
 | `tag` | a release tag, such as `v0.2.0`, or `latest` | `latest` |
 
-It does not rebuild. It downloads the zip attached to that release (for `latest`, the latest
-release) and publishes it to GitHub Pages, so what goes live is exactly what was tested and
-released. Deploying an older tag rolls the site back to it. Deployments run one at a time, in the
-`github-pages` environment, and the run links to the published site.
+It publishes three things to GitHub Pages:
+
+- **The landing page**, at the root (<https://jgermade.github.io/jackbird/>): `landing/`, put
+  together by `node scripts/build-landing.mjs site` from the commit the workflow runs on, with the
+  Deck theme's tokens and fonts, the logo and the screenshots it borrows. To look at it locally,
+  run `node scripts/build-landing.mjs` and serve `.tmp/landing/`.
+- **The app, as the demo**, at `/demo/`. It does not rebuild it: it downloads the zip attached to
+  that release (for `latest`, the latest release), so what goes live is exactly what was tested
+  and released.
+- **The design system**, at `/design/`: a redirect to the Deck theme's specimen sheet, which
+  every build carries (`/demo/theme/default/`).
+
+Deploying an older tag rolls the demo back to it; the landing page is always the workflow's own.
+Deployments run one at a time, in the `github-pages` environment, and the run links to the
+published site.
 
 The build uses a relative base (`base: "./"` in `vite.config.ts`), so the same files work under
-`/jackbird/` on Pages and at the root anywhere else.
+`/jackbird/demo/` on Pages and at the root anywhere else.
 
 ## One-off settings on GitHub
 

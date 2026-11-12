@@ -1,5 +1,8 @@
-# Deploys a released build to GitHub Pages. It does not rebuild: it publishes the
-# <repo>-vX.Y.Z.zip attached to the release, which is what release.yml tested and built.
+# Deploys to GitHub Pages: the landing page at the root (landing/, put together by
+# scripts/build-landing.mjs from the workflow's own commit), and a released build of the app as
+# its demo, in /demo/. The app is not rebuilt: it is the <repo>-vX.Y.Z.zip attached to the
+# release, which is what release.yml tested and built. /design/ leads to the Deck theme's
+# specimen sheet in that build (/demo/theme/default/).
 #
 # Needs Settings → Pages → Source: GitHub Actions.
 name: deploy
@@ -39,6 +42,15 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Put the landing page together
+        run: node scripts/build-landing.mjs site
+
       - name: Download the release build
         env:
           TAG: ${{ inputs.tag }}
@@ -47,7 +59,7 @@ jobs:
             TAG="$(gh release view --json tagName --jq .tagName)"
           fi
           gh release download "$TAG" --pattern "${GITHUB_REPOSITORY#*/}-*.zip" --dir release
-          unzip -q release/*.zip -d site
+          unzip -q release/*.zip -d site/demo
           echo "Deploying \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/configure-pages@v5
