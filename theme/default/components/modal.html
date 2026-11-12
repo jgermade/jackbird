@@ -14,10 +14,12 @@
   // With it the dialog keeps one height whichever tab is open (within the
   // viewport; the body scrolls), so the tabs never move.
   //
-  // It comes in rising a little and fading in over a fading backdrop, and
-  // goes out the same way back (`@starting-style`, and `display` and
-  // `overlay` moved discretely); where a browser has neither, it opens and
-  // closes at once. With reduced motion the durations are 0.
+  // It comes in rising and growing a little as it fades in, over a backdrop
+  // fading in, and goes out the same way back, quicker; the dialog closes once
+  // it is out. Played with the Web Animations API, which every engine the app
+  // runs in has (the desktop app's WebKit included, where `@starting-style`
+  // and discrete transitions may not be). With reduced motion the theme's
+  // durations are 0, and it simply appears and goes.
   //
   // At 720px and below it is a bottom sheet: the whole width, from the
   // bottom, rounded at the top, sliding in and out. Its header can be dragged
@@ -40,17 +42,68 @@
   $: isOpen = flag(open)
   const titleId = `mm-modal-${Math.random().toString(36).slice(2, 10)}`
 
+  // The way in and out. The state lives in this closure, not in the store.
+  const motion = (() => {
+    const SHEET = matchMedia("(max-width: 720px)")
+    let leaving: Animation | null = null
+    const ms = (element: Element, token: string): number => {
+      const value = getComputedStyle(element).getPropertyValue(token).trim()
+      return value.endsWith("ms") ? parseFloat(value) : parseFloat(value) * 1000 || 0
+    }
+    // The dialog where it rests away: below and a little smaller; a sheet, below the screen.
+    const away = () => (SHEET.matches ? { transform: "translateY(100%)" } : { opacity: 0, transform: "translateY(1.5rem) scale(.96)" })
+    const here = () => (SHEET.matches ? { transform: "translateY(0)" } : { opacity: 1, transform: "none" })
+    // The backdrop has its own animation; an engine without it shows it at once.
+    const backdrop = (dialog: HTMLDialogElement, frames: Keyframe[], options: KeyframeAnimationOptions) => {
+      try {
+        dialog.animate(frames, { ...options, pseudoElement: "::backdrop" })
+      } catch {
+        // No animation on ::backdrop here.
+      }
+    }
+    const enter = (dialog: HTMLDialogElement) => {
+      leaving?.cancel()
+      leaving = null
+      if (!dialog.open) dialog.showModal()
+      const duration = ms(dialog, "--mm-duration-slow")
+      if (!duration || typeof dialog.animate !== "function") return
+      dialog.animate([away(), here()], { duration, easing: "cubic-bezier(.2, .8, .2, 1)" })
+      backdrop(dialog, [{ opacity: 0 }, { opacity: 1 }], { duration, easing: "ease-out" })
+    }
+    const leave = (dialog: HTMLDialogElement) => {
+      if (leaving) return
+      const duration = ms(dialog, "--mm-duration") * 1.2
+      const close = () => {
+        leaving = null
+        if (!flag(open)) dialog.close()
+        drag.reset()
+      }
+      if (!duration || typeof dialog.animate !== "function") return close()
+      // From wherever it is (a sheet dragged down part of the way included).
+      const from = getComputedStyle(dialog)
+      leaving = dialog.animate([{ opacity: from.opacity, transform: from.transform === "none" ? "none" : from.transform }, away()], {
+        duration,
+        easing: "cubic-bezier(.4, 0, 1, 1)",
+        fill: "forwards"
+      })
+      backdrop(dialog, [{ opacity: 1 }, { opacity: 0 }], { duration, easing: "ease-in", fill: "forwards" })
+      leaving.onfinish = () => {
+        close()
+        dialog.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
+      }
+    }
+    return { enter, leave, leaving: () => leaving !== null }
+  })()
+
   const sync = () => {
     const dialog = $self("dialog") as HTMLDialogElement | null
     if (!dialog) return
-    if (isOpen && !dialog.open) {
-      drag.reset()
-      dialog.showModal()
+    // Opened, or opened again while it was going.
+    if (isOpen && (!dialog.open || motion.leaving())) {
+      if (!dialog.open) drag.reset()
+      motion.enter(dialog)
     }
-    if (!isOpen && dialog.open) {
-      dialog.close()
-      drag.reset()
-    }
+    if (!isOpen && dialog.open) motion.leave(dialog)
   }
   $: sync(isOpen)
 
@@ -113,11 +166,13 @@
       dragging = false
       swallowClick()
       if (moved > element.offsetHeight / 4 || speed > 0.6) {
-        element.style.transition = ""
-        element.style.transform = "translateY(100%)"
-        window.setTimeout(() => $emit("close"), 180)
+        // It goes on down from where it was let go (motion.leave).
+        $emit("close")
       } else {
+        // It springs back.
+        const from = element.style.transform
         reset()
+        element.animate?.([{ transform: from }, { transform: "translateY(0)" }], { duration: 200, easing: "cubic-bezier(.2, .8, .2, 1)" })
       }
     }
     return { down, move, up, reset }
@@ -153,7 +208,6 @@
   .modal {
     --width: 35rem;
     --height: 30rem;
-    --away: translateY(.75rem) scale(.98);
     width: min(var(--width), calc(100vw - 2 * var(--mm-space-4)));
     max-height: calc(100vh - 2 * var(--mm-space-6));
     padding: 0;
@@ -163,28 +217,13 @@
     color: var(--mm-fg);
     box-shadow: var(--mm-shadow-lg);
     overflow: hidden;
-    opacity: 0;
-    transform: var(--away);
-    transition: opacity var(--mm-duration) var(--mm-ease),
-                transform var(--mm-duration) var(--mm-ease),
-                overlay var(--mm-duration) allow-discrete,
-                display var(--mm-duration) allow-discrete;
   }
-  .modal[open] { display: flex; flex-direction: column; opacity: 1; transform: none; }
+  /* Its way in and out is played from the script (motion). */
+  .modal[open] { display: flex; flex-direction: column; }
   .modal.with-nav { height: min(var(--height), calc(100vh - 2 * var(--mm-space-6))); }
   .size-sm { --width: 25rem; --height: 24rem; }
   .size-lg { --width: 47.5rem; --height: 48rem; }
-  .modal::backdrop {
-    background-color: transparent;
-    transition: background-color var(--mm-duration) var(--mm-ease),
-                overlay var(--mm-duration) allow-discrete,
-                display var(--mm-duration) allow-discrete;
-  }
-  .modal[open]::backdrop { background-color: var(--mm-overlay); }
-  @starting-style {
-    .modal[open] { opacity: 0; transform: var(--away); }
-    .modal[open]::backdrop { background-color: transparent; }
-  }
+  .modal::backdrop { background-color: var(--mm-overlay); }
 
   .head {
     display: grid;
@@ -226,11 +265,9 @@
     border-top: var(--mm-border-width) solid var(--mm-border);
   }
 
-  /* Phones: a bottom sheet. Instead of the fade and rise above, it stays
-     opaque and slides up as it opens and down as it closes (display and
-     overlay transition as discrete steps); the backdrop keeps its fade. The
-     theme's durations are zero under reduced motion, so then it simply
-     appears. */
+  /* Phones: a bottom sheet. Instead of the fade and rise, it stays opaque
+     and slides up as it opens and down as it closes (motion, in the script);
+     the backdrop keeps its fade. */
   @media (max-width: 720px) {
     .modal {
       width: 100%;
@@ -239,19 +276,9 @@
       margin: auto 0 0;
       border-bottom-width: 0;
       border-radius: var(--mm-radius-lg) var(--mm-radius-lg) 0 0;
-      opacity: 1;
-      transform: translateY(100%);
-      transition:
-        transform var(--mm-duration-slow) var(--mm-ease),
-        overlay var(--mm-duration-slow) allow-discrete,
-        display var(--mm-duration-slow) allow-discrete;
     }
-    .modal[open] { transform: translateY(0); }
     /* A phone's navigation bar under the sheet (--mm-safe-bottom, set by the app on Android). */
     .modal { padding-bottom: var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)); }
-    @starting-style {
-      .modal[open] { opacity: 1; transform: translateY(100%); }
-    }
     /* The header is where the sheet is dragged from: its handle says so. */
     .head { touch-action: none; padding-top: var(--mm-space-4); }
     .grab {
