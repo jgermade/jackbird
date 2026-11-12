@@ -1,9 +1,12 @@
-<script :setup="{ level = 0, max = 1, segments = 32, pitch = 0, variant = 'chassis', label = '', levelText = '' }: Props" lang="ts">
+<script :setup="{ level = 0, ahead = 0, max = 1, segments = 32, pitch = 0, variant = 'chassis', label = '', levelText = '' }: Props" lang="ts">
   // A segmented meter: progress as lit segments, like a level meter. Inside a
   // Display (`variant="display"`) it lights in the window's ink; anywhere
   // else (`chassis`) it is a row of LEDs in a well.
   //
   //   <Meter :level="603" :max="739" label="Reading tags" level-text="603 of 739 tracks" />
+  //
+  // `ahead` (on the same scale as `level`) lights the segments past the level
+  // up to it at half strength: what a streamed track has buffered.
   //
   // With `pitch` (a segment's width, in rem) the segments keep that width and
   // their count follows the meter's: more on a wide screen, fewer on a narrow
@@ -17,6 +20,7 @@
 
   type Props = {
     level?: number
+    ahead?: number
     max?: number
     segments?: number
     pitch?: number
@@ -31,6 +35,7 @@
   $: top = Number(max)
   $: fraction = top > 0 ? Math.min(1, Math.max(0, Number(level) / top)) : 0
   $: lit = Math.round(fraction * count)
+  $: aheadLit = top > 0 ? Math.round(Math.min(1, Math.max(0, Number(ahead) / top)) * count) : 0
   $: cells = Array.from({ length: count }, (_, index) => index)
 
   const GAP_PX = 2
@@ -61,7 +66,7 @@
      :aria-valuenow="String(level)"
      :aria-valuetext="levelText || null"
      :style="`--segments: ${count}`">
-  <i :each="cell in cells" :key="cell" :class.on="cell < lit"></i>
+  <i :each="cell in cells" :key="cell" :class.on="cell < lit" :class.ahead="cell >= lit && cell < aheadLit"></i>
 </div>
 
 <style scoped>
@@ -75,6 +80,7 @@
 
   .display { height: .375rem; }
   .display i { background: var(--mm-display-dim); }
+  .display i.ahead { background: color-mix(in srgb, var(--mm-display-fg) 35%, var(--mm-display-dim)); }
   .display i.on { background: var(--mm-display-fg); box-shadow: var(--mm-display-glow); }
 
   .chassis {
@@ -86,5 +92,6 @@
     box-shadow: var(--mm-well-shadow);
   }
   .chassis i { background: var(--mm-led-off); opacity: .45; }
+  .chassis i.ahead { background: var(--mm-accent); opacity: .35; }
   .chassis i.on { background: var(--mm-accent); opacity: 1; box-shadow: 0 0 .25rem var(--mm-accent); }
 </style>

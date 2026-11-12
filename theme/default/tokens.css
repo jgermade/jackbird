@@ -122,7 +122,8 @@
      are offsets in em from the middle, not shares of the gradient's length, so slanting it keeps
      the bands as thin as on level lettering. */
   --mm-metal-angle: 175deg;
-  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #a7acb0 calc(50% - .575em), #767c81 calc(50% - .21em), #3f4448 calc(50% + .023em), #81878c calc(50% + .23em), #b4b9bc calc(50% + .575em));
+  /* The metal dark at its edges, a light reflection across its middle. */
+  --mm-metal-face: linear-gradient(var(--mm-metal-angle), #2f3437 calc(50% - .575em), #5d6368 calc(50% - .21em), #d4d8db calc(50% + .023em), #6a7075 calc(50% + .23em), #2a2e31 calc(50% + .575em));
   --mm-metal-shadow: 1px 1px .5px rgba(20, 24, 24, .55);
 
   /* ---- type --------------------------------------------------------------- */

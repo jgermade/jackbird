@@ -18,6 +18,7 @@
   const { nowPlaying, readSpectrum, stream } = await import("../lib/player")
   const { soundingDac, soundingDevice, soundingParts, soundingText } = await import("../lib/output")
   const { playback } = await import("../lib/playback")
+  const { library } = await import("../lib/library")
   const { t } = await import("../lib/i18n")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   const mp3Url: string = (await import("../assets/formats/mp3.svg?url")).default
@@ -88,6 +89,10 @@
   // it, in place of the song's title and artist.
   $: dacName = markView === "dac" ? (soundingDevice()?.device ?? "") : ""
   $: dacWay = markView === "dac" ? (soundingDevice()?.route ?? "") : ""
+  // Nothing open yet (and nothing coming back): the title's line runs a marquee instead of
+  // "Nothing playing", at a pace by its length.
+  $: marquee = !current && !playback.error && !library.restoring && library.roots.length === 0 ? t("faceplate.marquee") : ""
+  $: marqueePace = `--marquee-time: ${Math.max(8, Math.round(marquee.length * 0.28))}s`
   $: titleLine = dacName || playback.error || (current ? current.title : t("faceplate.idle"))
   $: artistLine = dacName ? dacWay : playback.error ? "" : (current?.artist ?? "")
   // The clock at the display's right, turned with a click or a tap: where the song is (its minutes
@@ -142,7 +147,8 @@
           <div class="lcd-text">
             <span class="now">
               <span class="visually-hidden">{{ stateLabel }}</span>
-              <span class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
+              <span :if="marquee" class="mm-display-title marquee" :style="marqueePace"><span class="marquee-run" aria-hidden="true"><span>{{ marquee }}</span><span>{{ marquee }}</span></span><span class="visually-hidden">{{ marquee }}</span></span>
+              <span :else class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
             </span>
             <span class="now">
               <span class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
@@ -162,7 +168,7 @@
             </span>
           </button>
         </div>
-        <Meter variant="display" :segments="40" :pitch=".625" :level="playback.position" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+        <Meter variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
       </div>
     </div>
   </Display>
@@ -251,6 +257,17 @@
     background: currentColor;
     -webkit-mask: var(--logo) center / contain no-repeat;
     mask: var(--logo) center / contain no-repeat;
+  }
+  /* The marquee: the text twice in a row, slid left by one copy and round again, so it runs on
+     without a seam; still, cut with an ellipsis, under reduced motion. */
+  .marquee { display: block; text-overflow: clip; }
+  .marquee-run { display: inline-flex; animation: marquee var(--marquee-time, 20s) linear infinite; }
+  .marquee-run > span { padding-right: 3em; }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee { text-overflow: ellipsis; }
+    .marquee-run { animation: none; }
+    .marquee-run > span + span { display: none; }
   }
   /* The display's second line: the artist, under the title. */
   .artist { font-weight: var(--mm-weight-regular); opacity: .7; }

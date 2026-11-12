@@ -68,7 +68,9 @@
   <!-- While no folder is open: the sources' tabs, a folder or a server (their content is the
        workspace's welcome, views/sources-panel.html), instead of the roots and the key to add one. -->
   <Tabs :if="!hasRoots && !library.restoring && sourceTabs().length > 1" :label="t('sources.tabs')" :items="sourceTabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
-  <Tabs :else :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
+  <!-- The roots' bar: hidden while nothing is open, coming back or to import (the welcome is the
+       page then, and the panes' key has no panes to turn between). -->
+  <Tabs :elseif="hasRoots || library.restoring || (importing.available && can('editor'))" :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" closable compact
         :add-label="folderLabel" :add-disabled="library.loading || sourcesHere().length === 0" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>

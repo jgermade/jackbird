@@ -240,8 +240,9 @@ export async function hydrateRoot(
             checksum: fullChecksum,
             fullChecksum,
             audioChecksum,
-            size: file.size,
-            lastModified: file.lastModified,
+            // The file as it was read, which may be newer than the walk saw it (a sample still on its way).
+            size: found.size,
+            lastModified: found.lastModified ?? file.lastModified,
             lastVerifiedAt: nowIso,
             metadata,
             updatedAt: nowIso

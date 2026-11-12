@@ -82,6 +82,7 @@ export const en = {
   "faceplate.state.loading": "Loading",
   "faceplate.state.error": "Error",
   "faceplate.idle": "Nothing playing",
+  "faceplate.marquee": "Welcome to jackbird · Your music, its tags in order · Choose a folder, or try the sample music",
   "compact.window": "Compact window",
   "compact.float": "Float the player",
   "compact.page": "Compact view",

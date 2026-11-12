@@ -11,6 +11,8 @@ export const playback = $reactive({
   /** Seconds into the current track, and its length (0 until known). */
   position: 0,
   duration: 0,
+  /** The second the buffer reaches, while the track streams (0 when unknown; the length when whole). */
+  buffered: 0,
   loading: false,
   error: null as string | null
 });

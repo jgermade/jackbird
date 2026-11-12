@@ -20,6 +20,7 @@ import {
   restoreQueue,
   type QueuePosition
 } from "../helpers/queue";
+import { bufferedTo, rangesOf } from "../helpers/buffered";
 import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
@@ -469,6 +470,7 @@ async function load(current: NowPlaying | null): Promise<void> {
   release();
   playback.position = 0;
   playback.duration = 0;
+  playback.buffered = 0;
   playback.error = null;
 
   if (!current) {
@@ -553,6 +555,14 @@ function wire(element: HTMLAudioElement | NativeAudio | PhoneAudio): void {
     if (element !== audio) return;
     playback.duration = Number.isFinite(element.duration) ? element.duration : 0;
   });
+  // How far the track is buffered (an element that reads it as it streams; a native player has none).
+  if ("buffered" in element) {
+    const buffer = () => {
+      if (element !== audio) return;
+      playback.buffered = bufferedTo(rangesOf(element.buffered), element.currentTime, element.duration);
+    };
+    for (const type of ["progress", "timeupdate", "durationchange", "seeked"] as const) element.addEventListener(type, buffer);
+  }
   // Waiting for data for two seconds while it should play: the file may have
   // been rewritten by another program, which nothing here has noticed yet.
   let stalled: ReturnType<typeof setTimeout> | null = null;
