@@ -19,6 +19,7 @@
   const { soundingDac, soundingDevice, soundingParts, soundingText } = await import("../lib/output")
   const { playback } = await import("../lib/playback")
   const { library } = await import("../lib/library")
+  const { activeRoot } = await import("../lib/workspace")
   const { t } = await import("../lib/i18n")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   const mp3Url: string = (await import("../assets/formats/mp3.svg?url")).default
@@ -95,8 +96,23 @@
   $: marquee = !current && !playback.error && !library.restoring && library.roots.length === 0 ? t("faceplate.marquee") : ""
   $: marqueeSub = marquee ? t("faceplate.marqueeSub") : ""
   const pace = (text: string): string => `--marquee-time: ${Math.max(8, Math.round(text.length * 0.28))}s`
-  $: titleLine = dacName || playback.error || (current ? current.title : t("faceplate.idle"))
-  $: artistLine = dacName ? dacWay : playback.error ? "" : (current?.artist ?? "")
+  // Nothing playing: a remark of the deck's own, a new one every so often (IDLE_LINES of them).
+  const IDLE_LINES = 12
+  let idleLine = 1 + Math.floor(Math.random() * IDLE_LINES)
+  const idleTimer = window.setInterval(() => {
+    if (current) return
+    idleLine = 1 + ((idleLine + Math.floor(Math.random() * (IDLE_LINES - 1))) % IDLE_LINES)
+  }, 20000)
+  $destroyed(() => window.clearInterval(idleTimer))
+  // A folder's tags being read, with nothing playing: the display says so, its meter the progress
+  // (in place of the library's own meter). Read through a function: the root is boxed.
+  const reading = (): { loaded: number; total: number } | null => {
+    const root = activeRoot.value.data
+    return root?.loadingMetadata && root.tracks.length > 0 ? { loaded: root.loadedCount, total: root.tracks.length } : null
+  }
+  $: readingNow = !current && !playback.error ? reading() : null
+  $: titleLine = dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
+  $: artistLine = dacName ? dacWay : playback.error ? "" : current ? (current.artist ?? "") : readingNow ? t("faceplate.readingCount", { loaded: readingNow.loaded, total: readingNow.total }) : ""
   // The clock at the display's right, turned with a click or a tap: where the song is (its minutes
   // over its seconds), its length (the same), or both (where it is over its length, each mm:ss).
   // The minutes' zeros at the left are dimmed: "03" shows its 3 lit, "00" nothing lit.
@@ -171,7 +187,8 @@
             </span>
           </button>
         </div>
-        <Meter variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+        <Meter :if="readingNow" variant="display" :segments="40" :pitch=".625" :level="readingNow.loaded" :max="readingNow.total" :label="t('faceplate.reading')" :level-text="t('faceplate.readingCount', { loaded: readingNow.loaded, total: readingNow.total })" />
+        <Meter :else variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
       </div>
     </div>
   </Display>

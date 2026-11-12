@@ -385,6 +385,16 @@ export function folderTracks(rowKey: string): { label: string; trackIds: string[
 }
 
 /** Queues a folder row's tracks, in the order the folder plays them, next or at the end. */
+/**
+ * What the album sheet shows, queued in the order it plays, its first track loaded paused (nothing
+ * starts by itself): the app embedded in the landing page, ready for its play keys.
+ */
+export function queueWhatIsShown(): void {
+  const { root, scope } = derive();
+  if (!root || scope.tracks.length === 0) return;
+  addToQueue(queueOf(root.id, playOrder(scope).map((track) => track.id), scope.label).items, scope.label);
+}
+
 export function queueFolder(rowKey: string, where: "next" | "end"): void {
   const { root, rows } = derive();
   const row = rows.find((item) => item.key === rowKey);

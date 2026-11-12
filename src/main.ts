@@ -14,7 +14,7 @@ import { startHotkeys } from "./lib/hotkeys";
 import { loadRecent } from "./lib/recent";
 import { loadFavourites, startMine } from "./lib/mine";
 import { keepPlaybackSaved, restorePlayback } from "./lib/player";
-import { isDesktop, isPhone } from "./lib/platform";
+import { isDesktop, isEmbed, isPhone } from "./lib/platform";
 import { followActiveRoot, keepSessionSaved, restoreSession } from "./lib/session";
 import { startVerifier } from "./lib/verifier";
 import App from "./views/app.html";
@@ -23,20 +23,51 @@ App.mount("#app");
 keepFaviconLit();
 startCompact();
 startHotkeys();
-void loadRecent();
-keepSessionSaved();
-startVerifier();
-// The folders come back once someone is in (the service's people, S3); the
-// music once its root has: restoring it saves nothing over it.
-void startAccount()
-  .then(() => startMine())
-  .then(() => restoreSession())
-  .then(() => {
-    void loadFavourites();
-    followActiveRoot();
-    restorePlayback();
-    keepPlaybackSaved();
-  });
+// Embedded in the landing page (`?embed`): the sample music at once, and nothing of this browser's
+// own session (restored or saved), so the demo (/demo/) keeps its own.
+if (isEmbed) {
+  void startEmbedded();
+} else {
+  startSession();
+}
+
+/** The app embedded in the landing page: nothing to restore; the sample music, queued paused. */
+async function startEmbedded(): Promise<void> {
+  const [{ library }, { sampleList }, { openSamples }, { queueWhatIsShown }] = await Promise.all([
+    import("./lib/library"),
+    import("./lib/sources/samples"),
+    import("./lib/roots"),
+    import("./lib/workspace")
+  ]);
+  library.restoring = false;
+  const list = await sampleList();
+  if (!list) return;
+  await openSamples(list);
+  // Its tracks come with the folder's walk (the first time, their copies too): queued once read.
+  for (let waited = 0; waited < 120; waited += 1) {
+    const root = library.roots.find((one) => one.id === library.activeRootId);
+    if (root && root.tracks.length > 0 && !root.loadingMetadata) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  queueWhatIsShown();
+}
+
+function startSession(): void {
+  void loadRecent();
+  keepSessionSaved();
+  startVerifier();
+  // The folders come back once someone is in (the service's people, S3); the
+  // music once its root has: restoring it saves nothing over it.
+  void startAccount()
+    .then(() => startMine())
+    .then(() => restoreSession())
+    .then(() => {
+      void loadFavourites();
+      followActiveRoot();
+      restorePlayback();
+      keepPlaybackSaved();
+    });
+}
 // The desktop app's unattended check (desktop.yml), only when the app is started for it.
 if (isDesktop && !isPhone) {
   void import("./lib/sources/check").then((check) => check.runCheckIfAsked());

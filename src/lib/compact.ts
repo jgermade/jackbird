@@ -14,7 +14,7 @@
 import { $reactive } from "jq79";
 import { compactHeightFor, compactSize, isCompactShortcut, parseCompactState, pipSize, type Bounds, type CompactState } from "../helpers/compact";
 import { onSpace } from "./hotkeys";
-import { isDesktop, isPhone } from "./platform";
+import { isDesktop, isEmbed, isPhone } from "./platform";
 import { readStored, STORAGE_KEYS, writeStored } from "./storage";
 
 /** Where the compact view is: not shown, the window, a floating window, or the page. */
@@ -29,8 +29,8 @@ type PipApi = { requestWindow(options: { width: number; height: number }): Promi
 const pipApi = (): PipApi | null =>
   typeof window !== "undefined" && "documentPictureInPicture" in window ? ((window as unknown as { documentPictureInPicture: PipApi }).documentPictureInPicture ?? null) : null;
 
-/** This runtime's place for the compact view. Phones have none: their screen is one deck already. */
-export const compactPlace: CompactPlace | null = isPhone ? null : isDesktop ? "window" : pipApi() ? "pip" : "page";
+/** This runtime's place for the compact view. Phones have none: their screen is one deck already; nor the app embedded in the landing page, which draws it always. */
+export const compactPlace: CompactPlace | null = isPhone || isEmbed ? null : isDesktop ? "window" : pipApi() ? "pip" : "page";
 
 export const compact = $reactive({
   mode: "full" as CompactMode,

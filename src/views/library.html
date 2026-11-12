@@ -1,7 +1,7 @@
 <script :setup lang="ts">
   // The library pane: the active root's folders and tracks as a tree (or as
   // one of its views), with its head (the view keys),
-  // its messages and the scan meter. Each row's ⋮ is its menu (lib/menus.ts).
+  // its messages (the scan's progress is the display's). Each row's ⋮ is its menu (lib/menus.ts).
   // A view over lib/workspace.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5) and
   // RECORD/2026-11-04.github-actions-workflows.WIP.md (W6, W8, and the head
@@ -10,7 +10,6 @@
   const Key = await import("../../theme/default/components/key.html")
   const ListRow = await import("../../theme/default/components/list-row.html")
   const Menu = await import("../../theme/default/components/menu.html")
-  const Meter = await import("../../theme/default/components/meter.html")
   const Reel = await import("../../theme/default/components/reel.html")
 
   const { formatTrackNumber, trackLead } = await import("../helpers/format")
@@ -154,10 +153,6 @@
     <p :if="library.infoMessage" class="notice" role="status">{{ library.infoMessage }}</p>
   </div>
 
-  <div :if="isLoading()" class="scan">
-    <Meter :segments="24" :level="root().loadedCount" :max="root().tracks.length" :label="t('library.loadingMetadata', { loaded: root().loadedCount, total: root().tracks.length })" />
-    <span class="mm-legend">{{ t("library.loadingMetadata", { loaded: root().loadedCount, total: root().tracks.length }) }}</span>
-  </div>
 
   <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
@@ -230,7 +225,6 @@
   }
   .notice.is-error { border-left-color: var(--mm-bad-led); background: var(--mm-bad-soft); color: var(--mm-bad); }
 
-  .scan { display: grid; gap: var(--mm-space-2); padding: var(--mm-space-3) var(--mm-space-4) 0; }
 
   .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }
   .tree { padding-block: var(--mm-space-2); outline: none; }

@@ -6,6 +6,7 @@
 import { $reactive } from "jq79";
 import { pickLanguage } from "../helpers/i18n";
 import type { Language, Theme } from "../types";
+import { isEmbed } from "./platform";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 
 export const LANGUAGES: readonly Language[] = ["en", "es"];
@@ -31,9 +32,17 @@ function browserLanguage(): Language {
   return pickLanguage(preferred, LANGUAGES, "en");
 }
 
+/** Embedded in the landing page (`?embed`): its tone (`&tone=`) and its language (`&lang=`), not this browser's saved ones. */
+const embedded = isEmbed ? new URLSearchParams(location.search) : null;
+const embeddedTheme = (): Theme | null => {
+  const tone = embedded?.get("tone");
+  return tone === "light" || tone === "dark" ? tone : null;
+};
+const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => language === embedded?.get("lang")) ?? null;
+
 export const preferences = $reactive({
-  theme: storedTheme() ?? systemTheme(),
-  language: storedLanguage() ?? browserLanguage()
+  theme: embeddedTheme() ?? storedTheme() ?? systemTheme(),
+  language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage()
 });
 
 function apply(): void {
@@ -43,9 +52,18 @@ function apply(): void {
 apply();
 preferences.$onAny(apply);
 
+// The landing page turns its tone, and the embedded app's with it (saved nowhere).
+if (isEmbed) {
+  window.addEventListener("message", (event) => {
+    const data = event.data as { type?: string; tone?: string } | null;
+    if (event.origin !== location.origin || data?.type !== "jackbird:tone") return;
+    if (data.tone === "light" || data.tone === "dark") preferences.theme = data.tone;
+  });
+}
+
 if (typeof matchMedia === "function") {
   matchMedia(DARK_QUERY).addEventListener("change", (event) => {
-    if (storedTheme() === null) {
+    if (!isEmbed && storedTheme() === null) {
       preferences.theme = event.matches ? "dark" : "light";
     }
   });

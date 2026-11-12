@@ -11,6 +11,14 @@ export const isDesktop: boolean = typeof window !== "undefined" && "__TAURI_INTE
  */
 export const isPhone: boolean = isDesktop && typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
 
+/**
+ * Whether the page is the app embedded in the landing page (`?embed`, in an iframe of it): the
+ * sample music opened at once, its window and its compact player drawn together over one player,
+ * no session kept, the tone the landing page's. See RECORD/2026-11-03.deck-design-system.WIP.md
+ * (2026-11-13 20:30).
+ */
+export const isEmbed: boolean = !isDesktop && typeof location !== "undefined" && new URLSearchParams(location.search).has("embed");
+
 let served: Promise<boolean> | null = null;
 
 /**

@@ -305,8 +305,9 @@ h1 em {
 
 .phone { display: grid; grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); align-items: center; gap: 4rem; }
 .phone img {
-  border: .5rem solid #0d0e0f;
-  border-radius: 2.25rem;
+  /* A thin bezel, the corners of a phone's screen rather than a pebble's. */
+  border: .25rem solid #0d0e0f;
+  border-radius: 1.25rem;
   box-shadow: var(--mm-shadow-lg), 0 0 0 1px var(--mm-border-strong);
   transform: rotate(-4deg);
 }
