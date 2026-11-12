@@ -118,7 +118,7 @@
      horizon slanted, a light edge below and a shadow above (the faceplate's wordmark). The stops
      are offsets in em from the middle, not shares of the gradient's length, so slanting it keeps
      the bands as thin as on level lettering. */
-  --mm-metal-angle: 172deg;
+  --mm-metal-angle: 175deg;
   --mm-metal-face: linear-gradient(var(--mm-metal-angle), #a7acb0 calc(50% - .575em), #767c81 calc(50% - .21em), #3f4448 calc(50% + .023em), #81878c calc(50% + .23em), #b4b9bc calc(50% + .575em));
   --mm-metal-light: rgba(255, 255, 255, .9);
   --mm-metal-shadow: rgba(0, 0, 0, .45);
