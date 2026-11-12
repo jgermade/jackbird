@@ -254,6 +254,21 @@ fn media_url(roots: State<'_, Roots>, media: State<'_, Media>, root: String, pat
     })
 }
 
+/// A file of a folder the person chose in Android's folder picker (E6b-D9), opened by the app's
+/// plugin and reached as `/proc/self/fd/<fd>`: its size, date, checksums, and tags unless its full
+/// checksum is still `known`. Only a descriptor of the app's own process can be named.
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn inspect_fd(fd: i32, known: Option<String>) -> Answer<InspectionJson> {
+    if fd < 0 {
+        return Err(failure("io", "no file"));
+    }
+    let path = std::path::PathBuf::from(format!("/proc/self/fd/{fd}"));
+    blocking(move || jackbird_core::inspect_file(&path, known.as_deref()))
+        .await
+        .map(Into::into)
+}
+
 /// The unattended check's folder, when the app runs it (`JACKBIRD_CHECK_FOLDER`, `desktop.yml`).
 #[tauri::command]
 fn check_folder() -> Option<String> {
@@ -334,8 +349,13 @@ pub fn run() {
         audio::audio_status,
         audio::audio_spectrum
     ]);
-    // The phone's native player (E6b): the page drives it directly (src/lib/phone-audio.ts).
-    #[cfg(mobile)]
+    // The phone's native player and folders (E6b): the page drives the plugin directly
+    // (src/lib/phone-audio.ts, src/lib/sources/phone.ts); Rust reads the folders' tags.
+    #[cfg(target_os = "android")]
+    let builder = builder
+        .plugin(tauri_plugin_jackbird_player::init())
+        .invoke_handler(commands![inspect_fd]);
+    #[cfg(target_os = "ios")]
     let builder = builder
         .plugin(tauri_plugin_jackbird_player::init())
         .invoke_handler(commands![]);

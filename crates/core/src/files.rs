@@ -164,6 +164,13 @@ pub fn inspect(root: &Root, relative: &str, known: Option<&str>) -> Result<Inspe
     inspect_path(&path, relative, known)
 }
 
+/// A file opened by another and reached by a path of its own (`/proc/self/fd/<n>`, a file Android's
+/// document provider opened for the phone's folders, E6b-D9): its size, date and checksums; its tags
+/// too, unless its full checksum is still `known`. Streamed, as `inspect`.
+pub fn inspect_file(path: &Path, known: Option<&str>) -> Result<Inspection, Error> {
+    inspect_path(path, &path.display().to_string(), known)
+}
+
 fn inspect_path(path: &Path, shown: &str, known: Option<&str>) -> Result<Inspection, Error> {
     let mut file = File::open(path).map_err(io(shown))?;
     let metadata = file.metadata().map_err(io(shown))?;

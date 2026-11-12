@@ -7,7 +7,8 @@
 
 import { isAudioFile } from "../helpers/formats";
 
-type PhoneCheck = { address: string; folder: string; report: string };
+/** `deviceFolder`: a folder of the phone (its `content://` address) with the fixtures in it, chosen in Android's folder picker (E6b-D9). */
+type PhoneCheck = { address: string; folder: string; report: string; deviceFolder?: string };
 
 /** The check this build was made for, if any. */
 export function phoneCheck(): PhoneCheck | null {
@@ -58,8 +59,8 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
   const started = Date.now();
   const heartbeat = setInterval(() => beacon(config, "alive", Math.round((Date.now() - started) / 1000)), 5000);
   // Each step has 30 seconds: one that hangs is reported, not waited for.
-  const within = <T>(step: string, work: Promise<T>): Promise<T> =>
-    Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${step}: no answer in 30 s`)), 30_000))]);
+  const within = <T>(step: string, work: Promise<T>, ms = 30_000): Promise<T> =>
+    Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${step}: no answer in ${ms / 1000} s`)), ms))]);
   const report: Record<string, unknown> = { userAgent: navigator.userAgent, drawn: Boolean(document.querySelector("#app")?.children.length) };
   try {
     const info = await fetch(`${config.address}/api/info`).then(
@@ -87,6 +88,10 @@ export async function runPhoneCheckIfBuilt(): Promise<void> {
       const media = await within("open the media", source.openMedia(flac.path));
       report.played = { path: flac.path, ...(await play(media.url)) };
       beacon(config, "played", report.played);
+    }
+    if (config.deviceFolder) {
+      report.device = await within("the phone's folder", checkPhoneFolder(config, config.deviceFolder), 120_000);
+      beacon(config, "device", report.device);
     }
 
   } catch (error) {
@@ -230,4 +235,43 @@ async function measureNativeQueue(config: PhoneCheck, mediaUrl: () => Promise<st
   }
   audio.removeAttribute("src");
   await post("background", { native: true, muted: false, mediaSession: false, samples, changes, ended, failures });
+}
+
+/**
+ * A folder of the phone as a source (E6b-D9): Android's folder picker opened at it (the check taps
+ * "Use this folder" and "Allow" in it, scripts/phone-check.mjs), its songs walked, a FLAC's tags read
+ * by Rust through the file Android opens, and the FLAC played a moment by the native player from
+ * its `content://` address.
+ */
+async function checkPhoneFolder(config: PhoneCheck, folder: string): Promise<Record<string, unknown>> {
+  const { pickPhoneFolder } = await import("./sources/phone");
+  const { PhoneAudio } = await import("./phone-audio");
+  beacon(config, "picking", folder);
+  const source = await pickPhoneFolder(folder);
+  if (!source) return { picked: false };
+  const tracks = (await source.walk()).filter((entry) => isAudioFile(entry.path));
+  const flac = tracks.find((track) => track.path.toLowerCase().endsWith(".flac") && !track.path.includes("silence"));
+  if (!flac) return { picked: true, tracks: tracks.length };
+  // The tagged fixture (fixtures/tags/flac-full.flac, titled "Before") for the tags; the FLAC for playing.
+  const tagged = tracks.find((track) => track.path === "flac-full.flac") ?? flac;
+  const inspection = await source.inspect(tagged.path);
+  const media = await source.openMedia(flac.path);
+  const audio = new PhoneAudio();
+  const failures: unknown[] = [];
+  audio.addEventListener("fallback", (event) => failures.push((event as CustomEvent).detail));
+  audio.open({ key: "phone-folder-flac", url: media.url, title: flac.path });
+  await audio.play();
+  for (let step = 0; step < 40 && audio.currentTime < 0.2; step += 1) await wait(100);
+  const played = audio.currentTime;
+  audio.removeAttribute("src");
+  return {
+    picked: true,
+    tracks: tracks.length,
+    path: flac.path,
+    tagged: tagged.path,
+    title: inspection.metadata?.title ?? null,
+    checksum: inspection.fullChecksum ?? null,
+    played,
+    failures
+  };
 }

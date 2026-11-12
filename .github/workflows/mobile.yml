@@ -37,7 +37,8 @@ jobs:
     timeout-minutes: 40
     env:
       # The emulator reaches this machine at 10.0.2.2 (scripts/phone-check.mjs).
-      VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://10.0.2.2:4647","folder":"/tmp/jackbird-phone-music","report":"http://10.0.2.2:4700/report"}'
+      # And a folder of the phone, chosen in Android's folder picker (E6b-D9; scripts/phone-check.mjs fills it).
+      VITE_JACKBIRD_PHONE_CHECK: '{"address":"http://10.0.2.2:4647","folder":"/tmp/jackbird-phone-music","report":"http://10.0.2.2:4700/report","deviceFolder":"content://com.android.externalstorage.documents/document/primary%3AMusic%2Fjackbird-check"}'
 
     steps:
       - uses: actions/checkout@v6

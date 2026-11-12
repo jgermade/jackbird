@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-folder-address"
+description = "Enables the folder_address command without any pre-configured scope."
+commands.allow = ["folder_address"]
+
+[[permission]]
+identifier = "deny-folder-address"
+description = "Denies the folder_address command without any pre-configured scope."
+commands.deny = ["folder_address"]

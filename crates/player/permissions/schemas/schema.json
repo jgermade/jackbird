@@ -295,6 +295,150 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the folder_address command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-address",
+          "markdownDescription": "Enables the folder_address command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_address command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-address",
+          "markdownDescription": "Denies the folder_address command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-check",
+          "markdownDescription": "Enables the folder_check command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-check",
+          "markdownDescription": "Denies the folder_check command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_close command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-close",
+          "markdownDescription": "Enables the folder_close command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_close command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-close",
+          "markdownDescription": "Denies the folder_close command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-delete",
+          "markdownDescription": "Enables the folder_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-delete",
+          "markdownDescription": "Denies the folder_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-list",
+          "markdownDescription": "Enables the folder_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-list",
+          "markdownDescription": "Denies the folder_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-mkdir",
+          "markdownDescription": "Enables the folder_mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_mkdir command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-mkdir",
+          "markdownDescription": "Denies the folder_mkdir command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_open command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-open",
+          "markdownDescription": "Enables the folder_open command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_open command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-open",
+          "markdownDescription": "Denies the folder_open command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-read",
+          "markdownDescription": "Enables the folder_read command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-read",
+          "markdownDescription": "Denies the folder_read command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_rename command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-rename",
+          "markdownDescription": "Enables the folder_rename command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_rename command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-rename",
+          "markdownDescription": "Denies the folder_rename command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_stat command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-stat",
+          "markdownDescription": "Enables the folder_stat command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_stat command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-stat",
+          "markdownDescription": "Denies the folder_stat command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_walk command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-walk",
+          "markdownDescription": "Enables the folder_walk command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_walk command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-walk",
+          "markdownDescription": "Denies the folder_walk command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the folder_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-folder-write",
+          "markdownDescription": "Enables the folder_write command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the folder_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-folder-write",
+          "markdownDescription": "Denies the folder_write command without any pre-configured scope."
+        },
+        {
           "description": "Enables the output_info command without any pre-configured scope.",
           "type": "string",
           "const": "allow-output-info",
@@ -317,6 +461,18 @@
           "type": "string",
           "const": "deny-pause",
           "markdownDescription": "Denies the pause command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the pick_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-pick-folder",
+          "markdownDescription": "Enables the pick_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the pick_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-pick-folder",
+          "markdownDescription": "Denies the pick_folder command without any pre-configured scope."
         },
         {
           "description": "Enables the play command without any pre-configured scope.",
@@ -353,6 +509,18 @@
           "type": "string",
           "const": "deny-remove-listener",
           "markdownDescription": "Denies the remove_listener command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the safe_area command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-safe-area",
+          "markdownDescription": "Enables the safe_area command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the safe_area command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-safe-area",
+          "markdownDescription": "Denies the safe_area command without any pre-configured scope."
         },
         {
           "description": "Enables the seek command without any pre-configured scope.",
@@ -427,10 +595,10 @@
           "markdownDescription": "Denies the stop command without any pre-configured scope."
         },
         {
-          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-register-listener`\n- `allow-remove-listener`",
+          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-folder-open`\n- `allow-folder-close`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-register-listener`\n- `allow-remove-listener`"
+          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-folder-open`\n- `allow-folder-close`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`"
         }
       ]
     }

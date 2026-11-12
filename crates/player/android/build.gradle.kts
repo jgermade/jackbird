@@ -31,5 +31,7 @@ kotlin {
 dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
+    // Android's folder picker's result (E6b-D9).
+    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation(project(":tauri-android"))
 }

@@ -43,9 +43,14 @@
   .app {
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;
     height: 100vh;
     height: 100dvh;
+    /* Clear of a phone's cutouts at the sides (landscape); the top's and the bottom's are the faceplate's and the footbar's. */
+    padding-right: var(--mm-safe-right, env(safe-area-inset-right, 0px));
+    padding-left: var(--mm-safe-left, env(safe-area-inset-left, 0px));
   }
-  .top { flex: none; position: relative; z-index: 1; }
+  /* Under a phone's status bar and selfie camera: the chassis goes on behind them, the faceplate starts below. */
+  .top { flex: none; position: relative; z-index: 1; padding-top: var(--mm-safe-top, env(safe-area-inset-top, 0px)); background: var(--mm-chassis); }
   .body { flex: 1 1 auto; min-height: 0; }
 </style>

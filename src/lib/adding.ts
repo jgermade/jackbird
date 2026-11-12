@@ -37,9 +37,10 @@ export function serverName(): string {
 /** The sources this runtime offers now, in order. */
 export function sourcesHere(): SourceKind[] {
   const kinds: SourceKind[] = [];
-  // The browser's folders when no service serves the page; the desktop's. A phone's own folders wait
-  // for Android's folder picker (E6b-D9, 2026-11-11 23:33): the app never asks for all files.
-  if ((isDesktop && !isPhone) || (!isDesktop && adding.served === false)) kinds.push("device");
+  // The browser's folders when no service serves the page; the desktop's; an Android phone's, through
+  // its own folder picker, which grants the app that folder alone (E6b-D9, 2026-11-12).
+  const android = isPhone && /Android/.test(navigator.userAgent);
+  if ((isDesktop && (!isPhone || android)) || (!isDesktop && adding.served === false)) kinds.push("device");
   // A folder of the server in front, for its owners: the page's own server, or one the app added
   // (the desktop's installed service is its "device" already).
   const server = currentServer();
@@ -53,13 +54,10 @@ export function sourcesHere(): SourceKind[] {
 /** The folders this runtime offers now (the "Folder" tab's choices). */
 export const folderSources = (): SourceKind[] => sourcesHere().filter((kind) => kind !== "server");
 
-/**
- * The dialog's tabs: "Folder" wherever folders are offered, and on a phone, whose own folders come
- * with Android's folder picker (E6b-D9); "Server" in the apps.
- */
+/** The dialog's tabs: "Folder" wherever folders are offered; "Server" in the apps. */
 export function tabsHere(): ("folder" | "server")[] {
   const tabs: ("folder" | "server")[] = [];
-  if (folderSources().length > 0 || isPhone) tabs.push("folder");
+  if (folderSources().length > 0) tabs.push("folder");
   if (sourcesHere().includes("server")) tabs.push("server");
   return tabs;
 }

@@ -33,6 +33,10 @@ void startAccount()
 if (isDesktop && !isPhone) {
   void import("./lib/sources/check").then((check) => check.runCheckIfAsked());
 }
+// An Android phone draws the app under its bars and camera: the page keeps clear of them.
+if (isPhone && /Android/.test(navigator.userAgent)) {
+  void import("./lib/safe-area").then((area) => area.keepClearOfEdges());
+}
 // A phone's (mobile.yml), only in a build made for it.
 if (isPhone) {
   void import("./lib/phone-check").then((check) => check.runPhoneCheckIfBuilt());

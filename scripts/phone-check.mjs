@@ -70,11 +70,44 @@ createServer((request, response) => {
     console.log(`phone-check: <- ${request.method} ${request.url} ${body.slice(0, 400)}`);
     if (request.method !== "POST") return;
     const name = new URL(request.url, "http://localhost").searchParams.get("phase") ?? "report";
+    if (name === "step" && platform === "android" && JSON.parse(body || "{}").step === "picking") void grantFolder();
     phase(name);
     waiting[name](JSON.parse(body || "{}"));
   });
 }).listen(4700);
 const reported = phase("report");
+
+// Android's folder picker, as a person goes through it (E6b-D9): it opens at the folder the build
+// names; "Use this folder", then "Allow". Its screen is read with uiautomator, and each key tapped
+// at its middle. Tries for a minute.
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+async function tapText(pattern) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      execFileSync("adb", ["shell", "uiautomator", "dump", "/sdcard/ui.xml"], { timeout: 30_000 });
+      const xml = execFileSync("adb", ["shell", "cat", "/sdcard/ui.xml"], { encoding: "utf8", timeout: 30_000 });
+      for (const node of xml.match(/<node [^>]*>/g) ?? []) {
+        const text = /text="([^"]*)"/.exec(node)?.[1] ?? "";
+        const bounds = /bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/.exec(node);
+        if (bounds && pattern.test(text)) {
+          const [x, y] = [(+bounds[1] + +bounds[3]) >> 1, (+bounds[2] + +bounds[4]) >> 1];
+          console.log(`phone-check: picker: tapping "${text}" at ${x},${y}`);
+          execFileSync("adb", ["shell", "input", "tap", String(x), String(y)], { timeout: 30_000 });
+          return true;
+        }
+      }
+    } catch (error) {
+      console.log(`phone-check: picker: ${error.message}`);
+    }
+    await sleep(3000);
+  }
+  console.log(`phone-check: picker: no ${pattern} on the screen`);
+  return false;
+}
+async function grantFolder() {
+  await sleep(3000);
+  if (await tapText(/^use this folder$/i)) await tapText(/^allow$/i);
+}
 const within = (promise, ms) => Promise.race([promise, new Promise((done) => setTimeout(() => done(null), ms))]);
 
 // Android's emulator reaches this machine at 10.0.2.2 (not through `adb reverse`, which did not keep
@@ -141,6 +174,11 @@ const showLog = () => {
 if (platform === "android") {
   startLog();
   run("adb", ["install", "-r", app]);
+  // A folder of the phone (E6b-D9): the audio fixtures and a tagged FLAC, in its shared storage, for
+  // Android's folder picker to grant (driven below, when the page says it is picking).
+  run("adb", ["shell", "mkdir", "-p", "/sdcard/Music/jackbird-check"]);
+  for (const name of readdirSync(music)) run("adb", ["push", join(music, name), `/sdcard/Music/jackbird-check/${name}`]);
+  run("adb", ["push", "fixtures/tags/flac-full.flac", "/sdcard/Music/jackbird-check/flac-full.flac"]);
   run("adb", ["shell", "monkey", "-p", bundle, "-c", "android.intent.category.LAUNCHER", "1"]);
 } else {
   const devices = JSON.parse(read("xcrun", ["simctl", "list", "devices", "available", "-j"])).devices;
@@ -255,6 +293,12 @@ if (!report.played || report.played.error || !(report.played.played > 0)) proble
 // The native player (E6b-D7, Android for now): the queue goes on in the background by itself.
 if (platform === "android") {
   const background = report.background;
+  // A folder of the phone (E6b-D9): granted in Android's picker, walked, the tagged FLAC's title read by
+  // Rust through the file Android opened, and a FLAC played from its content:// address.
+  const device = report.device;
+  if (!device?.picked || !(device.tracks >= 4) || device.title !== "Before" || !(device.played > 0) || device.failures?.length) {
+    problems.push(`the phone's folder: ${JSON.stringify(device ?? null)}`);
+  }
   if (!background?.native) problems.push("the native player's queue was not measured");
   else {
     if (background.changesWhileHidden < 2) problems.push(`${background.changesWhileHidden} changes of song while hidden (2 or more expected)`);

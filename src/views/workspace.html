@@ -133,7 +133,7 @@
     .footbar {
       display: flex;
       flex: none;
-      padding: var(--mm-space-2) var(--mm-space-3) max(var(--mm-space-2), env(safe-area-inset-bottom));
+      padding: var(--mm-space-2) var(--mm-space-3) max(var(--mm-space-2), var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)));
       border-top: var(--mm-border-width) solid var(--mm-chassis-lo);
       background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
     }

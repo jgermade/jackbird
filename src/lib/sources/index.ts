@@ -15,6 +15,8 @@ import type { ServiceClient } from "./service";
  * `server`, a folder of that server's machine (E6b-D11). Null when the person cancels.
  */
 export async function pickSource(server?: ServiceClient): Promise<RootSource | null> {
+  // A folder of the phone (E6b-D9): Android's own folder picker, which grants that folder alone.
+  if (isPhone && !server) return (await import("./phone")).pickPhoneFolder();
   if (server) {
     const path = await (await import("../folders")).chooseMachineFolder();
     return path === null ? null : (await import("./service")).openServiceFolder(path, server);
@@ -49,6 +51,7 @@ export async function restoreSource(saved: FileSystemDirectoryHandle | string): 
     return service.restoreServiceSource(onServer.path, service.serviceAt(onServer.server));
   }
   if (typeof saved === "string") {
+    if (isPhone && saved.startsWith("content://")) return (await import("./phone")).restorePhoneFolder(saved);
     if (isDesktop) {
       return (await (await import("../desktop-service")).desktopUsesService())
         ? (await import("./service")).restoreServiceSource(saved)
