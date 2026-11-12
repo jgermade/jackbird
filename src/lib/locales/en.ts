@@ -108,7 +108,6 @@ export const en = {
   "compact.back": "Back to the full window",
   "compact.backPage": "Back to the library",
   "compact.onTop": "Keep on top",
-  "compact.next": "Next: {title}",
   "compact.list": "Show or hide the queue",
   "compact.label": "Compact player",
   "compact.withKeys": "{action} ({keys})",

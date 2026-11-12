@@ -5,7 +5,7 @@
  */
 
 /** The compact window's size, and the least it can be made, in rem: a card, the display over the keys. */
-export const COMPACT = { width: 22, height: 11, minWidth: 18, minHeight: 10, pipHeight: 13, list: 14 } as const;
+export const COMPACT = { width: 22, height: 11, minWidth: 18, minHeight: 10, list: 14 } as const;
 
 /**
  * The root's size in the compact player, as a share of the window's width (tokens.css:
@@ -59,9 +59,9 @@ export function compactSize(rootPx: number): { width: number; height: number; mi
   };
 }
 
-/** The floating window's size (Picture-in-Picture), in pixels: as wide, a little taller for the next track. */
+/** The floating window's size (Picture-in-Picture), in pixels: the compact window's. */
 export function pipSize(rootPx: number): { width: number; height: number } {
-  return { width: remToPx(COMPACT.width, rootPx), height: remToPx(COMPACT.pipHeight, rootPx) };
+  return { width: remToPx(COMPACT.width, rootPx), height: remToPx(COMPACT.height, rootPx) };
 }
 
 function bounds(value: unknown): Bounds | null {

@@ -109,7 +109,6 @@ export const es: Record<MessageKey, string> = {
   "compact.back": "Volver a la ventana completa",
   "compact.backPage": "Volver a la biblioteca",
   "compact.onTop": "Siempre encima",
-  "compact.next": "Después: {title}",
   "compact.list": "Mostrar u ocultar la cola",
   "compact.label": "Reproductor compacto",
   "compact.withKeys": "{action} ({keys})",

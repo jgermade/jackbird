@@ -3,8 +3,7 @@
   // (DeckDisplay `small`, the same view, so it follows every change to it), and under it the
   // transport keys between the mode's keys: back to the full view and "on top" (in the desktop
   // app's window) at the left, and at the right the list key, which shows the queue's list (QueueList) under the card, the window
-  // growing for it. Without the list, where there is room (a container query on its height), the
-  // queue's next track under the keys. In the desktop app a
+  // growing for it. In the desktop app a
   // press on its chassis, off the keys, moves the window. A view over lib/compact.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
 
@@ -20,14 +19,7 @@
   const { isEmbed } = await import("../lib/platform")
   // Embedded in the landing page: no way back (it is drawn always) and no list (the window beside it has the queue).
   const embed: boolean = isEmbed
-  const { queueEntries } = await import("../lib/player")
 
-  // Read through a function: the entries are boxed (see Opaque).
-  const upNext = (): string => {
-    const entry = queueEntries.value.data.find((one) => one.state === "upcoming")
-    if (!entry) return ""
-    return entry.artist ? `${entry.title} — ${entry.artist}` : entry.title
-  }
   $: backLabel = compact.mode === "window" ? t("compact.back") : t("compact.backPage")
   $: backTitle = t("compact.withKeys", { action: backLabel, keys: compactKeys })
 </script>
@@ -52,7 +44,6 @@
         </Key>
       </div>
     </div>
-    <p :if="upNext() && !compact.list" class="next" :title="upNext()">{{ t("compact.next", { title: upNext() }) }}</p>
   </div>
   <div :if="compact.list" class="list" data-no-drag><QueueList /></div>
   <!-- The brand's three stripes along the bottom edge, as on a J-card. -->
@@ -112,21 +103,4 @@
   .side { display: flex; gap: var(--mm-space-2); }
   .side.end { justify-content: flex-end; }
   .icon { width: .875rem; height: .875rem; }
-  /* The next track, printed small on the chassis under the keys, where there is room for it. */
-  .next {
-    display: none;
-    margin: 0;
-    overflow: hidden;
-    font-family: var(--mm-font-label);
-    font-stretch: var(--mm-stretch-label);
-    font-size: var(--mm-text-xs);
-    letter-spacing: .06em;
-    text-align: center;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--mm-fg-subtle);
-  }
-  @container compact (min-height: 10.9375rem) {
-    .next { display: block; }
-  }
 </style>
