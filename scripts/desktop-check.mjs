@@ -64,12 +64,18 @@ const shown = (holding) => (holding ?? []).find((root) => root.path === folder);
 const kind = process.env.JACKBIRD_CHECK_KIND ?? "desktop";
 if (shown(report.library)?.kind !== kind) problems.push(`the root is ${shown(report.library)?.kind}, not ${kind}`);
 if (shown(report.library)?.tracks !== audio.length) problems.push(`the library shows ${JSON.stringify(report.library)}`);
+// Back at its size; or, where the window had opened taller than the screen's work area (a small
+// runner's screen: macOS lets a window open past it but not be sized past it), as tall as that area.
+const near = (a, b) => typeof a === "number" && typeof b === "number" && Math.abs(a - b) <= 2;
+const backAtSize = (after, before) =>
+  near(after?.width, before?.width) &&
+  (near(after?.height, before?.height) || (before?.outerHeight > before?.workHeight && near(after?.outerHeight, after?.workHeight)));
 // The compact mode (C2): the window turned small and bare, and back to its size and its title bar.
 const compact = report.compact ?? {};
 if (compact.error) problems.push(`compact mode: ${compact.error}`);
 else if (!(compact.during?.mode === "window" && compact.during?.drawn && compact.during?.decorated === false && compact.during?.width < compact.before?.width && compact.during?.height < 200))
   problems.push(`the window did not turn compact: ${JSON.stringify(compact)}`);
-else if (!(compact.after?.mode === "full" && compact.after?.decorated && Math.abs(compact.after.width - compact.before.width) <= 2 && Math.abs(compact.after.height - compact.before.height) <= 2))
+else if (!(compact.after?.mode === "full" && compact.after?.decorated && backAtSize(compact.after, compact.before)))
   problems.push(`the window did not come back from compact: ${JSON.stringify(compact)}`);
 if (shown(restored.restored)?.tracks !== audio.length) problems.push(`after a restart: ${JSON.stringify(restored.restored)}`);
 if (problems.length > 0) {

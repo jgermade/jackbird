@@ -78,7 +78,7 @@ async function playNative(root: string, path: string): Promise<NativeReport> {
   return report;
 }
 
-type WindowShape = { width: number; height: number; decorated: boolean; onTop: boolean };
+type WindowShape = { width: number; height: number; outerHeight: number; decorated: boolean; onTop: boolean; workHeight: number | null };
 
 /**
  * The compact mode's window (C2): turned compact and back, through the app's own actions; the
@@ -86,11 +86,28 @@ type WindowShape = { width: number; height: number; decorated: boolean; onTop: b
  */
 async function checkCompact(): Promise<Record<string, unknown>> {
   const { compact, enterCompact, leaveCompact } = await import("../compact");
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  const { currentMonitor, getCurrentWindow } = await import("@tauri-apps/api/window");
   const win = getCurrentWindow();
+  // The inside, the whole window's height, and the screen's work area's height (a window cannot be
+  // made taller than it), all in logical pixels.
   const shape = async (): Promise<WindowShape> => {
-    const [size, scale, decorated, onTop] = await Promise.all([win.innerSize(), win.scaleFactor(), win.isDecorated(), win.isAlwaysOnTop()]);
-    return { width: Math.round(size.width / scale), height: Math.round(size.height / scale), decorated, onTop };
+    const [size, outer, scale, decorated, onTop, monitor] = await Promise.all([
+      win.innerSize(),
+      win.outerSize(),
+      win.scaleFactor(),
+      win.isDecorated(),
+      win.isAlwaysOnTop(),
+      currentMonitor().catch(() => null)
+    ]);
+    const work = monitor?.workArea?.size;
+    return {
+      width: Math.round(size.width / scale),
+      height: Math.round(size.height / scale),
+      outerHeight: Math.round(outer.height / scale),
+      decorated,
+      onTop,
+      workHeight: work ? Math.round(work.height / scale) : null
+    };
   };
   const before = await shape();
   await enterCompact();

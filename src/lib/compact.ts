@@ -105,6 +105,7 @@ async function placeAndSize(place: { x: number; y: number }, width: number, heig
     const inner = await win.innerSize();
     return Math.abs(inner.width - width) <= 1 && Math.abs(inner.height - height) <= 1;
   };
+  let last = "";
   for (const wait of [100, 300, 600, 1000]) {
     if (isMac()) {
       const inner = await win.innerSize();
@@ -113,7 +114,15 @@ async function placeAndSize(place: { x: number; y: number }, width: number, heig
     await win.setSize(new PhysicalSize(width, height));
     await win.setPosition(new PhysicalPosition(place.x, place.y));
     await pause(wait);
-    if (!(await right())) continue;
+    if (!(await right())) {
+      // The same wrong size twice: the screen will not give more (macOS keeps a window within its
+      // work area); trying again only waits longer.
+      const inner = await win.innerSize();
+      const seen = `${inner.width}x${inner.height}`;
+      if (seen === last) return;
+      last = seen;
+      continue;
+    }
     await pause(300);
     if (await right()) return;
   }
