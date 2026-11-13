@@ -47,6 +47,15 @@ export function writeStored(key: string, value: string): void {
   }
 }
 
+/** Forgets a stored value; a failure only keeps it. */
+export function removeStored(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Nothing to forget it from.
+  }
+}
+
 /** A value kept for this tab, or null when there is none or session storage is unavailable. */
 export function readSession(key: string): string | null {
   try {

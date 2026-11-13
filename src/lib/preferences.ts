@@ -11,7 +11,7 @@ import { densityOf } from "../helpers/density";
 import { pickLanguage } from "../helpers/i18n";
 import type { Density, Language, Theme } from "../types";
 import { isEmbed } from "./platform";
-import { STORAGE_KEYS, readStored, writeStored } from "./storage";
+import { STORAGE_KEYS, readStored, removeStored, writeStored } from "./storage";
 
 export const LANGUAGES: readonly Language[] = ["en", "es"];
 
@@ -44,8 +44,12 @@ const embeddedTheme = (): Theme | null => {
 };
 const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => language === embedded?.get("lang")) ?? null;
 
+/** The tone chosen: one of the two, or "auto", following the system's. */
+export type ThemeChoice = Theme | "auto";
+
 export const preferences = $reactive({
   theme: embeddedTheme() ?? storedTheme() ?? systemTheme(),
+  themeChoice: (storedTheme() ?? "auto") as ThemeChoice,
   language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage(),
   songsInTree: readStored(STORAGE_KEYS.songsInTree) !== "off",
   density: densityOf(readStored(STORAGE_KEYS.density))
@@ -78,7 +82,16 @@ if (typeof matchMedia === "function") {
 
 export function setTheme(theme: Theme): void {
   preferences.theme = theme;
+  preferences.themeChoice = theme;
   writeStored(STORAGE_KEYS.theme, theme);
+}
+
+/** The tone chosen in Settings: "auto" forgets the saved one and follows the system's. */
+export function setThemeChoice(choice: ThemeChoice): void {
+  if (choice !== "auto") return setTheme(choice);
+  preferences.themeChoice = "auto";
+  removeStored(STORAGE_KEYS.theme);
+  if (!isEmbed) preferences.theme = systemTheme();
 }
 
 export function toggleTheme(): void {

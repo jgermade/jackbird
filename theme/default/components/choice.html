@@ -1,0 +1,118 @@
+<script :setup="{ label = '', options = [], model = '', icons = false }: Props" lang="ts">
+  // A grouped choice: keys joined in one row, edge to edge, one of them
+  // down. The chosen one is sunk (a pressed key's face and shadow) and its
+  // icon or text lit in the accent's ink; the others stand raised, their ink
+  // muted. A radio group: arrows, Home and End move the choice.
+  //
+  //   <Choice label="Tone" icons :model="tone" :options="[
+  //     { value: 'light', label: 'Light', icon: 'M8 5.5…' }, …
+  //   ]" @change="tone = $event.detail" />
+  //
+  // An option is `{ value, label, icon, title }`: `icon` an SVG path on a
+  // 16 × 16 grid, stroked in the ink's colour. With `icons`, the keys show
+  // their icons alone, and the label is each key's name and tooltip. The
+  // choice goes up through `:model` and as `change`.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`
+  // (2026-11-14 03:10).
+
+  type Option = { value: string; label: string; icon?: string; title?: string }
+  type Props = { label?: string; options?: Option[]; model?: string; icons?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  $: iconsOnly = flag(icons)
+  $: focusable = options.some((option: Option) => option.value === model) ? model : options[0]?.value
+
+  const choose = (value: string) => {
+    if (value === model) return
+    $updateModel(value)
+    $emit("change", value)
+  }
+
+  const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
+  const key = (event: KeyboardEvent, option: Option) => {
+    const index = options.indexOf(option)
+    const last = options.length - 1
+    const next =
+      event.key === "Home" ? 0 :
+      event.key === "End" ? last :
+      event.key in STEP ? (index + STEP[event.key] + options.length) % options.length :
+      -1
+    if (next < 0) return
+    event.preventDefault()
+    choose(options[next].value)
+    $$self('[role="radio"]')[next]?.focus()
+  }
+</script>
+
+<div class="choice" role="radiogroup" :aria-label="label || null">
+  <button :each="option in options"
+          :key="option.value"
+          type="button"
+          role="radio"
+          class="option"
+          :class.bare="iconsOnly && !!option.icon"
+          :aria-checked="option.value === model ? 'true' : 'false'"
+          :aria-label="iconsOnly ? option.label : null"
+          :title="option.title || (iconsOnly ? option.label : null)"
+          :tabindex="option.value === focusable ? 0 : -1"
+          @click="choose(option.value)"
+          @keydown="key($event, option)">
+    <svg :if="option.icon" class="glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="option.icon" /></svg>
+    <span :if="!iconsOnly || !option.icon">{{ option.label }}</span>
+  </button>
+</div>
+
+<style scoped>
+  /* The keys share one frame: a hairline between each two, the frame's corners rounded. */
+  .choice {
+    display: inline-flex;
+    max-width: 100%;
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-sunken);
+    box-shadow: var(--mm-key-shadow);
+    overflow: hidden;
+  }
+  .option {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mm-space-2);
+    min-width: 0;
+    height: var(--mm-control-md);
+    padding: 0 var(--mm-space-3);
+    border: 0;
+    border-radius: 0;
+    background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+    color: var(--mm-fg-muted);
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-weight: var(--mm-weight-bold);
+    font-size: var(--mm-text-label-sm);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--mm-duration-key) ease, box-shadow var(--mm-duration-key) ease, color var(--mm-duration-key) ease;
+  }
+  .option + .option { border-left: var(--mm-border-width) solid var(--mm-border-strong); }
+  .option.bare { width: calc(var(--mm-control-md) + .5rem); flex: none; padding: 0; }
+  .option span { overflow: hidden; text-overflow: ellipsis; }
+  .glyph { flex: none; width: 1rem; height: 1rem; }
+  @media (hover: hover) { .option:hover { color: var(--mm-fg); } }
+  .option:active { background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
+  /* The chosen one: sunk into the frame, its ink lit. */
+  .option[aria-checked="true"] {
+    background: var(--mm-key-down);
+    box-shadow: var(--mm-key-pressed);
+    color: var(--mm-accent-ink);
+  }
+  .option[aria-checked="true"] .glyph,
+  .option[aria-checked="true"] span { filter: drop-shadow(0 0 .1875rem color-mix(in srgb, var(--mm-accent) 45%, transparent)); }
+  .option:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+</style>

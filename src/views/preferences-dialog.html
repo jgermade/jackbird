@@ -19,11 +19,11 @@
   const Checkbox = await import("../../theme/default/components/checkbox.html")
   const Key = await import("../../theme/default/components/key.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
-  const KeySelect = await import("../../theme/default/components/key-select.html")
+  const Choice = await import("../../theme/default/components/choice.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
 
   const { languageName, t } = await import("../lib/i18n")
-  const { LANGUAGES, preferences, setDensity, setLanguage, setSongsInTree, setTheme } = await import("../lib/preferences")
+  const { LANGUAGES, preferences, setDensity, setLanguage, setSongsInTree, setThemeChoice } = await import("../lib/preferences")
   const { DENSITIES, densityOf } = await import("../helpers/density")
   const { ui } = await import("../lib/ui")
   const { isDesktop, isPhone } = await import("../lib/platform")
@@ -82,7 +82,16 @@
   ]
   const pickKind = (kind: string) => setOutputKind(kind === "exclusive" || kind === "embedded" ? kind : "shared")
 
-  $: isDark = preferences.theme === "dark"
+  // The tone: automatic (the system's), light or dark, as icons.
+  const TONE_ICONS = {
+    auto: "M2 2.75h12v8.5H2zM5.5 14h5M8 11.25V14",
+    light: "M8 5.25a2.75 2.75 0 1 0 0 5.5a2.75 2.75 0 1 0 0-5.5M8 1.25v1.5M8 13.25v1.5M1.25 8h1.5M13.25 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05",
+    dark: "M13.25 9.75A5.75 5.75 0 0 1 6.25 2.75a5.75 5.75 0 1 0 7 7z"
+  } as const
+  const tones = () => (["auto", "light", "dark"] as const).map((tone) => ({ value: tone, label: t(`preferences.tone.${tone}`), icon: TONE_ICONS[tone] }))
+  const toneOf = (value: string) => (value === "light" || value === "dark" ? value : "auto")
+  const toneText = (): string =>
+    preferences.themeChoice === "auto" ? t("preferences.toneAutoOn") : preferences.theme === "dark" ? t("preferences.darkOn") : t("preferences.lightOn")
   // The sections, each in the bar where it applies (an SVG path on a 16 × 16 grid for its icon);
   // the open one is ui.preferencesSection, General when it does not apply (signed out).
   const ICONS = {
@@ -121,9 +130,9 @@
       <section class="pref inline">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("preferences.appearance") }}</h3>
-          <p>{{ isDark ? t("preferences.darkOn") : t("preferences.lightOn") }}</p>
+          <p>{{ toneText() }}</p>
         </div>
-        <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
+        <Choice icons :label="t('preferences.appearance')" :model="preferences.themeChoice" :options="tones()" @change="setThemeChoice(toneOf($event.detail))" />
       </section>
       <!-- How tall the lists' rows are (helpers/density.ts). -->
       <section class="pref density">
@@ -131,7 +140,7 @@
           <h3 class="mm-legend is-ink">{{ t("preferences.density") }}</h3>
           <p>{{ t("preferences.densityHint") }}</p>
         </div>
-        <KeySelect :label="t('preferences.density')" :model="preferences.density" :options="densities()" @change="setDensity(densityOf($event.detail))" />
+        <Choice :label="t('preferences.density')" :model="preferences.density" :options="densities()" @change="setDensity(densityOf($event.detail))" />
       </section>
       <section class="pref">
         <Field :label="t('preferences.language')" control="preferences-language" :hint="t('preferences.languageHint')">
