@@ -23,7 +23,7 @@
   const { formatBytes } = await import("../helpers/format")
   const { audioFormatOf } = await import("../helpers/formats")
   const { getVariedFields } = await import("../helpers/metadata")
-  const { closeSelection, confirmField, editor, inSharedMusic, saveEdits, setCompilation } = await import("../lib/editor")
+  const { canChange, closeSelection, confirmField, editor, inSharedMusic, saveEdits, setCompilation } = await import("../lib/editor")
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { loadSongExtras, songExtras } = await import("../lib/importing")
@@ -81,7 +81,7 @@
     { id: "edit", label: t("actions.edit"), tone: "edit" },
     { id: "rename", label: t("selection.tab.rename"), tone: "edit" },
     { id: "danger", label: t("selection.tab.danger"), tone: "danger" }
-  ].filter((tab) => tab.id === "info" || (tab.id === "edit" && inLibrary()) || (can("editor") && !inSharedMusic()))
+  ].filter((tab) => tab.id === "info" || (tab.id === "edit" && inLibrary()) || (canChange() && !inSharedMusic()))
   const heading = (): string => {
     const one = single()
     return one ? one.metadata.title || one.name : tn("selection.count", tracks().length)

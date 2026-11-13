@@ -178,6 +178,8 @@ export type RootSource = {
   readonly vfs: VFSAdapter;
   /** What the session keeps to reopen it: a directory handle, or a path (with its server's address, on a server other than the home one). */
   readonly saved: FileSystemDirectoryHandle | string;
+  /** A folder the browser can only read (Safari, Firefox: lib/sources/picked.ts): it plays and its tags are read, nothing is written to it, and it is not reopened after a reload. */
+  readonly readOnly?: boolean;
   /** The server it is on (E6b-D11); none for the browser's and the device's own folders. */
   readonly server?: ServiceClient;
   /** In a server's library, whose music it is when not one's own (SH-D6): their id. */

@@ -267,6 +267,7 @@ export const en = {
   "preferences.languageHint": "Interface language. Where a text has no translation, it is shown in English.",
 
   "message.noFsa": "Your browser does not support the File System Access API.",
+  "message.readOnlyOpened": "Opened read-only: this browser cannot save changes to the folder.",
   "message.scanFailed": "Could not scan the selected folder.",
   "message.removed.one": "Track removed from the library.",
   "message.removed.other": "{count} tracks removed from the library.",
@@ -294,6 +295,8 @@ export const en = {
   "sources.samplesHint": "No music at hand? Four tracks to try jackbird with: they are copied into this browser's own storage, and nothing of yours is opened.",
   "sources.chooseFolder": "Choose a folder…",
   "sources.chooseFolderHint": "Your device's own dialog opens; jackbird reaches the folder you choose, and nothing else.",
+  "sources.readOnlyHint": "This browser can only read a folder: you can play it and see its tags, but not save changes, and it is not reopened after a reload. To edit, use Chrome, Edge, Brave or Opera, or the app.",
+  "sources.noFolders": "This browser cannot open a folder. Use Chrome, Edge, Brave or Opera on a computer, or the app.",
   "sources.chooseServerFolder": "Choose a folder of {server}…",
   "sources.close": "Close",
   "sources.thisServer": "this server",

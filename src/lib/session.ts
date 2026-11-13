@@ -109,7 +109,8 @@ export function keepSessionSaved(): () => void {
     if (library.restoring) {
       return;
     }
-    const next = sessionOf($toRaw(roots), activeRootId);
+    // A folder read only (lib/sources/picked.ts) cannot be reopened: not kept.
+    const next = sessionOf($toRaw(roots).filter((root) => !root.source.readOnly), activeRootId);
     if (sameSession(last, next)) {
       return;
     }

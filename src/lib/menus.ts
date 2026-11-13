@@ -5,8 +5,7 @@
 // W8's plan for the playlists' items).
 
 import type { WizardTreeRow } from "../types";
-import { can } from "./account";
-import { openSelectionFor } from "./editor";
+import { canChange, openSelectionFor } from "./editor";
 import { isFavourite, toggleFavourite } from "./mine";
 import { t, tn } from "./i18n";
 import { moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
@@ -55,7 +54,8 @@ function allowed(items: MenuItem[]): MenuItem[] {
   const source = activeRoot.value.data?.source;
   // Someone's music shared with one: theirs to rearrange (SH-D4); one keeps one's own version.
   if (source?.kind === "library" && source.shelf !== undefined) return styled(items.filter((item) => !LIBRARY_CHANGES.has(item.id)));
-  if (can("editor")) return styled(items);
+  // A listener's menus, and a folder's the browser can only read, leave out what changes the files.
+  if (canChange()) return styled(items);
   const changes = source?.kind === "library" ? LIBRARY_CHANGES : CHANGES;
   return styled(items.filter((item) => !changes.has(item.id)));
 }

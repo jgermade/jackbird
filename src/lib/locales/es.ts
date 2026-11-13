@@ -268,6 +268,7 @@ export const es: Record<MessageKey, string> = {
   "preferences.languageHint": "Idioma de la interfaz. Donde falte una traducción, se muestra en inglés.",
 
   "message.noFsa": "Tu navegador no soporta File System Access API.",
+  "message.readOnlyOpened": "Abierta solo para leer: este navegador no puede guardar cambios en la carpeta.",
   "message.scanFailed": "No se pudo escanear la carpeta seleccionada.",
   "message.removed.one": "Pista eliminada de la biblioteca.",
   "message.removed.other": "{count} pistas eliminadas de la biblioteca.",
@@ -295,6 +296,8 @@ export const es: Record<MessageKey, string> = {
   "sources.samplesHint": "¿Sin música a mano? Cuatro temas para probar jackbird: se copian en el almacenamiento propio de este navegador, y no se abre nada tuyo.",
   "sources.chooseFolder": "Elegir una carpeta…",
   "sources.chooseFolderHint": "Se abre el diálogo de tu dispositivo; jackbird entra en la carpeta que elijas, y en nada más.",
+  "sources.readOnlyHint": "Este navegador solo puede leer la carpeta: podrás escucharla y ver sus etiquetas, pero no guardar cambios, y no se vuelve a abrir al recargar. Para editar, usa Chrome, Edge, Brave u Opera, o la app.",
+  "sources.noFolders": "Este navegador no puede abrir carpetas. Usa Chrome, Edge, Brave u Opera en un ordenador, o la app.",
   "sources.chooseServerFolder": "Elegir una carpeta de {server}…",
   "sources.close": "Cerrar",
   "sources.thisServer": "este servidor",

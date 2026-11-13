@@ -323,6 +323,8 @@ export async function openFolder(server?: ServiceClient): Promise<void> {
     const source = await pickSource(server);
     if (source) {
       await hydrateRoot(source, {});
+      // A folder the browser can only read (lib/sources/picked.ts): said once it is open.
+      if (source.readOnly) library.infoMessage = t("message.readOnlyOpened");
     }
   } catch (error) {
     // The dialog closed with no folder chosen (the browser's picker rejects with AbortError): nothing to say.
@@ -421,8 +423,8 @@ export function closeRoot(rootId: string): void {
 
   dropFromQueue((item) => item.rootId === rootId);
   roots[index].source.close();
-  // Offered again in "Add to the library…"'s Folder tab.
-  rememberClosed({ label: roots[index].label, saved: roots[index].source.saved });
+  // Offered again in "Add to the library…"'s Folder tab; not a folder read only, which cannot be reopened.
+  if (!roots[index].source.readOnly) rememberClosed({ label: roots[index].label, saved: roots[index].source.saved });
 
   const nextRoots = roots.filter((root) => root.id !== rootId);
   library.roots = nextRoots;
