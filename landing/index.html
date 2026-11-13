@@ -73,12 +73,15 @@
     <section class="shot">
       <!-- The window and the compact player, as screenshots; on a computer the app itself takes
            their place as the page loads (./demo/?embed: both windows over one player, the sample
-           music). The tilt follows the pointer (landing.js, and the embedded app). -->
+           music). The tilt follows the pointer (landing.js, and the embedded app). The iframe takes
+           the stage's size, which the screenshots give it: their width and height are written, so
+           it holds before they load (Safari leaves a lazy image of no size unloaded, and the app
+           was squashed into a strip). -->
       <div class="stage" data-rest-x="1" data-rest-y="-2">
       <figure class="window">
         <div class="window-bar"><span></span><span></span><span></span></div>
-        <img class="only-light" src="./screenshots/library-silver.png" alt="jackbird's library in Silver, with a track playing" loading="lazy">
-        <img class="only-dark" src="./screenshots/library-graphite.png" alt="A two-disc album in jackbird's Graphite tone, with a track playing" loading="lazy">
+        <img class="only-light" src="./screenshots/library-silver.png" alt="jackbird's library in Silver, with a track playing" width="2880" height="1800" loading="lazy">
+        <img class="only-dark" src="./screenshots/library-graphite.png" alt="A two-disc album in jackbird's Graphite tone, with a track playing" width="2880" height="1800" loading="lazy">
       </figure>
       <!-- The compact player, captured from the app too (scripts/screenshots.cjs), playing: a small
            window in front of the big one, over its bottom left corner. A release from before it
@@ -135,7 +138,7 @@
     <section class="phone">
       <!-- The phone's screenshot; on a computer the app itself in its place, as a phone draws it
            (./demo/?embed=phone, landing.js). -->
-      <figure class="handset"><img src="./screenshots/phone.png" alt="jackbird on a phone, playing a track" loading="lazy"></figure>
+      <figure class="handset"><img src="./screenshots/phone.png" alt="jackbird on a phone, playing a track" width="780" height="1328" loading="lazy"></figure>
       <div>
         <h2 class="section-label">In your pocket</h2>
         <p class="statement">The same deck on a phone, with the queue playing in the background, screen off.</p>
