@@ -32,6 +32,7 @@ import { streamInfo, streamInfoNeeds, type StreamInfo } from "../helpers/stream-
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
 import { PhoneAudio, phoneAudioAvailable, type PhoneSong } from "./phone-audio";
+import { coverDataUrlNow } from "./covers";
 import { output } from "./output";
 import { mirror, mirroredSpectrum, sendCommand } from "./mirror";
 import { played } from "./mine";
@@ -102,7 +103,7 @@ export type QueueEntry = {
   artist: string;
   /** The open root it is in. */
   rootLabel: string;
-  /** Its cover, as a data URL; null without one. */
+  /** Its cover, as the library holds it (lib/covers.ts's coverSrc draws it); null without one. */
   cover: string | null;
   state: "played" | "current" | "upcoming";
   /** No longer in the library (removed from it since it was queued). */
@@ -430,7 +431,8 @@ function songOf(opened: MediaHandle, key: string): PhoneSong {
     title: metadata?.title || track?.name || trackId.split("/").pop() || trackId,
     artist: metadata?.artist ?? "",
     album: metadata?.album ?? "",
-    cover: metadata?.coverDataUrl ?? null
+    // The phone's player takes the picture whole (lib/covers.ts keeps it once, by reference).
+    cover: coverDataUrlNow(metadata?.coverDataUrl ?? null)
   };
 }
 

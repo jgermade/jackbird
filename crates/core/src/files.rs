@@ -189,6 +189,55 @@ fn inspect_handle(file: &mut File, shown: &str, known: Option<&str>) -> Result<I
     })
 }
 
+/// A file's size, date and tags, read from its head (and its last bytes) only: no checksum, so
+/// the audio is not read. The desktop app's scan shows a folder with these, and works out the
+/// checksums after ([`checksums`]).
+#[derive(Clone, Debug)]
+pub struct Tagged {
+    /// Its size and date.
+    pub stat: Stat,
+    /// Its tags; a file the engine cannot read reads as untagged, as in [`inspect`].
+    pub tags: (jackbird_tags::Fields, Option<Cover>),
+}
+
+/// A file's tags, from its head: [`Tagged`].
+pub fn read_tags(root: &Root, relative: &str) -> Result<Tagged, Error> {
+    let path = root.resolve(relative)?;
+    let mut file = File::open(&path).map_err(io(relative))?;
+    let metadata = file.metadata().map_err(io(relative))?;
+    let (layout, head) = layout_of(&mut file, metadata.len(), relative)?;
+    Ok(Tagged {
+        stat: Stat::of(&metadata),
+        tags: found(&head, &layout),
+    })
+}
+
+/// A file's checksums, the whole file read (streamed), and its size and date as they were when it
+/// was read: [`Sums`].
+#[derive(Clone, Debug)]
+pub struct Sums {
+    /// Its size and date.
+    pub stat: Stat,
+    /// The SHA-1 of the whole file, in hex.
+    pub full_checksum: String,
+    /// The SHA-1 of its audio region, in hex.
+    pub audio_checksum: String,
+}
+
+/// A file's checksums: [`Sums`].
+pub fn checksums(root: &Root, relative: &str) -> Result<Sums, Error> {
+    let path = root.resolve(relative)?;
+    let mut file = File::open(&path).map_err(io(relative))?;
+    let metadata = file.metadata().map_err(io(relative))?;
+    let (layout, _) = layout_of(&mut file, metadata.len(), relative)?;
+    let (full_checksum, audio_checksum) = hashes(&mut file, &layout.audio, relative)?;
+    Ok(Sums {
+        stat: Stat::of(&metadata),
+        full_checksum,
+        audio_checksum,
+    })
+}
+
 /// Writes `edit` into a file's tags and gives the file as it is after.
 ///
 /// The new tags come from `jackbird_tags::write_head`, checked by its

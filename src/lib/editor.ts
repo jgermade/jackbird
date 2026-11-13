@@ -43,6 +43,14 @@ export function inSharedMusic(): boolean {
 }
 
 /**
+ * Whether the files of the root in view can be changed: by an editor (S3), and not in a folder the
+ * browser can only read (lib/sources/picked.ts).
+ */
+export function canChange(): boolean {
+  return can("editor") && !activeRoot.value.data?.source.readOnly;
+}
+
+/**
  * Opens the selection's dialog on `tab`, the form filled with the values its
  * tracks share. Switching tabs afterwards keeps what was typed.
  */
@@ -57,7 +65,7 @@ export function openSelection(tab: SelectionTab = "edit"): void {
   // A listener sees the files' info only (S3); in the family library they edit their own version (F3).
   // In someone's music shared with one, one saves one's own version (SH-D4).
   editor.scope = can("editor") && !inSharedMusic() ? "family" : "mine";
-  ui.selectionTab = can("editor") || (inLibrary() && tab === "edit") ? tab : "info";
+  ui.selectionTab = canChange() || (inLibrary() && tab === "edit") ? tab : "info";
   ui.selectionOpen = true;
 }
 

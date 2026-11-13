@@ -10,6 +10,8 @@ import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
 import type { GroupingMode, LibraryView, RootSource, RootWorkspace, Track } from "../types";
+import { coversIn, internSnapshot, namesIn, withCovers } from "./covers";
+import { refName } from "../helpers/cover";
 import { t, tn } from "./i18n";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
@@ -30,7 +32,7 @@ export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[])
  * reads the tags of new and changed files.
  */
 export async function hydrateRoot(
-  source: RootSource,
+  given: RootSource,
   options: {
     rootId?: string;
     rootLabel?: string;
@@ -43,14 +45,17 @@ export async function hydrateRoot(
   }
 ): Promise<void> {
   // Open again: no longer offered among the folders closed lately.
-  forgetRecent(source.saved);
+  forgetRecent(given.saved);
+  // Its tags with their covers by reference, each picture kept once (lib/covers.ts).
+  const source = withCovers(given);
   const vfs = source.vfs;
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const rootLabel = options.rootLabel ?? (vfs.name || t("roots.fallbackName", { number: $toRaw(library).roots.length + 1 }));
   const groupingMode = options.groupingMode ?? "wizard";
 
   // ─── Phase 1: Snapshot → instant render ──────────────────────────────────
-  const snapshot = await readMetaSnapshot(vfs);
+  // An older `.meta/` holds each track's cover whole: taken by reference, and written again so.
+  const { snapshot, changed: olderSnapshot } = internSnapshot(await readMetaSnapshot(vfs));
 
   const snapshotEntries = Object.entries(snapshot.tracks);
   const initialTracks: Track[] = snapshotEntries.map(([relativePath, stored]) => ({
@@ -111,7 +116,9 @@ export async function hydrateRoot(
   // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
   void (async () => {
     try {
-      const walked = await source.walk();
+      // The covers the snapshot names, looked for in `.meta/covers/`: a track whose picture is not
+      // there has its tags read again.
+      const [walked, missingCovers] = await Promise.all([source.walk(), coversIn(vfs, namesIn(snapshot))]);
       // The playlists are read beside the tracks, and do not hold them up.
       void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
         console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
@@ -138,11 +145,17 @@ export async function hydrateRoot(
       const modifiedFiles = audioFiles.filter((f) => {
         const stored = snapshot.tracks[f.relativePath];
         // Kept before the disc, album artist and compilation were read: read again, for them.
-        return stored && (stored.size !== f.size || stored.lastModified !== f.lastModified || !readsEveryField(stored.metadata));
+        if (!stored) return false;
+        const cover = refName(stored.metadata.coverDataUrl);
+        return stored.size !== f.size || stored.lastModified !== f.lastModified || !readsEveryField(stored.metadata) || (cover !== null && missingCovers.has(cover));
       });
 
       const staleOrNewFiles = [...newFiles, ...modifiedFiles];
       const isFullyCached = staleOrNewFiles.length === 0 && removedPaths.length === 0;
+      // Read in bulk (the desktop app), a new file comes in with its tags, a batch at a time: no
+      // empty row first, which drew the whole library once more for nothing.
+      const bulk = !!source.scanTags;
+      const adding = new Set(bulk ? newFiles.map((file) => file.relativePath) : []);
 
       // Drop tracks that are gone from disk
       updateRoots((currentRoots) =>
@@ -151,10 +164,11 @@ export async function hydrateRoot(
             return root;
           }
 
-          const tracks = root.tracks.filter((t) => !removedPaths.includes(t.relativePath));
+          const removed = new Set(removedPaths);
+          const tracks = root.tracks.filter((t) => !removed.has(t.relativePath));
 
           // Add genuinely new files (not in snapshot at all) as empty placeholder tracks
-          for (const file of newFiles) {
+          for (const file of bulk ? [] : newFiles) {
             tracks.push({
               id: file.relativePath,
               name: file.name,
@@ -174,12 +188,15 @@ export async function hydrateRoot(
             tracks,
             metaSnapshot: omitRecords(root.metaSnapshot, removedPaths),
             loadingMetadata: !isFullyCached,
-            loadedCount: tracks.length - staleOrNewFiles.length
+            loadedCount: audioFiles.length - staleOrNewFiles.length,
+            total: audioFiles.length
           };
         })
       );
 
       if (isFullyCached) {
+        // An older `.meta/` is written again with its covers by reference.
+        if (olderSnapshot) await flushMeta(rootId).catch(() => undefined);
         updateRoots((currentRoots) =>
           currentRoots.map((root) =>
             root.id === rootId ? { ...root, loadingMetadata: false } : root
@@ -199,7 +216,7 @@ export async function hydrateRoot(
       // last batch is flushed).
       const totalAfterWalk = audioFiles.length;
       let loadedCount = totalAfterWalk - staleOrNewFiles.length;
-      let snapshotDirty = removedPaths.length > 0;
+      let snapshotDirty = removedPaths.length > 0 || olderSnapshot;
 
       function flush(): void {
         const updates = [...pendingUpdates];
@@ -208,7 +225,7 @@ export async function hydrateRoot(
         updateRoots((currentRoots) =>
           currentRoots.map((root) =>
             root.id === rootId
-              ? { ...applyScanResults(root, updates), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
+              ? { ...applyScanResults(root, updates, adding), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
               : root
           )
         );
@@ -220,9 +237,13 @@ export async function hydrateRoot(
       let cursor = 0;
       let failedCount = 0;
 
-      // The checksum a track has in the library now, or "" when it is gone.
+      // The checksum a track has in the library now, or "" when it is gone: through a map of the
+      // root's tracks, made again only when they change (a find on each file was quadratic).
+      let indexed: { tracks: readonly Track[]; byId: Map<string, Track> } | null = null;
       function checksumNow(trackId: string): string {
-        const track = $toRaw(library).roots.find((root) => root.id === rootId)?.tracks.find((item) => item.id === trackId);
+        const tracks = $toRaw(library).roots.find((root) => root.id === rootId)?.tracks ?? [];
+        if (indexed?.tracks !== tracks) indexed = { tracks, byId: new Map(tracks.map((item) => [item.id, item])) };
+        const track = indexed.byId.get(trackId);
         return track ? checksumOf(track) : "";
       }
 
@@ -230,8 +251,10 @@ export async function hydrateRoot(
       async function readOne(file: (typeof staleOrNewFiles)[number]): Promise<void> {
         const readFrom = checksumNow(file.relativePath);
         const stored = snapshot.tracks[file.relativePath];
-        // With no checksum to compare, the tags come back even when the file has not changed.
-        const known = stored && readsEveryField(stored.metadata) ? stored.fullChecksum || stored.checksum : undefined;
+        // With no checksum to compare, the tags come back even when the file has not changed; so
+        // too when its cover is missing from `.meta/covers/`.
+        const coverGone = missingCovers.has(refName(stored?.metadata.coverDataUrl) ?? "");
+        const known = stored && readsEveryField(stored.metadata) && !coverGone ? stored.fullChecksum || stored.checksum : undefined;
         const found = await source.inspect(file.relativePath, known);
         const { fullChecksum, audioChecksum } = found;
         const metadata = withEveryField(found.metadata ?? stored?.metadata ?? emptyMetadata());
@@ -284,9 +307,53 @@ export async function hydrateRoot(
         }
       }
 
-      await Promise.all(
-        Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
-      );
+      // In bulk where the source can (the desktop app: src-tauri/src/scan.rs): every file's tags in
+      // one call, from their heads, in batches; their checksums after, in the background
+      // (lib/verifier.ts), so the library shows whole without the audio read. Elsewhere, each file
+      // inspected, several at once.
+      async function inBulk(scanTags: NonNullable<RootSource["scanTags"]>): Promise<void> {
+        const readFrom = new Map(staleOrNewFiles.map((file) => [file.relativePath, checksumNow(file.relativePath)]));
+        await scanTags(
+          staleOrNewFiles.map((file) => file.relativePath),
+          [],
+          (batch) => {
+            const nowIso = new Date().toISOString();
+            for (const found of batch.tracks) {
+              pendingUpdates.push({
+                trackId: found.path,
+                readFrom: readFrom.get(found.path) ?? "",
+                record: {
+                  // No checksum yet: the verifier works them out next.
+                  checksum: "",
+                  fullChecksum: "",
+                  audioChecksum: "",
+                  size: found.size,
+                  lastModified: found.lastModified,
+                  lastVerifiedAt: undefined,
+                  metadata: withEveryField(found.metadata),
+                  updatedAt: nowIso
+                }
+              });
+            }
+            for (const unread of batch.unread) console.error(`jackbird: could not read ${unread.path}`, unread.message);
+            failedCount += batch.unread.length;
+            loadedCount += batch.tracks.length + batch.unread.length;
+            snapshotDirty ||= batch.tracks.length > 0;
+            if (batch.done || Date.now() - flushedAt >= FLUSH_EVERY_MS) {
+              flushedAt = Date.now();
+              flush();
+            }
+          }
+        );
+      }
+
+      if (source.scanTags) {
+        await inBulk(source.scanTags);
+      } else {
+        await Promise.all(
+          Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
+        );
+      }
 
       if (snapshotDirty) {
         await flushMeta(rootId);
@@ -323,6 +390,8 @@ export async function openFolder(server?: ServiceClient): Promise<void> {
     const source = await pickSource(server);
     if (source) {
       await hydrateRoot(source, {});
+      // A folder the browser can only read (lib/sources/picked.ts): said once it is open.
+      if (source.readOnly) library.infoMessage = t("message.readOnlyOpened");
     }
   } catch (error) {
     // The dialog closed with no folder chosen (the browser's picker rejects with AbortError): nothing to say.
@@ -421,8 +490,8 @@ export function closeRoot(rootId: string): void {
 
   dropFromQueue((item) => item.rootId === rootId);
   roots[index].source.close();
-  // Offered again in "Add to the library…"'s Folder tab.
-  rememberClosed({ label: roots[index].label, saved: roots[index].source.saved });
+  // Offered again in "Add to the library…"'s Folder tab; not a folder read only, which cannot be reopened.
+  if (!roots[index].source.readOnly) rememberClosed({ label: roots[index].label, saved: roots[index].source.saved });
 
   const nextRoots = roots.filter((root) => root.id !== rootId);
   library.roots = nextRoots;

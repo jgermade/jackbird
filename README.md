@@ -34,7 +34,8 @@ You need [Node.js](https://nodejs.org/) 22.6 or later, [Rust](https://rustup.rs/
 its WebAssembly target (`rustup target add wasm32-unknown-unknown`: jackbird's tag engine is
 built from source into the web app), and a Chromium-based desktop browser
 (Chrome, Edge, Brave, Opera). jackbird reads and writes your files through the File System Access
-API, which Firefox and Safari do not have.
+API, which Firefox and Safari do not have: there a folder opens read-only (it plays and its tags
+are read, nothing is saved to it, and it is not reopened after a reload).
 
 ```bash
 make up

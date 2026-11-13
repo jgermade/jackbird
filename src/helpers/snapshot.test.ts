@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { MetaSnapshot } from "../types.ts";
+import type { MetaRecord, MetaSnapshot } from "../types.ts";
 import { track } from "./fixtures.test-support.ts";
-import { applyScanResults, applyVerification, checksumOf, emptySnapshot, omitRecords, parseMetaSnapshot, serializeMetaSnapshot } from "./snapshot.ts";
+import { applyScanResults, applySums, applyVerification, checksumOf, emptySnapshot, omitRecords, parseMetaSnapshot, serializeMetaSnapshot } from "./snapshot.ts";
 
 const snapshot: MetaSnapshot = {
   version: 1,
@@ -189,6 +189,30 @@ describe("applyScanResults", () => {
     assert.equal(next.tracks[0].size, 1000);
   });
 
+  it("adds a file new to the library as a track at the end, once, with its tags", () => {
+    const record = recordFor("Freddie", "");
+    const next = applyScanResults(
+      root,
+      [
+        { trackId: "Jazz/freddie.mp3", readFrom: "", record },
+        { trackId: "Jazz/freddie.mp3", readFrom: "", record }
+      ],
+      new Set(["Jazz/freddie.mp3"])
+    );
+    assert.equal(next.tracks.length, 3);
+    assert.equal(next.tracks[2].id, "Jazz/freddie.mp3");
+    assert.equal(next.tracks[2].name, "freddie.mp3");
+    assert.equal(next.tracks[2].metadata.title, "Freddie");
+    assert.equal(next.tracks[2].size, 2000);
+    assert.deepEqual(next.metaSnapshot.tracks["Jazz/freddie.mp3"], record);
+  });
+
+  it("adds no file it was not told is new, nor one read from a checksum", () => {
+    const record = recordFor("Freddie", "");
+    assert.equal(applyScanResults(root, [{ trackId: "Jazz/freddie.mp3", readFrom: "", record }]), root);
+    assert.equal(applyScanResults(root, [{ trackId: "Jazz/freddie.mp3", readFrom: "old", record }], new Set(["Jazz/freddie.mp3"])), root);
+  });
+
   it("leaves out a track saved since its file was read, and one that is gone", () => {
     const saved = { ...root, tracks: [loading, { ...known, checksum: "saved", fullChecksum: "saved" }] };
     const next = applyScanResults(saved, [
@@ -228,5 +252,63 @@ describe("omitRecords", () => {
   it("is the snapshot itself when none of the paths is in it", () => {
     assert.equal(omitRecords(records, ["missing.mp3"]), records);
     assert.equal(omitRecords(records, []), records);
+  });
+});
+
+describe("applySums", () => {
+  const now = "2026-11-14T01:00:00.000Z";
+  const before = "2026-11-13T00:00:00.000Z";
+  // Tags read, no checksum yet: as the desktop app's scan leaves a track.
+  const unsummed = (path: string, title: string) => ({ ...track(path, { title }), checksum: "", fullChecksum: "", audioChecksum: "", size: 1000, lastModified: 111 });
+  const recordOf = (one: ReturnType<typeof unsummed>): MetaRecord => ({ checksum: "", fullChecksum: "", audioChecksum: "", size: 1000, lastModified: 111, metadata: one.metadata, updatedAt: before });
+  const soWhat = unsummed("so-what.mp3", "So What");
+  const hunter = unsummed("hunter.mp3", "Hunter");
+  const root = {
+    id: "root",
+    tracks: [soWhat, hunter],
+    metaSnapshot: { version: 1 as const, tracks: { "so-what.mp3": recordOf(soWhat), "hunter.mp3": recordOf(hunter) } }
+  };
+  const sums = (trackId: string, extra: Partial<{ readFrom: string; size: number; lastModified: number }> = {}) => ({
+    trackId,
+    readFrom: "",
+    fullChecksum: `full-${trackId}`,
+    audioChecksum: `audio-${trackId}`,
+    size: 1000,
+    lastModified: 111,
+    ...extra
+  });
+
+  it("records each track's checksums and time on it and its record, keeping its tags", () => {
+    const { root: next, applied } = applySums(root, [sums("so-what.mp3"), sums("hunter.mp3")], now);
+    assert.deepEqual(applied, ["so-what.mp3", "hunter.mp3"]);
+    const one = next.tracks[0];
+    assert.equal(one.fullChecksum, "full-so-what.mp3");
+    assert.equal(one.checksum, "full-so-what.mp3");
+    assert.equal(one.audioChecksum, "audio-so-what.mp3");
+    assert.equal(one.lastVerifiedAt, now);
+    assert.equal(one.metadata, soWhat.metadata);
+    const record = next.metaSnapshot.tracks["so-what.mp3"];
+    assert.equal(record.fullChecksum, "full-so-what.mp3");
+    assert.equal(record.lastVerifiedAt, now);
+    assert.equal(record.updatedAt, before);
+    assert.equal(record.metadata, soWhat.metadata);
+    // Nothing given is changed.
+    assert.equal(root.tracks[0].fullChecksum, "");
+  });
+
+  it("leaves out a track gone, saved since, or whose file changed since its tags were read", () => {
+    const { root: next, applied } = applySums(
+      root,
+      [sums("gone.mp3"), sums("so-what.mp3", { readFrom: "saved-since" }), sums("hunter.mp3", { size: 2000 }), sums("hunter.mp3", { lastModified: 222 })],
+      now
+    );
+    assert.deepEqual(applied, []);
+    assert.equal(next, root);
+  });
+
+  it("makes a record for a track the snapshot had none of", () => {
+    const bare = { ...root, metaSnapshot: { version: 1 as const, tracks: {} as Record<string, MetaRecord> } };
+    const { root: next } = applySums(bare, [sums("hunter.mp3")], now);
+    assert.equal(next.metaSnapshot.tracks["hunter.mp3"].updatedAt, now);
   });
 });

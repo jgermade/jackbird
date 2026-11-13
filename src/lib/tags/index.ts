@@ -6,7 +6,8 @@
  * RECORD/2026-08-11.musikmatch-rust-migration.WIP.md, 2026-11-07 20:16). The
  * desktop app (E4) gives the same interface over Tauri commands.
  */
-import { coverToDataUrl, editFor } from "../../helpers/cover.ts";
+import { editFor } from "../../helpers/cover.ts";
+import { internCoverBytes } from "../covers.ts";
 import { emptyMetadata } from "../../helpers/metadata.ts";
 import type { TrackMetadata } from "../../types.ts";
 import type { WireLayout } from "../../helpers/tagwire.ts";
@@ -68,7 +69,8 @@ export async function readTags(bytes: Uint8Array): Promise<TrackMetadata> {
     discNumber: tags.fields.disc,
     albumArtist: tags.fields.albumArtist,
     compilation: tags.fields.compilation,
-    coverDataUrl: tags.cover ? coverToDataUrl(tags.cover) : null
+    // Kept once, by reference (lib/covers.ts): never made into a data URL to be read back.
+    coverDataUrl: tags.cover ? internCoverBytes(tags.cover) : null
   };
 }
 

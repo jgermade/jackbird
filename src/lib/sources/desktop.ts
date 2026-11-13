@@ -7,8 +7,8 @@
 // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4-D1 to E4-D6).
 
 import type { VFSAdapter, VFSListEntry, VFSStat } from "@cloudauthn/vfs-sync";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Inspection, MediaHandle, RootSource, TrackMetadata } from "../../types";
+import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
+import type { Inspection, MediaHandle, RootSource, SumsBatch, TagsBatch, TrackMetadata } from "../../types";
 import { TagError } from "../tags";
 
 /** An error as the app's commands give it. */
@@ -26,6 +26,22 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 
 type InspectionJson = Omit<Inspection, "lastModified"> & { lastModified: number };
 type MediaUrl = { kind: "asset"; path: string } | { kind: "http"; url: string };
+
+/**
+ * Calls a command that sends its results in batches over a channel; resolves once the last batch
+ * (`done`) is taken, which can come after the command's own answer.
+ */
+async function streamed<B extends { done: boolean }>(command: string, args: Record<string, unknown>, take: (batch: B) => void): Promise<void> {
+  let finished = (): void => undefined;
+  const last = new Promise<void>((resolve) => (finished = resolve));
+  const channel = new Channel<B>();
+  channel.onmessage = (batch) => {
+    take(batch);
+    if (batch.done) finished();
+  };
+  await call<void>(command, { ...args, channel });
+  await last;
+}
 
 /** The small-file adapter over the app's commands. */
 function desktopVfs(root: string, name: string): VFSAdapter {
@@ -56,6 +72,9 @@ function desktopSource(root: string, name: string): RootSource {
     saved: root,
     walk: () => call("walk", { root }),
     inspect: (path, known) => call<InspectionJson>("inspect", { root, path, known: known ?? null }),
+    // In bulk (src-tauri/src/scan.rs): one call for the folder, its batches over a channel.
+    scanTags: (paths, knownCovers, take) => streamed<TagsBatch>("scan", { root, paths, knownCovers }, take),
+    scanSums: (paths, take) => streamed<SumsBatch>("checksums", { root, paths }, take),
     save: (path: string, previous: TrackMetadata, metadata: TrackMetadata) =>
       call<InspectionJson>("save", { root, path, previous, metadata }),
     async openMedia(path): Promise<MediaHandle> {

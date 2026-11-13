@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { coverToDataUrl, dataUrlToCover, editFor } from "./cover.ts";
+import { coverMime, coverName, coverRef, coverToDataUrl, dataUrlToCover, editFor, fromBase64, refName } from "./cover.ts";
 import { emptyMetadata } from "./metadata.ts";
 
 describe("coverToDataUrl and dataUrlToCover", () => {
@@ -62,5 +62,46 @@ describe("editFor", () => {
       set: { mime: "image/jpeg", data: Uint8Array.of(2) }
     });
     assert.deepEqual(editFor(before, { ...before, coverDataUrl: "blob:x" }).cover, { keep: true });
+  });
+});
+
+describe("coverName", () => {
+  // The same vectors as crates/api's cover_name test: both sides name a picture alike.
+  it("names a picture by its bytes and its type", () => {
+    assert.equal(coverName({ mime: "image/png", data: new Uint8Array([1, 2]) }), "ed74208a24b98405-2.png");
+    assert.equal(coverName({ mime: "image/jpeg", data: new TextEncoder().encode("jackbird") }), "d79105f5ef3292ca-8.jpg");
+  });
+  it("takes a picture with no type as a JPEG, and an unknown type as an image", () => {
+    assert.equal(coverName({ mime: "", data: new Uint8Array([]) }), "811c9dc55ad1e806-0.jpg");
+    assert.match(coverName({ mime: "image/x-odd", data: new Uint8Array([7]) }), /\.img$/);
+  });
+  it("gives the same name to the same bytes, and another to others", () => {
+    const one = coverName({ mime: "image/jpeg", data: new Uint8Array([1, 2, 3]) });
+    assert.equal(coverName({ mime: "IMAGE/JPEG", data: new Uint8Array([1, 2, 3]) }), one);
+    assert.notEqual(coverName({ mime: "image/jpeg", data: new Uint8Array([1, 2, 4]) }), one);
+  });
+});
+
+describe("coverMime, coverRef and refName", () => {
+  it("reads the type back from the name", () => {
+    assert.equal(coverMime("ed74208a24b98405-2.png"), "image/png");
+    assert.equal(coverMime("d79105f5ef3292ca-8.jpg"), "image/jpeg");
+    assert.equal(coverMime("d79105f5ef3292ca-8.img"), "image/jpeg");
+  });
+  it("makes and reads a reference, and nothing else", () => {
+    const name = "ed74208a24b98405-2.png";
+    assert.equal(refName(coverRef(name)), name);
+    assert.equal(refName("data:image/png;base64,AQI="), null);
+    assert.equal(refName(null), null);
+    assert.equal(refName(undefined), null);
+    assert.equal(refName(coverRef("../../etc/passwd")), null);
+  });
+});
+
+describe("fromBase64", () => {
+  it("reads base64 into bytes, and nothing else", () => {
+    assert.deepEqual(fromBase64("AQI="), new Uint8Array([1, 2]));
+    assert.deepEqual(fromBase64(""), new Uint8Array([]));
+    assert.equal(fromBase64("%%%"), null);
   });
 });

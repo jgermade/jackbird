@@ -3,7 +3,7 @@
 //! (S1-D1, RECORD/2026-08-11.musikmatch-rust-migration.WIP.md, 2026-11-08 17:43). The interface's
 //! side is `src/lib/sources/desktop.ts` and `service.ts`, and `TrackMetadata` in `src/types.ts`.
 
-use jackbird_core::{Entry, Error, Inspection, Stat};
+use jackbird_core::{Entry, Error, Inspection, Stat, Sums, Tagged};
 use jackbird_tags::{Cover, CoverEdit, Edit};
 use serde::{Deserialize, Serialize};
 
@@ -132,6 +132,129 @@ pub struct InspectionJson {
     pub metadata: Option<Metadata>,
 }
 
+/// A cover's name, as `coverName` (`src/helpers/cover.ts`) makes it: two 32-bit FNV-1a hashes of
+/// its bytes (one from the standard offset, one from another), its length, in hex, and its type's
+/// extension. The interface keeps each picture once by this name (`src/lib/covers.ts`).
+pub fn cover_name(cover: &Cover) -> String {
+    let (mut one, mut two) = (0x811c_9dc5_u32, 0x0100_0193_u32 ^ 0x5bd1_e995);
+    for byte in &cover.data {
+        one = (one ^ u32::from(*byte)).wrapping_mul(0x0100_0193);
+        two = (two ^ u32::from(*byte)).wrapping_mul(0x0100_0193);
+    }
+    let mime = if cover.mime.is_empty() {
+        "image/jpeg".to_string()
+    } else {
+        cover.mime.to_lowercase()
+    };
+    let extension = match mime.as_str() {
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/png" => "png",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/bmp" => "bmp",
+        _ => "img",
+    };
+    format!("{one:08x}{two:08x}-{:x}.{extension}", cover.data.len())
+}
+
+/// A reference to a cover by its name, as the library holds it in place of the picture.
+pub fn cover_ref(name: &str) -> String {
+    format!("jackbird-cover:{name}")
+}
+
+/// The tags as the interface keeps them, the cover a data URL (`with_cover`) or none.
+fn metadata_of(fields: jackbird_tags::Fields, cover_data_url: Option<String>) -> Metadata {
+    Metadata {
+        title: fields.title,
+        artist: fields.artist,
+        album: fields.album,
+        year: fields.year,
+        genre: fields.genre,
+        track_number: fields.track,
+        disc_number: fields.disc,
+        album_artist: fields.album_artist,
+        compilation: fields.compilation,
+        cover_data_url,
+    }
+}
+
+/// A file as the desktop app's scan reads it (`scan` in `src-tauri/`): its size, date and tags, the
+/// cover by reference; no checksum yet.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScannedJson {
+    /// Its path under the root.
+    pub path: String,
+    /// Its size in bytes.
+    pub size: u64,
+    /// When it last changed, in milliseconds since 1970.
+    pub last_modified: u64,
+    /// Its tags, the cover a reference to one of the batch's `covers` or to one the interface has.
+    pub metadata: Metadata,
+}
+
+/// A cover, the first time a scan meets it: its name and its bytes in base64.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverJson {
+    /// Its name ([`cover_name`]).
+    pub name: String,
+    /// Its bytes, in base64.
+    pub data: String,
+}
+
+/// A file's tags as the scan gives them, and its cover's name and the cover itself.
+pub fn scanned(path: String, tagged: Tagged) -> (ScannedJson, Option<(String, Cover)>) {
+    let (fields, cover) = tagged.tags;
+    let named = cover.map(|cover| (cover_name(&cover), cover));
+    let json = ScannedJson {
+        path,
+        size: tagged.stat.size,
+        last_modified: tagged.stat.mtime,
+        metadata: metadata_of(fields, named.as_ref().map(|(name, _)| cover_ref(name))),
+    };
+    (json, named)
+}
+
+/// A file's checksums as the scan's second half gives them, with its size and date then.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SumsJson {
+    /// Its path under the root.
+    pub path: String,
+    /// Its size in bytes.
+    pub size: u64,
+    /// When it last changed, in milliseconds since 1970.
+    pub last_modified: u64,
+    /// The SHA-1 of the whole file.
+    pub full_checksum: String,
+    /// The SHA-1 of its audio region.
+    pub audio_checksum: String,
+}
+
+impl SumsJson {
+    /// The checksums of the file at `path`.
+    pub fn of(path: String, sums: Sums) -> Self {
+        SumsJson {
+            path,
+            size: sums.stat.size,
+            last_modified: sums.stat.mtime,
+            full_checksum: sums.full_checksum,
+            audio_checksum: sums.audio_checksum,
+        }
+    }
+}
+
+/// A file the scan could not read, and why.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnreadJson {
+    /// Its path under the root.
+    pub path: String,
+    /// What went wrong.
+    pub message: String,
+}
+
 impl From<Inspection> for InspectionJson {
     fn from(found: Inspection) -> Self {
         InspectionJson {
@@ -139,24 +262,18 @@ impl From<Inspection> for InspectionJson {
             last_modified: found.stat.mtime,
             full_checksum: found.full_checksum,
             audio_checksum: found.audio_checksum,
-            metadata: found.tags.map(|(fields, cover)| Metadata {
-                title: fields.title,
-                artist: fields.artist,
-                album: fields.album,
-                year: fields.year,
-                genre: fields.genre,
-                track_number: fields.track,
-                disc_number: fields.disc,
-                album_artist: fields.album_artist,
-                compilation: fields.compilation,
-                cover_data_url: cover.map(|cover| {
-                    let mime = if cover.mime.is_empty() {
-                        "image/jpeg"
-                    } else {
-                        &cover.mime
-                    };
-                    format!("data:{mime};base64,{}", jackbird_core::base64_encode(&cover.data))
-                }),
+            metadata: found.tags.map(|(fields, cover)| {
+                metadata_of(
+                    fields,
+                    cover.map(|cover| {
+                        let mime = if cover.mime.is_empty() {
+                            "image/jpeg"
+                        } else {
+                            &cover.mime
+                        };
+                        format!("data:{mime};base64,{}", jackbird_core::base64_encode(&cover.data))
+                    }),
+                )
             }),
         }
     }
@@ -218,6 +335,23 @@ mod tests {
             compilation: String::new(),
             cover_data_url: cover.map(Into::into),
         }
+    }
+
+    /// The same vectors as `coverName`'s test (`src/helpers/cover.test.ts`): both sides name a picture alike.
+    #[test]
+    fn cover_name_is_the_interfaces() {
+        let named = |mime: &str, data: &[u8]| {
+            cover_name(&Cover {
+                data: data.to_vec(),
+                mime: mime.into(),
+            })
+        };
+        assert_eq!(named("image/png", &[1, 2]), "ed74208a24b98405-2.png");
+        assert_eq!(named("image/jpeg", b"jackbird"), "d79105f5ef3292ca-8.jpg");
+        assert_eq!(named("", &[]), "811c9dc55ad1e806-0.jpg");
+        assert_eq!(named("IMAGE/JPEG", &[1, 2, 3]), named("image/jpeg", &[1, 2, 3]));
+        assert!(named("image/x-odd", &[7]).ends_with(".img"));
+        assert_eq!(cover_ref("a.jpg"), "jackbird-cover:a.jpg");
     }
 
     #[test]

@@ -14,9 +14,14 @@ export function translate(messages: Messages, fallback: Messages, key: string, p
   return fill(messages[key] ?? fallback[key] ?? key, params);
 }
 
+/** Each language's rules, made once: making them is slow, and a library's menus asked thousands of times. */
+const pluralRules = new Map<string, Intl.PluralRules>();
+
 /** The plural category of `count` in `language`: `one` or `other` in English and Spanish. */
 export function pluralCategory(language: string, count: number): Intl.LDMLPluralRule {
-  return new Intl.PluralRules(language).select(count);
+  let rules = pluralRules.get(language);
+  if (!rules) pluralRules.set(language, (rules = new Intl.PluralRules(language)));
+  return rules.select(count);
 }
 
 /**

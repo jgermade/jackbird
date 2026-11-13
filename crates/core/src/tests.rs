@@ -188,6 +188,30 @@ fn inspect_open_reads_a_file_already_open() {
     }
 }
 
+/// The scan's two halves (the desktop app's tags first, checksums after): together, `inspect`.
+#[test]
+fn read_tags_and_checksums_are_inspect_in_two() {
+    let (_, root) = fixture_root();
+    for case in cases() {
+        let whole = inspect(&root, &case.file, None).unwrap();
+        let tagged = read_tags(&root, &case.file).unwrap();
+        let sums = checksums(&root, &case.file).unwrap();
+        assert_eq!(Some(tagged.tags), whole.tags, "{}", case.name);
+        assert_eq!(tagged.stat.size, whole.stat.size, "{}", case.name);
+        assert_eq!(sums.full_checksum, whole.full_checksum, "{}", case.name);
+        assert_eq!(sums.audio_checksum, whole.audio_checksum, "{}", case.name);
+        assert_eq!(sums.stat.mtime, whole.stat.mtime, "{}", case.name);
+    }
+}
+
+/// Neither reaches out of its root.
+#[test]
+fn read_tags_and_checksums_stay_in_their_root() {
+    let (_, root) = fixture_root();
+    assert!(read_tags(&root, "../outside.mp3").is_err());
+    assert!(checksums(&root, "../outside.mp3").is_err());
+}
+
 fn cover() -> Cover {
     Cover {
         data: fs::read(fixtures().join("covers/cover9.jpg")).unwrap(),

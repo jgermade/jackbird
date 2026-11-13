@@ -18,7 +18,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { languageName, t } = await import("../lib/i18n")
-  const { LANGUAGES, preferences, setLanguage, setTheme } = await import("../lib/preferences")
+  const { LANGUAGES, preferences, setLanguage, setSongsInTree, setTheme } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
   const { isDesktop, isPhone } = await import("../lib/platform")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
@@ -89,6 +89,14 @@
           <p>{{ isDark ? t("preferences.darkOn") : t("preferences.lightOn") }}</p>
         </div>
         <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
+      </section>
+      <!-- The library's tree with its songs, or its folders only (helpers/folders.ts). -->
+      <section class="pref">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("preferences.library") }}</h3>
+          <p>{{ preferences.songsInTree ? t("preferences.songsInTreeOn") : t("preferences.songsInTreeOff") }}</p>
+        </div>
+        <SlideSwitch :label="t('preferences.songsInTree')" :model="preferences.songsInTree" @change="setSongsInTree($event.detail)" />
       </section>
       <section :if="account.active && account.me" class="pref account">
         <div class="text">

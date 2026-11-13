@@ -8,6 +8,7 @@ import { t } from "../i18n";
 import { isDesktop, isPhone, isService } from "../platform";
 import { parseSaved } from "../../helpers/instance";
 import { pickBrowserSource, restoreBrowserSource } from "./browser";
+import { folderAccessHere, pickReadOnlySource } from "./picked";
 import type { ServiceClient } from "./service";
 
 /**
@@ -39,7 +40,11 @@ export async function pickSource(server?: ServiceClient): Promise<RootSource | n
     const path = await (await import("../folders")).chooseMachineFolder();
     return path === null ? null : (await import("./service")).openServiceFolder(path);
   }
-  return pickBrowserSource(t("message.noFsa"));
+  // A browser with no File System Access (Safari, Firefox): the folder, to read only.
+  // Imported up front, not on the click: Safari opens the input's dialog only straight from it.
+  const access = folderAccessHere();
+  if (access === "read") return pickReadOnlySource();
+  return pickBrowserSource(t(access === "none" ? "sources.noFolders" : "message.noFsa"));
 }
 
 /** Reopens what the session kept of a root; null when it cannot be (no permission, a path gone, the other runtime's). */

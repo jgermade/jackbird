@@ -6,6 +6,7 @@
 
 import { $reactive, $toRaw } from "jq79";
 import { normaliseAddress } from "../helpers/instance";
+import type { FolderAccess } from "../helpers/picked";
 import type { SampleList } from "../helpers/samples";
 import { account, can, followServer, whenSignedIn } from "./account";
 import { t } from "./i18n";
@@ -15,6 +16,7 @@ import { isDesktop, isEmbed, isPhone, isService } from "./platform";
 import { recent, forgetRecent, type RecentRoot } from "./recent";
 import { hydrateRoot, openFolder, openSamples } from "./roots";
 import { restoreSource } from "./sources";
+import { folderAccessHere } from "./sources/picked";
 import { currentServer, homeServer, librarySource, serviceAt, serviceRoots, sharedShelves, type Shelf } from "./sources/service";
 
 export type SourceKind = "device" | "serverFolder" | "server";
@@ -97,6 +99,12 @@ export function sourcesHere(): SourceKind[] {
 /** The folders this runtime offers now (the "Folder" tab's choices). */
 export const folderSources = (): SourceKind[] => sourcesHere().filter((kind) => kind !== "server");
 
+/**
+ * What a folder of this device can be here: read and written (the apps, a Chromium browser), only
+ * read (Safari, Firefox: lib/sources/picked.ts), or not opened at all (a browser with neither).
+ */
+export const deviceAccess = (): FolderAccess => (isDesktop ? "full" : folderAccessHere());
+
 /** The dialog's tabs: "Folder" wherever folders are offered; "Server" in the apps. */
 export function tabsHere(): ("folder" | "server")[] {
   const tabs: ("folder" | "server")[] = [];
@@ -119,7 +127,8 @@ export function openAdding(): void {
   void loadShared();
   const tabs = tabsHere();
   const folders = folderSources();
-  if (tabs.length === 1 && tabs[0] === "folder" && folders.length === 1 && adding.shared.length === 0) {
+  // Not where the folder could only be read, or not opened: the dialog says so first.
+  if (tabs.length === 1 && tabs[0] === "folder" && folders.length === 1 && adding.shared.length === 0 && (folders[0] !== "device" || deviceAccess() === "full")) {
     void addFrom(folders[0]);
     return;
   }

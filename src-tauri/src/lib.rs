@@ -9,6 +9,7 @@
 #[cfg(desktop)]
 mod audio;
 mod media;
+mod scan;
 mod service;
 
 use std::collections::HashMap;
@@ -382,6 +383,8 @@ macro_rules! commands {
             rename,
             mkdir,
             inspect,
+            scan::scan,
+            scan::checksums,
             save,
             media_url,
             check_folder,

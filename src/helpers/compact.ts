@@ -31,7 +31,7 @@ export type Bounds = { x: number; y: number; width: number; height: number };
 export type CompactState = {
   /** Whether the app was compact when it closed. */
   on: boolean;
-  /** Whether the compact window is kept on top of the others. */
+  /** Whether the compact window is kept on top of the others: so by default, until turned off. */
   onTop: boolean;
   /** Whether the compact player shows the queue's list. */
   list: boolean;
@@ -41,7 +41,7 @@ export type CompactState = {
   full: (Bounds & { maximized: boolean }) | null;
 };
 
-export const NO_COMPACT: CompactState = { on: false, onTop: false, list: false, compact: null, full: null };
+export const NO_COMPACT: CompactState = { on: false, onTop: true, list: false, compact: null, full: null };
 
 /** A size in rem, in pixels at the given root font size (in px), rounded. */
 export function remToPx(rem: number, rootPx: number): number {
@@ -87,7 +87,7 @@ export function parseCompactState(raw: string | null): CompactState {
   const full = bounds(saved.full);
   return {
     on: saved.on === true,
-    onTop: saved.onTop === true,
+    onTop: saved.onTop !== false,
     list: saved.list === true,
     compact: bounds(saved.compact),
     full: full ? { ...full, maximized: (saved.full as Record<string, unknown>).maximized === true } : null

@@ -8,6 +8,7 @@ import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
 import { byCaret, followFolder } from "../helpers/follow";
+import { withoutSongs } from "../helpers/folders";
 import { levelsOf, openOnEntering, openOnLeaving, type Levels } from "../helpers/levels";
 import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
@@ -32,10 +33,10 @@ type Derived = {
   crumbs: Crumb[];
 };
 
-// The last derivation, keyed on the roots array, the active id and the
-// language (the views' labels): every write replaces the array (updateRoots),
-// so identity is enough.
-let cache: { roots: RootWorkspace[]; id: string | null; language: string; derived: Derived } | null = null;
+// The last derivation, keyed on the roots array, the active id, the
+// language (the views' labels) and whether the tree shows the songs: every
+// write replaces the array (updateRoots), so identity is enough.
+let cache: { roots: RootWorkspace[]; id: string | null; language: string; songs: boolean; derived: Derived } | null = null;
 
 /** The words the views need, in the interface's language. */
 function viewLabels(): ViewLabels {
@@ -68,13 +69,17 @@ function derive(): Derived {
   const roots = $toRaw(library.roots);
   const id = library.activeRootId;
   const language = preferences.language;
-  if (cache && cache.roots === roots && cache.id === id && cache.language === language) {
+  const songs = preferences.songsInTree;
+  if (cache && cache.roots === roots && cache.id === id && cache.language === language && cache.songs === songs) {
     return cache.derived;
   }
   const root = roots.find((item) => item.id === id) ?? null;
-  const rows = root ? rowsOf(root) : [];
-  const derived = { root, rows, scope: detailScope(root, rows), crumbs: scopeCrumbs(root, rows) };
-  cache = { roots, id, language, derived };
+  const all = root ? rowsOf(root) : [];
+  // Without the songs (a preference), the tree shows and walks the folders only; what Details
+  // shows, and its breadcrumb, are still worked out from every row.
+  const rows = root && !songs ? withoutSongs(all, root.view ?? "files", root.tracks) : all;
+  const derived = { root, rows, scope: detailScope(root, all), crumbs: scopeCrumbs(root, all) };
+  cache = { roots, id, language, songs, derived };
   return derived;
 }
 

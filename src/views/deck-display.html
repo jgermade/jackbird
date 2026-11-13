@@ -93,9 +93,8 @@
   // it, in place of the song's title and artist.
   $: dacName = markView === "dac" ? (soundingDevice()?.device ?? "") : ""
   $: dacWay = markView === "dac" ? (soundingDevice()?.route ?? "") : ""
-  // Nothing open yet (and nothing coming back): the title's line runs a marquee instead of
-  // "Nothing playing", at a pace by its length.
-  // The artist's line runs one of its own, under it.
+  // Nothing open yet (and nothing coming back): the title's line says welcome instead of "Nothing
+  // playing", and the artist's line what to do; each scrolls only if it does not fit, as any line.
   $: marquee = !current && !playback.error && !library.restoring && library.roots.length === 0 ? t("faceplate.marquee") : ""
   $: marqueeSub = marquee ? t("faceplate.marqueeSub") : ""
   const pace = (text: string): string => `--marquee-time: ${Math.max(8, Math.round(text.length * 0.28))}s`
@@ -111,21 +110,33 @@
   // (in place of the library's own meter). Read through a function: the root is boxed.
   const reading = (): { loaded: number; total: number } | null => {
     const root = activeRoot.value.data
-    return root?.loadingMetadata && root.tracks.length > 0 ? { loaded: root.loadedCount, total: root.tracks.length } : null
+    const total = root?.total ?? root?.tracks.length ?? 0
+    return root?.loadingMetadata && total > 0 ? { loaded: root.loadedCount, total } : null
   }
   $: readingNow = !current && !playback.error ? reading() : null
-  // The title scrolls when it does not fit, as an old deck's display does: measured with a copy of
-  // it laid out unseen (the scrolling one holds the text twice), again when it or the row's width
-  // changes. Under reduced motion the marquee stands still, cut with an ellipsis.
+  // Each line scrolls when it does not fit, as an old deck's display does, and only then: measured
+  // with a copy of it laid out unseen (the scrolling one holds the text twice), again when it or
+  // the row's width changes. The artist's line has the clock's room taken off. Under reduced motion
+  // the marquee stands still, cut with an ellipsis.
   let titleScrolls = false
+  let artistScrolls = false
   const fit = (() => {
     let frame = 0
+    /** Whether the row's unseen copy is wider than the room the row leaves the text. */
+    const overflows = (rowSelector: string): boolean => {
+      const row = $self(rowSelector) as HTMLElement | null
+      const sizer = row?.querySelector<HTMLElement>(".line-sizer")
+      if (!row || !sizer) return false
+      const clock = row.querySelector<HTMLElement>(".lcd-time")
+      const room = row.clientWidth - (clock ? clock.offsetWidth + (parseFloat(getComputedStyle(row).columnGap) || 0) : 0)
+      return sizer.offsetWidth > room + 1
+    }
     const measure = () => {
       frame = 0
-      const row = $self(".title-row") as HTMLElement | null
-      const sizer = $self(".title-sizer") as HTMLElement | null
-      const scrolls = !!row && !!sizer && sizer.offsetWidth > row.clientWidth + 1
-      if (scrolls !== titleScrolls) titleScrolls = scrolls
+      const title = overflows(".title-row")
+      const artist = overflows(".artist-row")
+      if (title !== titleScrolls) titleScrolls = title
+      if (artist !== artistScrolls) artistScrolls = artist
     }
     const soon = () => {
       if (!frame) frame = requestAnimationFrame(measure)
@@ -136,7 +147,7 @@
       check(_text: string) {
         soon()
         requestAnimationFrame(() => {
-          const row = $self(".title-row")
+          const row = $self(".lcd-text")
           if (watcher && row && row !== watched) {
             watcher.disconnect()
             watcher.observe(row)
@@ -151,9 +162,9 @@
     }
   })()
   $destroyed(() => fit.stop())
-  $: titleLine = dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
-  $: fit.check(titleLine)
-  $: artistLine = dacName ? dacWay : playback.error ? "" : current ? (current.artist ?? "") : readingNow ? t("faceplate.readingCount", { loaded: readingNow.loaded, total: readingNow.total }) : ""
+  $: titleLine = marquee || dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
+  $: artistLine = marqueeSub || (dacName ? dacWay : playback.error ? "" : current ? (current.artist ?? "") : readingNow ? t("faceplate.readingCount", { loaded: readingNow.loaded, total: readingNow.total }) : "")
+  $: fit.check(`${titleLine}\n${artistLine}\n${current ? 1 : 0}`)
   // The clock at the end of the artist's line, mm:ss, turned with a click or a tap: where the song
   // is, or its length. The minutes' zeros at the left are dimmed: "03" shows its 3 lit.
   const TIME_VIEWS = ["elapsed", "total"] as const
@@ -209,15 +220,15 @@
           <div class="lcd-text">
             <span class="now title-row">
               <span class="visually-hidden">{{ stateLabel }}</span>
-              <span :if="marquee" class="mm-display-title marquee" :style="pace(marquee)"><span class="marquee-run" aria-hidden="true"><span>{{ marquee }}</span><span>{{ marquee }}</span></span><span class="visually-hidden">{{ marquee }}</span></span>
-              <span :elseif="titleScrolls" class="mm-display-title marquee" :style="pace(titleLine)" :title="titleLine"><span class="marquee-run" aria-hidden="true"><span>{{ titleLine }}</span><span>{{ titleLine }}</span></span><span class="visually-hidden">{{ titleLine }}</span></span>
+              <span :if="titleScrolls" class="mm-display-title marquee" :style="pace(titleLine)" :title="titleLine"><span class="marquee-run" aria-hidden="true"><span>{{ titleLine }}</span><span>{{ titleLine }}</span></span><span class="visually-hidden">{{ titleLine }}</span></span>
               <span :else class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
               <!-- The title laid out whole and unseen, to know whether it fits. -->
-              <span class="mm-display-title title-sizer" aria-hidden="true">{{ titleLine }}</span>
+              <span class="mm-display-title line-sizer" aria-hidden="true">{{ titleLine }}</span>
             </span>
             <span class="now artist-row">
-              <span :if="marqueeSub" class="artist mm-display-title marquee" :style="pace(marqueeSub)"><span class="marquee-run" aria-hidden="true"><span>{{ marqueeSub }}</span><span>{{ marqueeSub }}</span></span><span class="visually-hidden">{{ marqueeSub }}</span></span>
+              <span :if="artistScrolls" class="artist mm-display-title marquee" :style="pace(artistLine)" :title="artistLine"><span class="marquee-run" aria-hidden="true"><span>{{ artistLine }}</span><span>{{ artistLine }}</span></span><span class="visually-hidden">{{ artistLine }}</span></span>
               <span :else class="artist mm-display-title" :title="artistLine">{{ artistLine || "\u00a0" }}</span>
+              <span class="artist mm-display-title line-sizer" aria-hidden="true">{{ artistLine }}</span>
               <!-- The clock, at the artist line's end: where the song is, or its length (mm:ss); a
                    click turns it. Nothing with no song loaded. -->
               <button :if="current" type="button" class="lcd-time"
@@ -388,8 +399,8 @@
     .marquee-run { animation: none; }
     .marquee-run > span + span { display: none; }
   }
-  .title-row { position: relative; }
-  .lcd-text .mm-display-title.title-sizer { position: absolute; top: 0; left: 0; visibility: hidden; white-space: nowrap; overflow: visible; text-overflow: clip; pointer-events: none; }
+  .title-row, .artist-row { position: relative; }
+  .lcd-text .mm-display-title.line-sizer { position: absolute; top: 0; left: 0; visibility: hidden; white-space: nowrap; overflow: visible; text-overflow: clip; pointer-events: none; }
   /* The display's second line: the artist, under the title. */
   .artist { font-weight: var(--mm-weight-regular); opacity: .7; }
   /* The display: the mark at the left, the title row and the meter beside it. */
