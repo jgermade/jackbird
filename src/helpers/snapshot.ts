@@ -97,6 +97,49 @@ export function applyVerification<Root extends WithSnapshot>(
   };
 }
 
+/** One file's checksums worked out in bulk (the desktop app's), with its size and date then. */
+export type Sums = { trackId: string; readFrom: string; fullChecksum: string; audioChecksum: string; size: number; lastModified: number };
+
+/**
+ * A root after a batch of checksums worked out in bulk, as new objects, in one pass (a track at a
+ * time, as applyVerification, was quadratic over a folder). Each sets its track's checksums and
+ * verification time, and its record, the tags kept. Left out: a track gone, or whose checksum is
+ * no longer the one it was read from (a save since), or whose file had another size or date when
+ * it was read than the library holds (it changed since its tags were read: the verifier reads it
+ * again whole). The root itself when none applies; `applied` lists those that did.
+ */
+export function applySums<Root extends WithSnapshot>(root: Root, sums: readonly Sums[], nowIso: string): { root: Root; applied: string[] } {
+  const byId = new Map(root.tracks.map((item) => [item.id, item]));
+  const changed = new Map<string, Track>();
+  const records: Record<string, MetaRecord> = {};
+  for (const sum of sums) {
+    const track = byId.get(sum.trackId);
+    if (!track || checksumOf(track) !== sum.readFrom || track.size !== sum.size || track.lastModified !== sum.lastModified) continue;
+    const { fullChecksum, audioChecksum } = sum;
+    changed.set(track.id, { ...track, checksum: fullChecksum, fullChecksum, audioChecksum, lastVerifiedAt: nowIso });
+    const previous = root.metaSnapshot.tracks[track.relativePath];
+    records[track.relativePath] = {
+      checksum: fullChecksum,
+      fullChecksum,
+      audioChecksum,
+      size: track.size,
+      lastModified: track.lastModified,
+      lastVerifiedAt: nowIso,
+      metadata: track.metadata,
+      updatedAt: previous?.updatedAt ?? nowIso
+    };
+  }
+  if (changed.size === 0) return { root, applied: [] };
+  return {
+    root: {
+      ...root,
+      tracks: root.tracks.map((item) => changed.get(item.id) ?? item),
+      metaSnapshot: { ...root.metaSnapshot, tracks: { ...root.metaSnapshot.tracks, ...records } }
+    },
+    applied: [...changed.keys()]
+  };
+}
+
 /** What the initial scan read from one file. */
 export type ScanResult = {
   trackId: string;
@@ -112,14 +155,21 @@ export type ScanResult = {
  * date, tags and verification time, and its `.meta` record. A result whose
  * track is gone, or no longer has the checksum it was read from, is left out:
  * something else (a save) wrote and recorded that track since, and its
- * record stands. The root itself when no result applies.
+ * record stands; but a file new to the library, among `adding`, becomes a
+ * track at the end of the list. The root itself when no result applies.
  */
-export function applyScanResults<Root extends WithSnapshot>(root: Root, results: readonly ScanResult[]): Root {
+export function applyScanResults<Root extends WithSnapshot>(root: Root, results: readonly ScanResult[], adding: ReadonlySet<string> = new Set()): Root {
   const byId = new Map(root.tracks.map((item) => [item.id, item]));
   const changed = new Map<string, Track>();
+  const added: string[] = [];
   const records: Record<string, MetaRecord> = {};
   for (const { trackId, readFrom, record } of results) {
-    const track = changed.get(trackId) ?? byId.get(trackId);
+    let track = changed.get(trackId) ?? byId.get(trackId);
+    // A file new to the library, shown with its tags (the desktop app's scan adds no empty rows first).
+    if (!track && adding.has(trackId) && readFrom === "") {
+      track = { id: trackId, name: trackId.split("/").at(-1) ?? trackId, relativePath: trackId, size: record.size ?? 0, checksum: "", metadata: record.metadata };
+      added.push(trackId);
+    }
     if (!track || checksumOf(track) !== readFrom) {
       continue;
     }
@@ -138,9 +188,14 @@ export function applyScanResults<Root extends WithSnapshot>(root: Root, results:
   if (changed.size === 0) {
     return root;
   }
+  const tracks = root.tracks.map((item) => changed.get(item.id) ?? item);
+  for (const trackId of added) {
+    const track = changed.get(trackId);
+    if (track) tracks.push(track);
+  }
   return {
     ...root,
-    tracks: root.tracks.map((item) => changed.get(item.id) ?? item),
+    tracks,
     metaSnapshot: { ...root.metaSnapshot, tracks: { ...root.metaSnapshot.tracks, ...records } }
   };
 }

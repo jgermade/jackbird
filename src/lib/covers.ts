@@ -8,7 +8,7 @@
 
 import type { VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $reactive } from "jq79";
-import { coverMime, coverName, coverRef, coverToDataUrl, dataUrlToCover, refName } from "../helpers/cover";
+import { coverMime, coverName, coverRef, coverToDataUrl, dataUrlToCover, fromBase64, refName } from "../helpers/cover";
 import type { MetaSnapshot, RootSource, TrackMetadata } from "../types";
 
 /** Where a folder keeps its covers. */
@@ -38,6 +38,13 @@ const writtenIn = (vfs: VFSAdapter): Set<string> => {
 export function keepCover(name: string, data: Uint8Array): void {
   if (kept.has(name)) return;
   kept.set(name, { data, mime: coverMime(name), url: null });
+}
+
+/** A picture read from a file's tags, kept, and its reference. */
+export function internCoverBytes(cover: { mime: string; data: Uint8Array }): string {
+  const name = coverName(cover);
+  keepCover(name, cover.data);
+  return coverRef(name);
 }
 
 /** A cover as the library holds it: a reference for a data URL (the picture kept here), anything else as it is. */
@@ -85,20 +92,24 @@ export function namesIn(snapshot: MetaSnapshot): Set<string> {
  */
 export async function coversIn(vfs: VFSAdapter, names: Iterable<string>): Promise<Set<string>> {
   const missing = new Set<string>();
-  const there = writtenIn(vfs);
   await Promise.all(
     [...names].map(async (name) => {
       const found = await vfs.stat(`${COVERS_DIR}/${name}`).catch(() => null);
       if (found?.kind === "file") {
-        there.add(name);
-        const places = folders.get(name) ?? [];
-        if (!places.includes(vfs)) folders.set(name, [...places, vfs]);
+        coverAt(name, vfs);
       } else if (!kept.has(name)) {
         missing.add(name);
       }
     })
   );
   return missing;
+}
+
+/** A picture a folder's `.meta/covers/` has (the desktop app's scan wrote it there): read from it when shown. */
+export function coverAt(name: string, vfs: VFSAdapter): void {
+  writtenIn(vfs).add(name);
+  const places = folders.get(name) ?? [];
+  if (!places.includes(vfs)) folders.set(name, [...places, vfs]);
 }
 
 /** Reads a picture from the first folder that has it; null when none does. */
@@ -174,9 +185,7 @@ export async function writeCovers(vfs: VFSAdapter, snapshot: MetaSnapshot): Prom
     if (!found) continue;
     try {
       await vfs.write(`${COVERS_DIR}/${name}`, found.data);
-      there.add(name);
-      const places = folders.get(name) ?? [];
-      if (!places.includes(vfs)) folders.set(name, [...places, vfs]);
+      coverAt(name, vfs);
     } catch {
       failed.add(name);
     }
@@ -209,6 +218,22 @@ export function withCovers(source: RootSource): RootSource {
       const found = await source.inspect(path, known);
       return { ...found, metadata: internMetadata(found.metadata) };
     },
+    // In bulk: the pictures the scan wrote into the folder's `.meta/covers/` read from there when
+    // shown; one it could not write comes in the batch, kept here. Those kept already not asked for.
+    scanTags: source.scanTags
+      ? (paths, knownCovers, take) =>
+          source.scanTags!(paths, [...new Set([...knownCovers, ...kept.keys()])], (batch) => {
+            for (const cover of batch.covers) {
+              const data = fromBase64(cover.data);
+              if (data) keepCover(cover.name, data);
+            }
+            for (const track of batch.tracks) {
+              const name = refName(track.metadata.coverDataUrl);
+              if (name && !kept.has(name)) coverAt(name, source.vfs);
+            }
+            take(batch);
+          })
+      : undefined,
     async save(path, previous, metadata, scope, expected) {
       const cover = metadata.coverDataUrl !== previous.coverDataUrl ? await coverDataUrl(metadata.coverDataUrl) : metadata.coverDataUrl;
       const written = await source.save(path, previous, { ...metadata, coverDataUrl: cover }, scope, expected);

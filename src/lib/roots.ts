@@ -152,6 +152,10 @@ export async function hydrateRoot(
 
       const staleOrNewFiles = [...newFiles, ...modifiedFiles];
       const isFullyCached = staleOrNewFiles.length === 0 && removedPaths.length === 0;
+      // Read in bulk (the desktop app), a new file comes in with its tags, a batch at a time: no
+      // empty row first, which drew the whole library once more for nothing.
+      const bulk = !!source.scanTags;
+      const adding = new Set(bulk ? newFiles.map((file) => file.relativePath) : []);
 
       // Drop tracks that are gone from disk
       updateRoots((currentRoots) =>
@@ -164,7 +168,7 @@ export async function hydrateRoot(
           const tracks = root.tracks.filter((t) => !removed.has(t.relativePath));
 
           // Add genuinely new files (not in snapshot at all) as empty placeholder tracks
-          for (const file of newFiles) {
+          for (const file of bulk ? [] : newFiles) {
             tracks.push({
               id: file.relativePath,
               name: file.name,
@@ -184,7 +188,8 @@ export async function hydrateRoot(
             tracks,
             metaSnapshot: omitRecords(root.metaSnapshot, removedPaths),
             loadingMetadata: !isFullyCached,
-            loadedCount: tracks.length - staleOrNewFiles.length
+            loadedCount: audioFiles.length - staleOrNewFiles.length,
+            total: audioFiles.length
           };
         })
       );
@@ -220,7 +225,7 @@ export async function hydrateRoot(
         updateRoots((currentRoots) =>
           currentRoots.map((root) =>
             root.id === rootId
-              ? { ...applyScanResults(root, updates), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
+              ? { ...applyScanResults(root, updates, adding), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
               : root
           )
         );
@@ -302,9 +307,53 @@ export async function hydrateRoot(
         }
       }
 
-      await Promise.all(
-        Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
-      );
+      // In bulk where the source can (the desktop app: src-tauri/src/scan.rs): every file's tags in
+      // one call, from their heads, in batches; their checksums after, in the background
+      // (lib/verifier.ts), so the library shows whole without the audio read. Elsewhere, each file
+      // inspected, several at once.
+      async function inBulk(scanTags: NonNullable<RootSource["scanTags"]>): Promise<void> {
+        const readFrom = new Map(staleOrNewFiles.map((file) => [file.relativePath, checksumNow(file.relativePath)]));
+        await scanTags(
+          staleOrNewFiles.map((file) => file.relativePath),
+          [],
+          (batch) => {
+            const nowIso = new Date().toISOString();
+            for (const found of batch.tracks) {
+              pendingUpdates.push({
+                trackId: found.path,
+                readFrom: readFrom.get(found.path) ?? "",
+                record: {
+                  // No checksum yet: the verifier works them out next.
+                  checksum: "",
+                  fullChecksum: "",
+                  audioChecksum: "",
+                  size: found.size,
+                  lastModified: found.lastModified,
+                  lastVerifiedAt: undefined,
+                  metadata: withEveryField(found.metadata),
+                  updatedAt: nowIso
+                }
+              });
+            }
+            for (const unread of batch.unread) console.error(`jackbird: could not read ${unread.path}`, unread.message);
+            failedCount += batch.unread.length;
+            loadedCount += batch.tracks.length + batch.unread.length;
+            snapshotDirty ||= batch.tracks.length > 0;
+            if (batch.done || Date.now() - flushedAt >= FLUSH_EVERY_MS) {
+              flushedAt = Date.now();
+              flush();
+            }
+          }
+        );
+      }
+
+      if (source.scanTags) {
+        await inBulk(source.scanTags);
+      } else {
+        await Promise.all(
+          Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
+        );
+      }
 
       if (snapshotDirty) {
         await flushMeta(rootId);

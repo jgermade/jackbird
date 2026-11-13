@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { coverMime, coverName, coverRef, coverToDataUrl, dataUrlToCover, editFor, refName } from "./cover.ts";
+import { coverMime, coverName, coverRef, coverToDataUrl, dataUrlToCover, editFor, fromBase64, refName } from "./cover.ts";
 import { emptyMetadata } from "./metadata.ts";
 
 describe("coverToDataUrl and dataUrlToCover", () => {
@@ -95,5 +95,13 @@ describe("coverMime, coverRef and refName", () => {
     assert.equal(refName(null), null);
     assert.equal(refName(undefined), null);
     assert.equal(refName(coverRef("../../etc/passwd")), null);
+  });
+});
+
+describe("fromBase64", () => {
+  it("reads base64 into bytes, and nothing else", () => {
+    assert.deepEqual(fromBase64("AQI="), new Uint8Array([1, 2]));
+    assert.deepEqual(fromBase64(""), new Uint8Array([]));
+    assert.equal(fromBase64("%%%"), null);
   });
 });

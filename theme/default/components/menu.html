@@ -26,17 +26,19 @@
   // (23:32, W4).
 
   type Item = { id: string; label: string; danger?: boolean; rule?: boolean; disabled?: boolean; icon?: string; group?: string }
-  // The items in rows: one each, or side by side where they share a group.
+  // The items in rows: one each, or side by side where they share a group. Given as a function,
+  // they are made only when the menu opens: a list with a menu on each row (a library's tracks)
+  // made every row's items on every change, and drew them all, closed.
   const rows = (): { key: string; rule: boolean; items: Item[] }[] => {
     const out: { key: string; rule: boolean; items: Item[] }[] = []
-    for (const item of items as Item[]) {
+    for (const item of (typeof items === "function" ? items() : items) as Item[]) {
       const last = out[out.length - 1]
       if (item.group && last && last.items[0].group === item.group) last.items.push(item)
       else out.push({ key: item.id, rule: !!item.rule, items: [item] })
     }
     return out
   }
-  type Props = { items?: Item[]; label?: string; disabled?: boolean | ""; size?: "sm" | "md" | "lg"; variant?: string }
+  type Props = { items?: Item[] | (() => Item[]); label?: string; disabled?: boolean | ""; size?: "sm" | "md" | "lg"; variant?: string }
 
   const Key = await import("./key.html")
 
@@ -79,9 +81,11 @@
   const show = () => {
     const element = list()
     if (!element || open) return
-    element.showPopover()
+    // Open first, so its items are drawn, then shown and placed by their size.
     open = true
+    element.showPopover()
     place()
+    requestAnimationFrame(place)
     document.addEventListener("pointerdown", outside, true)
     addEventListener("resize", place)
     requestAnimationFrame(() => entries()[0]?.focus())
@@ -129,7 +133,7 @@
     <svg :else class="dots" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3.25" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="12.75" r="1.4" /></svg>
   </Key>
   <div class="list" popover="manual" role="menu" :aria-label="label || null">
-    <div :each="row in rows()" :key="row.key" class="row" :class.rule="row.rule" :class.shared="row.items.length > 1">
+    <div :each="row in (open ? rows() : [])" :key="row.key" class="row" :class.rule="row.rule" :class.shared="row.items.length > 1">
       <button :each="item in row.items" :key="item.id" type="button" role="menuitem" tabindex="-1" class="item"
               :class.danger="!!item.danger" :disabled="!!item.disabled" @click="choose(item)"><svg :if="item.icon" class="glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="item.icon" /></svg>{{ item.label }}</button>
     </div>

@@ -25,9 +25,15 @@ export function dataUrlToCover(url: string): WireCover | null {
   if (!match) {
     return null;
   }
+  const data = fromBase64(match[2]);
+  return data ? { mime: match[1] || "image/jpeg", data } : null;
+}
+
+/** Bytes from base64, or null when it is not base64. */
+export function fromBase64(text: string): Uint8Array | null {
   let binary: string;
   try {
-    binary = atob(match[2]);
+    binary = atob(text);
   } catch {
     return null;
   }
@@ -35,7 +41,7 @@ export function dataUrlToCover(url: string): WireCover | null {
   for (let at = 0; at < binary.length; at += 1) {
     data[at] = binary.charCodeAt(at);
   }
-  return { mime: match[1] || "image/jpeg", data };
+  return data;
 }
 
 /**

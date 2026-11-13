@@ -11,7 +11,10 @@ mod files;
 mod root;
 
 pub use b64::{decode as base64_decode, encode as base64_encode};
-pub use files::{Examined, Inspection, Saved, examine, head_of, inspect, inspect_open, save, save_open};
+pub use files::{
+    Examined, Inspection, Saved, Sums, Tagged, checksums, examine, head_of, inspect, inspect_open, read_tags, save,
+    save_open,
+};
 pub use root::{Entry, Error, Root, Stat};
 
 #[cfg(test)]

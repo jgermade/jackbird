@@ -203,7 +203,7 @@
             <Key square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
               <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
             </Key>
-            <Menu :label="t('menu.folder', { title: rowLabel(row) })" :items="rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
+            <Menu :label="t('menu.folder', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
           </span>
         </template>
       </ListRow>
@@ -238,7 +238,7 @@
           <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
-          <Menu :if="row.kind === 'album' || row.trackId || row.playlist" :label="t(row.kind === 'album' ? 'menu.folder' : 'menu.track', { title: rowLabel(row) })" :items="rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
+          <Menu :if="row.kind === 'album' || row.trackId || row.playlist" :label="t(row.kind === 'album' ? 'menu.folder' : 'menu.track', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
         </span>
       </template>
     </ListRow>

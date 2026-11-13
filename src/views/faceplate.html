@@ -52,7 +52,7 @@
   $: tabs = library.roots.map((root) => ({
     id: root.id,
     label: root.label,
-    meta: root.loadingMetadata ? `${root.loadedCount}/${root.tracks.length}` : String(root.tracks.length),
+    meta: root.loadingMetadata ? `${root.loadedCount}/${root.total ?? root.tracks.length}` : String(root.tracks.length),
     closeLabel: t("roots.close", { name: root.label })
   }))
 </script>

@@ -12,7 +12,7 @@
 // verifier fix).
 
 import { $toRaw } from "jq79";
-import { applyVerification, checksumOf, type Verification } from "../helpers/snapshot";
+import { applySums, applyVerification, checksumOf, type Sums, type Verification } from "../helpers/snapshot";
 import { tracksToVerify } from "../helpers/tracks";
 import type { RootWorkspace } from "../types";
 import { library } from "./library";
@@ -21,6 +21,8 @@ import { updateRoots } from "./roots";
 
 /** How long after a root is ready the verifier starts. */
 const START_AFTER_MS = 3000;
+/** How long, where the source works out checksums in bulk and some are missing (a folder just read). */
+const BULK_AFTER_MS = 300;
 /** The pause before each track, so the verifier stays in the background. */
 const PAUSE_MS = 300;
 /** `.meta/` is written every this many tracks, and at the end. */
@@ -46,7 +48,49 @@ async function inspect(root: RootWorkspace, track: RootWorkspace["tracks"][numbe
 /** How many times a track is read again because a save started while it was read. */
 const RETRIES = 3;
 
+/**
+ * The checksums missing from a root, worked out in bulk where its source can (the desktop app:
+ * src-tauri/src/scan.rs), all at once and applied a batch at a time: a folder just read by its
+ * tags (lib/roots.ts) gets them in the background. A track whose file changed since its tags were
+ * read is left to the one-at-a-time pass after, which reads its tags again.
+ */
+async function sumsInBulk(rootId: string, cancelled: () => boolean): Promise<void> {
+  const start = openRoot(rootId);
+  const scanSums = start?.source.scanSums;
+  const missing = start ? start.tracks.filter((track) => !checksumOf(track)) : [];
+  if (!scanSums || missing.length === 0) return;
+  const readFrom = new Map(missing.map((track) => [track.id, checksumOf(track)]));
+  let pending: Sums[] = [];
+  let applied = 0;
+  const apply = () => {
+    const now = openRoot(rootId);
+    // Not while a save is under way: those wait for the pass after.
+    if (!now || cancelled() || library.saving || pending.length === 0) return;
+    const { root: next, applied: done } = applySums(now, pending, new Date().toISOString());
+    pending = [];
+    if (done.length === 0) return;
+    applied += done.length;
+    updateRoots((roots) => roots.map((item) => (item.id === rootId ? next : item)));
+  };
+  let appliedAt = Date.now();
+  await scanSums(
+    missing.map((track) => track.relativePath),
+    (batch) => {
+      for (const sum of batch.sums) {
+        pending.push({ trackId: sum.path, readFrom: readFrom.get(sum.path) ?? "", ...sum });
+      }
+      // A few times a second: each lays the library out again.
+      if (batch.done || Date.now() - appliedAt >= 1000) {
+        appliedAt = Date.now();
+        apply();
+      }
+    }
+  ).catch((error: unknown) => console.error("jackbird: could not work out the checksums", error));
+  if (applied > 0 && !cancelled()) await flushMeta(rootId).catch(() => undefined);
+}
+
 async function verify(rootId: string, cancelled: () => boolean): Promise<void> {
+  await sumsInBulk(rootId, cancelled);
   const start = openRoot(rootId);
   const trackIds = start ? tracksToVerify(start.tracks, Date.now()).map((track) => track.id) : [];
   let verified = 0;
@@ -126,7 +170,8 @@ export function startVerifier(): () => void {
     if (ready) {
       let cancelled = false;
       const rootId = ready.id;
-      const timer = setTimeout(() => void verify(rootId, () => cancelled), START_AFTER_MS);
+      const bulk = !!ready.source.scanSums && ready.tracks.some((track) => !checksumOf(track));
+      const timer = setTimeout(() => void verify(rootId, () => cancelled), bulk ? BULK_AFTER_MS : START_AFTER_MS);
       cancel = () => {
         cancelled = true;
         clearTimeout(timer);

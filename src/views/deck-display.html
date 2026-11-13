@@ -110,7 +110,8 @@
   // (in place of the library's own meter). Read through a function: the root is boxed.
   const reading = (): { loaded: number; total: number } | null => {
     const root = activeRoot.value.data
-    return root?.loadingMetadata && root.tracks.length > 0 ? { loaded: root.loadedCount, total: root.tracks.length } : null
+    const total = root?.total ?? root?.tracks.length ?? 0
+    return root?.loadingMetadata && total > 0 ? { loaded: root.loadedCount, total } : null
   }
   $: readingNow = !current && !playback.error ? reading() : null
   // Each line scrolls when it does not fit, as an old deck's display does, and only then: measured

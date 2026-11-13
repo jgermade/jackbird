@@ -155,7 +155,7 @@
                       <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
                     </td>
                     <td class="menu-cell">
-                      <Menu :label="t('menu.track', { title: titleOf(track) })" :items="trackMenu(track.id, 'sheet')" @select="onTrackMenu(track.id, $event.detail)" />
+                      <Menu :label="t('menu.track', { title: titleOf(track) })" :items="() => trackMenu(track.id, 'sheet')" @select="onTrackMenu(track.id, $event.detail)" />
                     </td>
                   </tr>
                 </tbody>

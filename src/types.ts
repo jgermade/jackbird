@@ -122,6 +122,8 @@ export type RootWorkspace = {
   selectionAnchorTrackId: string | null;
   loadingMetadata: boolean;
   loadedCount: number;
+  /** While loading, how many tracks the folder has (its walk's count): its tracks may not all be in the list yet. */
+  total?: number;
   groupingMode: GroupingMode;
   metaSnapshot: MetaSnapshot;
   expandedAlbums: string[];
@@ -166,6 +168,24 @@ export type MediaHandle = {
   native?: { root: string; path: string };
 };
 
+/** A file the bulk reads could not read, and why. */
+export type Unread = { path: string; message: string };
+
+/** Tags read in bulk: the files (covers by reference), the covers met for the first time (base64), the files not read. */
+export type TagsBatch = {
+  done: boolean;
+  tracks: { path: string; size: number; lastModified: number; metadata: TrackMetadata }[];
+  covers: { name: string; data: string }[];
+  unread: Unread[];
+};
+
+/** Checksums worked out in bulk, with each file's size and date then, and the files not read. */
+export type SumsBatch = {
+  done: boolean;
+  sums: { path: string; size: number; lastModified: number; fullChecksum: string; audioChecksum: string }[];
+  unread: Unread[];
+};
+
 /**
  * Where a root lives, and the work on its files, so that nothing above knows
  * whether it is the browser's folder (File System Access, the tag engine as
@@ -186,6 +206,14 @@ export type RootSource = {
   readonly shelf?: number;
   /** Every file under it, with its size and date. */
   walk(): Promise<WalkedFile[]>;
+  /**
+   * Many files' tags at once, from their heads (no checksum), handed to `take` in batches; the
+   * desktop app's (src-tauri/src/scan.rs). `knownCovers` are the covers' names the interface has,
+   * not sent again. Where there is none, each file is inspected.
+   */
+  scanTags?(paths: string[], knownCovers: string[], take: (batch: TagsBatch) => void): Promise<void>;
+  /** Many files' checksums at once, handed to `take` in batches; the desktop app's, as `scanTags`. */
+  scanSums?(paths: string[], take: (batch: SumsBatch) => void): Promise<void>;
   /** One file's checksums, size and date; its tags too, unless its full checksum is still `known`. */
   inspect(path: string, known?: string): Promise<Inspection>;
   /** Writes `metadata` over the tags the library held (`previous`); the file as it is after. In the family library (F3), for everyone (`family`) or for oneself (`mine`), refused (`stale`, F4) when it changed since its full checksum was `expected`. */
