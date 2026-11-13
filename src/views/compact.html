@@ -31,7 +31,8 @@
       <div class="side">
         <!-- Not in the floating window: the browser's own bar has the key back to the tab, which also brings the tab to the front. -->
         <Key :if="compact.mode !== 'pip' && !embed" size="sm" square :label="backLabel" :title="backTitle" :disabled="compact.busy" @click="leaveCompact()">
-          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" /></svg>
+          <!-- The compact key's own picture (deck-keys.html) opened at its top left: the small window, and an arrow out to the whole one. -->
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.25 2.75h5a1 1 0 0 1 1 1v3.5M1.75 8.75v3.5a1 1 0 0 0 1 1h4.5M7.25 7.75 2.5 3M2.5 6.5V3H6" /><rect x="9" y="9" width="5.25" height="4.25" rx=".5" fill="currentColor" stroke="none" /></svg>
         </Key>
         <Key :if="compact.mode === 'window'" size="sm" square :pressed="compact.onTop" :label="t('compact.onTop')" :title="t('compact.onTop')" @click="setOnTop(!compact.onTop)">
           <svg class="icon" :class.on="compact.onTop" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 2.5h5l-.75 4 2.25 2.25H4L6.25 6.5z" /><path d="M8 8.75v4.75" /></svg>
