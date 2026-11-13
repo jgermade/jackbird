@@ -68,3 +68,22 @@ export function spectrumBands(
   }
   return levels;
 }
+
+/** The bands a display's spectrum shows at its widest (the faceplate's LCD): what a row's bars are folded from. */
+export const DISPLAY_BANDS = 24;
+
+/**
+ * A display's band levels folded into `groups` (a playing row's three bars), on the display's own
+ * scale: the bands split into runs as even as can be, low first, each group the highest band of
+ * its run, as the eye reads the display's tallest column there. No levels or no groups give none.
+ */
+export function foldBands(levels: readonly number[], groups: number): number[] {
+  if (levels.length === 0 || groups <= 0) return [];
+  return Array.from({ length: groups }, (_, group) => {
+    const from = Math.floor((group * levels.length) / groups);
+    const to = Math.max(from + 1, Math.floor(((group + 1) * levels.length) / groups));
+    let highest = 0;
+    for (let band = from; band < Math.min(to, levels.length); band += 1) highest = Math.max(highest, levels[band]);
+    return highest;
+  });
+}

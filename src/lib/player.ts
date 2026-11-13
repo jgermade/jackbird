@@ -27,7 +27,7 @@ import { isOrderOf, nextIndex, nextRepeat, previousIndex, shuffledOrder, upcomin
 import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
-import { SPECTRUM_DECIBELS, SPECTRUM_FFT, SPECTRUM_RANGE, SPECTRUM_SMOOTHING, SPECTRUM_TILT, spectrumBands } from "../helpers/spectrum";
+import { DISPLAY_BANDS, SPECTRUM_DECIBELS, SPECTRUM_FFT, SPECTRUM_RANGE, SPECTRUM_SMOOTHING, SPECTRUM_TILT, foldBands, spectrumBands } from "../helpers/spectrum";
 import { streamInfo, streamInfoNeeds, type StreamInfo } from "../helpers/stream-info";
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
@@ -280,6 +280,15 @@ export function readSpectrum(bands: number): number[] | null {
   }
   analyser.getByteFrequencyData(bins);
   return spectrumBands(bins, bands, context.sampleRate, SPECTRUM_RANGE, SPECTRUM_TILT);
+}
+
+/**
+ * The playing row's bars (`bars` levels, low first) on the display's scale: the display's bands,
+ * folded (see foldBands); `null` as readSpectrum.
+ */
+export function readRowSpectrum(bars: number): number[] | null {
+  const levels = readSpectrum(DISPLAY_BANDS);
+  return levels ? foldBands(levels, bars) : null;
 }
 
 /** The spectrum's raw levels and their rate, for a frame that follows this one (lib/mirror.ts). */

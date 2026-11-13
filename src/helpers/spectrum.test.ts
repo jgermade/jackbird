@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { SPECTRUM_DECIBELS, SPECTRUM_RANGE, SPECTRUM_TILT, spectrumBands } from "./spectrum.ts";
+import { DISPLAY_BANDS, SPECTRUM_DECIBELS, SPECTRUM_RANGE, SPECTRUM_TILT, foldBands, spectrumBands } from "./spectrum.ts";
 
 // An analyser's 512 bins (fftSize 1024) at the two usual rates.
 const BINS = 512;
@@ -96,5 +96,25 @@ describe("spectrumBands", () => {
     const loud = spectrumBands(new Uint8Array(BINS).fill(255), 16, 48000, SPECTRUM_RANGE, 30);
     const faint = spectrumBands(new Uint8Array(BINS).fill(1), 16, 48000, SPECTRUM_RANGE, 30);
     assert.ok(loud.every((level) => level <= 1) && faint.every((level) => level >= 0));
+  });
+});
+
+describe("foldBands", () => {
+  it("gives each group the highest band of its run, low first", () => {
+    assert.deepEqual(foldBands([0.1, 0.5, 0.2, 0.9, 0.3, 0.4], 3), [0.5, 0.9, 0.4]);
+  });
+
+  it("folds the display's bands into a row's three bars, each from a third of them", () => {
+    const levels = Array.from({ length: DISPLAY_BANDS }, (_, band) => band / DISPLAY_BANDS);
+    assert.deepEqual(foldBands(levels, 3), [7 / 24, 15 / 24, 23 / 24]);
+  });
+
+  it("repeats bands when there are more groups than bands", () => {
+    assert.deepEqual(foldBands([0.2, 0.8], 4), [0.2, 0.2, 0.8, 0.8]);
+  });
+
+  it("gives nothing for no levels or no groups", () => {
+    assert.deepEqual(foldBands([], 3), []);
+    assert.deepEqual(foldBands([0.5], 0), []);
   });
 });

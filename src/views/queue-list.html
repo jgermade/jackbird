@@ -19,7 +19,7 @@
   const { t } = await import("../lib/i18n")
   const { coverSrc } = await import("../lib/covers")
   const { playback } = await import("../lib/playback")
-  const { moveInQueue, playAt, queueEntries, queueIsAlbum, readSpectrum, removeFromQueue } = await import("../lib/player")
+  const { moveInQueue, playAt, queueEntries, queueIsAlbum, readRowSpectrum, removeFromQueue } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
   const { preferences } = await import("../lib/preferences")
   const { rowHeights } = await import("../helpers/density")
@@ -225,7 +225,7 @@
         <span class="name">{{ entry.title }}</span>
         <span class="sub">{{ subtitle(entry) }}</span>
       </span>
-      <span class="cue"><EqBars :if="entry.state === 'current'" :active="playback.playing" :source="readSpectrum" /></span>
+      <span class="cue"><EqBars :if="entry.state === 'current'" :active="playback.playing" :source="readRowSpectrum" /></span>
       <span :if="!queueIsAlbum.value" class="keys" @click.stop="null">
         <Key square size="sm" variant="ghost" :label="t('queue.remove', { title: entry.title })" :title="t('queue.remove', { title: entry.title })"
              :disabled="entry.state === 'current'" @click="remove(entry)">
