@@ -35,7 +35,7 @@
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; playlist?: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; inView?: string; missing?: boolean }
+  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; inView?: string; missing?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
@@ -99,7 +99,9 @@
   // A phone (the panes one at a time) lists no nesting: one level at a time (lib/workspace.ts,
   // `treeLevels`). The open folders are stacked at the top, from the first one down, and under
   // them only what the last one holds. A folder's row enters it; an open one's row leaves it (and
-  // the ones under it); its ❯ key opens it in Details.
+  // the ones under it); its ❯ key opens it in Details. Without the songs in the tree (a preference:
+  // helpers/folders.ts), a folder that holds no other (a leaf) has nothing to enter: a tap opens it
+  // in Details, and on a computer it has no toggle.
   const PHONE = matchMedia("(max-width: 720px)")
   let phone: boolean = PHONE.matches
   const onPhone = (event: MediaQueryListEvent) => {
@@ -114,7 +116,8 @@
   const open = (row: Row, event: MouseEvent) => {
     if (event?.detail > 1) return
     if (phone && row.kind === "album") {
-      enterLevel(row.key)
+      if (row.leaf) openFolder(row)
+      else enterLevel(row.key)
       return
     }
     // A computer: the tree follows the click (a folder opens, and closes again as the current row
@@ -229,7 +232,7 @@
              :selectable="row.kind === 'track' && !!row.trackId"
              :playable="row.kind === 'track' && !!row.trackId"
              :muted="!!row.missing"
-             :no-toggle="phone"
+             :no-toggle="phone || !!row.leaf"
              @select="open(row, $event.detail)"
              @pick="pick(row, $event.detail)"
              @toggle="toggleFolder(row.album)">

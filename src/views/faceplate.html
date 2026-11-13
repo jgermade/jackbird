@@ -28,6 +28,7 @@
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
   const { ui } = await import("../lib/ui")
+  const { preferences } = await import("../lib/preferences")
   // The display's spectrum: 24 bands above 640px, 12 below.
   const WIDE = matchMedia("(min-width: 641px)")
   let wide: boolean = WIDE.matches
@@ -98,8 +99,9 @@
           <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
         </Key>
       </span>
-      <!-- Phones: the key that turns between the library and the details, at the bar's right. -->
-      <span class="pane-pick">
+      <!-- Phones: the key that turns between the library and the details, at the bar's right. Not
+           without the songs in the tree: a folder opens in Details, and its breadcrumb goes back. -->
+      <span :if="preferences.songsInTree" class="pane-pick">
         <Key size="sm" square :label="ui.pane === 'library' ? t('panels.details') : t('library.title')" :title="ui.pane === 'library' ? t('panels.details') : t('library.title')"
              @click="pickPane(ui.pane === 'library' ? 'details' : 'library')">
           <!-- The details: a sheet; the library: a list. -->

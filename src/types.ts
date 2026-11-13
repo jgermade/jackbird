@@ -43,6 +43,8 @@ export type WizardTreeRow = {
   depth: number;
   disc?: string;
   expanded?: boolean;
+  /** With the songs out of the tree (helpers/folders.ts): a folder or group that holds no other, which a phone opens in Details. */
+  leaf?: boolean;
   trackId?: string;
   trackNumber?: string;
   artist?: string;

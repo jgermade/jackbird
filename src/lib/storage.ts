@@ -13,7 +13,9 @@ export const STORAGE_KEYS = {
   /** The library pane's width beside the album sheet, in rem (src/helpers/split.ts). */
   splitWidth: "jackbird.splitWidth",
   /** The compact mode's state (src/helpers/compact.ts): whether it was on, its place, "on top". */
-  compact: "jackbird.compact"
+  compact: "jackbird.compact",
+  /** Whether the library's tree shows the songs ("off" when not: src/helpers/folders.ts). */
+  songsInTree: "jackbird.songsInTree"
 } as const;
 
 /**

@@ -1,7 +1,9 @@
 // The user's preferences: theme and language. Each starts from what was
 // saved, else from the system (colour scheme, browser languages), is saved
 // once chosen, and is applied to <html> (data-theme, lang). The theme follows
-// the system until one is chosen. A jq79 store, so views can bind to it.
+// the system until one is chosen. And whether the library's tree shows the
+// songs (helpers/folders.ts), on until turned off. A jq79 store, so views can
+// bind to it.
 
 import { $reactive } from "jq79";
 import { pickLanguage } from "../helpers/i18n";
@@ -42,7 +44,8 @@ const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => lan
 
 export const preferences = $reactive({
   theme: embeddedTheme() ?? storedTheme() ?? systemTheme(),
-  language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage()
+  language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage(),
+  songsInTree: readStored(STORAGE_KEYS.songsInTree) !== "off"
 });
 
 function apply(): void {
@@ -76,6 +79,12 @@ export function setTheme(theme: Theme): void {
 
 export function toggleTheme(): void {
   setTheme(preferences.theme === "dark" ? "light" : "dark");
+}
+
+/** Shows the songs in the library's tree, or only its folders and groups (a song reached through Details). */
+export function setSongsInTree(on: boolean): void {
+  preferences.songsInTree = on;
+  writeStored(STORAGE_KEYS.songsInTree, on ? "on" : "off");
 }
 
 export function setLanguage(language: Language): void {

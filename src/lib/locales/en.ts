@@ -263,6 +263,10 @@ export const en = {
   "preferences.appearance": "Appearance",
   "preferences.darkOn": "Dark theme on",
   "preferences.lightOn": "Light theme on",
+  "preferences.library": "Library",
+  "preferences.songsInTree": "Songs in the library",
+  "preferences.songsInTreeOn": "The library shows the folders and their songs.",
+  "preferences.songsInTreeOff": "The library shows the folders only: their songs are in Details. On a phone, a folder opens in Details, and the trail above it goes back to the library.",
   "preferences.language": "Language",
   "preferences.languageHint": "Interface language. Where a text has no translation, it is shown in English.",
 
