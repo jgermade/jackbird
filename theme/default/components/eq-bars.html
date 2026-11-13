@@ -1,20 +1,81 @@
-<script :setup="{ active = false }: Props" lang="ts">
+<script :setup="{ active = false, source = null }: Props" lang="ts">
   // Three level bars that mark the current track: moving while it plays,
   // still while paused. Decorative: say "now playing" in words elsewhere.
   //
-  //   <EqBars :active="playing" />
+  //   <EqBars :active="playing" :source="readSpectrum" />
   //
-  // The movement scales `--mm-duration-slow`, so reduced motion holds it.
+  // With a `source` (as Spectrum's: `source(bands)` gives the levels, 0 to 1,
+  // low frequencies first, or `null`), the bars are the music's: its lows,
+  // mids and highs, read on every animation frame while `active` (four times
+  // a second under reduced motion), falling slowly as a meter's do; with no
+  // levels to read, they rest. With no `source`, a loop of their own, which
+  // `--mm-duration-slow` scales, so reduced motion holds it.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
-  type Props = { active?: boolean | "" }
+  type Props = { active?: boolean | ""; source?: ((bands: number) => number[] | null) | null }
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  const live = (): boolean => typeof source === "function"
+
+  // The bars' state lives in this closure, not in the component's store: a
+  // top-level `let` would be a reactive field, written on every frame.
+  const meter = (() => {
+    const BARS = 3
+    const REST = 0.15
+    const FALL = 0.05
+    let shown: number[] = Array(BARS).fill(REST)
+    let frame = 0
+    let timer = 0
+
+    const still = (): boolean => matchMedia("(prefers-reduced-motion: reduce)").matches
+
+    // One frame; true while some bar is still above its rest.
+    const draw = (): boolean => {
+      const bars = ($self(".eq") as HTMLElement | null)?.children
+      if (!bars) return false
+      const read = flag(active) && live() ? source!(BARS) : null
+      // Up at once, down slowly; never under the rest, so the mark always shows.
+      shown = shown.map((level, bar) => Math.max(REST, Math.min(1, read?.[bar] ?? 0), level - FALL))
+      shown.forEach((level, bar) => {
+        const element = bars[bar] as HTMLElement | undefined
+        if (element) element.style.transform = `scaleY(${level.toFixed(3)})`
+      })
+      return shown.some((level) => level > REST)
+    }
+
+    const stop = () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+      frame = 0
+      timer = 0
+    }
+
+    // Reads while active, and after that until the bars have fallen.
+    const loop = () => {
+      frame = 0
+      timer = 0
+      const moving = draw()
+      if (!flag(active) && !moving) return
+      if (still()) timer = window.setTimeout(loop, 250)
+      else frame = requestAnimationFrame(loop)
+    }
+
+    const run = (on: boolean) => {
+      if (!live() || frame || timer) return
+      if (on) loop()
+      else requestAnimationFrame(() => draw())
+    }
+
+    return { run, stop }
+  })()
+
+  $destroyed(() => meter.stop())
+  $: meter.run(flag(active))
 </script>
 
-<span class="eq" :class.active="flag(active)" aria-hidden="true"><i></i><i></i><i></i></span>
+<span class="eq" :class.active="flag(active)" :class.live="live()" aria-hidden="true"><i></i><i></i><i></i></span>
 
 <style scoped>
   .eq {
@@ -32,9 +93,11 @@
     transform-origin: bottom;
     transform: scaleY(.4);
   }
-  .active i { animation: mm-eq calc(var(--mm-duration-slow) * 2.8) ease-in-out infinite alternate; }
-  .active i:nth-child(2) { animation-delay: calc(var(--mm-duration-slow) * -.9); }
-  .active i:nth-child(3) { animation-delay: calc(var(--mm-duration-slow) * -1.9); }
+  /* The music's levels: written on each bar as they come. */
+  .live i { transform: scaleY(.15); }
+  .active:not(.live) i { animation: mm-eq calc(var(--mm-duration-slow) * 2.8) ease-in-out infinite alternate; }
+  .active:not(.live) i:nth-child(2) { animation-delay: calc(var(--mm-duration-slow) * -.9); }
+  .active:not(.live) i:nth-child(3) { animation-delay: calc(var(--mm-duration-slow) * -1.9); }
   @keyframes mm-eq {
     0% { transform: scaleY(.25); }
     50% { transform: scaleY(1); }

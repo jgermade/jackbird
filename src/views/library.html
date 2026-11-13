@@ -17,7 +17,7 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { ui } = await import("../lib/ui")
-  const { nowPlaying } = await import("../lib/player")
+  const { nowPlaying, readSpectrum } = await import("../lib/player")
   const { onRowMenu, rowMenu } = await import("../lib/menus")
   const { rescanRoot } = await import("../lib/roots")
   const {
@@ -211,6 +211,7 @@
              :current="isCurrent(row)"
              :playing="row.kind === 'track' && row.trackId === playingId()"
              :playing-active="playback.playing"
+             :playing-source="readSpectrum"
              :row-id="rowDomId(row.key)"
              :selectable="row.kind === 'track' && !!row.trackId"
              :playable="row.kind === 'track' && !!row.trackId"

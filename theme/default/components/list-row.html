@@ -5,6 +5,7 @@
   chosen = false,
   playing = false,
   playingActive = false,
+  playingSource = null,
   focusable = false,
   selectable = false,
   playable = false,
@@ -35,7 +36,8 @@
   // `$event.detail`) instead of `select`. With a pointer (a computer) the box shows only on
   // the row pointed at, chosen, or with the keyboard's focus. A `playable` item ends in a cue: a
   // ▶ shown on hover, to say a click plays it, and the moving bars on the
-  // row being played (`playing`; still unless `playing-active`). The cue is
+  // row being played (`playing`; still unless `playing-active`; the music's
+  // levels with a `playing-source`, as EqBars' `source`). The cue is
   // decorative: the click on the row is what plays. `focusable` puts it in
   // the tab order. `chosen`
   // is its selection (not `selected`, which jq79 keeps for an `<option>`'s
@@ -61,6 +63,7 @@
     chosen?: boolean | ""
     playing?: boolean | ""
     playingActive?: boolean | ""
+    playingSource?: ((bands: number) => number[] | null) | null
     focusable?: boolean | ""
     selectable?: boolean | ""
     playable?: boolean | ""
@@ -121,7 +124,7 @@
   <span class="end"><span class="meta">{{ meta }}</span></span>
   <span :if="$slots.action" class="action"><slot.action /></span>
   <span :if="isCued" class="cue" aria-hidden="true">
-    <EqBars :if="flag(playing)" :active="flag(playingActive)" />
+    <EqBars :if="flag(playing)" :active="flag(playingActive)" :source="playingSource" />
     <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
   </span>
 </div>

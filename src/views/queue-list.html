@@ -18,7 +18,7 @@
 
   const { t } = await import("../lib/i18n")
   const { playback } = await import("../lib/playback")
-  const { moveInQueue, playAt, queueEntries, queueIsAlbum, removeFromQueue } = await import("../lib/player")
+  const { moveInQueue, playAt, queueEntries, queueIsAlbum, readSpectrum, removeFromQueue } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
 
   type Entry = { index: number; title: string; artist: string; rootLabel: string; cover: string | null; state: "played" | "current" | "upcoming"; missing: boolean }
@@ -222,7 +222,7 @@
         <span class="name">{{ entry.title }}</span>
         <span class="sub">{{ subtitle(entry) }}</span>
       </span>
-      <span class="cue"><EqBars :if="entry.state === 'current'" :active="playback.playing" /></span>
+      <span class="cue"><EqBars :if="entry.state === 'current'" :active="playback.playing" :source="readSpectrum" /></span>
       <span :if="!queueIsAlbum.value" class="keys" @click.stop="null">
         <Key square size="sm" variant="ghost" :label="t('queue.remove', { title: entry.title })" :title="t('queue.remove', { title: entry.title })"
              :disabled="entry.state === 'current'" @click="remove(entry)">
