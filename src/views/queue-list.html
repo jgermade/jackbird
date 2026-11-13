@@ -17,6 +17,7 @@
   const Stripes = await import("../../theme/default/components/stripes.html")
 
   const { t } = await import("../lib/i18n")
+  const { coverSrc } = await import("../lib/covers")
   const { playback } = await import("../lib/playback")
   const { moveInQueue, playAt, queueEntries, queueIsAlbum, readSpectrum, removeFromQueue } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
@@ -215,7 +216,7 @@
         <svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="8" r="1.2" /><circle cx="7" cy="8" r="1.2" /><circle cx="3" cy="13" r="1.2" /><circle cx="7" cy="13" r="1.2" /></svg>
       </span>
       <span class="art" aria-hidden="true">
-        <img :if="entry.cover" :src="entry.cover" alt="" />
+        <img :if="coverSrc(entry.cover)" :src="coverSrc(entry.cover)" alt="" />
         <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
       </span>
       <span class="text">

@@ -25,6 +25,7 @@
   const { getVariedFields } = await import("../helpers/metadata")
   const { canChange, closeSelection, confirmField, editor, inSharedMusic, saveEdits, setCompilation } = await import("../lib/editor")
   const { t, tn } = await import("../lib/i18n")
+  const { coverSrc } = await import("../lib/covers")
   const { can } = await import("../lib/account")
   const { loadSongExtras, songExtras } = await import("../lib/importing")
   const { applySuggestion, backToFamily, loadLayers, mine } = await import("../lib/mine")
@@ -176,7 +177,7 @@
 
     <div :elseif="ui.selectionTab === 'edit'" class="editor">
       <div class="hero">
-        <CoverDrop :model="editor.form.coverDataUrl"
+        <CoverDrop :model="editor.form.coverDataUrl" :src="coverSrc(editor.form.coverDataUrl)"
                    :alt="t('editor.cover')"
                    :drop-label="t('cover.dropHere')"
                    :choose-label="t('cover.choose')"
@@ -237,7 +238,7 @@
 
     <div :elseif="ui.selectionTab === 'info'" class="info">
       <div :if="single()" class="one">
-        <img :if="single().metadata.coverDataUrl" class="cover" :src="single().metadata.coverDataUrl" :alt="t('album.coverOf', { title: single().name })" />
+        <img :if="coverSrc(single().metadata.coverDataUrl)" class="cover" :src="coverSrc(single().metadata.coverDataUrl)" :alt="t('album.coverOf', { title: single().name })" />
         <dl class="info-facts">
           <div :each="fact in facts(single())" :key="fact.label">
             <dt>{{ fact.label }}</dt>

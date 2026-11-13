@@ -11,6 +11,7 @@
   const Stripes = await import("../../theme/default/components/stripes.html")
 
   const { t, tn } = await import("../lib/i18n")
+  const { coverSrc } = await import("../lib/covers")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readSpectrum } = await import("../lib/player")
@@ -111,7 +112,7 @@
       </nav>
       <article :each="album in albums()" :key="album.key" class="album">
         <div class="cover">
-          <img :if="album.coverDataUrl" :src="album.coverDataUrl" :alt="t('album.coverOf', { title: album.title })" />
+          <img :if="coverSrc(album.coverDataUrl)" :src="coverSrc(album.coverDataUrl)" :alt="t('album.coverOf', { title: album.title })" />
           <div :else class="no-cover" aria-hidden="true">
             <span class="band"><Stripes variant="band" /></span>
           </div>

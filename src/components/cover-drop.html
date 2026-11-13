@@ -1,4 +1,4 @@
-<script :setup="{ model = null, alt = '', dropLabel = '', chooseLabel = '', removeLabel = '', failLabel = '' }: Props" lang="ts">
+<script :setup="{ model = null, src = null, alt = '', dropLabel = '', chooseLabel = '', removeLabel = '', failLabel = '' }: Props" lang="ts">
   // A cover being edited: the image, or the empty sleeve. An image file
   // dropped on it, or chosen with its key, becomes the cover as a data URL;
   // the other key removes it. While a file is dragged over it, `dropLabel`
@@ -17,6 +17,8 @@
 
   type Props = {
     model?: string | null
+    /** What the picture is drawn from, when the model is a reference to it (lib/covers.ts); else the model. */
+    src?: string | null
     alt?: string
     dropLabel?: string
     chooseLabel?: string
@@ -71,7 +73,7 @@
 
 <div class="cover-drop">
   <div class="sleeve" :class.over="over" :title="dropLabel || null" @dragover="enter($event)" @dragleave="over = false" @drop="drop($event)">
-    <img :if="model" class="image" :src="model" :alt="alt" />
+    <img :if="src || model?.startsWith('data:')" class="image" :src="src || model" :alt="alt" />
     <span :else class="band"><Stripes variant="band" /></span>
     <span :if="over" class="mm-legend hint">{{ dropLabel }}</span>
   </div>

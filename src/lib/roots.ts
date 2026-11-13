@@ -10,6 +10,8 @@ import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths } from "../helpers/tracks";
 import type { GroupingMode, LibraryView, RootSource, RootWorkspace, Track } from "../types";
+import { coversIn, internSnapshot, namesIn, withCovers } from "./covers";
+import { refName } from "../helpers/cover";
 import { t, tn } from "./i18n";
 import { library } from "./library";
 import { flushMeta, readMetaSnapshot } from "./meta";
@@ -30,7 +32,7 @@ export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[])
  * reads the tags of new and changed files.
  */
 export async function hydrateRoot(
-  source: RootSource,
+  given: RootSource,
   options: {
     rootId?: string;
     rootLabel?: string;
@@ -43,14 +45,17 @@ export async function hydrateRoot(
   }
 ): Promise<void> {
   // Open again: no longer offered among the folders closed lately.
-  forgetRecent(source.saved);
+  forgetRecent(given.saved);
+  // Its tags with their covers by reference, each picture kept once (lib/covers.ts).
+  const source = withCovers(given);
   const vfs = source.vfs;
   const rootId = options.rootId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const rootLabel = options.rootLabel ?? (vfs.name || t("roots.fallbackName", { number: $toRaw(library).roots.length + 1 }));
   const groupingMode = options.groupingMode ?? "wizard";
 
   // ─── Phase 1: Snapshot → instant render ──────────────────────────────────
-  const snapshot = await readMetaSnapshot(vfs);
+  // An older `.meta/` holds each track's cover whole: taken by reference, and written again so.
+  const { snapshot, changed: olderSnapshot } = internSnapshot(await readMetaSnapshot(vfs));
 
   const snapshotEntries = Object.entries(snapshot.tracks);
   const initialTracks: Track[] = snapshotEntries.map(([relativePath, stored]) => ({
@@ -111,7 +116,9 @@ export async function hydrateRoot(
   // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
   void (async () => {
     try {
-      const walked = await source.walk();
+      // The covers the snapshot names, looked for in `.meta/covers/`: a track whose picture is not
+      // there has its tags read again.
+      const [walked, missingCovers] = await Promise.all([source.walk(), coversIn(vfs, namesIn(snapshot))]);
       // The playlists are read beside the tracks, and do not hold them up.
       void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
         console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
@@ -138,7 +145,9 @@ export async function hydrateRoot(
       const modifiedFiles = audioFiles.filter((f) => {
         const stored = snapshot.tracks[f.relativePath];
         // Kept before the disc, album artist and compilation were read: read again, for them.
-        return stored && (stored.size !== f.size || stored.lastModified !== f.lastModified || !readsEveryField(stored.metadata));
+        if (!stored) return false;
+        const cover = refName(stored.metadata.coverDataUrl);
+        return stored.size !== f.size || stored.lastModified !== f.lastModified || !readsEveryField(stored.metadata) || (cover !== null && missingCovers.has(cover));
       });
 
       const staleOrNewFiles = [...newFiles, ...modifiedFiles];
@@ -151,7 +160,8 @@ export async function hydrateRoot(
             return root;
           }
 
-          const tracks = root.tracks.filter((t) => !removedPaths.includes(t.relativePath));
+          const removed = new Set(removedPaths);
+          const tracks = root.tracks.filter((t) => !removed.has(t.relativePath));
 
           // Add genuinely new files (not in snapshot at all) as empty placeholder tracks
           for (const file of newFiles) {
@@ -180,6 +190,8 @@ export async function hydrateRoot(
       );
 
       if (isFullyCached) {
+        // An older `.meta/` is written again with its covers by reference.
+        if (olderSnapshot) await flushMeta(rootId).catch(() => undefined);
         updateRoots((currentRoots) =>
           currentRoots.map((root) =>
             root.id === rootId ? { ...root, loadingMetadata: false } : root
@@ -199,7 +211,7 @@ export async function hydrateRoot(
       // last batch is flushed).
       const totalAfterWalk = audioFiles.length;
       let loadedCount = totalAfterWalk - staleOrNewFiles.length;
-      let snapshotDirty = removedPaths.length > 0;
+      let snapshotDirty = removedPaths.length > 0 || olderSnapshot;
 
       function flush(): void {
         const updates = [...pendingUpdates];
@@ -220,9 +232,13 @@ export async function hydrateRoot(
       let cursor = 0;
       let failedCount = 0;
 
-      // The checksum a track has in the library now, or "" when it is gone.
+      // The checksum a track has in the library now, or "" when it is gone: through a map of the
+      // root's tracks, made again only when they change (a find on each file was quadratic).
+      let indexed: { tracks: readonly Track[]; byId: Map<string, Track> } | null = null;
       function checksumNow(trackId: string): string {
-        const track = $toRaw(library).roots.find((root) => root.id === rootId)?.tracks.find((item) => item.id === trackId);
+        const tracks = $toRaw(library).roots.find((root) => root.id === rootId)?.tracks ?? [];
+        if (indexed?.tracks !== tracks) indexed = { tracks, byId: new Map(tracks.map((item) => [item.id, item])) };
+        const track = indexed.byId.get(trackId);
         return track ? checksumOf(track) : "";
       }
 
@@ -230,8 +246,10 @@ export async function hydrateRoot(
       async function readOne(file: (typeof staleOrNewFiles)[number]): Promise<void> {
         const readFrom = checksumNow(file.relativePath);
         const stored = snapshot.tracks[file.relativePath];
-        // With no checksum to compare, the tags come back even when the file has not changed.
-        const known = stored && readsEveryField(stored.metadata) ? stored.fullChecksum || stored.checksum : undefined;
+        // With no checksum to compare, the tags come back even when the file has not changed; so
+        // too when its cover is missing from `.meta/covers/`.
+        const coverGone = missingCovers.has(refName(stored?.metadata.coverDataUrl) ?? "");
+        const known = stored && readsEveryField(stored.metadata) && !coverGone ? stored.fullChecksum || stored.checksum : undefined;
         const found = await source.inspect(file.relativePath, known);
         const { fullChecksum, audioChecksum } = found;
         const metadata = withEveryField(found.metadata ?? stored?.metadata ?? emptyMetadata());

@@ -1,6 +1,7 @@
 /**
- * Covers as jackbird keeps them, data URLs (in `TrackMetadata` and in
- * `.meta/`), and as the tag engine takes them, bytes and a MIME type. See
+ * Covers as jackbird keeps them, references to a picture kept once (in `TrackMetadata` and in
+ * `.meta/`) or data URLs (one just chosen, or as an older `.meta/` holds them), and as the tag
+ * engine takes them, bytes and a MIME type. See
  * RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-07 20:16, E2-D7).
  */
 import type { TrackMetadata } from "../types.ts";
@@ -35,6 +36,52 @@ export function dataUrlToCover(url: string): WireCover | null {
     data[at] = binary.charCodeAt(at);
   }
   return { mime: match[1] || "image/jpeg", data };
+}
+
+/**
+ * A cover kept once (RECORD/2026-11-03.deck-design-system.WIP.md, 2026-11-14): the library holds
+ * a reference to it, `jackbird-cover:<name>`, in place of the picture itself; the picture is in
+ * memory once (lib/covers.ts) and in the folder's `.meta/covers/<name>`. The name is made from
+ * the bytes (two FNV-1a hashes and the length), the same as crates/api's `cover_name`, so the same
+ * picture has one name whoever read it; and its type's extension, so the file says what it is.
+ */
+export const COVER_REF = "jackbird-cover:";
+
+/** Two 32-bit FNV-1a hashes of the bytes, one from the standard offset and one from another. */
+function fnv(data: Uint8Array): [number, number] {
+  let one = 0x811c9dc5;
+  let two = 0x01000193 ^ 0x5bd1e995;
+  for (let at = 0; at < data.length; at += 1) {
+    one = Math.imul(one ^ data[at], 0x01000193) >>> 0;
+    two = Math.imul(two ^ data[at], 0x01000193) >>> 0;
+  }
+  return [one, two];
+}
+
+const EXTENSIONS: Record<string, string> = { "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "image/bmp": "bmp" };
+
+/** A picture's name: its hashes and length in hex, and its type's extension. */
+export function coverName(cover: WireCover): string {
+  const [one, two] = fnv(cover.data);
+  const hex = (value: number) => value.toString(16).padStart(8, "0");
+  return `${hex(one)}${hex(two)}-${cover.data.length.toString(16)}.${EXTENSIONS[(cover.mime || "image/jpeg").toLowerCase()] ?? "img"}`;
+}
+
+/** The type a cover's name says, by its extension. */
+export function coverMime(name: string): string {
+  const extension = name.slice(name.lastIndexOf(".") + 1);
+  return Object.entries(EXTENSIONS).find(([, one]) => one === extension)?.[0] ?? "image/jpeg";
+}
+
+/** A reference to a cover by its name. */
+export const coverRef = (name: string): string => COVER_REF + name;
+
+/** The name a reference points to, or null for anything else (a data URL, nothing). */
+export function refName(value: string | null | undefined): string | null {
+  if (!value?.startsWith(COVER_REF)) return null;
+  const name = value.slice(COVER_REF.length);
+  // Only a name as coverName makes it: never a path.
+  return /^[0-9a-f]{16}-[0-9a-f]+\.[a-z]+$/.test(name) ? name : null;
 }
 
 /**
