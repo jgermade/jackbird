@@ -42,6 +42,9 @@ test("parseCompactState keeps what is well formed and defaults the rest", () => 
     full: { x: 10, y: 20, width: 1280, height: 800, maximized: true }
   });
   assert.equal(parseCompactState(JSON.stringify({ list: true })).list, true);
+  // On top unless turned off: missing (or not a boolean) is on, false is kept.
+  assert.equal(parseCompactState(JSON.stringify({ on: true })).onTop, true);
+  assert.equal(parseCompactState(JSON.stringify({ onTop: false })).onTop, false);
   // Truthy but not true is not on; bad bounds are dropped.
   assert.deepEqual(parseCompactState(JSON.stringify({ on: 1, onTop: "yes", list: "yes", compact: { x: 1, y: 2, width: 0, height: 5 }, full: { x: 1, y: 2, width: "3", height: 4 } })), NO_COMPACT);
   assert.deepEqual(parseCompactState(JSON.stringify({ compact: "here", full: { x: 0, y: 0, width: 10, height: 10 } })), {

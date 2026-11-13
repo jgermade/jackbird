@@ -34,7 +34,8 @@ export const compactPlace: CompactPlace | null = isPhone || isEmbed ? null : isD
 
 export const compact = $reactive({
   mode: "full" as CompactMode,
-  onTop: false,
+  /** On top of the others (and on every desktop) by default: a mini player is to be seen. */
+  onTop: true,
   /** The queue's list shown under the card (the window grows for it). */
   list: false,
   /** A turn under way: the keys wait for it. */
