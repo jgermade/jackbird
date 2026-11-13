@@ -31,7 +31,7 @@
   // no title (it still names the dialog). On a computer they go in the
   // header's own row, from its left, the close key at its end, and the
   // dialog is as wide as a large one; as a sheet they are drawn at its
-  // bottom, under the body (a `Tabs` with `bar` there looks like a bar of
+  // bottom, under the body, and the header is only its handle (a `Tabs` with `bar` there looks like a bar of
   // options, not tabs).
   //
   // A sheet rests on a phone's on-screen keyboard and fits in what it
@@ -351,5 +351,9 @@
       transform: translateX(-50%);
     }
     .head { position: relative; }
+    /* With sections, no header: only its handle, on the sheet's own ground, to drag it down by
+       (the backdrop and Escape close it too). */
+    .head.sections { min-height: 1.25rem; padding: 0; border-bottom: 0; background: var(--mm-surface); }
+    .head.sections .close { display: none; }
   }
 </style>
