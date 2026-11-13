@@ -194,6 +194,8 @@
 :root[data-theme="dark"], [data-tone="dark"] {
   --mm-bg: #121314;
   --mm-sheet: #444444;
+  /* The display's rim, black in Graphite (Silver's is grey). */
+  --mm-display-rim: black;
   --mm-chassis: #1f2022;
   --mm-chassis-hi: #2c2e31;
   --mm-chassis-lo: #0b0c0d;

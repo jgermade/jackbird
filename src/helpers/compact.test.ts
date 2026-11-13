@@ -13,8 +13,9 @@ test("remToPx turns rem into pixels at the root's size, and falls back to 16px",
 test("compactSize and pipSize follow the root's font size", () => {
   assert.deepEqual(compactSize(18), { width: 396, height: 198, minWidth: 324, minHeight: 180 });
   assert.deepEqual(compactSize(16), { width: 352, height: 176, minWidth: 288, minHeight: 160 });
-  assert.deepEqual(pipSize(18), { width: 396, height: 234 });
-  assert.equal(COMPACT.pipHeight, 13);
+  // The floating window is the compact window's size.
+  assert.deepEqual(pipSize(18), { width: 396, height: 198 });
+  assert.equal(COMPACT.height, 11);
 });
 
 test("compactHeightFor gives the card's height for a width, and the list's on top", () => {

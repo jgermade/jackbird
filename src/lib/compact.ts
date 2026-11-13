@@ -202,6 +202,8 @@ export const compactMarker = (list: boolean): string => (list ? "list" : "")
  */
 export async function setCompactList(on: boolean): Promise<void> {
   compact.list = on;
+  // Embedded in the landing page, nothing is kept: the demo beside it has its own.
+  if (isEmbed) return;
   saved.list = on;
   save();
   if (compact.mode === "window") {

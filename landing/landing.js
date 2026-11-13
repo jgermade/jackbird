@@ -1,26 +1,56 @@
-// The landing's few moving parts: the tone switch (Silver / Graphite, remembered; the page's
-// screenshots follow it) and the tab's icon lit like the display, as in the app (src/lib/favicon.ts).
+// The landing's few moving parts: the tone's selector (the system's, Silver or Graphite,
+// remembered; the page's screenshots follow it) and the tab's icon lit like the display, as in the
+// app (src/lib/favicon.ts).
 
 const root = document.documentElement;
 const KEY = "jackbird-landing-tone";
 
 // ---- the tone -----------------------------------------------------------------------------
 
-const toneKey = document.querySelector(".tone");
-const toneName = document.querySelector(".tone-name");
+const toneKeys = [...document.querySelectorAll(".tone")];
+const systemDark = matchMedia("(prefers-color-scheme: dark)");
 
+/** What is chosen: "light", "dark", or "auto" (nothing kept: the system's). */
+function chosenTone() {
+  let saved = null;
+  try { saved = localStorage.getItem(KEY); } catch {}
+  return saved === "light" || saved === "dark" ? saved : "auto";
+}
+
+/** The chosen key down, the only one in the tab order; the tab's icon in the tone. */
 function showTone() {
-  // The key names the tone it switches to.
-  toneName.textContent = root.dataset.theme === "dark" ? "Silver" : "Graphite";
+  const chosen = chosenTone();
+  for (const key of toneKeys) {
+    const on = key.dataset.choice === chosen;
+    key.setAttribute("aria-checked", String(on));
+    key.tabIndex = on ? 0 : -1;
+  }
   drawFavicon();
 }
 
-toneKey.addEventListener("click", () => {
-  root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
-  try { localStorage.setItem(KEY, root.dataset.theme); } catch {}
+/** Takes a choice: kept (automatic keeps nothing), the page turned to it, the embedded apps told. */
+function chooseTone(choice) {
+  try {
+    if (choice === "auto") localStorage.removeItem(KEY);
+    else localStorage.setItem(KEY, choice);
+  } catch {}
+  root.dataset.theme = choice === "auto" ? (systemDark.matches ? "dark" : "light") : choice;
   showTone();
   tellTone();
-});
+}
+
+for (const key of toneKeys) {
+  key.addEventListener("click", () => chooseTone(key.dataset.choice));
+  // Left and right (and up and down) move the choice, as a group of radio buttons does.
+  key.addEventListener("keydown", (event) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = toneKeys[(toneKeys.indexOf(key) + step + toneKeys.length) % toneKeys.length];
+    chooseTone(next.dataset.choice);
+    next.focus();
+  });
+}
 
 // ---- the tab's icon -----------------------------------------------------------------------
 
@@ -66,15 +96,9 @@ function drawFavicon() {
 }
 logo.addEventListener("load", drawFavicon);
 
-// The system's tone, followed until one is chosen here.
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
-  let saved = null;
-  try { saved = localStorage.getItem(KEY); } catch {}
-  if (!saved) {
-    root.dataset.theme = event.matches ? "dark" : "light";
-    showTone();
-    tellTone();
-  }
+// The system's tone, followed while the choice is automatic.
+systemDark.addEventListener("change", () => {
+  if (chosenTone() === "auto") chooseTone("auto");
 });
 
 showTone();
@@ -212,11 +236,8 @@ if (matchMedia("(min-width: 901px)").matches) {
   if (handset) embedApp(handset, "phone", "jackbird on a phone, with the sample music");
 }
 
-// One of them at a time plays: the one that starts pauses the other.
-window.addEventListener("message", (event) => {
-  if (event.origin !== location.origin || event.data?.type !== "jackbird:playing") return;
-  for (const live of lives) if (live.contentWindow !== event.source) live.contentWindow?.postMessage({ type: "jackbird:pause" }, location.origin);
-});
+// The two are one player: the phone follows the windows' (src/lib/mirror.ts), so nothing here
+// needs to keep them apart.
 
 // The embedded app asked for a folder: the demo is where one opens.
 const invite = stage?.querySelector(".invite");

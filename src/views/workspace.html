@@ -50,17 +50,32 @@
   // the ends; a double click goes back to the first width). Kept for the next visit. The CSS keeps
   // it within the window's room as the window changes; this keeps the stored value there too.
   // While dragging, the width is written straight on the element, from this closure: a top-level
-  // `let` would be a store field written on every move.
+  // `let` would be a store field written on every move. Once a frame at most, and with the room
+  // and the root's size measured when the drag starts: read on each move, they made the page lay
+  // itself out at once after every write (which WebKit, the macOS app, felt most).
   let splitWidth: number = parseSplit(readStored(STORAGE_KEYS.splitWidth)) ?? SPLIT.initial
+  // The library's width as chosen (in rem), within the room: at least 16rem, leaving the sheet at
+  // least 20rem (src/helpers/split.ts keeps the same bounds).
+  const splitAt = (width: number): string => `clamp(16rem, ${width}rem, calc(100% - 20rem))`
+  const splitColumns = (width: number): string => `${splitAt(width)} minmax(0, 1fr)`
+  const splitterLeft = (width: number): string => `calc(${splitAt(width)} - .625rem)`
   let splitting = false
   const split = (() => {
-    let start: { x: number; width: number; id: number } | null = null
+    let start: { x: number; width: number; id: number; rem: number; total: number } | null = null
     let live = splitWidth
+    let frame = 0
     const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
     const panes = () => $self(".panes") as HTMLElement | null
     const total = () => (panes()?.clientWidth ?? 0) / rem()
     const current = () => clampSplit(splitWidth, total())
-    const show = (width: number) => panes()?.style.setProperty("--split", `${width}rem`)
+    // Written on the grid and the separator themselves: an inherited custom property on the panes
+    // made every element in them (a whole root's albums) work out its style again on each move.
+    const show = (width: number) => {
+      const grid = panes()
+      if (grid) grid.style.gridTemplateColumns = splitColumns(width)
+      const line = $self(".splitter") as HTMLElement | null
+      if (line) line.style.left = splitterLeft(width)
+    }
     const keep = (width: number) => {
       splitWidth = Math.round(width * 100) / 100
       writeStored(STORAGE_KEYS.splitWidth, String(splitWidth))
@@ -70,19 +85,25 @@
       down(event: PointerEvent) {
         if (event.button !== 0) return
         event.preventDefault()
-        start = { x: event.clientX, width: current(), id: event.pointerId }
+        start = { x: event.clientX, width: current(), id: event.pointerId, rem: rem(), total: total() }
         live = start.width
         ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
         splitting = true
       },
       move(event: PointerEvent) {
         if (!start || event.pointerId !== start.id) return
-        live = clampSplit(start.width + (event.clientX - start.x) / rem(), total())
-        show(live)
+        live = clampSplit(start.width + (event.clientX - start.x) / start.rem, start.total)
+        if (!frame) frame = requestAnimationFrame(() => {
+          frame = 0
+          show(live)
+        })
       },
       up(event: PointerEvent) {
         if (!start || event.pointerId !== start.id) return
         start = null
+        cancelAnimationFrame(frame)
+        frame = 0
+        show(live)
         splitting = false
         keep(live)
       },
@@ -167,11 +188,11 @@
         <SourcesPanel />
       </div>
     </section>
-    <div :else class="panes" :class.splitting="splitting" :style="`--split: ${splitWidth}rem`" @scrollend="settle($event)">
+    <div :else class="panes" :class.splitting="splitting" :style="`grid-template-columns: ${splitColumns(splitWidth)}`" @scrollend="settle($event)">
       <div class="pane tree-pane"><Library /></div>
       <div class="pane sheet-pane"><AlbumSheet /></div>
       <!-- The separator between them, wider screens only: drag it, or move it with its keys. -->
-      <div :if="!narrow" class="splitter" :class.dragging="splitting" role="separator" tabindex="0"
+      <div :if="!narrow" class="splitter" :class.dragging="splitting" :style="`left: ${splitterLeft(splitWidth)}`" role="separator" tabindex="0"
            aria-orientation="vertical" :aria-label="t('workspace.split')"
            :aria-valuenow="String(Math.round(splitWidth))" :aria-valuemin="String(SPLIT.minLibrary)" :aria-valuemax="String(Math.round(split.most()))"
            @pointerdown="split.down($event)" @pointermove="split.move($event)" @pointerup="split.up($event)" @pointercancel="split.up($event)"
@@ -220,13 +241,10 @@
   }
   .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   .panes {
-    /* The library's width as chosen (--split, in rem), within the room: at least 16rem, leaving the
-       sheet at least 20rem (src/helpers/split.ts keeps the same bounds). */
-    --split-at: clamp(16rem, var(--split, 23.75rem), calc(100% - 20rem));
+    /* Its columns, the library's width as chosen, are written on it (see `splitColumns`). */
     position: relative;
     display: grid;
     flex: 1 1 auto;
-    grid-template-columns: var(--split-at) minmax(0, 1fr);
     min-height: 0;
   }
   .panes.splitting { cursor: col-resize; user-select: none; }
@@ -238,7 +256,6 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    left: calc(var(--split-at) - .625rem);
     z-index: 3;
     display: flex;
     align-items: center;

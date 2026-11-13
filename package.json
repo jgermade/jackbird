@@ -11,9 +11,10 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "pretest": "node scripts/build-wasm.mjs",
-    "test": "npm run test:layers && npm run test:styles && npm run test:types && npm run test:unit && npm run test:coverage",
+    "test": "npm run test:layers && npm run test:styles && npm run test:setup && npm run test:types && npm run test:unit && npm run test:coverage",
     "test:layers": "node scripts/check-layers.mjs",
     "test:styles": "node scripts/check-styles.mjs",
+    "test:setup": "node scripts/setup-check.mjs",
     "test:types": "tsc -p tsconfig.test.json",
     "test:unit": "mkdir -p .tmp/coverage && node --test --experimental-strip-types --disable-warning=ExperimentalWarning --experimental-test-coverage --test-coverage-include='src/helpers/**' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-exclude='src/**/*.test-support.ts' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=.tmp/coverage/lcov.info 'src/**/*.test.ts'",
     "test:coverage": "node scripts/check-coverage.mjs .tmp/coverage/lcov.info 90",
@@ -26,7 +27,7 @@
   "dependencies": {
     "@cloudauthn/vfs-sync": "^0.2.0",
     "@tauri-apps/api": "2.12.4",
-    "jq79": "^0.7.8"
+    "jq79": "^0.7.12"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.4",

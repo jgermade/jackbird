@@ -28,6 +28,15 @@
   // window's bottom left corner, one player behind both; the page itself see-through. As the
   // landing page's phone (`?embed=phone`), the app alone, as a phone draws it, filling the frame.
   const embed: boolean = embedKind === "windows"
+  // The landing page's phone: a phone's status bar over the chassis' top (the hour, signal, wifi,
+  // battery), drawn, not real; the faceplate starts under it, as under a real phone's.
+  const handset: boolean = embedKind === "phone"
+  const hourNow = (): string => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  let hour: string = hourNow()
+  if (handset) {
+    document.documentElement.style.setProperty("--mm-safe-top", "1.5rem")
+    setInterval(() => (hour = hourNow()), 15000)
+  }
   if (embed) {
     document.documentElement.classList.add("embedded")
     // See-through, so the landing page shows round the windows; its body is their stage.
@@ -73,6 +82,17 @@
   $: title(t("app.name"))
 </script>
 
+<div :if="handset" class="status-bar" aria-hidden="true">
+  <span class="hour">{{ hour }}</span>
+  <span class="status-icons">
+    <!-- Signal: four bars, rising. -->
+    <svg viewBox="0 0 16 12"><rect x="1" y="8" width="2.5" height="3" rx=".5" /><rect x="4.75" y="6" width="2.5" height="5" rx=".5" /><rect x="8.5" y="3.5" width="2.5" height="7.5" rx=".5" /><rect x="12.25" y="1" width="2.5" height="10" rx=".5" /></svg>
+    <!-- Wifi: a fan of three arcs and its dot. -->
+    <svg viewBox="0 0 16 12"><path d="M8 11.2 5.9 8.9a3 3 0 0 1 4.2 0z" /><path d="M8 1.2c2.6 0 5 1 6.8 2.7l-1.5 1.6A7.6 7.6 0 0 0 8 3.4 7.6 7.6 0 0 0 2.7 5.5L1.2 3.9A9.8 9.8 0 0 1 8 1.2zm0 3.4c1.7 0 3.3.6 4.5 1.7L11 7.9A4.4 4.4 0 0 0 8 6.8a4.4 4.4 0 0 0-3 1.1L3.5 6.3A6.6 6.6 0 0 1 8 4.6z" /></svg>
+    <!-- Battery: most of it full. -->
+    <svg class="battery" viewBox="0 0 24 12"><rect x=".75" y="1.25" width="19.5" height="9.5" rx="2.25" fill="none" stroke="currentColor" stroke-width="1.2" /><rect x="2.5" y="3" width="13.5" height="6" rx="1" /><rect x="21.25" y="4" width="1.75" height="4" rx=".75" /></svg>
+  </span>
+</div>
 <main class="app" :class.small="small" :class.embed="embed">
   <div :if="small" class="body"><Compact /></div>
   <!-- Hidden, not dropped, while compact: the library keeps its place and its scroll. -->
@@ -91,9 +111,32 @@
   <SourcesDialog />
 </main>
 <!-- Embedded: the compact player, outside the window (which turns and clips what it holds). -->
-<div :if="embed" class="mini"><Compact /></div>
+<div :if="embed" class="mini" :class.listed="compact.list"><Compact /></div>
 
 <style scoped>
+  /* The landing page's phone: its status bar, over the chassis' top (--mm-safe-top's room). */
+  .status-bar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 1.5rem;
+    padding: 0 1rem;
+    color: var(--mm-fg);
+    font-family: var(--mm-font-sans);
+    font-size: .6875rem;
+    font-weight: var(--mm-weight-medium);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .status-icons { display: flex; align-items: center; gap: .3rem; }
+  .status-icons svg { height: .625rem; width: auto; fill: currentColor; }
+  .status-icons .battery { height: .6875rem; }
   .app {
     display: flex;
     flex-direction: column;
@@ -142,12 +185,16 @@
     z-index: 2;
     left: 6rem;
     bottom: 1.5rem;
+    /* The compact window's own size (helpers/compact.ts): 22rem by 11rem, and 14rem more upwards
+       with the queue's list. */
     width: 22rem;
-    height: 12.5rem;
+    height: 11rem;
     overflow: hidden;
     border: var(--mm-border-width) solid var(--mm-border-strong);
     border-radius: var(--mm-radius-lg);
     /* Within the frame's 1.5rem below it, or the iframe cuts it. */
     box-shadow: 0 .5rem .875rem rgba(0, 0, 0, .3), 0 .125rem .375rem rgba(0, 0, 0, .2);
+    transition: height var(--mm-duration) var(--mm-ease);
   }
+  .mini.listed { height: 25rem; }
 </style>

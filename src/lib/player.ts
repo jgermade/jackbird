@@ -9,7 +9,7 @@
 // the app's native output (E5, lib/native-audio.ts); on a phone, through the phone's native player
 // (E6b, lib/phone-audio.ts), handed the queue's next tracks ahead so it goes on in the background.
 
-import { $computed, $reactive, $toRaw } from "jq79";
+import { $batch, $computed, $reactive, $toRaw } from "jq79";
 import {
   addTo,
   clearPlayed as clearBeforeCurrent,
@@ -33,6 +33,7 @@ import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
 import { PhoneAudio, phoneAudioAvailable, type PhoneSong } from "./phone-audio";
 import { output } from "./output";
+import { mirror, mirroredSpectrum, sendCommand } from "./mirror";
 import { played } from "./mine";
 import { t } from "./i18n";
 import { library } from "./library";
@@ -260,6 +261,11 @@ function routeThroughAnalyser(element: HTMLAudioElement): void {
  * where the browser has no Web Audio.
  */
 export function readSpectrum(bands: number): number[] | null {
+  // The landing page's phone, following its windows: what they hear.
+  if (mirror.following) {
+    const heard = mirroredSpectrum();
+    return heard ? spectrumBands(heard.bins, bands, heard.rate, SPECTRUM_RANGE, SPECTRUM_TILT) : null;
+  }
   if (phone && audio === phone) {
     return null;
   }
@@ -272,6 +278,17 @@ export function readSpectrum(bands: number): number[] | null {
   }
   analyser.getByteFrequencyData(bins);
   return spectrumBands(bins, bands, context.sampleRate, SPECTRUM_RANGE, SPECTRUM_TILT);
+}
+
+/** The spectrum's raw levels and their rate, for a frame that follows this one (lib/mirror.ts). */
+export function spectrumBins(): { bins: Uint8Array; rate: number } | null {
+  if (native && audio === native) {
+    const heard = native.spectrum();
+    return heard ? { bins: Uint8Array.from(heard.bins), rate: heard.rate } : null;
+  }
+  if (!analyser || !bins || !context || audio !== embedded) return null;
+  analyser.getByteFrequencyData(bins);
+  return { bins: bins.slice(), rate: context.sampleRate };
 }
 
 function release(): void {
@@ -471,7 +488,8 @@ async function sendNext(): Promise<void> {
 /** Loads and plays the current track, unless it is the one already loaded. */
 async function load(current: NowPlaying | null): Promise<void> {
   const key = current?.key ?? null;
-  if (!audio) {
+  // A frame that follows another one's player plays nothing itself (lib/mirror.ts).
+  if (!audio || mirror.following) {
     return;
   }
   if (key === loadedKey) {
@@ -681,22 +699,10 @@ if (embedded) {
     wire(phone);
     wireNative(phone);
   }
-  // Once per change of the queue: its queue and index are written one after
-  // the other, and in between the old index can point at another track of the
-  // new queue; loading on each write would start that track for a moment.
-  let loadQueued = false;
-  nowPlaying.$on(
-    "value",
-    () => {
-      if (loadQueued) return;
-      loadQueued = true;
-      queueMicrotask(() => {
-        loadQueued = false;
-        void load($toRaw(nowPlaying).value);
-      });
-    },
-    { immediate: true }
-  );
+  // Once per change of the queue: a queue and its index are written together, in one $batch
+  // (playQueue, apply, lib/mirror.ts), so the track is worked out once, never the old index's in
+  // the new queue.
+  nowPlaying.$on("value", () => void load($toRaw(nowPlaying).value), { immediate: true });
   if (native) {
     output.$on("kind", switchOutput);
   }
@@ -720,8 +726,15 @@ if (embedded) {
  */
 export function playQueue(queue: PlaybackQueue, index: number): void {
   startPaused = null;
-  playback.queue = queue;
-  playback.index = index;
+  // One change: the track loads once, never the old index's in the new queue.
+  $batch(() => {
+    playback.queue = queue;
+    playback.index = index;
+  });
+  if (mirror.following) {
+    sendCommand("play");
+    return;
+  }
   const item = queue.items[index];
   if (audio && audio.src && audio.paused && item && keyOf(item) === loadedKey) {
     void audio.play().catch((error: unknown) => {
@@ -748,8 +761,10 @@ function apply(next: QueuePosition, paused = false): void {
   } else if (startPaused !== key) {
     startPaused = null;
   }
-  playback.queue = next.queue;
-  playback.index = next.index;
+  $batch(() => {
+    playback.queue = next.queue;
+    playback.index = next.index;
+  });
 }
 
 /**
@@ -848,6 +863,10 @@ export function dropFromQueue(gone: (item: QueueItem) => boolean): void {
 
 /** Pauses or resumes the loaded track. */
 export function togglePlay(): void {
+  if (mirror.following) {
+    sendCommand("toggle");
+    return;
+  }
   if (!audio?.src) {
     // Still loading a track meant to start paused: it plays once loaded.
     startPaused = null;
@@ -864,6 +883,23 @@ export function togglePlay(): void {
   } else {
     audio.pause();
   }
+}
+
+/** Plays the loaded track (or the one loading, once it is in): a following frame's play (lib/mirror.ts). */
+export function resume(): void {
+  startPaused = null;
+  if (audio?.src && audio.paused) {
+    void audio.play().catch((error: unknown) => {
+      if (!interrupted(error)) playback.error = error instanceof Error ? error.message : t("playback.loadFailed");
+    });
+  }
+}
+
+/** A frame that was to follow another one plays by itself after all: the current track loads, paused. */
+export function playHere(): void {
+  const current = $toRaw(nowPlaying).value;
+  if (current) startPaused = current.key;
+  void load(current);
 }
 
 /**

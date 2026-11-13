@@ -506,10 +506,8 @@ async fn save(
 /// A track's file, with byte ranges, for the `<audio>` element.
 async fn media(State(service): State<Arc<Service>>, Query(at): Query<At>, request: Request) -> Answer<Response> {
     let file = service.root(&at.root)?.resolve(&at.path)?;
-    let served = tower_http::services::ServeFile::new(file)
-        .oneshot(request)
-        .await
-        .map_err(|error| ApiError::from(failure("io", error.to_string())))?;
+    // ServeFile cannot fail (its error is `Infallible`): a missing file is its 404.
+    let Ok(served) = tower_http::services::ServeFile::new(file).oneshot(request).await;
     Ok(served.map(Body::new))
 }
 

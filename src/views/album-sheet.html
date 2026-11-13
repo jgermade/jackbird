@@ -227,6 +227,11 @@
     border: var(--mm-border-width) solid var(--mm-border);
     border-radius: var(--mm-radius-md);
     background: var(--mm-surface);
+    /* An album out of view is not laid out or painted: the whole root is hundreds of them, and
+       each change of the sheet's width (the splitter, the window) would lay them all out again,
+       which WebKit (the macOS app) feels most. It keeps its last height while away. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 14rem;
   }
   .cover { grid-area: cover; width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
   /* On wider screens the cover stays in view while its album's tracks scroll past. */
@@ -246,8 +251,9 @@
   .mm-table tr { cursor: pointer; user-select: none; }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   .mm-table .pick-cell { width: 1%; padding-right: 0; }
-  /* With a pointer (a computer) the box takes the number's place, shown on the row pointed at,
-     chosen or focused, and the number otherwise; on a touch screen both, side by side. */
+  /* With a pointer (a computer) the box shows only on the row pointed at, chosen or with the
+     keyboard's focus, in the number's place where the disc has numbers; on a touch screen both,
+     side by side. */
   .pick-stack { display: grid; align-items: center; justify-items: start; }
   .pick-stack > * { grid-area: 1 / 1; }
   .pick-box { display: grid; }
@@ -256,9 +262,9 @@
     .num-cell { display: none; }
     .mm-table .pick-cell:has(.pick-num) { padding-right: .5rem; }
     .pick-num { display: block; }
-    .pick-stack:has(.pick-num) .pick-box { visibility: hidden; }
-    .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-within .pick-box { visibility: visible; }
-    .mm-table tr:hover .pick-num, .mm-table tr[aria-selected="true"] .pick-num, .mm-table tr:focus-within .pick-num { visibility: hidden; }
+    .pick-box { visibility: hidden; }
+    .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-visible .pick-box, .mm-table tr:has(:focus-visible) .pick-box { visibility: visible; }
+    .mm-table tr:hover .pick-num, .mm-table tr[aria-selected="true"] .pick-num, .mm-table tr:focus-visible .pick-num, .mm-table tr:has(:focus-visible) .pick-num { visibility: hidden; }
   }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   .mm-table .cue-cell { width: 1%; padding-left: 0; text-align: right; line-height: 0; }

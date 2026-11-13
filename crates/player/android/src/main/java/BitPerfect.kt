@@ -14,6 +14,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioMixerAttributes
 import android.os.Build
+import android.util.Log
 import androidx.media3.common.Format
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
@@ -24,6 +25,15 @@ data class Way(val device: String, val bitPerfect: Boolean, val rate: Int, val s
 object BitPerfect {
   /** The person's setting ("Bit-perfect to a USB DAC"); off by default. */
   @Volatile var wanted = false
+
+  /**
+   * The setting changed since the playing track's AudioTrack was made: the sink asks again when the
+   * player flushes it (PlayerPlugin.setOutput seeks to where it is, which makes a new AudioTrack).
+   */
+  @Volatile var pending = false
+
+  /** The format of the AudioTrack last made, to ask for again. */
+  @Volatile var lastFormat: Format? = null
 
   /** The way the last AudioTrack was made, and who hears it (PlayerPlugin). */
   @Volatile var way: Way? = null
@@ -64,6 +74,8 @@ object BitPerfect {
 
   /** Sets (or clears) the mixer's format for a track about to be made, and reports the way. */
   fun prepare(context: Context, format: Format) {
+    lastFormat = format
+    pending = false
     val manager = context.getSystemService(AudioManager::class.java) ?: return
     val usb = usbDevice(context)
     val encoding = if (format.pcmEncoding == Format.NO_VALUE) AudioFormat.ENCODING_PCM_16BIT else format.pcmEncoding
@@ -77,13 +89,19 @@ object BitPerfect {
     val offered = all.map { Triple(it.format.sampleRate, it.format.channelCount, it.format.encoding) }
     val described = offered.map { (rate, _, enc) -> "${sampleName(enc)}/${rate / 1000.0}" }.distinct().joinToString(", ")
     val found = if (wanted) choose(offered, format.sampleRate, format.channelCount, encoding) else null
+    if (wanted && found == null) {
+      Log.i(TAG, "bit-perfect: the DAC offers no ${sample}/${format.sampleRate}/${format.channelCount}ch (it offers $described)")
+    }
     if (found != null && manager.setPreferredMixerAttributes(attributes, usb, all[found])) {
       report(Way(device, true, format.sampleRate, sample, described))
     } else {
+      if (found != null) Log.w(TAG, "bit-perfect: Android refused the mixer's format ${all[found]}")
       manager.clearPreferredMixerAttributes(attributes, usb)
       report(Way(device, false, format.sampleRate, sample, described))
     }
   }
+
+  private const val TAG = "jackbird"
 
   private fun report(way: Way) {
     this.way = way
@@ -94,11 +112,24 @@ object BitPerfect {
 /** The player's audio sink, which prepares the mixer for each AudioTrack before it is made. */
 class BitPerfectSink(private val context: Context, sink: AudioSink) : ForwardingAudioSink(sink) {
   override fun configure(inputFormat: Format, specifiedBufferSize: Int, outputChannels: IntArray?) {
-    try {
-      BitPerfect.prepare(context, inputFormat)
-    } catch (_: Exception) {
-      // The mixer's preference is a nicety: the song plays through Android's mixer.
-    }
+    prepareSafely(inputFormat)
     super.configure(inputFormat, specifiedBufferSize, outputChannels)
+  }
+
+  // A flush lets the AudioTrack go, and the next one is made with the mixer as it then is: the
+  // setting, changed while a song plays, is asked for again here (BitPerfect.pending).
+  override fun flush() {
+    val format = BitPerfect.lastFormat
+    if (BitPerfect.pending && format != null) prepareSafely(format)
+    super.flush()
+  }
+
+  private fun prepareSafely(format: Format) {
+    try {
+      BitPerfect.prepare(context, format)
+    } catch (error: Exception) {
+      // The mixer's preference is a nicety: the song plays through Android's mixer.
+      Log.w("jackbird", "bit-perfect: could not set the mixer's format", error)
+    }
   }
 }

@@ -40,7 +40,7 @@ img { display: block; max-width: 100%; height: auto; }
   display: flex;
   align-items: center;
   gap: var(--mm-space-6);
-  padding: var(--mm-space-3) max(1rem, calc((100vw - 72rem) / 2));
+  padding: var(--mm-space-3) max(1rem, calc((100vw - 1024px) / 2));
   border-bottom: var(--mm-border-width) solid var(--mm-chassis-lo);
   background:
     repeating-linear-gradient(90deg, var(--mm-brush) 0 1px, transparent 1px 3px),
@@ -131,7 +131,16 @@ img { display: block; max-width: 100%; height: auto; }
   .key:hover { filter: brightness(1.04); }
 }
 
-.tone { padding: 0 var(--mm-space-3); font-size: var(--mm-text-label); }
+/* The tone's selector: three keys side by side, icons alone, the chosen one down and lit. */
+.tones { display: inline-flex; }
+.tone { width: var(--mm-control-lg); padding: 0; border-radius: 0; }
+.tone + .tone { margin-left: calc(-1 * var(--mm-border-width)); }
+.tone:first-child { border-radius: var(--mm-radius-key) 0 0 var(--mm-radius-key); }
+.tone:last-child { border-radius: 0 var(--mm-radius-key) var(--mm-radius-key) 0; }
+.tone svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tone svg .solid { fill: currentColor; stroke: none; }
+.tone[aria-checked="true"] { transform: translateY(1px); background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); color: var(--mm-accent-ink); }
+.tone:focus-visible { position: relative; }
 
 .led {
   display: inline-block;
@@ -145,11 +154,10 @@ img { display: block; max-width: 100%; height: auto; }
 .led.on { background: var(--mm-accent); box-shadow: 0 0 .4rem var(--mm-accent); }
 .led.on.ok { background: var(--mm-ok-led); box-shadow: 0 0 .4rem var(--mm-ok-led); }
 .led.on.warn { background: var(--mm-warn-led); box-shadow: 0 0 .4rem var(--mm-warn-led); }
-.tone .led { background: var(--mm-display-fg); box-shadow: 0 0 .35rem var(--mm-display-fg); }
 
 /* ---- the hero --------------------------------------------------------------------------- */
 
-main { display: grid; gap: 7rem; padding: 4rem max(1rem, calc((100vw - 72rem) / 2)) 6rem; }
+main { display: grid; gap: 7rem; padding: 4rem max(1rem, calc((100vw - 1024px) / 2)) 6rem; }
 
 .hero { display: grid; gap: 4rem; }
 .pitch { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); column-gap: 4rem; align-items: end; }
@@ -425,7 +433,8 @@ h1 em {
 .note { margin: var(--mm-space-4) 0 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
 
 .lead { max-width: 46rem; margin: 0 0 var(--mm-space-5); color: var(--mm-fg-muted); }
-.ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--mm-space-4); }
+/* One above the other: a command's line has the page's width, and is read whole. */
+.ways { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-4); }
 .way {
   display: grid;
   align-content: start;
@@ -448,6 +457,14 @@ h1 em {
 }
 .way code { font-family: var(--mm-font-mono); font-size: .92em; overflow-wrap: anywhere; }
 .way pre code { overflow-wrap: normal; }
+.way a:not(.file-link) { color: var(--mm-accent-ink); }
+/* The commands' colours, written by hand in the page: a command, its flags, what it is given
+   (an address, a variable), and what is only punctuation or a remark. */
+.t-cmd { color: var(--mm-accent-ink); font-weight: var(--mm-weight-medium); }
+.t-flag { color: var(--mm-ok); }
+.t-str { color: var(--mm-warn); }
+.t-op, .t-com { color: var(--mm-fg-subtle); }
+.t-com { font-style: italic; }
 .files { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
 .file-link {
   padding: var(--mm-space-1) var(--mm-space-3);
@@ -465,7 +482,7 @@ h1 em {
 .footer { border-top: var(--mm-border-width) solid var(--mm-chassis-lo); background: var(--mm-chassis); }
 .footer p {
   margin: 0;
-  padding: var(--mm-space-6) max(1rem, calc((100vw - 72rem) / 2));
+  padding: var(--mm-space-6) max(1rem, calc((100vw - 1024px) / 2));
   font-size: var(--mm-text-sm);
   color: var(--mm-fg-muted);
 }
@@ -477,13 +494,13 @@ h1 em {
   .pitch > * { grid-column: 1 !important; grid-row: auto !important; }
   .pitch > .lede { margin-top: var(--mm-space-6); }
   .modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .downloads, .ways { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .downloads { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   main { gap: 4.5rem; padding-top: 2.5rem; }
   .nav { display: none; }
-  .tone { margin-left: auto; }
-  .modules, .downloads, .ways { grid-template-columns: minmax(0, 1fr); }
+  .tones { margin-left: auto; }
+  .modules, .downloads { grid-template-columns: minmax(0, 1fr); }
   .phone { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 2.5rem; }
   .handset { max-width: 14rem; }
 }

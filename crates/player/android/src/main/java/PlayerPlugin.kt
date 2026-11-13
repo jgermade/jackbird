@@ -441,12 +441,25 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
-  /** The person's output setting (E6b-D10): bit-perfect to a USB DAC, from the next song. */
+  /**
+   * The person's output setting (E6b-D10): bit-perfect to a USB DAC, at once. The playing track's
+   * AudioTrack keeps the mixer it was made with (and the player reuses it for songs of the same
+   * format), so a seek to where it is makes a new one, for which BitPerfectSink asks again.
+   */
   @Command
   fun setOutput(invoke: Invoke) {
     val args = invoke.parseArgs(OutputArgs::class.java)
+    val changed = BitPerfect.wanted != args.bitPerfect
     BitPerfect.wanted = args.bitPerfect
-    invoke.resolve()
+    if (!changed || BitPerfect.lastFormat == null) {
+      invoke.resolve()
+      return
+    }
+    BitPerfect.pending = true
+    withPlayer(invoke) { player ->
+      if (player.mediaItemCount > 0) player.seekTo(player.currentPosition)
+      invoke.resolve()
+    }
   }
 
   /** Whether this Android can play bit-perfect to a USB DAC (14 and later), and the DAC connected, if any. */
