@@ -353,7 +353,7 @@ fn shares_are_their_owners_choice() {
 }
 
 #[test]
-fn ones_own_playlists_list_ones_own_shelf() {
+fn ones_own_playlists_list_the_shelf_one_looks_at() {
     let library = Library::open(&scratch()).unwrap();
     let song = fixtures().join("flac-full.flac");
     library
@@ -372,11 +372,31 @@ fn ones_own_playlists_list_ones_own_shelf() {
     library.set_favourite(1, "@2/B/y.mp3", true).unwrap();
     let text = String::from_utf8(library.read_as(FAVOURITES, Viewer::mine(1)).unwrap()).unwrap();
     assert_eq!(text, "#EXTM3U\n../A/x.flac\n");
-    // Written back with the shelf's paths: the favourites of the shelf, by those paths.
+    // Looking at Luis's shelf, its own: the favourite there.
+    let there = String::from_utf8(library.read_as(FAVOURITES, Viewer::mine(1).on(2)).unwrap()).unwrap();
+    assert_eq!(there, "#EXTM3U\n../B/y.mp3\n");
+    // Written back with a shelf's paths: that shelf's favourites; the other's stay.
+    library.write_as(FAVOURITES, b"#EXTM3U\n", Viewer::mine(1)).unwrap();
+    assert_eq!(library.favourites(1).unwrap(), vec!["@2/B/y.mp3".to_owned()]);
     library
         .write_as(FAVOURITES, b"#EXTM3U\n../A/x.flac\n", Viewer::mine(1))
         .unwrap();
-    assert_eq!(library.favourites(1).unwrap(), vec!["@1/A/x.flac".to_owned()]);
+    assert_eq!(library.favourites(1).unwrap().len(), 2);
+    // One's own playlists are on one's own shelf only.
+    library
+        .write_as("My playlists/Road.m3u", b"#EXTM3U\n", Viewer::mine(1))
+        .unwrap();
+    let paths = |viewer: Viewer| -> Vec<String> {
+        library
+            .walk_as(viewer)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.path)
+            .collect()
+    };
+    assert!(paths(Viewer::mine(1)).contains(&"My playlists/Road.m3u".to_owned()));
+    let there = paths(Viewer::mine(1).on(2));
+    assert!(!there.contains(&"My playlists/Road.m3u".to_owned()) && there.contains(&FAVOURITES.to_owned()));
 }
 
 #[test]

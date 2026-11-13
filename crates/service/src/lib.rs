@@ -130,6 +130,22 @@ impl Service {
             use base64::Engine;
             base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(people::random::<32>())
         };
+        // A library from before shelves goes onto the first owner's shelf, shared with everyone
+        // (SH-D2); with no owner yet, it waits for one.
+        if let Some(library) = &library {
+            let owner = store.people().ok().and_then(|people| {
+                people
+                    .into_iter()
+                    .filter(|person| person.role == people::Role::Owner)
+                    .map(|person| person.id)
+                    .min()
+            });
+            if let Some(owner) = owner
+                && let Err(error) = library.into_shelves(owner)
+            {
+                eprintln!("jackbird-service: the library could not move onto shelves: {error}");
+            }
+        }
         let (network, _) = tokio::sync::watch::channel(settings.signin && settings.network);
         let machine = config::machine_networks(&settings.machine);
         Arc::new(Service {

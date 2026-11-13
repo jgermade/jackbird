@@ -234,9 +234,11 @@ struct Catalogue {
 }
 
 fn catalogue(library: &Library, person: i64) -> Result<Catalogue, jackbird_core::Error> {
+    // One's own shelf and those shared with one (SH-D7); a song on no shelf, as before shelves.
     let songs: Vec<(Song, FieldsJson)> = library
         .songs()?
         .into_iter()
+        .filter(|song| jackbird_store::on_shelf(&song.path).is_none_or(|(owner, _)| library.may_see(person, owner)))
         .map(|song| {
             let fields = song.fields();
             (song, fields)
@@ -345,7 +347,7 @@ impl Catalogue {
             "size": song.size,
             "contentType": if flac { "audio/flac" } else { "audio/mpeg" },
             "suffix": song.format,
-            "path": song.path,
+            "path": jackbird_store::on_shelf(&song.path).map_or(song.path.as_str(), |(_, inner)| inner),
             "type": "music",
             "mediaType": "song",
             "created": iso(song.added),

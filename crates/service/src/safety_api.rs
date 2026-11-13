@@ -58,9 +58,27 @@ fn lock(state: &std::sync::Mutex<JobState>) -> std::sync::MutexGuard<'_, JobStat
 // ---------------------------------------------------------------------------------------------
 // The trash (admins and owners).
 
+/// A catalogue path as people read it: the shelf's path, and whose shelf (SH-D1).
+fn shown(service: &Service, path: &str) -> (String, String) {
+    match jackbird_store::on_shelf(path) {
+        Some((owner, inner)) => (
+            inner.to_owned(),
+            service.store.person(owner).map(|owner| owner.name).unwrap_or_default(),
+        ),
+        None => (path.to_owned(), String::new()),
+    }
+}
+
 async fn trash(State(service): Shared) -> Answer<Json<Value>> {
     let library = library(&service)?;
     let songs = blocking(move || library.trash()).await?;
+    let songs: Vec<Value> = songs
+        .into_iter()
+        .map(|song| {
+            let (path, owner) = shown(&service, &song.path);
+            json!({ "id": song.id, "path": path, "owner": owner, "by": song.by, "at": song.at })
+        })
+        .collect();
     Ok(Json(json!(songs)))
 }
 
@@ -76,8 +94,9 @@ async fn restore(
 ) -> Answer<Json<Value>> {
     let library = library(&service)?;
     let path = blocking(move || library.restore(body.id)).await?;
+    let (path, owner) = shown(&service, &path);
     service.store.log(&person.name, "restore", "Library", &path);
-    Ok(Json(json!({ "path": path })))
+    Ok(Json(json!({ "path": path, "owner": owner })))
 }
 
 async fn empty(State(service): Shared, Extension(person): Extension<Person>) -> Answer<Json<Value>> {
