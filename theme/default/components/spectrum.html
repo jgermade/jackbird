@@ -1,7 +1,9 @@
 <script :setup="{ source = null, bands = 16, active = false }: Props" lang="ts">
-  // A spectrum analyser for the display: columns of segments, lit in the
-  // display's ink over unlit ones, like the meter's. Decorative: the music
-  // is what it shows.
+  // A spectrum analyser for the display: columns of fine segments (about
+  // 2px each, as many as its height holds), lit in the display's ink over
+  // unlit ones, like the meter's; over each, its peak, a lit segment held a
+  // moment at the highest it reached, then falling slowly. Decorative: the
+  // music is what it shows.
   //
   //   <Spectrum :source="readSpectrum" :bands="16" :active="playing" />
   //
@@ -23,9 +25,17 @@
   // The drawing's state lives in this closure, not in the component's store:
   // a top-level `let` would be a reactive field, written on every frame.
   const painter = (() => {
-    const SEGMENTS = 8
+    // A segment about this tall (CSS px), with a device pixel between two; never fewer than 8.
+    const STEP = 2
+    const MIN_SEGMENTS = 8
+    // The bars: up at once, down by this much a frame, as a meter's needle falls.
     const FALL = 0.06
+    // The peaks: held this long (ms), then falling by this much of the height a second.
+    const HOLD = 600
+    const PEAK_FALL = 0.4
     let shown: number[] = []
+    let peaks: { level: number; held: number }[] = []
+    let last = 0
     let frame = 0
     let timer = 0
     let colours: { lit: string; unlit: string } | null = null
@@ -43,7 +53,7 @@
       return colours
     }
 
-    // One frame; true while some column is still up.
+    // One frame; true while some column or peak is still up.
     const draw = (): boolean => {
       const element = $self("canvas") as HTMLCanvasElement | null
       const count = Math.max(1, Number(bands) || 16)
@@ -55,25 +65,38 @@
         element.width = width
         element.height = height
       }
+      const now = performance.now()
+      const elapsed = last ? Math.min(250, now - last) : 16
+      last = now
       const read = flag(active) && typeof source === "function" ? source(count) : null
-      // Up at once, down slowly, as a meter's needle falls.
       shown = Array.from({ length: count }, (_, band) => Math.max(read?.[band] ?? 0, (shown[band] ?? 0) - FALL))
+      // A peak rises with its column and is held; then it falls, never below the column.
+      peaks = shown.map((level, band) => {
+        const peak = peaks[band] ?? { level: 0, held: 0 }
+        if (level >= peak.level) return { level, held: now }
+        const falling = now - peak.held > HOLD ? peak.level - (PEAK_FALL * elapsed) / 1000 : peak.level
+        return { level: Math.max(level, falling), held: peak.held }
+      })
       const context = element.getContext("2d")
       if (!context) return false
       const { lit, unlit } = ink(element)
       const gap = Math.max(1, Math.round(ratio))
-      const columnWidth = (width - gap * (count - 1)) / count
-      const segmentHeight = (height - gap * (SEGMENTS - 1)) / SEGMENTS
+      const segments = Math.max(MIN_SEGMENTS, Math.floor((height + gap) / (STEP * ratio + gap)))
+      const columnGap = Math.max(1, Math.round(ratio))
+      const columnWidth = (width - columnGap * (count - 1)) / count
+      const segmentHeight = (height - gap * (segments - 1)) / segments
+      const top = (segment: number) => height - (segment + 1) * segmentHeight - segment * gap
       context.clearRect(0, 0, width, height)
       shown.forEach((level, band) => {
-        const litSegments = Math.round(level * SEGMENTS)
-        const x = band * (columnWidth + gap)
-        for (let segment = 0; segment < SEGMENTS; segment += 1) {
-          context.fillStyle = segment < litSegments ? lit : unlit
-          context.fillRect(x, height - (segment + 1) * segmentHeight - segment * gap, columnWidth, segmentHeight)
+        const litSegments = Math.round(level * segments)
+        const peakSegment = Math.min(segments, Math.round(peaks[band].level * segments)) - 1
+        const x = band * (columnWidth + columnGap)
+        for (let segment = 0; segment < segments; segment += 1) {
+          context.fillStyle = segment < litSegments || (segment === peakSegment && peakSegment >= litSegments) ? lit : unlit
+          context.fillRect(x, top(segment), columnWidth, segmentHeight)
         }
       })
-      return shown.some((level) => level > 0)
+      return shown.some((level) => level > 0) || peaks.some((peak) => peak.level > 0)
     }
 
     const stop = () => {
@@ -83,11 +106,12 @@
       timer = 0
     }
 
-    // Draws while active, and after that until the columns have fallen.
+    // Draws while active, and after that until the columns and their peaks have fallen.
     const loop = () => {
       frame = 0
       timer = 0
       const moving = draw()
+      if (!moving) last = 0
       if (!flag(active) && !moving) return
       if (still()) timer = window.setTimeout(loop, 250)
       else frame = requestAnimationFrame(loop)

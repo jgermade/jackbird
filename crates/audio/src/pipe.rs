@@ -10,7 +10,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use crate::{DeviceSample, PcmFormat};
 
 /// Frames of the mono mix kept for the spectrum.
-pub const RECENT: usize = 2048;
+pub const RECENT: usize = 8192;
 
 /// A song's start in the pipe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

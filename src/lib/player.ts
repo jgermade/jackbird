@@ -27,7 +27,7 @@ import { isOrderOf, nextIndex, nextRepeat, previousIndex, shuffledOrder, upcomin
 import { fileUrl } from "../helpers/output";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
-import { SPECTRUM_DECIBELS, SPECTRUM_RANGE, SPECTRUM_TILT, spectrumBands } from "../helpers/spectrum";
+import { SPECTRUM_DECIBELS, SPECTRUM_FFT, SPECTRUM_RANGE, SPECTRUM_SMOOTHING, SPECTRUM_TILT, spectrumBands } from "../helpers/spectrum";
 import { streamInfo, streamInfoNeeds, type StreamInfo } from "../helpers/stream-info";
 import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
@@ -237,8 +237,8 @@ function routeThroughAnalyser(element: HTMLAudioElement): void {
     try {
       const made = new AudioContext({ latencyHint: "playback" });
       const node = made.createAnalyser();
-      node.fftSize = 1024;
-      node.smoothingTimeConstant = 0.8;
+      node.fftSize = SPECTRUM_FFT;
+      node.smoothingTimeConstant = SPECTRUM_SMOOTHING;
       // Headroom for the bass (see SPECTRUM_DECIBELS); crates/audio's spectrum spans the same.
       node.minDecibels = SPECTRUM_DECIBELS.min;
       node.maxDecibels = SPECTRUM_DECIBELS.max;

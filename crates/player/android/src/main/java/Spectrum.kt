@@ -1,9 +1,9 @@
 // The spectrum of what the player hands Android, for the display's analyser on a phone: the PCM the
 // sink takes (BitPerfectSink.handleBuffer), read without changing it, its channels mixed to one,
-// the last 1024 samples kept. When the page asks (the `spectrum` command), they are turned into
+// the last 8192 samples kept. When the page asks (the `spectrum` command), they are turned into
 // bins as Web Audio's AnalyserNode gives them with getByteFrequencyData: the same as the desktop's
 // (crates/audio/src/spectrum.rs, which this ports: a Blackman window, magnitudes over the window's
-// length smoothed with the previous ones, -100 to -10 dB scaled to 0-255). The page makes bands of
+// length smoothed with the previous ones, -90 to -10 dB scaled to 0-255). The page makes bands of
 // them as it does for the others (src/helpers/spectrum.ts).
 
 package es.germade.jackbird.player
@@ -20,10 +20,10 @@ import kotlin.math.min
 import kotlin.math.sin
 
 object Spectrum {
-  private const val SIZE = 1024
+  private const val SIZE = 8192
   private const val BINS = SIZE / 2
-  private const val SMOOTHING = 0.8f
-  private const val MIN_DB = -100f
+  private const val SMOOTHING = 0.6f
+  private const val MIN_DB = -90f
   private const val MAX_DB = -10f
 
   private val ring = FloatArray(SIZE)
