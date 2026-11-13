@@ -25,6 +25,7 @@ Every command of the phone's player, and its events.
 - `allow-folder-mkdir`
 - `allow-folder-address`
 - `allow-safe-area`
+- `allow-spectrum`
 - `allow-register-listener`
 - `allow-remove-listener`
 
@@ -579,6 +580,32 @@ Enables the set_upcoming command without any pre-configured scope.
 <td>
 
 Denies the set_upcoming command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:allow-spectrum`
+
+</td>
+<td>
+
+Enables the spectrum command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-spectrum`
+
+</td>
+<td>
+
+Denies the spectrum command without any pre-configured scope.
 
 </td>
 </tr>

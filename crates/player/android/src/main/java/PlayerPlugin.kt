@@ -242,6 +242,20 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     ViewCompat.requestApplyInsets(webView)
   }
 
+  /** The spectrum of what plays (Spectrum.kt): bins as Web Audio's analyser gives them, and the rate. */
+  @Command
+  fun spectrum(invoke: Invoke) {
+    val bins = Spectrum.bins()
+    if (bins == null) {
+      invoke.resolve(JSObject().apply { put("bins", null as String?) })
+      return
+    }
+    invoke.resolve(JSObject().apply {
+      put("bins", JSArray().apply { bins.forEach { put(it) } })
+      put("rate", Spectrum.rate)
+    })
+  }
+
   /** What covers the page's edges now (`insets` events follow each change). */
   @Command
   fun safeArea(invoke: Invoke) {

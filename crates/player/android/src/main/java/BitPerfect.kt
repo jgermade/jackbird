@@ -18,6 +18,7 @@ import android.util.Log
 import androidx.media3.common.Format
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
+import java.nio.ByteBuffer
 
 /** How a song goes to the device: its name, bit-perfect or not, at what rate and sample, and what the device offers. */
 data class Way(val device: String, val bitPerfect: Boolean, val rate: Int, val sample: String, val offered: String)
@@ -109,16 +110,34 @@ object BitPerfect {
   }
 }
 
-/** The player's audio sink, which prepares the mixer for each AudioTrack before it is made. */
+/**
+ * The player's audio sink, which prepares the mixer for each AudioTrack before it is made, and lets
+ * the spectrum (Spectrum.kt) read the PCM it takes, unchanged.
+ */
 class BitPerfectSink(private val context: Context, sink: AudioSink) : ForwardingAudioSink(sink) {
   override fun configure(inputFormat: Format, specifiedBufferSize: Int, outputChannels: IntArray?) {
     prepareSafely(inputFormat)
+    Spectrum.configure(inputFormat.pcmEncoding, inputFormat.channelCount, inputFormat.sampleRate)
     super.configure(inputFormat, specifiedBufferSize, outputChannels)
+  }
+
+  // The bytes the sink consumed this time (it may take a buffer in several calls) go to the
+  // spectrum, read through a copy of the buffer's position: what is played is not touched.
+  override fun handleBuffer(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
+    val from = buffer.position()
+    val done = super.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
+    try {
+      Spectrum.feed(buffer, from, buffer.position())
+    } catch (error: Exception) {
+      // The spectrum is decoration: a buffer it cannot read leaves it as it was.
+    }
+    return done
   }
 
   // A flush lets the AudioTrack go, and the next one is made with the mixer as it then is: the
   // setting, changed while a song plays, is asked for again here (BitPerfect.pending).
   override fun flush() {
+    Spectrum.clear()
     val format = BitPerfect.lastFormat
     if (BitPerfect.pending && format != null) prepareSafely(format)
     super.flush()

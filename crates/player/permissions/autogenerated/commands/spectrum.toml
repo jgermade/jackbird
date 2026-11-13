@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-spectrum"
+description = "Enables the spectrum command without any pre-configured scope."
+commands.allow = ["spectrum"]
+
+[[permission]]
+identifier = "deny-spectrum"
+description = "Denies the spectrum command without any pre-configured scope."
+commands.deny = ["spectrum"]
