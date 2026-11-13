@@ -96,8 +96,10 @@ async function signInByCode(page, email) {
   await page.getByRole("dialog", { name: "Sign in" }).waitFor({ state: "hidden", timeout: 15000 });
 }
 
+/** Opens the preferences at their Account section (people and sign-in, passkeys, signing out). */
 async function openPreferences(page) {
   await page.getByRole("button", { name: "Open preferences" }).first().click();
+  await page.getByRole("tab", { name: "Account", exact: true }).click();
 }
 
 (async () => {
