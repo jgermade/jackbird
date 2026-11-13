@@ -1,4 +1,4 @@
-<script :setup="{ items = [], model = null, label = '', closable = false, compact = false, plain = false, addLabel = '', addDisabled = false }: Props" lang="ts">
+<script :setup="{ items = [], model = null, label = '', closable = false, compact = false, plain = false, addLabel = '', addDisabled = false, bar = false }: Props" lang="ts">
   // Tabs on the chassis: the open folders. The open one joins the panel
   // below and carries the stripes. Arrow keys, Home and End move between
   // tabs and open them as they go.
@@ -24,8 +24,10 @@
   // tab one stripe colour on top, green, orange or red, instead of the three
   // stripes: a hairline while closed, the stripes' height while open.
   // An item's `icon` (an SVG path on a 16 × 16 grid, stroked in the text's
-  // colour, as a Menu item's) goes over its label: the tabs of a dialog's
-  // sections.
+  // colour, as a Menu item's) goes before its label: the tabs of a dialog's
+  // sections. `bar`: at 720px and below, a bar of equal options (a sheet's
+  // sections at its bottom), with no tab's edges, stripes or lift; the open
+  // one in the accent's ink.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -40,6 +42,7 @@
     plain?: boolean | ""
     addLabel?: string
     addDisabled?: boolean | ""
+    bar?: boolean | ""
   }
 
   // The value of the drop-down's "add" option. Ids are not expected to start with "+".
@@ -112,7 +115,7 @@
   }
 </script>
 
-<div class="tabs" :class.compact="flag(compact)" :class.plain="flag(plain)" :class.iconic="iconic">
+<div class="tabs" :class.compact="flag(compact)" :class.plain="flag(plain)" :class.iconic="iconic" :class.bar="flag(bar)">
   <div class="strip" role="tablist" :aria-label="label || null">
   <div :each="item in items" :key="item.id" class="tab" :class.on="item.id === model" :class.toned="!!item.tone"
        :class.tone-go="item.tone === 'go'" :class.tone-edit="item.tone === 'edit'" :class.tone-danger="item.tone === 'danger'">
@@ -334,10 +337,21 @@
   /* The open tab stands a little higher than the closed ones, as a lifted card. */
   .on .main { height: 2.375rem; color: var(--mm-fg); }
   @media (hover: hover) { .main:hover { color: var(--mm-fg); } }
-  /* With icons, each over its label: taller tabs, the label smaller. */
-  .iconic .main { flex-direction: column; justify-content: center; gap: .1875rem; height: 3.25rem; min-width: 4.25rem; padding: 0 var(--mm-space-3); font-size: var(--mm-text-xs); }
-  .iconic .on .main { height: 3.5rem; }
-  .glyph { flex: none; width: 1.125rem; height: 1.125rem; }
+  /* With icons, each before its label (over it in a bar). */
+  .glyph { flex: none; width: 1rem; height: 1rem; }
+  /* A dialog's sections, in its header: no recess line over them. */
+  .tabs.plain.iconic { box-shadow: none; }
+  /* A bar of options on a phone: the whole width, shared equally, no tab's look. */
+  @media (max-width: 720px) {
+    .tabs.bar { padding: 0; box-shadow: none; background: none; }
+    .bar .strip { flex: 1 1 auto; gap: 0; }
+    .bar .tab, .bar .tab.on { flex: 1 1 0; min-width: 0; border-width: 0; border-radius: 0; background: none; box-shadow: none; }
+    .bar .tab::before, .bar .tab.on::before { display: none; }
+    .bar .main, .bar .on .main { flex-direction: column; justify-content: center; gap: .1875rem; width: 100%; min-width: 0; height: 3.5rem; padding: 0 .125rem; font-size: var(--mm-text-xs); }
+    .bar .glyph { width: 1.125rem; height: 1.125rem; }
+    .bar .main span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .bar .on .main { color: var(--mm-accent-ink, var(--mm-accent)); }
+  }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .close {
     display: inline-grid;

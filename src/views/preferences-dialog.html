@@ -113,9 +113,9 @@
 </script>
 
 <div class="preferences-dialog">
-  <Modal :open="ui.preferencesOpen" :eyebrow="t('app.name')" :title="t('preferences.title')" :close-label="t('preferences.close')" @close="ui.preferencesOpen = false">
+  <Modal sections :open="ui.preferencesOpen" :eyebrow="t('app.name')" :title="t('preferences.title')" :close-label="t('preferences.close')" @close="ui.preferencesOpen = false">
     <template :slot.nav>
-      <Tabs plain :label="t('preferences.sections')" :items="sections()" :model="section()" @change="ui.preferencesSection = $event.detail" />
+      <Tabs plain bar :label="t('preferences.sections')" :items="sections()" :model="section()" @change="ui.preferencesSection = $event.detail" />
     </template>
     <div :if="section() === 'general'" class="prefs">
       <section class="pref inline">
