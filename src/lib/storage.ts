@@ -15,7 +15,9 @@ export const STORAGE_KEYS = {
   /** The compact mode's state (src/helpers/compact.ts): whether it was on, its place, "on top". */
   compact: "jackbird.compact",
   /** Whether the library's tree shows the songs ("off" when not: src/helpers/folders.ts). */
-  songsInTree: "jackbird.songsInTree"
+  songsInTree: "jackbird.songsInTree",
+  /** How tall the lists' rows are: compact, comfortable or spacious (src/helpers/density.ts). */
+  density: "jackbird.density"
 } as const;
 
 /**

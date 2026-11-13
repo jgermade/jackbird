@@ -2,12 +2,14 @@
 // saved, else from the system (colour scheme, browser languages), is saved
 // once chosen, and is applied to <html> (data-theme, lang). The theme follows
 // the system until one is chosen. And whether the library's tree shows the
-// songs (helpers/folders.ts), on until turned off. A jq79 store, so views can
+// songs (helpers/folders.ts), on until turned off. And how tall the lists' rows
+// are (helpers/density.ts), applied to <html> as data-density. A jq79 store, so views can
 // bind to it.
 
 import { $reactive } from "jq79";
+import { densityOf } from "../helpers/density";
 import { pickLanguage } from "../helpers/i18n";
-import type { Language, Theme } from "../types";
+import type { Density, Language, Theme } from "../types";
 import { isEmbed } from "./platform";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 
@@ -45,12 +47,14 @@ const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => lan
 export const preferences = $reactive({
   theme: embeddedTheme() ?? storedTheme() ?? systemTheme(),
   language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage(),
-  songsInTree: readStored(STORAGE_KEYS.songsInTree) !== "off"
+  songsInTree: readStored(STORAGE_KEYS.songsInTree) !== "off",
+  density: densityOf(readStored(STORAGE_KEYS.density))
 });
 
 function apply(): void {
   document.documentElement.dataset.theme = preferences.theme;
   document.documentElement.lang = preferences.language;
+  document.documentElement.dataset.density = preferences.density;
 }
 apply();
 preferences.$onAny(apply);
@@ -85,6 +89,12 @@ export function toggleTheme(): void {
 export function setSongsInTree(on: boolean): void {
   preferences.songsInTree = on;
   writeStored(STORAGE_KEYS.songsInTree, on ? "on" : "off");
+}
+
+/** How tall the lists' rows are. */
+export function setDensity(density: Density): void {
+  preferences.density = density;
+  writeStored(STORAGE_KEYS.density, density);
 }
 
 export function setLanguage(language: Language): void {

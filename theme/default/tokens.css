@@ -268,6 +268,13 @@
    the size it has at 421px: 18px × width / 421px (17.96px at 420px, 15.39px at 360px). */
 :root { --mm-root-phone: calc(100vw * 18 / 421); }
 html { font-size: 18px; }
+/* How tall the lists' rows are (lib/preferences.ts sets `data-density` on <html>): a tree row (one
+   line), a songs view row (a line under its title) and a queue row (its cover beside two lines);
+   comfortable unless chosen otherwise. helpers/density.ts holds the same heights as numbers, for
+   the lists drawn a window at a time. */
+:root { --mm-row: 2.25rem; --mm-row-two: 2.75rem; --mm-row-queue: 3.5rem; }
+html[data-density="compact"] { --mm-row: 1.75rem; --mm-row-two: 2.25rem; --mm-row-queue: 3.5rem; }
+html[data-density="spacious"] { --mm-row: 2.75rem; --mm-row-two: 3.25rem; --mm-row-queue: 4rem; }
 @media (max-width: 420px) {
   html { font-size: var(--mm-root-phone); }
 }

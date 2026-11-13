@@ -268,6 +268,11 @@ export const es: Record<MessageKey, string> = {
   "preferences.songsInTree": "Canciones en la biblioteca",
   "preferences.songsInTreeOn": "La biblioteca muestra las carpetas y sus canciones.",
   "preferences.songsInTreeOff": "La biblioteca muestra solo las carpetas: sus canciones se ven en Detalle. En el móvil, una carpeta se abre en Detalle y la ruta de arriba vuelve a la biblioteca.",
+  "preferences.density": "Filas",
+  "preferences.densityHint": "La altura de las filas de la biblioteca, las canciones y la cola.",
+  "preferences.density.compact": "Compacto",
+  "preferences.density.comfortable": "Cómodo",
+  "preferences.density.spacious": "Amplio",
   "preferences.language": "Idioma",
   "preferences.languageHint": "Idioma de la interfaz. Donde falte una traducción, se muestra en inglés.",
 

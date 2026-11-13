@@ -16,9 +16,11 @@
   const Checkbox = await import("../../theme/default/components/checkbox.html")
   const Key = await import("../../theme/default/components/key.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
+  const KeySelect = await import("../../theme/default/components/key-select.html")
 
   const { languageName, t } = await import("../lib/i18n")
-  const { LANGUAGES, preferences, setLanguage, setSongsInTree, setTheme } = await import("../lib/preferences")
+  const { LANGUAGES, preferences, setDensity, setLanguage, setSongsInTree, setTheme } = await import("../lib/preferences")
+  const { DENSITIES, densityOf } = await import("../helpers/density")
   const { ui } = await import("../lib/ui")
   const { isDesktop, isPhone } = await import("../lib/platform")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
@@ -77,6 +79,7 @@
   const pickKind = (kind: string) => setOutputKind(kind === "exclusive" || kind === "embedded" ? kind : "shared")
 
   $: isDark = preferences.theme === "dark"
+  const densities = () => DENSITIES.map((density) => ({ value: density, label: t(`preferences.density.${density}` as "preferences.density.compact") }))
   const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
 </script>
 
@@ -89,6 +92,14 @@
           <p>{{ isDark ? t("preferences.darkOn") : t("preferences.lightOn") }}</p>
         </div>
         <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
+      </section>
+      <!-- How tall the lists' rows are (helpers/density.ts). -->
+      <section class="pref density">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("preferences.density") }}</h3>
+          <p>{{ t("preferences.densityHint") }}</p>
+        </div>
+        <KeySelect :label="t('preferences.density')" :model="preferences.density" :options="densities()" @change="setDensity(densityOf($event.detail))" />
       </section>
       <!-- The library's tree with its songs, or its folders only (helpers/folders.ts). -->
       <section class="pref">
@@ -247,6 +258,7 @@
   .text { display: grid; gap: var(--mm-space-1); }
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .density { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); justify-items: start; }
   .service, .output { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
   .output .state { color: var(--mm-fg); }
   .service .state { color: var(--mm-fg); }

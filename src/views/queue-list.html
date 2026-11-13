@@ -21,6 +21,8 @@
   const { playback } = await import("../lib/playback")
   const { moveInQueue, playAt, queueEntries, queueIsAlbum, readSpectrum, removeFromQueue } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
+  const { preferences } = await import("../lib/preferences")
+  const { rowHeights } = await import("../helpers/density")
 
   type Entry = { index: number; title: string; artist: string; rootLabel: string; cover: string | null; state: "played" | "current" | "upcoming"; missing: boolean }
 
@@ -37,11 +39,11 @@
   const itemId = (index: number): string => `queue-item-${index}`
 
   // The list is drawn a window at a time (jq79's `:window`): only the tracks in view, and a few
-  // around them. Its rows are all ROW rem tall (the one playing too), which `:window` takes in
-  // pixels; the list's `$scrollTo(index)` brings a track into view, drawing it.
-  const ROW = 3.5
+  // around them. Its rows are all one height (the one playing too), as the density says
+  // (helpers/density.ts, `--mm-row-queue`), which `:window` takes in pixels; the list's
+  // `$scrollTo(index)` brings a track into view, drawing it.
   const rootPx = (): number => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-  const rowPx = (): number => ROW * rootPx()
+  const rowPx = (): number => rowHeights(preferences.density).queue * rootPx()
   const reveal = (index: number, block: "nearest" | "center") => {
     const list = $self("ol.queue") as (HTMLElement & { $scrollTo?: (index: number, options?: { block?: string }) => void }) | null
     list?.$scrollTo?.(index, { block })
@@ -245,9 +247,9 @@
     grid-template-columns: 1.25rem 2.25rem minmax(0, 1fr) 1.25rem auto;
     align-items: center;
     gap: var(--mm-space-3);
-    /* One height for every row, the one playing too (see ROW): the list is drawn a window at a time. */
+    /* One height for every row, the one playing too (see rowPx): the list is drawn a window at a time. */
     box-sizing: border-box;
-    height: 3.5rem;
+    height: var(--mm-row-queue);
     padding: var(--mm-space-1) var(--mm-space-2) var(--mm-space-1) var(--mm-space-1);
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     border-left: .1875rem solid transparent;

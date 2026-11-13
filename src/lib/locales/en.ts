@@ -267,6 +267,11 @@ export const en = {
   "preferences.songsInTree": "Songs in the library",
   "preferences.songsInTreeOn": "The library shows the folders and their songs.",
   "preferences.songsInTreeOff": "The library shows the folders only: their songs are in Details. On a phone, a folder opens in Details, and the trail above it goes back to the library.",
+  "preferences.density": "Rows",
+  "preferences.densityHint": "How tall the rows of the library, the songs and the queue are.",
+  "preferences.density.compact": "Compact",
+  "preferences.density.comfortable": "Comfortable",
+  "preferences.density.spacious": "Spacious",
   "preferences.language": "Language",
   "preferences.languageHint": "Interface language. Where a text has no translation, it is shown in English.",
 
