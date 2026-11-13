@@ -291,8 +291,16 @@ impl Library {
             .execute("delete from songs where trashed is not null and trashed < ?1", [before])
             .map_err(store_error)?;
         for (blob, format) in &gone {
-            // A blob is one song's (its audio is its name); none uses it now.
-            let _ = fs::remove_file(self.blob_path(blob, format));
+            // A blob is its audio's: gone once no song, on any shelf, uses it.
+            let used: bool = self
+                .db()
+                .query_row("select count(*) > 0 from songs where blob = ?1", [blob], |row| {
+                    row.get(0)
+                })
+                .unwrap_or(true);
+            if !used {
+                let _ = fs::remove_file(self.blob_path(blob, format));
+            }
         }
         Ok(gone.len())
     }

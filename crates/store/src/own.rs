@@ -34,6 +34,11 @@ create table if not exists plays (
   song integer not null references songs(id) on delete cascade,
   at integer not null
 );
+create table if not exists shares (
+  owner integer not null,
+  person integer not null,
+  primary key (owner, person)
+);
 create table if not exists own_files (
   person integer not null,
   path text not null,
@@ -109,12 +114,30 @@ pub fn is_own(path: &str) -> bool {
     path == OWN || path.starts_with(&format!("{OWN}/"))
 }
 
-/// A playlist's text: its songs, relative to the own folder.
-fn m3u(paths: &[String]) -> Vec<u8> {
+/// Who a shelf is shared with: everyone (newcomers included), or these people.
+#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Shares {
+    /// With everyone.
+    pub everyone: bool,
+    /// With these people (when not with everyone).
+    pub people: Vec<i64>,
+}
+
+/// In `shares`, the person who stands for everyone.
+const EVERYONE: i64 = 0;
+
+/// A playlist of `person`'s own folder: its songs relative to it, on their own shelf (another
+/// shelf's songs are another root's, out of its reach; a song on no shelf is as it was).
+fn m3u(person: i64, paths: &[String]) -> Vec<u8> {
     let mut text = String::from("#EXTM3U\n");
     for path in paths {
+        let inner = match on_shelf(path) {
+            Some((shelf, inner)) if shelf == person => inner,
+            Some(_) => continue,
+            None => path,
+        };
         text.push_str("../");
-        text.push_str(path);
+        text.push_str(inner);
         text.push('\n');
     }
     text.into_bytes()
@@ -297,9 +320,10 @@ impl Library {
     }
 
     fn set_favourites(&self, person: i64, paths: &[String]) -> Result<(), Error> {
+        // The playlist's paths are the person's shelf's (or, from before shelves, the library's).
         let ids: Vec<i64> = paths
             .iter()
-            .filter_map(|path| self.song(path))
+            .filter_map(|path| self.song(&shelf_path(person, path)).or_else(|| self.song(path)))
             .map(|song| song.id)
             .collect();
         let at = now() as i64;
@@ -378,7 +402,7 @@ impl Library {
         let mut out = vec![
             file(
                 FAVOURITES,
-                m3u(&self.favourites(person)?).len(),
+                m3u(person, &self.favourites(person)?).len(),
                 self.latest("select max(at) from favourites where person = ?1", person),
             ),
             file(
@@ -406,12 +430,15 @@ impl Library {
 
     fn read_own(&self, person: i64, path: &str) -> Result<Vec<u8>, Error> {
         match path {
-            FAVOURITES => Ok(m3u(&self.favourites(person)?)),
-            RECENT => Ok(m3u(&self
-                .history(person, RECENT_PLAYS)?
-                .into_iter()
-                .map(|(path, _)| path)
-                .collect::<Vec<_>>())),
+            FAVOURITES => Ok(m3u(person, &self.favourites(person)?)),
+            RECENT => Ok(m3u(
+                person,
+                &self
+                    .history(person, RECENT_PLAYS)?
+                    .into_iter()
+                    .map(|(path, _)| path)
+                    .collect::<Vec<_>>(),
+            )),
             _ => self
                 .db()
                 .query_row(
@@ -568,6 +595,72 @@ impl Library {
             }
             _ => Err(Error::Outside(format!("{from} → {to}: not across one's own folder"))),
         }
+    }
+
+    /// Who `owner`'s shelf is shared with.
+    pub fn shares(&self, owner: i64) -> Result<Shares, Error> {
+        let db = self.db();
+        let mut query = db
+            .prepare("select person from shares where owner = ?1 order by person")
+            .map_err(store_error)?;
+        let people: Vec<i64> = query
+            .query_map([owner], |row| row.get(0))
+            .and_then(|rows| rows.collect::<Result<_, _>>())
+            .map_err(store_error)?;
+        Ok(Shares {
+            everyone: people.contains(&EVERYONE),
+            people: people.into_iter().filter(|person| *person != EVERYONE).collect(),
+        })
+    }
+
+    /// Shares `owner`'s shelf with everyone, or with these people (none: with no one).
+    pub fn set_shares(&self, owner: i64, everyone: bool, people: &[i64]) -> Result<(), Error> {
+        let db = self.db();
+        db.execute("delete from shares where owner = ?1", [owner])
+            .map_err(store_error)?;
+        let with: Vec<i64> = if everyone {
+            vec![EVERYONE]
+        } else {
+            people
+                .iter()
+                .copied()
+                .filter(|person| *person != owner && *person != EVERYONE)
+                .collect()
+        };
+        for person in with {
+            db.execute(
+                "insert or ignore into shares (owner, person) values (?1, ?2)",
+                params![owner, person],
+            )
+            .map_err(store_error)?;
+        }
+        Ok(())
+    }
+
+    /// Whether `person` may see `owner`'s shelf: their own, or shared with them.
+    pub fn may_see(&self, person: i64, owner: i64) -> bool {
+        person == owner
+            || self
+                .db()
+                .query_row(
+                    "select count(*) > 0 from shares where owner = ?1 and person in (?2, ?3)",
+                    params![owner, person, EVERYONE],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false)
+    }
+
+    /// The people whose shelves `person` may see, besides their own.
+    pub fn shared_with(&self, person: i64) -> Result<Vec<i64>, Error> {
+        let db = self.db();
+        let mut query = db
+            .prepare("select distinct owner from shares where person in (?1, ?2) and owner != ?1 order by owner")
+            .map_err(store_error)?;
+        let owners = query
+            .query_map(params![person, EVERYONE], |row| row.get(0))
+            .and_then(|rows| rows.collect::<Result<_, _>>())
+            .map_err(store_error)?;
+        Ok(owners)
     }
 
     /// The song a play or a favourite names, by id (for tests and the service).
