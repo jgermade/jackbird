@@ -174,7 +174,8 @@
     display: flex;
     flex: 0 1 auto;
     align-items: flex-end;
-    gap: 2px;
+    /* Apart, so each reads as a tab of its own. */
+    gap: var(--mm-space-1);
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
@@ -286,7 +287,7 @@
     border-radius: .3125rem .3125rem 0 0;
   }
   /* The open tab joins the panel under it and carries the stripes. */
-  .tab.on { background: var(--mm-surface); border-color: var(--mm-border); }
+  .tab.on { background: var(--mm-surface); border-color: var(--mm-border); box-shadow: 0 -.125rem .375rem rgba(0, 0, 0, .18); }
   .tab.on::before {
     content: "";
     position: absolute;
@@ -325,7 +326,8 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .on .main { color: var(--mm-fg); }
+  /* The open tab stands a little higher than the closed ones, as a lifted card. */
+  .on .main { height: 2.375rem; color: var(--mm-fg); }
   @media (hover: hover) { .main:hover { color: var(--mm-fg); } }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .close {
