@@ -27,6 +27,12 @@
   // emits `close`; short of that it springs back. Keys and tabs in the header
   // still take their clicks, unless the press turned into a drag.
   //
+  // A sheet rests on a phone's on-screen keyboard and fits in what it
+  // leaves (`--mm-keyboard` and `--mm-viewport`, which the app sets on the
+  // root; none, none covered): its head and foot stay, its body scrolls, and
+  // the field taking the focus is brought into view once the keyboard is up
+  // (the app's `mm-keyboard` event on the document, or a moment after).
+  //
   // A `SubModal` written in its body comes down out of its head, over the
   // body alone (see sub-modal.html).
   //
@@ -115,6 +121,18 @@
     $emit("close")
   }
 
+  // A field taking the focus, brought into the body's view once the keyboard has come up.
+  const reveal = (event: FocusEvent) => {
+    const field = event.target as HTMLElement | null
+    if (!field?.matches?.("input, textarea, select, [contenteditable]")) return
+    const show = () => {
+      document.removeEventListener("mm-keyboard", show)
+      if (document.activeElement === field) field.scrollIntoView({ block: "nearest" })
+    }
+    document.addEventListener("mm-keyboard", show)
+    window.setTimeout(show, 400)
+  }
+
   // Dragging the sheet down (phones). The state lives in this closure, not
   // in the store: a top-level `let` would be a reactive field written on
   // every move.
@@ -189,6 +207,7 @@
         :class.with-nav="$slots.nav"
         :aria-labelledby="titleId"
         @cancel="cancel($event)"
+        @focusin="reveal($event)"
         @click.self="$emit('close')">
   <header class="head" :class.with-nav="$slots.nav"
           @pointerdown="drag.down($event)" @pointermove="drag.move($event)" @pointerup="drag.up($event)" @pointercancel="drag.up($event)">
@@ -274,13 +293,15 @@
     .modal {
       width: 100%;
       max-width: none;
-      max-height: 90dvh;
-      margin: auto 0 0;
+      /* On the keyboard, if one is up, and no taller than what it leaves, below the status bar. */
+      max-height: min(90dvh, calc(var(--mm-viewport, calc(100dvh - var(--mm-keyboard, 0px))) - var(--mm-safe-top, env(safe-area-inset-top, 0px)) - var(--mm-space-3)));
+      margin: auto 0 var(--mm-keyboard, 0px);
       border-bottom-width: 0;
       border-radius: var(--mm-radius-lg) var(--mm-radius-lg) 0 0;
     }
     /* A phone's navigation bar under the sheet (--mm-safe-bottom, set by the app on Android). */
-    .modal { padding-bottom: var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)); }
+    /* The keyboard, when up, covers that bar: then the sheet needs none of its room. */
+    .modal { padding-bottom: max(0px, calc(var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)) - var(--mm-keyboard, 0px))); }
     /* The header is where the sheet is dragged from: its handle says so. */
     .head { touch-action: none; padding-top: var(--mm-space-4); }
     .grab {

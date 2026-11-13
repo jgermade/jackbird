@@ -215,12 +215,17 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     trigger("sounding", event)
   }
 
-  /** The system's bars and the camera's cutout over the page, in CSS pixels (Android draws apps edge to edge). */
+  /**
+   * The system's bars and the camera's cutout over the page, in CSS pixels (Android draws apps edge
+   * to edge); and `keyboard`, how much of the page's bottom the on-screen keyboard covers (0 while
+   * it is down).
+   */
   @Volatile private var safe = JSObject().apply {
     put("top", 0.0)
     put("right", 0.0)
     put("bottom", 0.0)
     put("left", 0.0)
+    put("keyboard", 0.0)
   }
 
   override fun load(webView: WebView) {
@@ -228,14 +233,21 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     BitPerfect.listener = { main.post { sendSounding() } }
     // What covers the page's edges: the status bar, the camera's cutout, the navigation bar. The page
     // keeps clear of them (src/lib/safe-area.ts); the webview's own reading of them is not relied on.
+    // And the keyboard: edge to edge, the webview keeps its size and the keyboard lies over it, so
+    // the page is told how much of the webview it covers (none, if the window was made smaller).
     ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
       val edges = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+      val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+      val place = IntArray(2)
+      view.getLocationInWindow(place)
+      val covered = maxOf(0, place[1] + view.height - (view.rootView.height - ime))
       val density = view.resources.displayMetrics.density
       safe = JSObject().apply {
         put("top", edges.top / density)
         put("right", edges.right / density)
         put("bottom", edges.bottom / density)
         put("left", edges.left / density)
+        put("keyboard", (if (ime > 0) covered else 0) / density)
       }
       trigger("insets", safe)
       insets

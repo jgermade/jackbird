@@ -23,11 +23,14 @@
   // modal's header). An item's `tone` (`go`, `edit` or `danger`) gives its
   // tab one stripe colour on top, green, orange or red, instead of the three
   // stripes: a hairline while closed, the stripes' height while open.
+  // An item's `icon` (an SVG path on a 16 × 16 grid, stroked in the text's
+  // colour, as a Menu item's) goes over its label: the tabs of a dialog's
+  // sections.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
-  type Item = { id: string; label: string; meta?: string | number; closeLabel?: string; tone?: "go" | "edit" | "danger" }
+  type Item = { id: string; label: string; meta?: string | number; closeLabel?: string; tone?: "go" | "edit" | "danger"; icon?: string }
   type Props = {
     items?: Item[]
     model?: string | null
@@ -45,6 +48,7 @@
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: canClose = flag(closable)
   $: focusable = items.some((item: Item) => item.id === model) ? model : items[0]?.id
+  $: iconic = items.some((item: Item) => !!item.icon)
   $: chosen = items.find((item: Item) => item.id === model) ?? null
   const hasMeta = (item: Item): boolean => item.meta !== undefined && item.meta !== null && item.meta !== ""
 
@@ -108,7 +112,7 @@
   }
 </script>
 
-<div class="tabs" :class.compact="flag(compact)" :class.plain="flag(plain)">
+<div class="tabs" :class.compact="flag(compact)" :class.plain="flag(plain)" :class.iconic="iconic">
   <div class="strip" role="tablist" :aria-label="label || null">
   <div :each="item in items" :key="item.id" class="tab" :class.on="item.id === model" :class.toned="!!item.tone"
        :class.tone-go="item.tone === 'go'" :class.tone-edit="item.tone === 'edit'" :class.tone-danger="item.tone === 'danger'">
@@ -119,6 +123,7 @@
             :tabindex="item.id === focusable ? 0 : -1"
             @click="choose(item.id)"
             @keydown="key($event, item)">
+      <svg :if="item.icon" class="glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="item.icon" /></svg>
       <span>{{ item.label }}</span>
       <span :if="item.meta !== undefined && item.meta !== null && item.meta !== ''" class="meta">{{ item.meta }}</span>
     </button>
@@ -329,6 +334,10 @@
   /* The open tab stands a little higher than the closed ones, as a lifted card. */
   .on .main { height: 2.375rem; color: var(--mm-fg); }
   @media (hover: hover) { .main:hover { color: var(--mm-fg); } }
+  /* With icons, each over its label: taller tabs, the label smaller. */
+  .iconic .main { flex-direction: column; justify-content: center; gap: .1875rem; height: 3.25rem; min-width: 4.25rem; padding: 0 var(--mm-space-3); font-size: var(--mm-text-xs); }
+  .iconic .on .main { height: 3.5rem; }
+  .glyph { flex: none; width: 1.125rem; height: 1.125rem; }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   .close {
     display: inline-grid;
