@@ -118,11 +118,11 @@ export function soundingParts(
   }
   const rate = `${kilohertz(sounding.format.rate)} kHz`;
   const quality = info ? streamQuality(info) : sounding.format.bits > 0 ? `${sounding.format.bits} bit · ${rate}` : rate;
-  // On a phone (E6b-D10): bit-perfect to a DAC, through Android's mixer to a USB DAC ("DAC"), or
-  // nothing to say of the phone's own output.
+  // On a phone (E6b-D10): bit-perfect to a DAC (or so but for the phone's volume), through
+  // Android's mixer to a USB DAC ("DAC"), or nothing to say of the phone's own output.
   const route = output.phone
-    ? sounding.route.fidelity === "bit-perfect"
-      ? t("output.badge.bit-perfect")
+    ? sounding.route.fidelity === "bit-perfect" || sounding.route.fidelity === "volume"
+      ? t(`output.badge.${sounding.route.fidelity}`)
       : sounding.route.device !== "Android"
         ? t("output.badge.dac")
         : ""

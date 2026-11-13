@@ -10,6 +10,9 @@
 // 16- or 24-bit song's samples exactly, or 16-bit for a song of 16 bits or less. Media3's sink only
 // writes 16-bit integers or float, so a 32-bit track is made by the AudioTrack provider
 // (`IntegerTracks`) and handed the converted samples where it expects float (both 4 bytes a sample).
+//
+// In bit-perfect, Android applies no volume: the sink applies the phone's (Volume.kt), and the
+// samples go untouched only at its top step.
 
 package es.germade.jackbird.player
 
@@ -54,6 +57,9 @@ object BitPerfect {
    * the renderer (PlayerService); Format.NO_VALUE for a lossy song.
    */
   @Volatile var sourceEncoding: Int = Format.NO_VALUE
+
+  /** Whether the last `prepare` set the mixer bit-perfect: the sink then applies the phone's volume. */
+  @Volatile var exclusive = false
 
   /** The format of the AudioTrack last made, to ask for again. */
   @Volatile var lastFormat: Format? = null
@@ -122,6 +128,8 @@ object BitPerfect {
     lastFormat = format
     pending = false
     output = Output.FLOAT
+    exclusive = false
+    Volume.stop()
     val manager = context.getSystemService(AudioManager::class.java) ?: return
     val usb = usbDevice(context)
     val encoding = if (format.pcmEncoding == Format.NO_VALUE) AudioFormat.ENCODING_PCM_16BIT else format.pcmEncoding
@@ -142,6 +150,8 @@ object BitPerfect {
     }
     if (picked != null && found != null && manager.setPreferredMixerAttributes(attributes, usb, all[found])) {
       output = picked.second
+      exclusive = true
+      Volume.follow(context, usb)
       report(Way(device, true, format.sampleRate, sampleName(all[found].format.encoding), described))
     } else {
       if (found != null) Log.w(TAG, "bit-perfect: Android refused the mixer's format ${all[found]}")
@@ -176,8 +186,8 @@ class IntegerTracks(private val mode: () -> Output) : DefaultAudioSink.AudioTrac
 
 /**
  * The player's audio sink: it prepares the mixer for each AudioTrack before it is made, writes the
- * integers a DAC takes (`Output`) in place of the decoder's float, and lets the spectrum
- * (Spectrum.kt) read the PCM it takes.
+ * integers a DAC takes (`Output`) in place of the decoder's float, applies the phone's volume while
+ * the track goes bit-perfect (Volume.kt), and lets the spectrum (Spectrum.kt) read the PCM it takes.
  */
 class BitPerfectSink(private val context: Context, private val inner: AudioSink) : ForwardingAudioSink(inner) {
   /** What this sink writes now: set as it configures, read by the AudioTrack provider. */
@@ -187,9 +197,22 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
   private var input: Format? = null
   private var channels: IntArray? = null
 
+  /** Whether the AudioTrack goes bit-perfect: the phone's volume is then applied here. */
+  private var exclusive = false
+
+  /** The decoder's sample (C.ENCODING_PCM_*) and channels. */
+  private var encoding = C.ENCODING_PCM_FLOAT
+  private var channelCount = 2
+
+  /** The gain last applied, which a change ramps from; NaN: none yet, and the next starts at its own. */
+  private var applied = Float.NaN
+
   /** The converted samples of the buffer being written: the inner sink wants the same one until it is all taken. */
   private var converted: ByteBuffer? = null
   private var convertedFrom: ByteBuffer? = null
+
+  /** A buffer the inner sink is taking as it is, for the same reason. */
+  private var passing: ByteBuffer? = null
 
   override fun configure(inputFormat: Format, specifiedBufferSize: Int, outputChannels: IntArray?) {
     input = inputFormat
@@ -202,16 +225,23 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
   /** The inner sink configured for what this one writes: 16-bit integers are its own format. */
   private fun configureInner(inputFormat: Format, specifiedBufferSize: Int, outputChannels: IntArray?) {
     output = if (inputFormat.pcmEncoding == C.ENCODING_PCM_FLOAT) BitPerfect.output else Output.FLOAT
+    // Into bit-perfect or out of it, the gain starts anew: Android's mixer applied the volume before.
+    if (exclusive != BitPerfect.exclusive) applied = Float.NaN
+    exclusive = BitPerfect.exclusive
+    encoding = inputFormat.pcmEncoding
+    channelCount = maxOf(1, inputFormat.channelCount)
     val written = if (output == Output.INT16) inputFormat.buildUpon().setPcmEncoding(C.ENCODING_PCM_16BIT).build() else inputFormat
     super.configure(written, if (output == Output.INT16) specifiedBufferSize / 2 else specifiedBufferSize, outputChannels)
   }
 
   override fun handleBuffer(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
     val from = buffer.position()
-    val done = if (output == Output.FLOAT) {
-      super.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
-    } else {
-      handleConverted(buffer, presentationTimeUs, encodedAccessUnitCount)
+    val done = when {
+      // A buffer the inner sink has begun goes on the way it began.
+      passing === buffer -> passThrough(buffer, presentationTimeUs, encodedAccessUnitCount)
+      convertedFrom === buffer && converted != null -> handleConverted(buffer, presentationTimeUs, encodedAccessUnitCount)
+      converts() -> handleConverted(buffer, presentationTimeUs, encodedAccessUnitCount)
+      else -> passThrough(buffer, presentationTimeUs, encodedAccessUnitCount)
     }
     // The bytes the sink took this time go to the spectrum, read through a copy of the buffer's
     // position: what is played is not touched.
@@ -224,14 +254,41 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
   }
 
   /**
-   * The float samples in `buffer` written as integers: converted once, handed to the inner sink
-   * until it has taken them all, and `buffer` moved on as far as it has (2 float bytes for each
-   * 16-bit byte; 1 for 1 at 32 bits).
+   * Whether the next buffer is written converted: integers for a DAC that takes only those, or,
+   * while the track goes bit-perfect, the phone's volume below its top (and the ramp back to it).
+   */
+  private fun converts(): Boolean =
+    output != Output.FLOAT ||
+      (exclusive && Pcm.handles(encoding) && (Volume.gain != 1f || (!applied.isNaN() && applied != 1f)))
+
+  /** The buffer to the inner sink as it is. */
+  private fun passThrough(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
+    val done = super.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount)
+    passing = if (done) null else buffer
+    // Bit-perfect, a buffer goes as it is only at the top of the volume.
+    if (exclusive) applied = 1f
+    return done
+  }
+
+  /** What the sink writes, as C.ENCODING_PCM_*: integers for the DAC, else the decoder's own. */
+  private fun writtenEncoding(): Int = when (output) {
+    Output.INT16 -> C.ENCODING_PCM_16BIT
+    Output.INT32 -> C.ENCODING_PCM_32BIT
+    Output.FLOAT -> encoding
+  }
+
+  /**
+   * The samples in `buffer` written converted (`writtenEncoding`, with the volume's gain while
+   * bit-perfect, ramped across the buffer from the last one's): converted once, handed to the inner
+   * sink until it has taken them all, and `buffer` moved on as far as it has.
    */
   private fun handleConverted(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
+    val to = writtenEncoding()
     if (convertedFrom !== buffer || converted == null) {
-      converted = Integers.convert(buffer, output)
+      val gain = if (exclusive) Volume.gain else 1f
+      converted = Pcm.convert(buffer, encoding, to, channelCount, if (applied.isNaN()) gain else applied, gain)
       convertedFrom = buffer
+      applied = gain
     }
     val out = converted!!
     val start = buffer.position()
@@ -243,17 +300,24 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
       convertedFrom = null
     } else {
       val taken = out.position() - outStart
-      buffer.position(start + if (output == Output.INT16) taken * 2 else taken)
+      buffer.position(start + taken / Pcm.bytes(to) * Pcm.bytes(encoding))
     }
     return done
+  }
+
+  /** Forgets the buffers in progress: the inner sink has let them go. */
+  private fun forget() {
+    converted = null
+    convertedFrom = null
+    passing = null
+    applied = Float.NaN
   }
 
   // A flush lets the AudioTrack go, and the next one is made with the mixer as it then is: the
   // setting, changed while a song plays, is asked for again here (BitPerfect.pending), and the
   // inner sink configured anew for what is written now.
   override fun flush() {
-    converted = null
-    convertedFrom = null
+    forget()
     Spectrum.clear()
     super.flush()
     val format = input
@@ -264,8 +328,7 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
   }
 
   override fun reset() {
-    converted = null
-    convertedFrom = null
+    forget()
     super.reset()
   }
 
@@ -276,27 +339,61 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
       // The mixer's preference is a nicety: the song plays through Android's mixer.
       Log.w("jackbird", "bit-perfect: could not set the mixer's format", error)
       BitPerfect.output = Output.FLOAT
+      BitPerfect.exclusive = false
+      Volume.stop()
     }
   }
 }
 
-/** Float samples as integers, for a DAC that takes only those. */
-object Integers {
+/** PCM samples rewritten: in another encoding (integers for a DAC that takes only those), and with a gain (the volume). */
+object Pcm {
+  /** Whether `encoding` is one this can read and write. */
+  fun handles(encoding: Int): Boolean =
+    encoding == C.ENCODING_PCM_FLOAT || encoding == C.ENCODING_PCM_16BIT || encoding == C.ENCODING_PCM_24BIT || encoding == C.ENCODING_PCM_32BIT
+
+  /** The bytes a sample of `encoding` takes. */
+  fun bytes(encoding: Int): Int = when (encoding) {
+    C.ENCODING_PCM_16BIT -> 2
+    C.ENCODING_PCM_24BIT -> 3
+    else -> 4
+  }
+
   /**
-   * The rest of `buffer` (float, little-endian as Android's) as 16- or 32-bit integers in a new
-   * buffer, which the sink writes. A sample of a 16- or 24-bit song comes back as it was in the file
-   * (float holds it exactly): `round(x * 2^15)` or `round(x * 2^31)`, kept within range.
+   * The rest of `buffer` (little-endian, as Android's), samples of `from` interleaved over
+   * `channels`, as `to` in a new buffer, which the sink writes; each frame times a gain going from
+   * `gainFrom` at the first to `gainTo` at the last (the same gain all through when they are equal).
+   * With a gain of 1, a sample of a 16- or 24-bit song comes back as it was in the file (float holds
+   * it exactly): `round(x * 2^15)`, `2^23` or `2^31`, kept within range.
    */
-  fun convert(buffer: ByteBuffer, output: Output): ByteBuffer {
+  fun convert(buffer: ByteBuffer, from: Int, to: Int, channels: Int, gainFrom: Float, gainTo: Float): ByteBuffer {
     val source = buffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
-    val count = source.remaining() / 4
-    val out = ByteBuffer.allocateDirect(count * if (output == Output.INT16) 2 else 4).order(ByteOrder.nativeOrder())
+    val size = bytes(from)
+    val count = source.remaining() / size
+    val frames = maxOf(1, count / channels - 1)
+    val out = ByteBuffer.allocateDirect(count * bytes(to)).order(ByteOrder.nativeOrder())
+    val first = source.position()
+    val ramp = gainTo.toDouble() - gainFrom.toDouble()
     for (index in 0 until count) {
-      val sample = source.getFloat(source.position() + index * 4)
-      val value = if (sample.isNaN()) 0.0 else sample.toDouble()
-      when (output) {
-        Output.INT16 -> out.putShort(Math.round(value * 32768.0).coerceIn(-32768L, 32767L).toInt().toShort())
-        else -> out.putInt(Math.round(value * 2147483648.0).coerceIn(-2147483648L, 2147483647L).toInt())
+      val at = first + index * size
+      val sample = when (from) {
+        C.ENCODING_PCM_16BIT -> source.getShort(at) / 32768.0
+        C.ENCODING_PCM_24BIT ->
+          ((source.get(at).toInt() and 0xff) or ((source.get(at + 1).toInt() and 0xff) shl 8) or (source.get(at + 2).toInt() shl 16)) / 8388608.0
+        C.ENCODING_PCM_32BIT -> source.getInt(at) / 2147483648.0
+        else -> source.getFloat(at).toDouble().let { if (it.isNaN()) 0.0 else it }
+      }
+      val gain = if (ramp == 0.0) gainTo.toDouble() else gainFrom + ramp * minOf(1.0, (index / channels).toDouble() / frames)
+      val value = sample * gain
+      when (to) {
+        C.ENCODING_PCM_16BIT -> out.putShort(Math.round(value * 32768.0).coerceIn(-32768L, 32767L).toInt().toShort())
+        C.ENCODING_PCM_24BIT -> {
+          val integer = Math.round(value * 8388608.0).coerceIn(-8388608L, 8388607L).toInt()
+          out.put(integer.toByte())
+          out.put((integer shr 8).toByte())
+          out.put((integer shr 16).toByte())
+        }
+        C.ENCODING_PCM_32BIT -> out.putInt(Math.round(value * 2147483648.0).coerceIn(-2147483648L, 2147483647L).toInt())
+        else -> out.putFloat(value.toFloat())
       }
     }
     out.flip()
