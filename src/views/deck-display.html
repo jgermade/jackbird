@@ -392,13 +392,15 @@
     .lcd:not(.small) { --mm-text-display-md: var(--mm-text-display-sm); }
     .lcd:not(.small) .lcd-mark { height: auto; min-height: 0; align-self: stretch; }
   }
-  /* Phones: a smaller mark, so the title keeps its room; the spectrum, the format and the DAC
-     narrower still, 3.5rem: "BIT-PERFECT", the widest line, fits with its letters a little closer. */
+  /* Phones: a smaller mark, so the title keeps its room. The spectrum, the format and the DAC as
+     wide as the logo, so the text beside them stays put when the music plays or pauses:
+     "BIT-PERFECT", the widest line, fits narrowed and with its letters closer. */
   @media (max-width: 640px) {
     .lcd-mark { width: 3rem; height: 3rem; }
-    .lcd:not(.small) .lcd-mark.playing { width: 3.5rem; }
-    .lcd:not(.small) .lcd-format .route { letter-spacing: .04em; }
+    .lcd:not(.small) .lcd-mark.playing { height: auto; }
+    .lcd:not(.small) .lcd-format .route { letter-spacing: 0; font-stretch: 75%; }
   }
   .small .lcd-mark { width: 3rem; height: 3rem; }
-  .small .lcd-mark.playing { width: 4.5rem; height: auto; }
+  .small .lcd-mark.playing { height: auto; }
+  .small .lcd-format .route { letter-spacing: 0; font-stretch: 75%; }
 </style>
