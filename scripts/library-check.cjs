@@ -4,9 +4,11 @@
 // local SMTP sink, sets sign-in up through the console's key (email, an
 // editor and a listener, the owner's address confirmed by its code), and
 // drives Chromium (Playwright) as the three would. The owner imports Music
-// from the machine; the editor uploads a song from their device and retitles
-// one; the listener sees the new title, plays the song from the library, and
+// from the machine and shares it with everyone; the editor opens it from
+// "Shared with me" and uploads a song of their own; the owner retitles one; the
+// listener opens the owner's music, sees the new title, plays the song, and
 // downloads it carrying the title. The files on the machine are unchanged.
+// (Each person's music, shared: RECORD, 2026-11-13 03:33.)
 // Exits non-zero on the first thing missing.
 //
 //   node scripts/library-check.cjs target/release/jackbird-service
@@ -108,6 +110,20 @@ async function addMusic(page) {
   await page.getByRole("dialog", { name: "Add music" }).waitFor();
 }
 
+/** Opens the owner's music, shared with one, from "Shared with me". */
+async function openShared(page) {
+  await page.getByRole("button", { name: "Add to the library" }).first().click();
+  await page.getByRole("button", { name: "Owner's music", exact: true }).click();
+  await page.getByRole("button", { name: "Close Owner's music" }).waitFor({ timeout: 15000 });
+}
+
+async function retitle(page, from, to) {
+  await page.getByRole("button", { name: `More for ${from}` }).first().click();
+  await page.getByRole("menuitem", { name: "Edit tags…" }).first().click();
+  await page.getByLabel("Title", { exact: true }).fill(to);
+  await page.getByRole("button", { name: "Save changes" }).click();
+}
+
 async function report(page) {
   const shown = page.getByText(/\d+ added, \d+ already there/);
   await shown.waitFor({ timeout: 60000 });
@@ -139,9 +155,21 @@ async function report(page) {
     const imported = await report(owner);
     console.log("owner imported Music:", imported);
     if (!/^2 added/.test(imported)) fail(`the import said ${imported}`);
+    await owner.getByRole("dialog", { name: "Add music" }).getByRole("button", { name: "Close" }).click();
 
-    // ── The editor uploads a song and retitles one.
+    // ── The owner shares their music with everyone.
+    await owner.getByRole("button", { name: "Open preferences" }).first().click();
+    await owner.getByRole("switch", { name: "With everyone" }).or(owner.getByLabel("With everyone")).first().click();
+    for (let step = 0; step < 50; step += 1) {
+      if (await owner.evaluate(async () => (await (await fetch("/api/library/shares")).json()).everyone)) break;
+      await wait(100);
+    }
+    await owner.keyboard.press("Escape");
+    console.log("owner shared their music with everyone");
+
+    // ── The editor opens it, shared with them, and uploads a song of their own.
     const editor = await person(browser, "editor@example.com");
+    await openShared(editor);
     await editor.getByText("Before").first().waitFor({ timeout: 30000 });
     await addMusic(editor);
     await editor.locator('input[type="file"][multiple]').setInputFiles(path.join(elsewhere, "ape.mp3"));
@@ -149,39 +177,39 @@ async function report(page) {
     console.log("editor uploaded a song:", uploaded);
     if (!/^1 added/.test(uploaded)) fail(`the upload said ${uploaded}`);
     await editor.getByRole("dialog", { name: "Add music" }).getByRole("button", { name: "Close" }).click();
-    await editor.getByRole("button", { name: "More for Before" }).first().click();
-    await editor.getByRole("menuitem", { name: "Edit tags…" }).first().click();
-    await editor.getByLabel("Title", { exact: true }).fill("Retitled by Luis");
-    await editor.screenshot({ path: path.join(home, "edit.png") });
-    await editor.getByRole("button", { name: "Save changes" }).click();
-    await editor.getByText("Retitled by Luis").first().waitFor({ timeout: 15000 });
-    console.log("editor retitled a song");
 
-    // ── The listener sees it, plays it, and downloads it with the title.
+    // ── Its owner retitles a song, for everyone.
+    await retitle(owner, "Before", "Retitled by the owner");
+    await owner.screenshot({ path: path.join(home, "edit.png") });
+    await owner.getByText("Retitled by the owner").first().waitFor({ timeout: 15000 });
+    console.log("owner retitled a song");
+
+    // ── The listener opens the owner's music, sees it, plays it, and downloads it with the title.
     const listener = await person(browser, "kids@example.com");
-    await listener.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
+    await openShared(listener);
+    await listener.getByText("Retitled by the owner").first().waitFor({ timeout: 30000 });
     const served = [];
     listener.on("response", (response) => {
       if (response.url().includes("/api/library/media?")) served.push(response.status());
     });
-    await listener.getByText("Retitled by Luis", { exact: true }).first().click();
+    await listener.getByText("Retitled by the owner", { exact: true }).first().click();
     await wait(1500);
     if (!served.some((status) => status === 200 || status === 206)) fail(`the song was not served: ${served}`);
-    await listener.getByRole("button", { name: "More for Retitled by Luis" }).first().click();
+    await listener.getByRole("button", { name: "More for Retitled by the owner" }).first().click();
     await listener.getByRole("menuitem", { name: "Info…" }).first().click();
     const link = listener.getByRole("link", { name: "Download" });
     await link.waitFor({ timeout: 15000 });
     const carried = await listener.evaluate(async (href) => {
       const bytes = new Uint8Array(await (await fetch(href)).arrayBuffer());
       const text = new TextDecoder("latin1").decode(bytes.slice(0, 65536));
-      return [bytes.length, text.includes("Retitled by Luis") || new TextDecoder("utf-16le").decode(bytes.slice(0, 65536)).includes("Retitled by Luis")];
+      return [bytes.length, text.includes("Retitled by the owner") || new TextDecoder("utf-16le").decode(bytes.slice(0, 65536)).includes("Retitled by the owner")];
     }, await link.getAttribute("href"));
     console.log("listener played it (", served.join(" "), ") and downloaded", carried[0], "bytes carrying the title:", carried[1]);
     if (!carried[1]) fail("the download does not carry the family's title");
 
     // ── F3: the listener's own title; the editor still sees the family's.
     await listener.keyboard.press("Escape");
-    await listener.getByRole("button", { name: "More for Retitled by Luis" }).first().click();
+    await listener.getByRole("button", { name: "More for Retitled by the owner" }).first().click();
     await listener.getByRole("menuitem", { name: "Edit tags…" }).first().click();
     await listener.getByText("Saved for you only").waitFor();
     await listener.getByLabel("Title", { exact: true }).fill("The kids' title");
@@ -189,7 +217,7 @@ async function report(page) {
     await listener.getByRole("button", { name: "Save changes" }).click();
     await listener.getByText("The kids' title").first().waitFor({ timeout: 15000 });
     await editor.reload();
-    await editor.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
+    await editor.getByText("Retitled by the owner").first().waitFor({ timeout: 30000 });
     if ((await editor.getByText("The kids' title").count()) > 0) fail("the editor sees the listener's own title");
     console.log("listener titled the song for themselves; the editor still sees the family's");
 
@@ -198,20 +226,22 @@ async function report(page) {
     await listener.getByRole("menuitem", { name: "Add to favourites" }).click();
     await listener.getByText("The kids' title", { exact: true }).first().click();
     await wait(2500);
-    const own = await listener.evaluate(async () => {
-      const read = async (path) => (await fetch(`/api/library/read?path=${encodeURIComponent(path)}`)).text();
+    // In the owner's music, as each looks at it: what they did there.
+    const shelf = await listener.evaluate(async () => (await (await fetch("/api/library/shelves")).json())[0].shelf);
+    const own = await listener.evaluate(async (shelf) => {
+      const read = async (path) => (await fetch(`/api/library/read?path=${encodeURIComponent(path)}&shelf=${shelf}`)).text();
       return [await read("My playlists/Favourites.m3u"), await read("My playlists/Recently played.m3u")];
-    });
+    }, shelf);
     console.log("listener's favourites and plays:", JSON.stringify(own));
     if (!own[0].includes("flac-full.flac") && !own[0].includes(".mp3")) fail("no favourite");
     if (own[1].trim() === "#EXTM3U") fail("no play counted");
-    const theirs = await editor.evaluate(async () => (await fetch("/api/library/read?path=My%20playlists%2FFavourites.m3u")).text());
+    const theirs = await editor.evaluate(async (shelf) => (await fetch(`/api/library/read?path=My%20playlists%2FFavourites.m3u&shelf=${shelf}`)).text(), shelf);
     if (theirs.trim() !== "#EXTM3U") fail("the editor sees the listener's favourites");
 
     // The switch: the family's version.
     await listener.getByRole("button", { name: "Open preferences" }).first().click();
     await Promise.all([listener.waitForEvent("load"), listener.getByRole("switch", { name: "Your version" }).or(listener.getByLabel("Your version")).first().click()]);
-    await listener.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
+    await listener.getByText("Retitled by the owner").first().waitFor({ timeout: 30000 });
     console.log("listener switched to the family's version");
 
     // ── The files on the machine were never written.
@@ -220,22 +250,23 @@ async function report(page) {
     }
     console.log("the files on the machine are as they were");
 
-    // ── F4: an edit on an old version is refused and shown.
+    // ── F4: an edit on an old version is refused and shown (the owner, in two windows).
     await owner.reload();
-    await owner.getByText("Retitled by Luis").first().waitFor({ timeout: 30000 });
-    await editor.getByRole("button", { name: "More for Retitled by Luis" }).first().click();
-    await editor.getByRole("menuitem", { name: "Edit tags…" }).first().click();
-    await editor.getByLabel("Title", { exact: true }).fill("Second edit by Luis");
-    await editor.getByRole("button", { name: "Save changes" }).click();
-    await editor.getByText("Second edit by Luis").first().waitFor({ timeout: 15000 });
-    await owner.getByRole("button", { name: "More for Retitled by Luis" }).first().click();
+    await owner.getByText("Retitled by the owner").first().waitFor({ timeout: 30000 });
+    const elsewhereWindow = await owner.context().newPage();
+    pages.push(elsewhereWindow);
+    await elsewhereWindow.goto(base);
+    await elsewhereWindow.getByText("Retitled by the owner").first().waitFor({ timeout: 30000 });
+    await retitle(elsewhereWindow, "Retitled by the owner", "Second edit by the owner");
+    await elsewhereWindow.getByText("Second edit by the owner").first().waitFor({ timeout: 15000 });
+    await owner.getByRole("button", { name: "More for Retitled by the owner" }).first().click();
     await owner.getByRole("menuitem", { name: "Edit tags…" }).first().click();
     await owner.getByLabel("Title", { exact: true }).fill("The owner's, on an old version");
     await owner.getByRole("button", { name: "Save changes" }).click();
     await owner.getByText(/changed since you opened it/).first().waitFor({ timeout: 15000 });
     const shown = await owner.getByLabel("Title", { exact: true }).inputValue();
     console.log("owner's save on an old version refused; the form shows:", shown);
-    if (shown !== "Second edit by Luis") fail(`the form shows ${shown}`);
+    if (shown !== "Second edit by the owner") fail(`the form shows ${shown}`);
     await owner.getByRole("button", { name: "Cancel" }).first().click();
 
     // ── F4: deleted into the trash, restored by the owner.
@@ -247,7 +278,8 @@ async function report(page) {
     await owner.getByText("Uploads/Luis/ape.mp3").waitFor({ timeout: 15000 });
     await owner.getByRole("button", { name: "Restore" }).first().click();
     await owner.getByText("The trash is empty.").first().waitFor({ timeout: 15000 });
-    const back = await owner.evaluate(async () => (await (await fetch("/api/library/walk")).json()).some((entry) => entry.path === "Uploads/Luis/ape.mp3"));
+    // Back in the editor's own music, where it was.
+    const back = await editor.evaluate(async () => (await (await fetch("/api/library/walk")).json()).some((entry) => entry.path === "Uploads/Luis/ape.mp3"));
     if (!back) fail("the song did not come back from the trash");
     console.log("a song deleted into the trash and restored");
     await owner.getByRole("tab", { name: "Backups" }).click();
@@ -277,7 +309,7 @@ async function report(page) {
       service = start();
       await ready();
       await listener.reload();
-      await listener.getByText("Second edit by Luis").first().waitFor({ timeout: 30000 });
+      await listener.getByText("Second edit by the owner").first().waitFor({ timeout: 30000 });
       console.log("the library backed up with restic, wiped, restored and seen again");
     } else {
       console.log("restic is not installed here: its part is skipped");
@@ -289,7 +321,7 @@ async function report(page) {
     service = start();
     await ready();
     await listener.reload();
-    await listener.getByText("Second edit by Luis").first().waitFor({ timeout: 30000 });
+    await listener.getByText("Second edit by the owner").first().waitFor({ timeout: 30000 });
     await listener.screenshot({ path: path.join(home, "library.png") });
     console.log("library-check: ok", path.join(home, "library.png"));
   } catch (error) {

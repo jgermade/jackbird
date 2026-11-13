@@ -2,7 +2,7 @@
 //! mirrors it: little-endian, every string and byte run preceded by its
 //! length as a `u32`.
 //!
-//! - A read's result: the format (`u8`: 0 MP3, 1 FLAC), the six fields as
+//! - A read's result: the format (`u8`: 0 MP3, 1 FLAC), the fields as
 //!   strings in [`Field::ALL`]'s order, then `u8` 1 and the cover's MIME type
 //!   and bytes, or `u8` 0.
 //! - An error: its code and its message, as strings.
@@ -163,7 +163,7 @@ impl<'a> Reader<'a> {
 }
 
 fn edit(reader: &mut Reader<'_>) -> Result<Edit, String> {
-    let mut values: Vec<Option<String>> = Vec::with_capacity(6);
+    let mut values: Vec<Option<String>> = Vec::with_capacity(Field::ALL.len());
     for _ in Field::ALL {
         values.push(match reader.byte()? {
             0 => None,
@@ -190,6 +190,9 @@ fn edit(reader: &mut Reader<'_>) -> Result<Edit, String> {
         year: next(),
         genre: next(),
         track: next(),
+        disc: next(),
+        album_artist: next(),
+        compilation: next(),
         cover,
     })
 }
@@ -224,7 +227,7 @@ mod tests {
     use super::*;
 
     /// An edit as `tagwire.ts` encodes it.
-    fn encoded(fields: [Option<&str>; 6], cover: &[u8]) -> Vec<u8> {
+    fn encoded(fields: [Option<&str>; 9], cover: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
         for value in fields {
             match value {
@@ -255,7 +258,17 @@ mod tests {
         put_bytes(&mut cover, b"image/png");
         put_bytes(&mut cover, &[9, 8, 7]);
         let mut request = encoded(
-            [Some("Título"), None, Some(""), Some("1959"), None, Some("3/12")],
+            [
+                Some("Título"),
+                None,
+                Some(""),
+                Some("1959"),
+                None,
+                Some("3/12"),
+                Some("2/2"),
+                Some("Various Artists"),
+                Some("1"),
+            ],
             &cover,
         );
         request.extend_from_slice(&LAYOUT);
@@ -270,6 +283,9 @@ mod tests {
                 year: Some("1959".into()),
                 genre: None,
                 track: Some("3/12".into()),
+                disc: Some("2/2".into()),
+                album_artist: Some("Various Artists".into()),
+                compilation: Some("1".into()),
                 cover: CoverEdit::Set(Cover {
                     data: vec![9, 8, 7],
                     mime: "image/png".into()
@@ -278,7 +294,7 @@ mod tests {
         );
         assert_eq!(layout, layout_flac());
         assert_eq!(head, b"fLaC...");
-        let mut request = encoded([None; 6], &[2]);
+        let mut request = encoded([None; 9], &[2]);
         request.extend_from_slice(&[255, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0]);
         let (edit, layout, head) = write_request(&request).unwrap();
         assert_eq!(edit.cover, CoverEdit::Remove);
@@ -302,7 +318,7 @@ mod tests {
         assert!(write_request(&[]).unwrap_err().contains("ends early"));
         assert!(write_request(&[3]).unwrap_err().contains("field marked 3"));
         assert!(
-            write_request(&encoded([None; 6], &[5]))
+            write_request(&encoded([None; 9], &[5]))
                 .unwrap_err()
                 .contains("cover marked 5")
         );
@@ -333,7 +349,9 @@ mod tests {
         };
         let mut expected = vec![1, 1, 0, 0, 0, b'T', 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0];
         expected.extend_from_slice(b"1959");
-        expected.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0, 1, 10, 0, 0, 0]);
+        // genre, track, disc, album artist and compilation: empty.
+        expected.extend_from_slice(&[0; 20]);
+        expected.extend_from_slice(&[1, 10, 0, 0, 0]);
         expected.extend_from_slice(b"image/jpeg");
         expected.extend_from_slice(&[2, 0, 0, 0, 1, 2]);
         assert_eq!(tags(&read), expected);
@@ -342,7 +360,7 @@ mod tests {
             fields: Fields::default(),
             cover: None,
         };
-        assert_eq!(tags(&untagged), [vec![0], vec![0; 24], vec![0]].concat());
+        assert_eq!(tags(&untagged), [vec![0], vec![0; 36], vec![0]].concat());
         let mut expected = vec![6, 0, 0, 0];
         expected.extend_from_slice(b"id3v22");
         let message = Error::Id3v22.to_string();

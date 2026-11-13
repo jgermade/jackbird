@@ -49,6 +49,9 @@ fn cases() -> Vec<Case> {
                     year: text("year"),
                     genre: text("genre"),
                     track: text("track"),
+                    disc: text("disc"),
+                    album_artist: text("albumArtist"),
+                    compilation: text("compilation"),
                 },
                 cover: case["cover"].as_object().map(|cover| Cover {
                     data: fs::read(root().join(cover["file"].as_str().unwrap())).unwrap(),
@@ -147,6 +150,9 @@ fn every_field_at_once() {
         year: "2001-05-06".into(),
         genre: "Post-Rock".into(),
         track: "4/9".into(),
+        disc: "2/3".into(),
+        album_artist: "Various Artists".into(),
+        compilation: "1".into(),
     };
     for case in writable() {
         let out = write(&case.bytes, &Edit::all(&wanted)).unwrap_or_else(|error| panic!("{}: {error}", case.name));
@@ -372,6 +378,7 @@ fn lofty_reads_what_jackbird_writes() {
         year: "2002".into(),
         genre: "Rock".into(),
         track: "2/3".into(),
+        ..Fields::default()
     };
     for case in writable() {
         if OUTSIDE_SKIPS.contains(&case.name.as_str()) {
@@ -416,6 +423,7 @@ fn rust_id3_reads_the_mp3s_jackbird_writes() {
         year: "2002".into(),
         genre: "Rock".into(),
         track: "2/3".into(),
+        ..Fields::default()
     };
     for case in writable().into_iter().filter(|case| case.format == Format::Mp3) {
         // rust-id3 refuses a tag with a grouped frame ("grouping identity is not supported"), which that case keeps.
@@ -556,6 +564,7 @@ fn the_head_and_splice_path_gives_the_whole_files_bytes() {
                 year: "2002".into(),
                 genre: "Rock".into(),
                 track: "2/3".into(),
+                ..Fields::default()
             })
         },
         Edit {

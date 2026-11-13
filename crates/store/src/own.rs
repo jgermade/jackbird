@@ -34,6 +34,11 @@ create table if not exists plays (
   song integer not null references songs(id) on delete cascade,
   at integer not null
 );
+create table if not exists shares (
+  owner integer not null,
+  person integer not null,
+  primary key (owner, person)
+);
 create table if not exists own_files (
   person integer not null,
   path text not null,
@@ -60,6 +65,9 @@ pub struct Viewer {
     pub person: Option<i64>,
     /// Whether their own layer is shown.
     pub mine: bool,
+    /// The shelf they look at (their own when none): the playlists made from what they did
+    /// (favourites, history) list that shelf's songs, the root's they open.
+    pub shelf: Option<i64>,
 }
 
 impl Viewer {
@@ -68,6 +76,7 @@ impl Viewer {
         Viewer {
             person: Some(person),
             mine: true,
+            shelf: None,
         }
     }
 
@@ -76,7 +85,21 @@ impl Viewer {
         Viewer {
             person: Some(person),
             mine,
+            shelf: None,
         }
+    }
+
+    /// The same person, looking at `shelf`.
+    pub fn on(self, shelf: i64) -> Viewer {
+        Viewer {
+            shelf: Some(shelf),
+            ..self
+        }
+    }
+
+    /// The shelf they look at.
+    fn shelf_of(self, person: i64) -> i64 {
+        self.shelf.unwrap_or(person)
     }
 }
 
@@ -109,12 +132,31 @@ pub fn is_own(path: &str) -> bool {
     path == OWN || path.starts_with(&format!("{OWN}/"))
 }
 
-/// A playlist's text: its songs, relative to the own folder.
-fn m3u(paths: &[String]) -> Vec<u8> {
+/// Who a shelf is shared with: everyone (newcomers included), or these people.
+#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Shares {
+    /// With everyone.
+    pub everyone: bool,
+    /// With these people (when not with everyone).
+    pub people: Vec<i64>,
+}
+
+/// In `shares`, the person who stands for everyone.
+const EVERYONE: i64 = 0;
+
+/// A playlist of one's own folder as `shelf`'s root shows it: its songs on that shelf, relative
+/// to the folder (another shelf's are another root's, out of its reach; a song on no shelf is as
+/// it was).
+fn m3u(shelf: i64, paths: &[String]) -> Vec<u8> {
     let mut text = String::from("#EXTM3U\n");
     for path in paths {
+        let inner = match on_shelf(path) {
+            Some((on, inner)) if on == shelf => inner,
+            Some(_) => continue,
+            None => path,
+        };
         text.push_str("../");
-        text.push_str(path);
+        text.push_str(inner);
         text.push('\n');
     }
     text.into_bytes()
@@ -211,6 +253,9 @@ impl Library {
         layer.year = pick(&fields.year, &under.year);
         layer.genre = pick(&fields.genre, &under.genre);
         layer.track = pick(&fields.track, &under.track);
+        layer.disc = pick(&fields.disc, &under.disc);
+        layer.album_artist = pick(&fields.album_artist, &under.album_artist);
+        layer.compilation = pick(&fields.compilation, &under.compilation);
         self.put_own_layer(person, song.id, &layer)
     }
 
@@ -293,16 +338,23 @@ impl Library {
         Ok(paths)
     }
 
-    fn set_favourites(&self, person: i64, paths: &[String]) -> Result<(), Error> {
+    /// Sets a person's favourites on `shelf` (and on no shelf, from before shelves) to `paths`, that
+    /// shelf's; those on other shelves stay.
+    fn set_favourites(&self, person: i64, shelf: i64, paths: &[String]) -> Result<(), Error> {
         let ids: Vec<i64> = paths
             .iter()
-            .filter_map(|path| self.song(path))
+            .filter_map(|path| self.song(&shelf_path(shelf, path)).or_else(|| self.song(path)))
             .map(|song| song.id)
             .collect();
         let at = now() as i64;
+        let prefix = shelf_path(shelf, "") + "/";
         let db = self.db();
-        db.execute("delete from favourites where person = ?1", [person])
-            .map_err(store_error)?;
+        db.execute(
+            "delete from favourites where person = ?1 and song in
+               (select id from songs where substr(path, 1, length(?2)) = ?2 or substr(path, 1, 1) != '@')",
+            params![person, prefix],
+        )
+        .map_err(store_error)?;
         for (offset, id) in ids.iter().enumerate() {
             db.execute(
                 "insert or ignore into favourites (person, song, at) values (?1, ?2, ?3)",
@@ -362,7 +414,9 @@ impl Library {
             .unwrap_or(0) as u64
     }
 
-    fn own_entries(&self, person: i64) -> Result<Vec<Entry>, Error> {
+    /// One's own folder as `shelf`'s root shows it: the playlists made from what one did, of that
+    /// shelf; one's own playlists, on one's own shelf only.
+    fn own_entries(&self, person: i64, shelf: i64) -> Result<Vec<Entry>, Error> {
         let file = |path: &str, size: usize, mtime: u64| Entry {
             path: path.to_owned(),
             name: name_of(path),
@@ -375,15 +429,18 @@ impl Library {
         let mut out = vec![
             file(
                 FAVOURITES,
-                m3u(&self.favourites(person)?).len(),
+                m3u(shelf, &self.favourites(person)?).len(),
                 self.latest("select max(at) from favourites where person = ?1", person),
             ),
             file(
                 RECENT,
-                self.read_own(person, RECENT)?.len(),
+                self.read_own(person, shelf, RECENT)?.len(),
                 self.latest("select max(at) from plays where person = ?1", person),
             ),
         ];
+        if shelf != person {
+            return Ok(out);
+        }
         let db = self.db();
         let mut query = db
             .prepare("select path, length(bytes), changed from own_files where person = ?1 order by path")
@@ -401,14 +458,17 @@ impl Library {
         Ok(out)
     }
 
-    fn read_own(&self, person: i64, path: &str) -> Result<Vec<u8>, Error> {
+    fn read_own(&self, person: i64, shelf: i64, path: &str) -> Result<Vec<u8>, Error> {
         match path {
-            FAVOURITES => Ok(m3u(&self.favourites(person)?)),
-            RECENT => Ok(m3u(&self
-                .history(person, RECENT_PLAYS)?
-                .into_iter()
-                .map(|(path, _)| path)
-                .collect::<Vec<_>>())),
+            FAVOURITES => Ok(m3u(shelf, &self.favourites(person)?)),
+            RECENT => Ok(m3u(
+                shelf,
+                &self
+                    .history(person, RECENT_PLAYS)?
+                    .into_iter()
+                    .map(|(path, _)| path)
+                    .collect::<Vec<_>>(),
+            )),
             _ => self
                 .db()
                 .query_row(
@@ -433,7 +493,7 @@ impl Library {
         let mut out = self.walk()?;
         if let Some(person) = viewer.person {
             out.retain(|entry| !is_own(&entry.path));
-            out.extend(self.own_entries(person)?);
+            out.extend(self.own_entries(person, viewer.shelf_of(person))?);
             out.sort_by(|a, b| a.path.cmp(&b.path));
         }
         Ok(out)
@@ -447,7 +507,7 @@ impl Library {
         let path = relative.trim_matches('/');
         if is_own(path) {
             return Ok(if path == OWN {
-                self.own_entries(person)?
+                self.own_entries(person, viewer.shelf_of(person))?
             } else {
                 Vec::new()
             });
@@ -482,7 +542,7 @@ impl Library {
                 mtime: 0,
             })),
             Some(person) if is_own(&path) => Ok(self
-                .own_entries(person)?
+                .own_entries(person, viewer.shelf_of(person))?
                 .into_iter()
                 .find(|entry| entry.path == path)
                 .map(|entry| entry.stat)),
@@ -494,7 +554,8 @@ impl Library {
     pub fn read_as(&self, relative: &str, viewer: Viewer) -> Result<Vec<u8>, Error> {
         let path = clean(relative)?;
         if is_own(&path) {
-            return self.read_own(Library::person_of(viewer, &path)?, &path);
+            let person = Library::person_of(viewer, &path)?;
+            return self.read_own(person, viewer.shelf_of(person), &path);
         }
         self.read(&path)
     }
@@ -508,7 +569,7 @@ impl Library {
         }
         let person = Library::person_of(viewer, &path)?;
         match path.as_str() {
-            FAVOURITES => self.set_favourites(person, &entries_of(bytes)),
+            FAVOURITES => self.set_favourites(person, viewer.shelf_of(person), &entries_of(bytes)),
             RECENT => Err(Error::Outside(format!("{path}: what was played is not written"))),
             _ => {
                 self.db()
@@ -532,7 +593,7 @@ impl Library {
         }
         let person = Library::person_of(viewer, &path)?;
         match path.as_str() {
-            FAVOURITES => self.set_favourites(person, &[]),
+            FAVOURITES => self.set_favourites(person, viewer.shelf_of(person), &[]),
             RECENT => self.clear_history(person),
             _ => {
                 let gone = self
@@ -565,6 +626,72 @@ impl Library {
             }
             _ => Err(Error::Outside(format!("{from} → {to}: not across one's own folder"))),
         }
+    }
+
+    /// Who `owner`'s shelf is shared with.
+    pub fn shares(&self, owner: i64) -> Result<Shares, Error> {
+        let db = self.db();
+        let mut query = db
+            .prepare("select person from shares where owner = ?1 order by person")
+            .map_err(store_error)?;
+        let people: Vec<i64> = query
+            .query_map([owner], |row| row.get(0))
+            .and_then(|rows| rows.collect::<Result<_, _>>())
+            .map_err(store_error)?;
+        Ok(Shares {
+            everyone: people.contains(&EVERYONE),
+            people: people.into_iter().filter(|person| *person != EVERYONE).collect(),
+        })
+    }
+
+    /// Shares `owner`'s shelf with everyone, or with these people (none: with no one).
+    pub fn set_shares(&self, owner: i64, everyone: bool, people: &[i64]) -> Result<(), Error> {
+        let db = self.db();
+        db.execute("delete from shares where owner = ?1", [owner])
+            .map_err(store_error)?;
+        let with: Vec<i64> = if everyone {
+            vec![EVERYONE]
+        } else {
+            people
+                .iter()
+                .copied()
+                .filter(|person| *person != owner && *person != EVERYONE)
+                .collect()
+        };
+        for person in with {
+            db.execute(
+                "insert or ignore into shares (owner, person) values (?1, ?2)",
+                params![owner, person],
+            )
+            .map_err(store_error)?;
+        }
+        Ok(())
+    }
+
+    /// Whether `person` may see `owner`'s shelf: their own, or shared with them.
+    pub fn may_see(&self, person: i64, owner: i64) -> bool {
+        person == owner
+            || self
+                .db()
+                .query_row(
+                    "select count(*) > 0 from shares where owner = ?1 and person in (?2, ?3)",
+                    params![owner, person, EVERYONE],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false)
+    }
+
+    /// The people whose shelves `person` may see, besides their own.
+    pub fn shared_with(&self, person: i64) -> Result<Vec<i64>, Error> {
+        let db = self.db();
+        let mut query = db
+            .prepare("select distinct owner from shares where person in (?1, ?2) and owner != ?1 order by owner")
+            .map_err(store_error)?;
+        let owners = query
+            .query_map(params![person, EVERYONE], |row| row.get(0))
+            .and_then(|rows| rows.collect::<Result<_, _>>())
+            .map_err(store_error)?;
+        Ok(owners)
     }
 
     /// The song a play or a favourite names, by id (for tests and the service).

@@ -150,6 +150,9 @@
   }
   @media (hover: hover) { .variant-ghost:hover:not(:disabled) { background: var(--mm-hover); border-color: transparent; color: var(--mm-fg); } }
   .variant-ghost:active:not(:disabled) { background: var(--mm-sunken); box-shadow: none; }
+  /* A latched ghost key (the library's view in use): down in the panel and lit in the accent's
+     ink, so the one chosen reads at a glance. */
+  .variant-ghost[aria-pressed="true"] { background: var(--mm-sunken); box-shadow: var(--mm-key-pressed); color: var(--mm-accent-ink); }
 
   .size-sm { --h: var(--mm-control-sm); padding: 0 var(--mm-space-2); font-size: var(--mm-text-label-sm); }
   .size-lg { --h: var(--mm-control-lg); padding: 0 var(--mm-space-4); }

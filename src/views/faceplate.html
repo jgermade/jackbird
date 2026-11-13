@@ -21,7 +21,9 @@
   const { importing, openImport } = await import("../lib/importing")
   const { library } = await import("../lib/library")
   const { closeRoot, selectRoot } = await import("../lib/roots")
-  const { chooseTab, openAdding, shownTab, sourcesHere, tabsHere } = await import("../lib/adding")
+  const { adding, chooseTab, openAdding, shownTab, sourcesHere, tabsHere } = await import("../lib/adding")
+  // Something to add: a folder, a server, or someone's music shared with one (SH-D6, a listener's too).
+  const canAdd = (): boolean => sourcesHere().length > 0 || adding.shared.length > 0
   const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
@@ -72,11 +74,11 @@
   <!-- The roots' bar: hidden while nothing is open, coming back or to import (the welcome is the
        page then, and the panes' key has no panes to turn between). -->
   <Tabs :elseif="hasRoots || library.restoring || (importing.available && can('editor'))" :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" :closable="!isEmbed" compact
-        :add-label="folderLabel" :add-disabled="library.loading || sourcesHere().length === 0" @add="openAdding()"
+        :add-label="folderLabel" :add-disabled="library.loading || !canAdd()" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
       <!-- Adding another folder, once one is open: before that, the welcome offers it. -->
-      <span :if="hasRoots && sourcesHere().length > 0" class="open-folder" :class.has-roots="hasRoots">
+      <span :if="hasRoots && canAdd()" class="open-folder" :class.has-roots="hasRoots">
         <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openAdding()">
           <Reel :if="library.loading" :size="12" speed="fast" />
           <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>

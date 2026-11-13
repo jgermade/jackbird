@@ -12,7 +12,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1"
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -38,7 +41,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1"
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -64,7 +70,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1"
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -90,7 +99,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1"
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -116,7 +128,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -138,7 +153,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -160,7 +178,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -182,7 +203,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1"
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -208,7 +232,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -230,7 +257,10 @@
         "album": "",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -252,7 +282,10 @@
         "album": "",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -274,7 +307,10 @@
         "album": "",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -296,7 +332,10 @@
         "album": "",
         "year": "c. 1959",
         "genre": "(17)",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -318,7 +357,10 @@
         "album": "x",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -340,7 +382,10 @@
         "album": "Ålbum",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -362,7 +407,10 @@
         "album": "A/B",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -384,7 +432,10 @@
         "album": "Album",
         "year": "1990",
         "genre": "Rock",
-        "track": "1/9"
+        "track": "1/9",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": {
         "file": "covers/cover2.jpg",
@@ -410,7 +461,10 @@
         "album": "",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "unreadable",
@@ -432,7 +486,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1"
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -458,7 +515,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3"
+        "track": "3",
+        "disc": "1",
+        "albumArtist": "Album Artist",
+        "compilation": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -484,7 +544,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3"
+        "track": "3",
+        "disc": "1",
+        "albumArtist": "Album Artist",
+        "compilation": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -510,7 +573,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3"
+        "track": "3",
+        "disc": "1",
+        "albumArtist": "Album Artist",
+        "compilation": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -536,7 +602,10 @@
         "album": "Album",
         "year": "1959",
         "genre": "Jazz",
-        "track": "3"
+        "track": "3",
+        "disc": "1",
+        "albumArtist": "Album Artist",
+        "compilation": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -562,7 +631,10 @@
         "album": "",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -584,7 +656,10 @@
         "album": "",
         "year": "",
         "genre": "",
-        "track": ""
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": null,
       "write": "ok",
@@ -606,7 +681,10 @@
         "album": "",
         "year": "2001",
         "genre": "",
-        "track": "3/12"
+        "track": "3/12",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": ""
       },
       "cover": {
         "file": "covers/cover3.png",

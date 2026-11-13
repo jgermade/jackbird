@@ -37,6 +37,11 @@ function inLibrary(): boolean {
   return activeRoot.value.data?.source.kind === "library";
 }
 
+/** Whether the root in view is someone's music shared with one (SH-D6). */
+export function inSharedMusic(): boolean {
+  return activeRoot.value.data?.source.shelf !== undefined;
+}
+
 /**
  * Opens the selection's dialog on `tab`, the form filled with the values its
  * tracks share. Switching tabs afterwards keeps what was typed.
@@ -50,7 +55,8 @@ export function openSelection(tab: SelectionTab = "edit"): void {
   editor.confirmed = [];
   library.errorMessage = null;
   // A listener sees the files' info only (S3); in the family library they edit their own version (F3).
-  editor.scope = can("editor") ? "family" : "mine";
+  // In someone's music shared with one, one saves one's own version (SH-D4).
+  editor.scope = can("editor") && !inSharedMusic() ? "family" : "mine";
   ui.selectionTab = can("editor") || (inLibrary() && tab === "edit") ? tab : "info";
   ui.selectionOpen = true;
 }
@@ -76,6 +82,16 @@ export function confirmField(field: string, on: boolean): void {
   if (!on) {
     editor.form = { ...editor.form, [field]: "" };
   }
+}
+
+/**
+ * The "Compilation" box, in the album artist's field: ticked, every track is marked one ("1");
+ * unticked, none is (the mark empties, on every track even where the selection varied).
+ */
+export function setCompilation(on: boolean): void {
+  const rest = editor.confirmed.filter((one) => one !== "compilation");
+  editor.confirmed = on ? rest : [...rest, "compilation"];
+  editor.form = { ...editor.form, compilation: on ? "1" : "" };
 }
 
 /** Why a track could not be saved, in the interface's language. */

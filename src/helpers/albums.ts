@@ -1,4 +1,5 @@
 import type { Track } from "../types.ts";
+import { isCompilation } from "./metadata.ts";
 import { inferDiscNumber, trackNumberOrder } from "./tracks.ts";
 
 export type AlbumDisc = {
@@ -19,7 +20,8 @@ export type AlbumGroup = {
 };
 
 /**
- * Tracks grouped into albums by artist and album tag, ignoring case; a track
+ * Tracks grouped into albums by album artist (else artist; a compilation's
+ * tracks together) and album tag, ignoring case; a track
  * with no album tag goes under `untitled`. Year, genre and cover are the
  * album's first track's. Albums are sorted by title in `locale`.
  */
@@ -28,8 +30,11 @@ export function groupAlbums(tracks: readonly Track[], untitled: string, locale: 
 
   for (const track of tracks) {
     const album = track.metadata.album.trim();
-    const artist = track.metadata.artist.trim();
-    const key = `${artist.toLocaleLowerCase(locale)}::${album.toLocaleLowerCase(locale)}`;
+    // Who the album is by: its album artist; a compilation's tracks, by many, stay together.
+    const albumArtist = track.metadata.albumArtist.trim();
+    const artist = albumArtist || track.metadata.artist.trim();
+    const by = albumArtist || (isCompilation(track.metadata) ? "\u0000compilation" : artist);
+    const key = `${by.toLocaleLowerCase(locale)}::${album.toLocaleLowerCase(locale)}`;
     let entry = albums.get(key);
     if (!entry) {
       entry = {

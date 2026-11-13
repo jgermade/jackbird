@@ -547,6 +547,18 @@
           "markdownDescription": "Denies the set_upcoming command without any pre-configured scope."
         },
         {
+          "description": "Enables the spectrum command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-spectrum",
+          "markdownDescription": "Enables the spectrum command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the spectrum command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-spectrum",
+          "markdownDescription": "Denies the spectrum command without any pre-configured scope."
+        },
+        {
           "description": "Enables the status command without any pre-configured scope.",
           "type": "string",
           "const": "allow-status",
@@ -571,10 +583,10 @@
           "markdownDescription": "Denies the stop command without any pre-configured scope."
         },
         {
-          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`",
+          "description": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-spectrum`\n- `allow-register-listener`\n- `allow-remove-listener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-register-listener`\n- `allow-remove-listener`"
+          "markdownDescription": "Every command of the phone's player, and its events.\n#### This default permission set includes:\n\n- `allow-set-queue`\n- `allow-set-upcoming`\n- `allow-play`\n- `allow-pause`\n- `allow-seek`\n- `allow-stop`\n- `allow-status`\n- `allow-set-output`\n- `allow-output-info`\n- `allow-pick-folder`\n- `allow-folder-check`\n- `allow-folder-walk`\n- `allow-folder-list`\n- `allow-folder-stat`\n- `allow-folder-read`\n- `allow-folder-write`\n- `allow-folder-delete`\n- `allow-folder-rename`\n- `allow-folder-mkdir`\n- `allow-folder-address`\n- `allow-safe-area`\n- `allow-spectrum`\n- `allow-register-listener`\n- `allow-remove-listener`"
         }
       ]
     }

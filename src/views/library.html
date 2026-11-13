@@ -17,7 +17,7 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { ui } = await import("../lib/ui")
-  const { nowPlaying } = await import("../lib/player")
+  const { nowPlaying, readSpectrum } = await import("../lib/player")
   const { onRowMenu, rowMenu } = await import("../lib/menus")
   const { rescanRoot } = await import("../lib/roots")
   const {
@@ -73,6 +73,18 @@
   const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
   // A track's number before its title; nothing without one, and no column when no track has one.
   $: numbered = rows().some((row: Row) => row.kind === "track" && formatTrackNumber(row.trackNumber) !== "")
+  // A group's icon by what it is: in Artists an artist, in Albums and Compilations an album, in
+  // Albums by artist an artist and under it its albums, in Playlists a playlist; else a folder.
+  const glyphOf = (row: Row): "folder" | "artist" | "album" | "playlist" => {
+    switch (row.inView) {
+      case "artists": return "artist"
+      case "albums":
+      case "compilations": return "album"
+      case "albumsByArtist": return row.depth === 0 ? "artist" : "album"
+      case "playlists": return "playlist"
+      default: return "folder"
+    }
+  }
   const rowLead = (row: Row): string => (row.kind === "track" ? trackLead(row.trackNumber, isLoading(), numbered) : "")
   const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
   const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey
@@ -201,6 +213,7 @@
              :window="rowPx()"
              :height="windowed() ? SONG_ROW : 0"
              :kind="row.kind === 'album' ? 'folder' : 'item'"
+             :glyph="glyphOf(row)"
              :depth="phone ? 0 : row.depth"
              :label="rowLabel(row)"
              :lead="rowLead(row)"
@@ -211,6 +224,7 @@
              :current="isCurrent(row)"
              :playing="row.kind === 'track' && row.trackId === playingId()"
              :playing-active="playback.playing"
+             :playing-source="readSpectrum"
              :row-id="rowDomId(row.key)"
              :selectable="row.kind === 'track' && !!row.trackId"
              :playable="row.kind === 'track' && !!row.trackId"

@@ -59,6 +59,8 @@ export async function restoreSession(): Promise<void> {
     }
 
     importing.available = $toRaw(library).roots.some((root) => root.source.kind === "library" && root.source.server === currentServer());
+    // The music shared with one (SH-D6), offered among what can be added.
+    if (account.active) void (await import("./adding")).loadShared();
 
     if (session.activeRootId && reopened.includes(session.activeRootId)) {
       library.activeRootId = session.activeRootId;

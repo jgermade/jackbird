@@ -24,6 +24,7 @@ permissions = [
   "allow-folder-mkdir",
   "allow-folder-address",
   "allow-safe-area",
+  "allow-spectrum",
   "allow-register-listener",
   "allow-remove-listener",
 ]

@@ -1,4 +1,4 @@
-//! MP3: the six fields and the cover over an ID3v2 tag's frames.
+//! MP3: the fields and the cover over an ID3v2 tag's frames.
 
 use jackbird_id3::{self as id3, Frame, Picture, Version, decode_picture, decode_text, encode_picture, encode_text};
 
@@ -17,6 +17,9 @@ fn reader_ids(version: Version, field: Field) -> &'static [&'static str] {
         (Version::V22, Field::Year) => &["TYE"],
         (Version::V22, Field::Genre) => &["TCO"],
         (Version::V22, Field::Track) => &["TRK"],
+        (Version::V22, Field::Disc) => &["TPA"],
+        (Version::V22, Field::AlbumArtist) => &["TP2"],
+        (Version::V22, Field::Compilation) => &["TCP"],
         (Version::V23, Field::Year) => &["TYER", "TDRC"],
         (Version::V24, Field::Year) => &["TDRC", "TYER"],
         (_, field) => &managed(field)[..1],
@@ -33,6 +36,10 @@ fn managed(field: Field) -> &'static [&'static str] {
         Field::Year => &["TDRC", "TYER", "TDAT", "TIME"],
         Field::Genre => &["TCON"],
         Field::Track => &["TRCK"],
+        Field::Disc => &["TPOS"],
+        Field::AlbumArtist => &["TPE2"],
+        // Not in the standard, but iTunes' and every player's that reads one.
+        Field::Compilation => &["TCMP"],
     }
 }
 
@@ -102,6 +109,9 @@ fn fields_of(version: Version, unsynchronised: bool, frames: &[Frame]) -> Fields
         year: year.map(|(_, text)| text).unwrap_or_default(),
         genre: text(Field::Genre),
         track: text(Field::Track),
+        disc: text(Field::Disc),
+        album_artist: text(Field::AlbumArtist),
+        compilation: text(Field::Compilation),
     }
 }
 

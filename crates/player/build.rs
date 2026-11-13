@@ -27,6 +27,7 @@ const COMMANDS: &[&str] = &[
     "folder_mkdir",
     "folder_address",
     "safe_area",
+    "spectrum",
     "register_listener",
     "remove_listener",
 ];

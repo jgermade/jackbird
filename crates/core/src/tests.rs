@@ -211,6 +211,9 @@ fn save_gives_the_engines_bytes_in_place_or_beside() {
                 year: "2002".into(),
                 genre: "Rock".into(),
                 track: "2/3".into(),
+                disc: "1/2".into(),
+                album_artist: "Various Artists".into(),
+                compilation: "1".into(),
             })
         },
         Edit {

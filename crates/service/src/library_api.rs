@@ -2,6 +2,11 @@
 //! other (listeners read and play; editors save, rename, delete and upload), importing a folder of
 //! the machine in the background (owners), uploads streamed to disk and moved in, and songs leaving
 //! with the family's tags, with byte ranges, streamed.
+//!
+//! Each person's music is a shelf (SH-D1, RECORD/2026-08-11.musikmatch-rust-migration.WIP.md,
+//! 2026-11-13 03:33): every route takes `shelf` (a person's id; one's own by default), the
+//! interface's paths are the shelf's, and the catalogue's carry its prefix (`@<person>/`). A
+//! shelf shared with one is read, played and kept in one's own version; the rest is its owner's.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -13,8 +18,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 use jackbird_api::{EntryJson, InspectionJson, Metadata, StatJson, edit_for};
+use jackbird_core::Entry;
 use jackbird_core::Error;
-use jackbird_store::{Imported, Library, Outgoing, Report, Saved, Scope, Viewer, is_own};
+use jackbird_store::{Imported, Library, OWN, Outgoing, Report, Saved, Scope, Viewer, is_own, on_shelf, shelf_path};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::io::AsyncReadExt;
@@ -36,6 +42,84 @@ fn viewer(person: &Person) -> Viewer {
     Viewer::of(person.id, person.settings.mine)
 }
 
+/// The shelf a request is on, as the person asking may see it.
+#[derive(Clone, Copy, Debug)]
+struct Shelf {
+    /// Whose it is.
+    owner: i64,
+    /// Whether it is the asker's own.
+    own: bool,
+}
+
+impl Shelf {
+    /// `asked` (one's own when none), if the person may see it; refused as not found otherwise.
+    fn of(library: &Library, person: &Person, asked: Option<i64>) -> Answer<Shelf> {
+        let owner = asked.unwrap_or(person.id);
+        if !library.may_see(person.id, owner) {
+            return Err(ApiError::new(
+                StatusCode::NOT_FOUND,
+                "not-shared",
+                "no such music is shared with you",
+            ));
+        }
+        Ok(Shelf {
+            owner,
+            own: owner == person.id,
+        })
+    }
+
+    /// A path of the shelf as the catalogue keeps it; one's own folder (F3) stays as it is (it is
+    /// in every shelf one looks at, its playlists made from what one did listing that shelf's).
+    fn inner(&self, path: &str) -> String {
+        let path = path.trim_matches('/');
+        if is_own(path) {
+            path.to_owned()
+        } else {
+            shelf_path(self.owner, path)
+        }
+    }
+
+    /// How `person` sees this shelf.
+    fn viewer(&self, person: &Person) -> Viewer {
+        viewer(person).on(self.owner)
+    }
+
+    /// A catalogue path as the shelf shows it; `None` when it is not on it.
+    fn outer(&self, path: &str) -> Option<String> {
+        if is_own(path) {
+            return Some(path.to_owned());
+        }
+        match on_shelf(path) {
+            Some((owner, inner)) if owner == self.owner && !inner.is_empty() => Some(inner.to_owned()),
+            _ => None,
+        }
+    }
+
+    /// The entries of the catalogue that are the shelf's, with its paths.
+    fn entries(&self, entries: Vec<Entry>) -> Vec<Entry> {
+        entries
+            .into_iter()
+            .filter_map(|entry| {
+                let path = self.outer(&entry.path)?;
+                Some(Entry { path, ..entry })
+            })
+            .collect()
+    }
+
+    /// Changing the shelf (its tags, places, files) is its owner's (SH-D4).
+    fn writable(&self) -> Answer<()> {
+        if self.own {
+            Ok(())
+        } else {
+            Err(ApiError::new(
+                StatusCode::FORBIDDEN,
+                "not-yours",
+                "this music is shared with you: only its owner changes it",
+            ))
+        }
+    }
+}
+
 /// Writing outside one's own folder is an editor's.
 fn may_write(person: &Person, path: &str) -> Answer<()> {
     if person.role >= Role::Editor || is_own(path.trim_matches('/')) {
@@ -53,18 +137,43 @@ fn may_write(person: &Person, path: &str) -> Answer<()> {
 struct At {
     #[serde(default)]
     path: String,
+    /// Whose music (one's own by default).
+    shelf: Option<i64>,
 }
 
-async fn info(State(service): Shared) -> Answer<Json<Value>> {
+async fn info(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<Json<Value>> {
     let library = library(&service)?;
-    let songs = blocking(move || library.songs()).await?.len();
-    Ok(Json(json!({ "name": "Library", "songs": songs })))
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    let prefix = shelf_path(shelf.owner, "") + "/";
+    let songs = blocking(move || library.songs())
+        .await?
+        .iter()
+        .filter(|song| song.path.starts_with(&prefix))
+        .count();
+    let owner = service
+        .store
+        .person(shelf.owner)
+        .map(|owner| owner.name)
+        .unwrap_or_default();
+    Ok(Json(
+        json!({ "name": "Library", "songs": songs, "shelf": shelf.owner, "own": shelf.own, "owner": owner }),
+    ))
 }
 
-async fn walk(State(service): Shared, Extension(person): Extension<Person>) -> Answer<Json<Vec<EntryJson>>> {
+async fn walk(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<Json<Vec<EntryJson>>> {
     let library = library(&service)?;
-    let entries = blocking(move || library.walk_as(viewer(&person))).await?;
-    Ok(Json(entries.into_iter().map(Into::into).collect()))
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    let seen = shelf.viewer(&person);
+    let entries = blocking(move || library.walk_as(seen)).await?;
+    Ok(Json(shelf.entries(entries).into_iter().map(Into::into).collect()))
 }
 
 async fn list(
@@ -73,13 +182,31 @@ async fn list(
     Query(at): Query<At>,
 ) -> Answer<Json<Vec<EntryJson>>> {
     let library = library(&service)?;
-    let entries = blocking(move || library.list_as(&at.path, viewer(&person))).await?;
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    let path = shelf.inner(&at.path);
+    let seen = shelf.viewer(&person);
+    let mut entries = shelf.entries(blocking(move || library.list_as(&path, seen)).await?);
+    // One's own folder (F3), at the top of the shelf.
+    if at.path.trim_matches('/').is_empty() {
+        entries.push(Entry {
+            path: OWN.to_owned(),
+            name: OWN.to_owned(),
+            stat: jackbird_core::Stat {
+                folder: true,
+                size: 0,
+                mtime: 0,
+            },
+        });
+        entries.sort_by(|a, b| a.name.cmp(&b.name));
+    }
     Ok(Json(entries.into_iter().map(Into::into).collect()))
 }
 
 async fn read(State(service): Shared, Extension(person): Extension<Person>, Query(at): Query<At>) -> Answer<Response> {
     let library = library(&service)?;
-    let bytes = blocking(move || library.read_as(&at.path, viewer(&person))).await?;
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    let (path, seen) = (shelf.inner(&at.path), shelf.viewer(&person));
+    let bytes = blocking(move || library.read_as(&path, seen)).await?;
     Ok(([(header::CONTENT_TYPE, "application/octet-stream")], bytes).into_response())
 }
 
@@ -89,7 +216,9 @@ async fn stat(
     Query(at): Query<At>,
 ) -> Answer<Json<Option<StatJson>>> {
     let library = library(&service)?;
-    let stat = blocking(move || library.stat_as(&at.path, viewer(&person))).await?;
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    let (path, seen) = (shelf.inner(&at.path), shelf.viewer(&person));
+    let stat = blocking(move || library.stat_as(&path, seen)).await?;
     Ok(Json(stat.map(Into::into)))
 }
 
@@ -97,6 +226,7 @@ async fn stat(
 struct Inspect {
     path: String,
     known: Option<String>,
+    shelf: Option<i64>,
 }
 
 async fn inspect(
@@ -105,13 +235,19 @@ async fn inspect(
     Json(body): Json<Inspect>,
 ) -> Answer<Json<InspectionJson>> {
     let library = library(&service)?;
-    let found = blocking(move || library.inspect_as(&body.path, body.known.as_deref(), viewer(&person))).await?;
+    let path = Shelf::of(&library, &person, body.shelf)?.inner(&body.path);
+    let found = blocking(move || library.inspect_as(&path, body.known.as_deref(), viewer(&person))).await?;
     Ok(Json(found.into()))
 }
 
-async fn suggestions(State(service): Shared, Query(at): Query<At>) -> Answer<Json<Value>> {
+async fn suggestions(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<Json<Value>> {
     let library = library(&service)?;
-    let found = blocking(move || library.suggestions(&at.path)).await?;
+    let path = Shelf::of(&library, &person, at.shelf)?.inner(&at.path);
+    let found = blocking(move || library.suggestions(&path)).await?;
     Ok(Json(json!(found)))
 }
 
@@ -122,13 +258,15 @@ async fn layers(
     Query(at): Query<At>,
 ) -> Answer<Json<Value>> {
     let library = library(&service)?;
-    let found = blocking(move || library.layers(&at.path, Some(person.id))).await?;
+    let path = Shelf::of(&library, &person, at.shelf)?.inner(&at.path);
+    let found = blocking(move || library.layers(&path, Some(person.id))).await?;
     Ok(Json(json!(found)))
 }
 
 #[derive(Deserialize)]
 struct Path {
     path: String,
+    shelf: Option<i64>,
 }
 
 async fn forget_mine(
@@ -137,7 +275,8 @@ async fn forget_mine(
     Json(body): Json<Path>,
 ) -> Answer<StatusCode> {
     let library = library(&service)?;
-    blocking(move || library.forget_mine(&body.path, person.id)).await?;
+    let path = Shelf::of(&library, &person, body.shelf)?.inner(&body.path);
+    blocking(move || library.forget_mine(&path, person.id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -145,6 +284,7 @@ async fn forget_mine(
 struct Favourite {
     path: String,
     on: bool,
+    shelf: Option<i64>,
 }
 
 async fn favourite(
@@ -153,7 +293,8 @@ async fn favourite(
     Json(body): Json<Favourite>,
 ) -> Answer<StatusCode> {
     let library = library(&service)?;
-    blocking(move || library.set_favourite(person.id, &body.path, body.on)).await?;
+    let path = Shelf::of(&library, &person, body.shelf)?.inner(&body.path);
+    blocking(move || library.set_favourite(person.id, &path, body.on)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -163,7 +304,8 @@ async fn played(
     Json(body): Json<Path>,
 ) -> Answer<StatusCode> {
     let library = library(&service)?;
-    blocking(move || library.played(person.id, &body.path)).await?;
+    let path = Shelf::of(&library, &person, body.shelf)?.inner(&body.path);
+    blocking(move || library.played(person.id, &path)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -271,7 +413,8 @@ async fn media(
     request: Request,
 ) -> Answer<Response> {
     let library = library(&service)?;
-    let out = blocking(move || library.outgoing_as(&at.path, viewer(&person))).await?;
+    let path = Shelf::of(&library, &person, at.shelf)?.inner(&at.path);
+    let out = blocking(move || library.outgoing_as(&path, viewer(&person))).await?;
     send(out, request.headers(), false).await
 }
 
@@ -282,14 +425,74 @@ async fn download(
     request: Request,
 ) -> Answer<Response> {
     let library = library(&service)?;
-    let out = blocking(move || library.outgoing_as(&at.path, viewer(&person))).await?;
+    let path = Shelf::of(&library, &person, at.shelf)?.inner(&at.path);
+    let out = blocking(move || library.outgoing_as(&path, viewer(&person))).await?;
     send(out, request.headers(), true).await
+}
+
+/// The music shared with the person asking: one entry per person whose shelf they may see.
+async fn shelves(State(service): Shared, Extension(person): Extension<Person>) -> Answer<Json<Value>> {
+    let library = library(&service)?;
+    let me = person.id;
+    let owners = blocking(move || library.shared_with(me)).await?;
+    let shelves: Vec<Value> = owners
+        .into_iter()
+        .filter_map(|owner| service.store.person(owner))
+        .map(|owner| json!({ "shelf": owner.id, "name": owner.name }))
+        .collect();
+    Ok(Json(json!(shelves)))
+}
+
+/// Whom one's own shelf is shared with, and everyone who could be chosen.
+async fn shares(State(service): Shared, Extension(person): Extension<Person>) -> Answer<Json<Value>> {
+    let library = library(&service)?;
+    let me = person.id;
+    let shares = blocking(move || library.shares(me)).await?;
+    let people: Vec<Value> = service
+        .store
+        .people()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|other| other.id != person.id)
+        .map(|other| json!({ "id": other.id, "name": other.name }))
+        .collect();
+    Ok(Json(
+        json!({ "everyone": shares.everyone, "people": shares.people, "candidates": people }),
+    ))
+}
+
+#[derive(Deserialize)]
+struct SetShares {
+    everyone: bool,
+    #[serde(default)]
+    people: Vec<i64>,
+}
+
+/// Shares one's own shelf with everyone, or with these people (SH-D3).
+async fn set_shares(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Json(body): Json<SetShares>,
+) -> Answer<StatusCode> {
+    let library = library(&service)?;
+    let me = person.id;
+    let (everyone, people) = (body.everyone, body.people.clone());
+    blocking(move || library.set_shares(me, everyone, &people)).await?;
+    let with = if body.everyone {
+        "everyone".to_owned()
+    } else {
+        format!("{} people", body.people.len())
+    };
+    service.store.log(&person.name, "share", "Library", &with);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Routes of everyone with a place (listeners and up).
 pub fn listeners() -> Router<Arc<Service>> {
     Router::new()
         .route("/library", get(info))
+        .route("/library/shelves", get(shelves))
+        .route("/library/shares", get(shares).post(set_shares))
         .route("/library/walk", get(walk))
         .route("/library/list", get(list))
         .route("/library/read", get(read))
@@ -318,6 +521,7 @@ pub fn listeners() -> Router<Arc<Service>> {
 struct WriteAt {
     #[serde(default)]
     path: String,
+    shelf: Option<i64>,
     /// The size and date the writer read (F4): a file changed since is not written over.
     size: Option<u64>,
     mtime: Option<u64>,
@@ -340,8 +544,10 @@ async fn write(
 ) -> Answer<Response> {
     may_write(&person, &at.path)?;
     let library = library(&service)?;
-    let path = at.path.clone();
-    let seen = viewer(&person);
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    shelf.writable()?;
+    let path = shelf.inner(&at.path);
+    let seen = shelf.viewer(&person);
     let expected = at.size.zip(at.mtime);
     if !blocking(move || library.write_checked(&path, &body, seen, expected)).await? {
         return Ok(stale(format!("{} changed since it was read", at.path), Value::Null));
@@ -359,8 +565,10 @@ async fn delete(
 ) -> Answer<StatusCode> {
     may_write(&person, &at.path)?;
     let library = library(&service)?;
-    let path = at.path.clone();
-    let seen = viewer(&person);
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    shelf.writable()?;
+    let path = shelf.inner(&at.path);
+    let seen = shelf.viewer(&person);
     let by = person.name.clone();
     blocking(move || {
         if is_own(path.trim_matches('/')) {
@@ -377,9 +585,16 @@ async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn mkdir(State(service): Shared, Query(at): Query<At>) -> Answer<StatusCode> {
+async fn mkdir(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+) -> Answer<StatusCode> {
     let library = library(&service)?;
-    blocking(move || library.mkdir(&at.path)).await?;
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    shelf.writable()?;
+    let path = shelf.inner(&at.path);
+    blocking(move || library.mkdir(&path)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -387,6 +602,7 @@ async fn mkdir(State(service): Shared, Query(at): Query<At>) -> Answer<StatusCod
 struct Rename {
     from: String,
     to: String,
+    shelf: Option<i64>,
 }
 
 async fn rename(
@@ -397,8 +613,10 @@ async fn rename(
     may_write(&person, &body.from)?;
     may_write(&person, &body.to)?;
     let library = library(&service)?;
-    let (from, to) = (body.from.clone(), body.to.clone());
-    let seen = viewer(&person);
+    let shelf = Shelf::of(&library, &person, body.shelf)?;
+    shelf.writable()?;
+    let (from, to) = (shelf.inner(&body.from), shelf.inner(&body.to));
+    let seen = shelf.viewer(&person);
     blocking(move || library.rename_as(&from, &to, seen)).await?;
     if !is_own(body.from.trim_matches('/')) {
         service.store.log(
@@ -422,6 +640,7 @@ struct Save {
     /// The full checksum the saver read (F4): a song changed since is not saved over.
     #[serde(default)]
     expected: Option<String>,
+    shelf: Option<i64>,
 }
 
 async fn save(
@@ -441,8 +660,13 @@ async fn save(
         }
     };
     let library = library(&service)?;
+    let shelf = Shelf::of(&library, &person, body.shelf)?;
+    // The shelf's tags are its owner's; in a shared one, one saves one's own version (SH-D4).
+    if scope == Scope::Family {
+        shelf.writable()?;
+    }
     let edit = edit_for(&body.previous, body.metadata);
-    let path = body.path.clone();
+    let path = shelf.inner(&body.path);
     let (seen, expected, by) = (viewer(&person), body.expected.clone(), person.name.clone());
     let saved = blocking(move || library.save_checked(&path, &edit, scope, seen, expected.as_deref(), &by)).await?;
     match saved {
@@ -466,12 +690,13 @@ async fn save(
     }
 }
 
-/// What one upload did.
-fn imported_json(imported: &Imported) -> Value {
+/// What one upload did, its path the shelf's.
+fn imported_json(shelf: &Shelf, imported: &Imported) -> Value {
+    let shown = |path: &String| shelf.outer(path).unwrap_or_else(|| path.clone());
     match imported {
-        Imported::Added(path) => json!({ "result": "added", "path": path }),
-        Imported::Existing(path) => json!({ "result": "existing", "path": path }),
-        Imported::Suggested(path) => json!({ "result": "suggested", "path": path }),
+        Imported::Added(path) => json!({ "result": "added", "path": shown(path) }),
+        Imported::Existing(path) => json!({ "result": "existing", "path": shown(path) }),
+        Imported::Suggested(path) => json!({ "result": "suggested", "path": shown(path) }),
         Imported::Unreadable(why) => json!({ "result": "unreadable", "why": why }),
     }
 }
@@ -484,6 +709,8 @@ async fn upload(
     request: Request,
 ) -> Answer<Json<Value>> {
     let library = library(&service)?;
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    shelf.writable()?;
     let temporary = library.upload_path();
     let written = async {
         use futures_util::StreamExt;
@@ -500,21 +727,27 @@ async fn upload(
         let _ = tokio::fs::remove_file(&temporary).await;
         return Err(Error::Io(format!("the upload: {error}")).into());
     }
-    let (path, by, id) = (at.path.clone(), person.name.clone(), person.id);
+    let (path, by, id) = (shelf.inner(&at.path), person.name.clone(), person.id);
     let source = temporary.clone();
     let imported = blocking(move || library.import_file(&source, &path, &by, Some(id), true)).await;
     let _ = tokio::fs::remove_file(&temporary).await;
     let imported = imported?;
     if let Imported::Added(path) = &imported {
-        service.store.log(&person.name, "upload", "Library", path);
+        service.store.log(
+            &person.name,
+            "upload",
+            "Library",
+            shelf.outer(path).as_deref().unwrap_or(path),
+        );
     }
-    Ok(Json(imported_json(&imported)))
+    Ok(Json(imported_json(&shelf, &imported)))
 }
 
 #[derive(Deserialize)]
 struct Apply {
     path: String,
     id: i64,
+    shelf: Option<i64>,
 }
 
 /// Applies a suggestion to the family's version (editors, F3).
@@ -524,7 +757,9 @@ async fn apply_suggestion(
     Json(body): Json<Apply>,
 ) -> Answer<Json<InspectionJson>> {
     let library = library(&service)?;
-    let path = body.path.clone();
+    let shelf = Shelf::of(&library, &person, body.shelf)?;
+    shelf.writable()?;
+    let path = shelf.inner(&body.path);
     let found = blocking(move || library.apply_suggestion(&path, body.id)).await?;
     service.store.log(&person.name, "save", "Library", &body.path);
     Ok(Json(found.into()))
@@ -615,7 +850,8 @@ async fn import_folder(
             state.done = done;
             state.total = total;
         };
-        let result = library.import_folder(&folder, &name, &by, Some(id), progress);
+        // Onto the importer's shelf (SH-D1).
+        let result = library.import_folder(&folder, &shelf_path(id, &name), &by, Some(id), progress);
         if let Ok(report) = &result {
             worker.store.log(
                 &by,

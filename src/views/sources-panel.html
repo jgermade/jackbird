@@ -9,7 +9,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { t } = await import("../lib/i18n")
-  const { addFrom, addSamples, addServer, adding, folderSources, recentFolders, reopenRecent, serverName, shownTab } = await import("../lib/adding")
+  const { addFrom, addSamples, addServer, adding, folderSources, openShared, recentFolders, reopenRecent, serverName, sharedLabel, shownTab } = await import("../lib/adding")
 
   // Each folder source is a key that opens its dialog: the device's own (the system's, Android's
   // folder picker, the browser's), or the server's folder chooser.
@@ -37,6 +37,18 @@
           <button type="button" class="choice" :aria-label="t('sources.reopen', { name: entry.label })" @click="reopenRecent(entry)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z" /></svg>
             <span class="name">{{ entry.label }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+    <!-- The music others share with one (SH-D6), each opening as a tab of its own. -->
+    <div :if="adding.shared.length > 0" class="recent">
+      <h3 class="mm-legend">{{ t("sources.sharedWithMe") }}</h3>
+      <ul class="list">
+        <li :each="shelf in adding.shared" :key="shelf.shelf">
+          <button type="button" class="choice" @click="openShared(shelf)">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.75c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" /></svg>
+            <span class="name">{{ sharedLabel(shelf.name) }}</span>
           </button>
         </li>
       </ul>

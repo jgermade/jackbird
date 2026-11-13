@@ -3,6 +3,18 @@ import type { EditableMetadata, Track, TrackMetadata } from "../types.ts";
 /** Which fields differ across a set of tracks. */
 export type VariedFields = Record<keyof TrackMetadata, boolean>;
 
+/** A text field of the tags (every field but the cover). */
+export type TextField = Exclude<keyof TrackMetadata, "coverDataUrl">;
+
+/** The text fields, the six the tags started with first. */
+export const TEXT_FIELDS: readonly TextField[] = ["title", "artist", "album", "year", "genre", "trackNumber", "discNumber", "albumArtist", "compilation"];
+
+/**
+ * The fields added after the first six: a library read before them (in `.meta/`, a service's
+ * catalogue) does not have them, and their tags are read again (`readsEveryField`).
+ */
+export const LATER_FIELDS: readonly TextField[] = ["discNumber", "albumArtist", "compilation"];
+
 /** Metadata with every field empty and no cover. */
 export function emptyMetadata(): TrackMetadata {
   return {
@@ -12,8 +24,26 @@ export function emptyMetadata(): TrackMetadata {
     year: "",
     genre: "",
     trackNumber: "",
+    discNumber: "",
+    albumArtist: "",
+    compilation: "",
     coverDataUrl: null
   };
+}
+
+/** Whether metadata was read with every field there is now: kept before some came, it was not. */
+export function readsEveryField(metadata: Partial<TrackMetadata>): boolean {
+  return LATER_FIELDS.every((field) => typeof metadata[field] === "string");
+}
+
+/** Metadata kept before some fields came, with those empty. */
+export function withEveryField(metadata: Partial<TrackMetadata>): TrackMetadata {
+  return { ...emptyMetadata(), ...metadata };
+}
+
+/** Whether the tags mark a compilation: iTunes' and Vorbis' "1" (a "0" or anything else does not). */
+export function isCompilation(metadata: Pick<TrackMetadata, "compilation">): boolean {
+  return metadata.compilation.trim() === "1";
 }
 
 /**
@@ -27,12 +57,9 @@ export function computeCommonMetadata(tracks: Track[]): EditableMetadata {
 
   const result: EditableMetadata = { ...tracks[0].metadata };
   for (const { metadata } of tracks.slice(1)) {
-    if (metadata.title !== result.title) result.title = "";
-    if (metadata.artist !== result.artist) result.artist = "";
-    if (metadata.album !== result.album) result.album = "";
-    if (metadata.year !== result.year) result.year = "";
-    if (metadata.genre !== result.genre) result.genre = "";
-    if (metadata.trackNumber !== result.trackNumber) result.trackNumber = "";
+    for (const field of TEXT_FIELDS) {
+      if (metadata[field] !== result[field]) result[field] = "";
+    }
     if (metadata.coverDataUrl !== result.coverDataUrl) result.coverDataUrl = null;
   }
   return result;
@@ -48,15 +75,9 @@ export function getVariedFields(tracks: Track[]): VariedFields {
   const differs = (field: keyof TrackMetadata): boolean =>
     tracks.length > 1 && tracks.some((track) => track.metadata[field] !== first[field]);
 
-  return {
-    title: differs("title"),
-    artist: differs("artist"),
-    album: differs("album"),
-    year: differs("year"),
-    genre: differs("genre"),
-    trackNumber: differs("trackNumber"),
-    coverDataUrl: differs("coverDataUrl")
-  };
+  const varied = { coverDataUrl: differs("coverDataUrl") } as VariedFields;
+  for (const field of TEXT_FIELDS) varied[field] = differs(field);
+  return varied;
 }
 
 /**
@@ -68,16 +89,11 @@ export function getVariedFields(tracks: Track[]): VariedFields {
  * and the draft is taken whole.
  */
 export function mergeDraft(original: TrackMetadata, draft: EditableMetadata, varied: VariedFields, confirmed: readonly string[] = []): TrackMetadata {
-  const text = (field: Exclude<keyof TrackMetadata, "coverDataUrl">): string =>
-    varied[field] && !draft[field] && !confirmed.includes(field) ? original[field] : draft[field];
-
-  return {
-    title: text("title"),
-    artist: text("artist"),
-    album: text("album"),
-    year: text("year"),
-    genre: text("genre"),
-    trackNumber: text("trackNumber"),
+  const merged = {
     coverDataUrl: varied.coverDataUrl && draft.coverDataUrl === null ? original.coverDataUrl : draft.coverDataUrl
-  };
+  } as TrackMetadata;
+  for (const field of TEXT_FIELDS) {
+    merged[field] = varied[field] && !draft[field] && !confirmed.includes(field) ? original[field] : draft[field];
+  }
+  return merged;
 }

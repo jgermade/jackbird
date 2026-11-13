@@ -52,8 +52,11 @@ const CHANGES = new Set(["playlist", "edit", "rename", "remove", "delete", "up",
 const LIBRARY_CHANGES = new Set(["rename", "remove"]);
 
 function allowed(items: MenuItem[]): MenuItem[] {
+  const source = activeRoot.value.data?.source;
+  // Someone's music shared with one: theirs to rearrange (SH-D4); one keeps one's own version.
+  if (source?.kind === "library" && source.shelf !== undefined) return styled(items.filter((item) => !LIBRARY_CHANGES.has(item.id)));
   if (can("editor")) return styled(items);
-  const changes = activeRoot.value.data?.source.kind === "library" ? LIBRARY_CHANGES : CHANGES;
+  const changes = source?.kind === "library" ? LIBRARY_CHANGES : CHANGES;
   return styled(items.filter((item) => !changes.has(item.id)));
 }
 

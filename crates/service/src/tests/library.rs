@@ -1,7 +1,8 @@
 //! The family library through the router (F1): an owner imports a folder of the machine in the
 //! background, an editor uploads a song and retitles one, a listener sees the new title, plays a
 //! range and downloads a file carrying it; what each role may not do is refused; the files on the
-//! machine are never written.
+//! machine are never written. Since shelves (2026-11-13): each one's music is their own, read by
+//! those it is shared with (`shelf=<id>`), changed by its owner alone.
 
 use std::time::Duration;
 
@@ -16,6 +17,42 @@ fn two_songs() -> PathBuf {
         std::fs::copy(fixtures.join(name), folder.join(name)).unwrap();
     }
     folder
+}
+
+/// The id of the shelf of the person behind `cookie` (their own music).
+async fn own_shelf(app: &Router, cookie: &str) -> i64 {
+    call(Method::GET, "/api/library")
+        .header("cookie", cookie)
+        .value(app)
+        .await
+        .1["shelf"]
+        .as_i64()
+        .unwrap()
+}
+
+/// The paths a walk gives (`query`: `?shelf=…`, or nothing for one's own).
+async fn walked(app: &Router, cookie: &str, query: &str) -> Vec<String> {
+    call(Method::GET, format!("/api/library/walk{query}"))
+        .header("cookie", cookie)
+        .value(app)
+        .await
+        .1
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["path"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// The owner shares their music with everyone.
+async fn share_with_everyone(app: &Router, cookie: &str) {
+    let status = call(Method::POST, "/api/library/shares")
+        .header("cookie", cookie)
+        .json(json!({ "everyone": true }))
+        .on(app)
+        .await
+        .0;
+    assert_eq!(status, StatusCode::NO_CONTENT);
 }
 
 fn tags_of(bytes: &[u8]) -> jackbird_tags::Tags {
@@ -62,6 +99,17 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     assert_eq!(state["report"]["added"], 2, "{state}");
+    // Onto the owner's shelf, shared with no one yet: the listener sees nothing of it.
+    let shelf = own_shelf(&app, &owner).await;
+    let (status, body) = call(Method::GET, format!("/api/library/walk?shelf={shelf}"))
+        .header("cookie", &listener)
+        .value(&app)
+        .await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::NOT_FOUND, Some("not-shared"))
+    );
+    share_with_everyone(&app, &owner).await;
 
     // An editor uploads a song; a listener may not.
     let song = std::fs::read(fixtures.join("mp3-v24-ape.mp3")).unwrap();
@@ -85,37 +133,53 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
     again.body = Body::from(song);
     assert_eq!(again.value(&app).await.1["result"], "existing");
 
-    // Everyone sees the library as a root.
-    let (_, walked) = call(Method::GET, "/api/library/walk")
+    // Everyone sees the owner's shelf as a root; the editor's upload is on the editor's own, which
+    // is shared with no one.
+    let songs = |walked: Value| -> Vec<String> {
+        walked
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["path"].as_str().unwrap().to_owned())
+            .filter(|path| jackbird_store::is_audio(path))
+            .collect()
+    };
+    let (_, walked) = call(Method::GET, format!("/api/library/walk?shelf={shelf}"))
         .header("cookie", &listener)
         .value(&app)
         .await;
-    let paths: Vec<&str> = walked
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|entry| entry["path"].as_str().unwrap())
-        .filter(|path| jackbird_store::is_audio(path))
-        .collect();
+    assert_eq!(songs(walked), ["Music/flac-full.flac", "Music/mp3-v24-padded.mp3"]);
+    let (_, walked) = call(Method::GET, "/api/library/walk")
+        .header("cookie", &editor)
+        .value(&app)
+        .await;
+    assert_eq!(songs(walked), ["Uploads/Luis/ape.mp3"]);
+    let editors = own_shelf(&app, &editor).await;
     assert_eq!(
-        paths,
-        [
-            "Music/flac-full.flac",
-            "Music/mp3-v24-padded.mp3",
-            "Uploads/Luis/ape.mp3"
-        ]
+        call(Method::GET, format!("/api/library/walk?shelf={editors}"))
+            .header("cookie", &listener)
+            .on(&app)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
     );
+    let (_, shared) = call(Method::GET, "/api/library/shelves")
+        .header("cookie", &listener)
+        .value(&app)
+        .await;
+    assert_eq!(shared, json!([{ "shelf": shelf, "name": "Owner" }]));
 
-    // An editor retitles a song; a listener may not; the listener sees the new title.
+    // Its owner retitles a song; the editor and the listener may not (it is not theirs); the
+    // listener sees the new title.
     let path = "Music/flac-full.flac";
     let (_, before) = call(Method::POST, "/api/library/inspect")
         .header("cookie", &listener)
-        .json(json!({ "path": path }))
+        .json(json!({ "path": path, "shelf": shelf }))
         .value(&app)
         .await;
     let mut metadata = before["metadata"].clone();
     metadata["title"] = json!("Retitled by Luis");
-    let save = json!({ "path": path, "previous": before["metadata"], "metadata": metadata });
+    let save = json!({ "path": path, "previous": before["metadata"], "metadata": metadata, "shelf": shelf });
     assert_eq!(
         call(Method::POST, "/api/library/save")
             .header("cookie", &listener)
@@ -125,26 +189,38 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
             .0,
         StatusCode::FORBIDDEN
     );
-    let (status, saved) = call(Method::POST, "/api/library/save")
+    let (status, refused) = call(Method::POST, "/api/library/save")
         .header("cookie", &editor)
+        .json(save.clone())
+        .value(&app)
+        .await;
+    assert_eq!(
+        (status, refused["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("not-yours"))
+    );
+    let (status, saved) = call(Method::POST, "/api/library/save")
+        .header("cookie", &owner)
         .json(save)
         .value(&app)
         .await;
     assert_eq!(status, StatusCode::OK, "{saved}");
     let (_, after) = call(Method::POST, "/api/library/inspect")
         .header("cookie", &listener)
-        .json(json!({ "path": path }))
+        .json(json!({ "path": path, "shelf": shelf }))
         .value(&app)
         .await;
     assert_eq!(after["metadata"]["title"], "Retitled by Luis");
     assert_ne!(after["fullChecksum"], before["fullChecksum"]);
 
     // Played by ranges, downloaded whole with the new title, the audio as it was.
-    let (status, headers, first) = call(Method::GET, format!("/api/library/media?path={}", enc(path)))
-        .header("cookie", &listener)
-        .header("range", "bytes=0-99")
-        .on(&app)
-        .await;
+    let (status, headers, first) = call(
+        Method::GET,
+        format!("/api/library/media?path={}&shelf={shelf}", enc(path)),
+    )
+    .header("cookie", &listener)
+    .header("range", "bytes=0-99")
+    .on(&app)
+    .await;
     assert_eq!(status, StatusCode::PARTIAL_CONTENT);
     assert_eq!(first.len(), 100);
     let total: usize = headers[header::CONTENT_RANGE]
@@ -155,10 +231,13 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
         .unwrap()
         .parse()
         .unwrap();
-    let (status, headers, file) = call(Method::GET, format!("/api/library/download?path={}", enc(path)))
-        .header("cookie", &listener)
-        .on(&app)
-        .await;
+    let (status, headers, file) = call(
+        Method::GET,
+        format!("/api/library/download?path={}&shelf={shelf}", enc(path)),
+    )
+    .header("cookie", &listener)
+    .on(&app)
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(file.len(), total);
     assert_eq!(&file[..100], &first[..]);
@@ -169,22 +248,28 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
             .contains("flac-full.flac")
     );
     assert_eq!(tags_of(&file).fields.title, "Retitled by Luis");
-    let (status, _, tail) = call(Method::GET, format!("/api/library/media?path={}", enc(path)))
-        .header("cookie", &listener)
-        .header("range", "bytes=-10")
-        .on(&app)
-        .await;
+    let (status, _, tail) = call(
+        Method::GET,
+        format!("/api/library/media?path={}&shelf={shelf}", enc(path)),
+    )
+    .header("cookie", &listener)
+    .header("range", "bytes=-10")
+    .on(&app)
+    .await;
     assert_eq!(
         (status, &tail[..]),
         (StatusCode::PARTIAL_CONTENT, &file[file.len() - 10..])
     );
     assert_eq!(
-        call(Method::GET, format!("/api/library/media?path={}", enc(path)))
-            .header("cookie", &listener)
-            .header("range", format!("bytes={}-", total + 5).as_str())
-            .on(&app)
-            .await
-            .0,
+        call(
+            Method::GET,
+            format!("/api/library/media?path={}&shelf={shelf}", enc(path))
+        )
+        .header("cookie", &listener)
+        .header("range", format!("bytes={}-", total + 5).as_str())
+        .on(&app)
+        .await
+        .0,
         StatusCode::RANGE_NOT_SATISFIABLE
     );
     // The folder on the machine was never written.
@@ -193,19 +278,21 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
         std::fs::read(fixtures.join("flac-full.flac")).unwrap()
     );
 
-    // Renames and removals are editors'; the log names who did what.
+    // Renames and removals are the shelf's owner's; the log names who did what.
+    for cookie in [&listener, &editor] {
+        assert_eq!(
+            call(Method::POST, "/api/library/rename")
+                .header("cookie", cookie)
+                .json(json!({ "from": path, "to": "Music/Full.flac", "shelf": shelf }))
+                .on(&app)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+    }
     assert_eq!(
         call(Method::POST, "/api/library/rename")
-            .header("cookie", &listener)
-            .json(json!({ "from": path, "to": "Music/Full.flac" }))
-            .on(&app)
-            .await
-            .0,
-        StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        call(Method::POST, "/api/library/rename")
-            .header("cookie", &editor)
+            .header("cookie", &owner)
             .json(json!({ "from": path, "to": "Music/Full.flac" }))
             .on(&app)
             .await
@@ -221,9 +308,10 @@ async fn a_family_library_imports_plays_and_shares_an_edit() {
         .collect();
     for expected in [
         ("Owner", "import"),
+        ("Owner", "share"),
         ("editor", "upload"),
-        ("editor", "save"),
-        ("editor", "rename"),
+        ("Owner", "save"),
+        ("Owner", "rename"),
     ] {
         assert!(actions.contains(&expected), "{expected:?} in {actions:?}");
     }
@@ -266,22 +354,24 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
+    let shelf = own_shelf(&app, &owner).await;
+    share_with_everyone(&app, &owner).await;
     let path = "Music/flac-full.flac";
     let inspect = |cookie: &str| {
         call(Method::POST, "/api/library/inspect")
             .header("cookie", cookie)
-            .json(json!({ "path": path }))
+            .json(json!({ "path": path, "shelf": shelf }))
     };
     let title_for = |value: Value| value["metadata"]["title"].as_str().unwrap_or_default().to_owned();
     let before = inspect(&editor).value(&app).await.1;
     let retitled = |title: &str, scope: &str| {
         let mut metadata = before["metadata"].clone();
         metadata["title"] = json!(title);
-        json!({ "path": path, "previous": before["metadata"], "metadata": metadata, "scope": scope })
+        json!({ "path": path, "previous": before["metadata"], "metadata": metadata, "scope": scope, "shelf": shelf })
     };
-    // The editor saves for everyone; the listener, for themselves only.
+    // Its owner saves for everyone; the listener, for themselves only.
     let (status, _) = call(Method::POST, "/api/library/save")
-        .header("cookie", &editor)
+        .header("cookie", &owner)
         .json(retitled("The family's", "family"))
         .value(&app)
         .await;
@@ -305,10 +395,13 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
     assert_eq!(title_for(inspect(&listener).value(&app).await.1), "The kids' own");
     assert_eq!(title_for(inspect(&editor).value(&app).await.1), "The family's");
     assert_eq!(title_for(inspect(&owner).value(&app).await.1), "The family's");
-    let (_, layers) = call(Method::GET, format!("/api/library/layers?path={}", enc(path)))
-        .header("cookie", &listener)
-        .value(&app)
-        .await;
+    let (_, layers) = call(
+        Method::GET,
+        format!("/api/library/layers?path={}&shelf={shelf}", enc(path)),
+    )
+    .header("cookie", &listener)
+    .value(&app)
+    .await;
     assert_eq!(layers["mine"]["title"], "The kids' own");
     assert_eq!(layers["family"]["title"], "The family's");
     // The switch: the family's version; and back.
@@ -334,14 +427,17 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
         .await;
     assert_eq!(title_for(inspect(&listener).value(&app).await.1), "The kids' own");
     // Downloads as each sees it.
-    let (_, _, theirs) = call(Method::GET, format!("/api/library/download?path={}", enc(path)))
-        .header("cookie", &listener)
-        .on(&app)
-        .await;
+    let (_, _, theirs) = call(
+        Method::GET,
+        format!("/api/library/download?path={}&shelf={shelf}", enc(path)),
+    )
+    .header("cookie", &listener)
+    .on(&app)
+    .await;
     assert_eq!(tags_of(&theirs).fields.title, "The kids' own");
     call(Method::POST, "/api/library/mine/forget")
         .header("cookie", &listener)
-        .json(json!({ "path": path }))
+        .json(json!({ "path": path, "shelf": shelf }))
         .on(&app)
         .await;
     assert_eq!(title_for(inspect(&listener).value(&app).await.1), "The family's");
@@ -350,7 +446,7 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
     assert_eq!(
         call(Method::POST, "/api/library/favourite")
             .header("cookie", &listener)
-            .json(json!({ "path": path, "on": true }))
+            .json(json!({ "path": path, "on": true, "shelf": shelf }))
             .on(&app)
             .await
             .0,
@@ -358,11 +454,16 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
     );
     call(Method::POST, "/api/library/played")
         .header("cookie", &listener)
-        .json(json!({ "path": path }))
+        .json(json!({ "path": path, "shelf": shelf }))
         .on(&app)
         .await;
+    // In the owner's shelf, as the listener looks at it: what they did there.
     let read = |cookie: &str, file: &str| {
-        call(Method::GET, format!("/api/library/read?path={}", enc(file))).header("cookie", cookie)
+        call(
+            Method::GET,
+            format!("/api/library/read?path={}&shelf={shelf}", enc(file)),
+        )
+        .header("cookie", cookie)
     };
     let (_, _, favourites) = read(&listener, "My playlists/Favourites.m3u").on(&app).await;
     assert_eq!(
@@ -387,30 +488,22 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
         StatusCode::FORBIDDEN
     );
     assert_eq!(
-        write(&editor, "Music/Shared.m3u").on(&app).await.0,
+        write(&owner, "Music/Shared.m3u").on(&app).await.0,
         StatusCode::NO_CONTENT
     );
-    let walked = |cookie: &str| call(Method::GET, "/api/library/walk").header("cookie", cookie);
-    let theirs: Vec<String> = walked(&listener)
-        .value(&app)
-        .await
-        .1
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|entry| entry["path"].as_str().unwrap().to_owned())
-        .collect();
-    assert!(theirs.contains(&"My playlists/Road.m3u".to_owned()) && theirs.contains(&"Music/Shared.m3u".to_owned()));
-    let editors: Vec<String> = walked(&editor)
-        .value(&app)
-        .await
-        .1
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|entry| entry["path"].as_str().unwrap().to_owned())
-        .collect();
-    assert!(!editors.contains(&"My playlists/Road.m3u".to_owned()));
+    // The listener's playlist, on their own shelf; the owner's shared one, on the owner's.
+    assert!(
+        walked(&app, &listener, "")
+            .await
+            .contains(&"My playlists/Road.m3u".to_owned())
+    );
+    let there = walked(&app, &listener, &format!("?shelf={shelf}")).await;
+    assert!(there.contains(&"Music/Shared.m3u".to_owned()) && !there.contains(&"My playlists/Road.m3u".to_owned()));
+    assert!(
+        !walked(&app, &editor, "")
+            .await
+            .contains(&"My playlists/Road.m3u".to_owned())
+    );
     // Their history, cleared.
     call(Method::POST, "/api/library/history/clear")
         .header("cookie", &listener)
@@ -422,7 +515,7 @@ async fn each_person_has_their_own_version_favourites_plays_and_playlists() {
     assert_eq!(
         call(Method::POST, "/api/library/suggestions/apply")
             .header("cookie", &listener)
-            .json(json!({ "path": path, "id": 1 }))
+            .json(json!({ "path": path, "id": 1, "shelf": shelf }))
             .on(&app)
             .await
             .0,
@@ -453,18 +546,21 @@ async fn edits_on_old_versions_are_refused_and_the_library_is_kept_safe() {
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
+    let shelf = own_shelf(&app, &owner).await;
+    share_with_everyone(&app, &owner).await;
     let path = "Music/flac-full.flac";
     let (_, read) = call(Method::POST, "/api/library/inspect")
         .header("cookie", &editor)
-        .json(json!({ "path": path }))
+        .json(json!({ "path": path, "shelf": shelf }))
         .value(&app)
         .await;
     let save = |title: &str, expected: &Value| {
         let mut metadata = read["metadata"].clone();
         metadata["title"] = json!(title);
-        json!({ "path": path, "previous": read["metadata"], "metadata": metadata, "expected": expected })
+        json!({ "path": path, "previous": read["metadata"], "metadata": metadata, "expected": expected, "shelf": shelf })
     };
-    // The owner saves first; the editor's save, made on what they read before, is refused.
+    // The owner saves; a save made on what was read before (the owner's own, in another window)
+    // is refused. The editor may not save the owner's music at all.
     let (status, _) = call(Method::POST, "/api/library/save")
         .header("cookie", &owner)
         .json(save("The owner's", &read["fullChecksum"]))
@@ -474,6 +570,15 @@ async fn edits_on_old_versions_are_refused_and_the_library_is_kept_safe() {
     let (status, refused) = call(Method::POST, "/api/library/save")
         .header("cookie", &editor)
         .json(save("The editor's", &read["fullChecksum"]))
+        .value(&app)
+        .await;
+    assert_eq!(
+        (status, refused["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("not-yours"))
+    );
+    let (status, refused) = call(Method::POST, "/api/library/save")
+        .header("cookie", &owner)
+        .json(save("Again, from before", &read["fullChecksum"]))
         .value(&app)
         .await;
     assert_eq!(
@@ -492,27 +597,39 @@ async fn edits_on_old_versions_are_refused_and_the_library_is_kept_safe() {
     };
     let list = "path=Music%2FShared.m3u";
     assert_eq!(
-        write(&editor, list.into(), "#EXTM3U\n").on(&app).await.0,
+        write(&owner, list.into(), "#EXTM3U\n").on(&app).await.0,
         StatusCode::NO_CONTENT
     );
     let (_, stat) = call(Method::GET, format!("/api/library/stat?{list}"))
-        .header("cookie", &editor)
+        .header("cookie", &owner)
         .value(&app)
         .await;
     let read_at = format!("{list}&size={}&mtime={}", stat["size"], stat["mtime"]);
     assert_eq!(
-        write(&admin, read_at.clone(), "#EXTM3U\n../a.mp3\n").on(&app).await.0,
+        write(&owner, read_at.clone(), "#EXTM3U\n../a.mp3\n").on(&app).await.0,
         StatusCode::NO_CONTENT
     );
-    let (status, body) = write(&editor, read_at, "#EXTM3U\n../b.mp3\n../c.mp3\n")
+    let (status, body) = write(&owner, read_at, "#EXTM3U\n../b.mp3\n../c.mp3\n")
         .value(&app)
         .await;
     assert_eq!((status, body["code"].as_str()), (StatusCode::CONFLICT, Some("stale")));
 
-    // Deleted into the trash: admins restore it, listeners and editors may not.
+    // Deleted into the trash by its owner (not by the editor: not theirs): admins restore it,
+    // listeners and editors may not.
+    assert_eq!(
+        call(
+            Method::POST,
+            format!("/api/library/delete?path={}&shelf={shelf}", enc(path))
+        )
+        .header("cookie", &editor)
+        .on(&app)
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(
         call(Method::POST, format!("/api/library/delete?path={}", enc(path)))
-            .header("cookie", &editor)
+            .header("cookie", &owner)
             .on(&app)
             .await
             .0,
@@ -533,8 +650,12 @@ async fn edits_on_old_versions_are_refused_and_the_library_is_kept_safe() {
         .value(&app)
         .await;
     assert_eq!(
-        (trash[0]["path"].as_str(), trash[0]["by"].as_str()),
-        (Some(path), Some("editor"))
+        (
+            trash[0]["path"].as_str(),
+            trash[0]["owner"].as_str(),
+            trash[0]["by"].as_str()
+        ),
+        (Some(path), Some("Owner"), Some("Owner"))
     );
     let (status, restored) = call(Method::POST, "/api/library/trash/restore")
         .header("cookie", &admin)

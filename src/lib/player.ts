@@ -267,7 +267,8 @@ export function readSpectrum(bands: number): number[] | null {
     return heard ? spectrumBands(heard.bins, bands, heard.rate, SPECTRUM_RANGE, SPECTRUM_TILT) : null;
   }
   if (phone && audio === phone) {
-    return null;
+    const heard = phone.spectrum();
+    return heard ? spectrumBands(heard.bins, bands, heard.rate, SPECTRUM_RANGE, SPECTRUM_TILT) : null;
   }
   if (native && audio === native) {
     const heard = native.spectrum();

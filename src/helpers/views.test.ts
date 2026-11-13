@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track as fixture } from "./fixtures.test-support.ts";
-import { albumFolder, albumKey, artistKey, buildViewRows } from "./views.ts";
+import { albumArtistOf, albumFolder, albumKey, artistKey, buildViewRows } from "./views.ts";
 
 const labels = { unknownArtist: "Unknown artist", unknownAlbum: "No album", variousArtists: "Various", missing: "Missing", locale: "en" };
 
@@ -31,10 +31,11 @@ describe("keys", () => {
 });
 
 describe("buildViewRows", () => {
-  it("Songs: every track by title, its artist beside it", () => {
+  it("Songs: every track by title, its artist and album beside it", () => {
     const rows = buildViewRows("songs", tracks, [], labels);
     assert.deepEqual(labelsOf(rows), ["Freddie Freeloader", "Giant Steps", "Naima", "One", "So What", "Two", "x.mp3"]);
-    assert.equal(rows[0].meta, "Miles Davis");
+    assert.equal(rows[0].meta, "Miles Davis - Kind of Blue");
+    assert.equal(rows[6].meta, "");
     assert.equal(rows[0].inView, "songs");
     assert.equal(rows[0].parentKey, null);
   });
@@ -60,6 +61,30 @@ describe("buildViewRows", () => {
   it("Compilations: only the albums with more than one artist", () => {
     const rows = buildViewRows("compilations", tracks, [], labels);
     assert.deepEqual(labelsOf(rows), ["Summer Mix"]);
+  });
+
+  it("Compilations: also an album a track marks as one, and not one an album artist joins", () => {
+    const marked = [...tracks, fixture("Hits/01.mp3", { title: "Hit", artist: "Solo", album: "Hits", compilation: "1" })];
+    assert.deepEqual(labelsOf(buildViewRows("compilations", marked, [], labels)), ["Hits", "Summer Mix"]);
+    const joined = tracks.map((one) => (one.metadata.album.toLowerCase() === "summer mix" ? { ...one, metadata: { ...one.metadata, albumArtist: "DJ Cee" } } : one));
+    assert.deepEqual(labelsOf(buildViewRows("compilations", joined, [], labels)), []);
+    assert.equal(buildViewRows("albums", joined, [], labels).find((row) => row.label === "Summer Mix")?.meta, "DJ Cee");
+  });
+
+  it("albumArtistOf: the album artist, else Various for a compilation, else the artist", () => {
+    const one = fixture("a.mp3", { artist: "Ana" });
+    assert.equal(albumArtistOf([one], "Various"), "Ana");
+    assert.equal(albumArtistOf([{ ...one, metadata: { ...one.metadata, compilation: "1" } }], "Various"), "Various");
+    assert.equal(albumArtistOf([one, { ...one, metadata: { ...one.metadata, albumArtist: "Band" } }], "Various"), "Band");
+    assert.equal(albumArtistOf([], "Various"), "");
+  });
+
+  it("Albums by artist: a compilation under Various, its tracks together", () => {
+    const rows = buildViewRows("albumsByArtist", tracks, "all", labels);
+    const various = rows.findIndex((row) => row.label === "Various");
+    const [artist, album, ...songs] = rows.slice(various, various + 4);
+    assert.deepEqual([artist.depth, album.depth, album.label.toLowerCase()], [0, 1, "summer mix"]);
+    assert.deepEqual(songs.map((song) => song.label).sort(), ["One", "Two"]);
   });
 
   it("Albums by artist: each artist, their albums, the tracks", () => {

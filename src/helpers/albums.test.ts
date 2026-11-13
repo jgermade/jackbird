@@ -6,6 +6,21 @@ import { track } from "./fixtures.test-support.ts";
 const kob = { artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", coverDataUrl: "data:kob" };
 
 describe("groupAlbums", () => {
+  it("groups by album artist, and keeps a compilation's tracks of many artists together", () => {
+    const albums = groupAlbums(
+      [
+        track("m/01.mp3", { title: "One", artist: "Ana", album: "Mix", compilation: "1" }, "c1"),
+        track("m/02.mp3", { title: "Two", artist: "Bea", album: "Mix", compilation: "1" }, "c2"),
+        track("b/01.mp3", { title: "Live", artist: "Guest", albumArtist: "Band", album: "Live" }, "b1"),
+        track("b/02.mp3", { title: "Encore", artist: "Band", album: "Live" }, "b2")
+      ],
+      "Untitled",
+      "en"
+    );
+    assert.deepEqual(albums.map((album) => [album.title, album.discs[0].tracks.length]), [["Live", 2], ["Mix", 2]]);
+    assert.equal(albums[0].artist, "Band");
+  });
+
   it("groups by artist and album, ignoring case, taking the first track's details", () => {
     const albums = groupAlbums(
       [

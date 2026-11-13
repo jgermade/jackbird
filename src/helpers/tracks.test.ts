@@ -11,6 +11,13 @@ describe("inferDiscNumber", () => {
     assert.equal(inferDiscNumber(track("cd-4/01.mp3")), 4);
   });
 
+  it("takes the disc tag first, its number before any total", () => {
+    assert.equal(inferDiscNumber(track("Album/CD2/01.mp3", { discNumber: "3/4" })), 3);
+    assert.equal(inferDiscNumber(track("Album/01.mp3", { discNumber: "2" })), 2);
+    assert.equal(inferDiscNumber(track("Album/CD2/01.mp3", { discNumber: "0" })), 2);
+    assert.equal(inferDiscNumber(track("Album/01.mp3", { discNumber: "x" })), 1);
+  });
+
   it("is disc 1 when no folder names one", () => {
     assert.equal(inferDiscNumber(track("Album/01.mp3")), 1);
     assert.equal(inferDiscNumber(track("Album/cd2.mp3")), 1);

@@ -103,6 +103,15 @@ pub struct Metadata {
     pub genre: String,
     /// The track number, `n` or `n/total`.
     pub track_number: String,
+    /// The disc number, `n` or `n/total`. Absent in what an older interface or `.meta/` sends.
+    #[serde(default)]
+    pub disc_number: String,
+    /// The album's artist.
+    #[serde(default)]
+    pub album_artist: String,
+    /// Part of a compilation: `1`, or as the file holds it; empty when not.
+    #[serde(default)]
+    pub compilation: String,
     /// The cover, as a data URL.
     pub cover_data_url: Option<String>,
 }
@@ -137,6 +146,9 @@ impl From<Inspection> for InspectionJson {
                 year: fields.year,
                 genre: fields.genre,
                 track_number: fields.track,
+                disc_number: fields.disc,
+                album_artist: fields.album_artist,
+                compilation: fields.compilation,
                 cover_data_url: cover.map(|cover| {
                     let mime = if cover.mime.is_empty() {
                         "image/jpeg"
@@ -165,8 +177,11 @@ pub fn cover_of(url: &str) -> Option<Cover> {
 }
 
 /// The edit that writes `metadata` over the tags the library held (`previous`), as
-/// `editFor` (`src/helpers/cover.ts`) makes it in the browser.
+/// `editFor` (`src/helpers/cover.ts`) makes it in the browser: the six first fields whole, and
+/// the disc, the album artist and the compilation only when they changed (a library read before
+/// they were known holds them empty, which must not empty the file's).
 pub fn edit_for(previous: &Metadata, metadata: Metadata) -> Edit {
+    let changed = |before: &String, now: String| (*before != now).then_some(now);
     let cover = match (&previous.cover_data_url, &metadata.cover_data_url) {
         (before, now) if before == now => CoverEdit::Keep,
         (_, None) => CoverEdit::Remove,
@@ -179,6 +194,9 @@ pub fn edit_for(previous: &Metadata, metadata: Metadata) -> Edit {
         year: Some(metadata.year),
         genre: Some(metadata.genre),
         track: Some(metadata.track_number),
+        disc: changed(&previous.disc_number, metadata.disc_number),
+        album_artist: changed(&previous.album_artist, metadata.album_artist),
+        compilation: changed(&previous.compilation, metadata.compilation),
         cover,
     }
 }
@@ -195,6 +213,9 @@ mod tests {
             year: String::new(),
             genre: String::new(),
             track_number: "1".into(),
+            disc_number: "1/2".into(),
+            album_artist: String::new(),
+            compilation: String::new(),
             cover_data_url: cover.map(Into::into),
         }
     }
@@ -221,6 +242,20 @@ mod tests {
         );
         let edit = edit_for(&metadata(None), metadata(None));
         assert_eq!((edit.title.as_deref(), edit.track.as_deref()), (Some("T"), Some("1")));
+        assert_eq!((edit.disc, edit.album_artist, edit.compilation), (None, None, None));
+        let edit = edit_for(
+            &metadata(None),
+            Metadata {
+                disc_number: String::new(),
+                compilation: "1".into(),
+                ..metadata(None)
+            },
+        );
+        assert_eq!(
+            (edit.disc.as_deref(), edit.compilation.as_deref()),
+            (Some(""), Some("1"))
+        );
+        assert_eq!(edit.album_artist, None);
         assert_eq!(cover_of("data:;base64,AQ==").unwrap().mime, "image/jpeg");
         assert_eq!(cover_of("data:image/png;name=a;base64,AQ==").unwrap().mime, "image/png");
         assert!(cover_of("data:image/png,raw").is_none());

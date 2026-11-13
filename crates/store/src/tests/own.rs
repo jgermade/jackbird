@@ -248,3 +248,163 @@ fn an_import_with_other_tags_becomes_the_importers_layer_and_a_suggestion() {
     ));
     assert_eq!(library.song_path(library.song(SONG).unwrap().id).as_deref(), Some(SONG));
 }
+
+// ---------------------------------------------------------------- shelves (SH-D1 to SH-D5)
+
+#[test]
+fn a_library_from_before_shelves_moves_onto_its_owners_shelf_shared_with_everyone() {
+    let dir = scratch();
+    // A catalogue as F1 made it: each blob once.
+    {
+        let db = Connection::open(dir.join("catalogue.db")).unwrap();
+        db.execute_batch(
+            "create table songs (id integer primary key, path text not null unique, blob text not null unique,
+               format text not null, size integer not null, added integer not null, changed integer not null,
+               version integer not null default 1, file text not null, family text not null default '{}');
+             alter table songs add column trashed integer;",
+        )
+        .unwrap();
+    }
+    let library = Library::open(&dir).unwrap();
+    library
+        .import_folder(&music(), "Music", "Owner", Some(1), |_, _| {})
+        .unwrap();
+    library.write("Music/.meta/snapshot.json", b"{}").unwrap();
+    assert_eq!(library.into_shelves(1).unwrap(), 4);
+    assert!(library.song("@1/Music/flac-full.flac").is_some());
+    assert_eq!(library.read("@1/Music/.meta/snapshot.json").unwrap(), b"{}");
+    assert_eq!(
+        library.shares(1).unwrap(),
+        Shares {
+            everyone: true,
+            people: vec![]
+        }
+    );
+    assert!(library.may_see(7, 1));
+    assert_eq!(library.shared_with(7).unwrap(), vec![1]);
+    // Done once: nothing moves again.
+    assert_eq!(library.into_shelves(1).unwrap(), 0);
+    let sql: String = library
+        .db()
+        .query_row("select sql from sqlite_master where name = 'songs'", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert!(!sql.contains("blob text not null unique"));
+}
+
+#[test]
+fn the_same_audio_on_two_shelves_is_two_songs_and_one_blob() {
+    let library = Library::open(&scratch()).unwrap();
+    let song = fixtures().join("flac-full.flac");
+    assert!(matches!(
+        library
+            .import_file(&song, "@1/A/x.flac", "Ana", Some(1), false)
+            .unwrap(),
+        Imported::Added(_)
+    ));
+    assert!(matches!(
+        library
+            .import_file(&song, "@2/B/x.flac", "Luis", Some(2), false)
+            .unwrap(),
+        Imported::Added(_)
+    ));
+    // Again on the same shelf: already there.
+    assert!(matches!(
+        library
+            .import_file(&song, "@2/C/x.flac", "Luis", Some(2), false)
+            .unwrap(),
+        Imported::Existing(_)
+    ));
+    let blobs: Vec<String> = library.songs().unwrap().into_iter().map(|song| song.blob).collect();
+    assert_eq!(blobs.len(), 2);
+    assert_eq!(blobs[0], blobs[1]);
+    // One song to the trash, emptied: the blob stays for the other.
+    library.delete("@1/A/x.flac").unwrap();
+    assert_eq!(library.empty_trash(None).unwrap(), 1);
+    let out = library.outgoing("@2/B/x.flac").unwrap();
+    assert!(out.blob.exists());
+    library.delete("@2/B/x.flac").unwrap();
+    library.empty_trash(None).unwrap();
+    assert!(!out.blob.exists());
+}
+
+#[test]
+fn shares_are_their_owners_choice() {
+    let library = Library::open(&scratch()).unwrap();
+    assert_eq!(library.shares(1).unwrap(), Shares::default());
+    assert!(!library.may_see(2, 1));
+    assert!(library.may_see(1, 1));
+    library.set_shares(1, false, &[2, 3, 1]).unwrap();
+    assert_eq!(
+        library.shares(1).unwrap(),
+        Shares {
+            everyone: false,
+            people: vec![2, 3]
+        }
+    );
+    assert!(library.may_see(2, 1));
+    assert!(!library.may_see(4, 1));
+    library.set_shares(4, true, &[]).unwrap();
+    assert_eq!(library.shared_with(2).unwrap(), vec![1, 4]);
+    assert_eq!(library.shared_with(5).unwrap(), vec![4]);
+    library.set_shares(1, false, &[]).unwrap();
+    assert!(!library.may_see(2, 1));
+}
+
+#[test]
+fn ones_own_playlists_list_the_shelf_one_looks_at() {
+    let library = Library::open(&scratch()).unwrap();
+    let song = fixtures().join("flac-full.flac");
+    library
+        .import_file(&song, "@1/A/x.flac", "Ana", Some(1), false)
+        .unwrap();
+    library
+        .import_file(
+            &fixtures().join("mp3-v24-padded.mp3"),
+            "@2/B/y.mp3",
+            "Luis",
+            Some(2),
+            false,
+        )
+        .unwrap();
+    library.set_favourite(1, "@1/A/x.flac", true).unwrap();
+    library.set_favourite(1, "@2/B/y.mp3", true).unwrap();
+    let text = String::from_utf8(library.read_as(FAVOURITES, Viewer::mine(1)).unwrap()).unwrap();
+    assert_eq!(text, "#EXTM3U\n../A/x.flac\n");
+    // Looking at Luis's shelf, its own: the favourite there.
+    let there = String::from_utf8(library.read_as(FAVOURITES, Viewer::mine(1).on(2)).unwrap()).unwrap();
+    assert_eq!(there, "#EXTM3U\n../B/y.mp3\n");
+    // Written back with a shelf's paths: that shelf's favourites; the other's stay.
+    library.write_as(FAVOURITES, b"#EXTM3U\n", Viewer::mine(1)).unwrap();
+    assert_eq!(library.favourites(1).unwrap(), vec!["@2/B/y.mp3".to_owned()]);
+    library
+        .write_as(FAVOURITES, b"#EXTM3U\n../A/x.flac\n", Viewer::mine(1))
+        .unwrap();
+    assert_eq!(library.favourites(1).unwrap().len(), 2);
+    // One's own playlists are on one's own shelf only.
+    library
+        .write_as("My playlists/Road.m3u", b"#EXTM3U\n", Viewer::mine(1))
+        .unwrap();
+    let paths = |viewer: Viewer| -> Vec<String> {
+        library
+            .walk_as(viewer)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.path)
+            .collect()
+    };
+    assert!(paths(Viewer::mine(1)).contains(&"My playlists/Road.m3u".to_owned()));
+    let there = paths(Viewer::mine(1).on(2));
+    assert!(!there.contains(&"My playlists/Road.m3u".to_owned()) && there.contains(&FAVOURITES.to_owned()));
+}
+
+#[test]
+fn shelf_paths_and_back() {
+    assert_eq!(shelf_path(3, "A/x.mp3"), "@3/A/x.mp3");
+    assert_eq!(shelf_path(3, "/"), "@3");
+    assert_eq!(on_shelf("@3/A/x.mp3"), Some((3, "A/x.mp3")));
+    assert_eq!(on_shelf("@3"), Some((3, "")));
+    assert_eq!(on_shelf("A/x.mp3"), None);
+    assert_eq!(on_shelf("@x/A"), None);
+}

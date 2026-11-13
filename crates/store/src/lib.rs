@@ -35,7 +35,7 @@ mod safety;
 #[cfg(test)]
 mod tests;
 
-pub use own::{FAVOURITES, Layers, OWN, RECENT, Scope, Viewer, is_own};
+pub use own::{FAVOURITES, Layers, OWN, RECENT, Scope, Shares, Viewer, is_own};
 pub use safety::{Exported, Saved, Stale, TrashedSong, keep_backups, today};
 
 /// The formats the library keeps.
@@ -61,7 +61,8 @@ fn store_error(error: rusqlite::Error) -> Error {
     Error::Io(format!("the library's catalogue: {error}"))
 }
 
-/// The six fields, as the catalogue keeps them.
+/// The fields, as the catalogue keeps them. The disc, the album artist and the compilation came
+/// later: a song imported before them has them empty (`serde(default)`).
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct FieldsJson {
     /// The title.
@@ -76,6 +77,15 @@ pub struct FieldsJson {
     pub genre: String,
     /// The track number.
     pub track: String,
+    /// The disc number.
+    #[serde(default)]
+    pub disc: String,
+    /// The album's artist.
+    #[serde(default)]
+    pub album_artist: String,
+    /// Part of a compilation (`1`), or empty.
+    #[serde(default)]
+    pub compilation: String,
 }
 
 impl From<&Fields> for FieldsJson {
@@ -87,6 +97,9 @@ impl From<&Fields> for FieldsJson {
             year: fields.year.clone(),
             genre: fields.genre.clone(),
             track: fields.track.clone(),
+            disc: fields.disc.clone(),
+            album_artist: fields.album_artist.clone(),
+            compilation: fields.compilation.clone(),
         }
     }
 }
@@ -100,6 +113,9 @@ impl From<&FieldsJson> for Fields {
             year: fields.year.clone(),
             genre: fields.genre.clone(),
             track: fields.track.clone(),
+            disc: fields.disc.clone(),
+            album_artist: fields.album_artist.clone(),
+            compilation: fields.compilation.clone(),
         }
     }
 }
@@ -140,6 +156,15 @@ pub struct Layer {
     /// The track number it sets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub track: Option<String>,
+    /// The disc number it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disc: Option<String>,
+    /// The album artist it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub album_artist: Option<String>,
+    /// The compilation mark it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compilation: Option<String>,
     /// What it does to the cover.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<CoverLayer>,
@@ -160,6 +185,9 @@ impl Layer {
             year: self.year.clone().or_else(|| under.year.clone()),
             genre: self.genre.clone().or_else(|| under.genre.clone()),
             track: self.track.clone().or_else(|| under.track.clone()),
+            disc: self.disc.clone().or_else(|| under.disc.clone()),
+            album_artist: self.album_artist.clone().or_else(|| under.album_artist.clone()),
+            compilation: self.compilation.clone().or_else(|| under.compilation.clone()),
             cover: self.cover.clone().or_else(|| under.cover.clone()),
         }
     }
@@ -174,6 +202,9 @@ impl Layer {
             year: pick(&self.year, &file.year),
             genre: pick(&self.genre, &file.genre),
             track: pick(&self.track, &file.track),
+            disc: pick(&self.disc, &file.disc),
+            album_artist: pick(&self.album_artist, &file.album_artist),
+            compilation: pick(&self.compilation, &file.compilation),
         }
     }
 }
@@ -317,7 +348,7 @@ const SCHEMA: &str = "
 create table if not exists songs (
   id integer primary key,
   path text not null unique,
-  blob text not null unique,
+  blob text not null,
   format text not null,
   size integer not null,
   added integer not null,
@@ -326,6 +357,7 @@ create table if not exists songs (
   file text not null,
   family text not null default '{}'
 );
+create index if not exists songs_blob on songs (blob);
 create table if not exists suggestions (
   id integer primary key,
   song integer not null references songs(id) on delete cascade,
@@ -366,6 +398,26 @@ pub fn clean(path: &str) -> Result<String, Error> {
     Ok(parts.join("/"))
 }
 
+/// A path of a person's shelf as the catalogue keeps it: `@<person>/<path>` (`@<person>` for the
+/// shelf itself). Each person's music is a shelf; the interface sees each as a root of its own,
+/// without the prefix.
+pub fn shelf_path(shelf: i64, path: &str) -> String {
+    let path = path.trim_matches('/');
+    if path.is_empty() {
+        format!("@{shelf}")
+    } else {
+        format!("@{shelf}/{path}")
+    }
+}
+
+/// The shelf a catalogue path is on, and the path within it; `None` for a path on no shelf (a
+/// library from before shelves, or one's own folder).
+pub fn on_shelf(path: &str) -> Option<(i64, &str)> {
+    let rest = path.strip_prefix('@')?;
+    let (shelf, inner) = rest.split_once('/').unwrap_or((rest, ""));
+    Some((shelf.parse().ok()?, inner))
+}
+
 fn name_of(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_owned()
 }
@@ -386,6 +438,7 @@ impl Library {
         }
         let files = Root::open(dir.join("files"))?;
         let db = Connection::open(dir.join("catalogue.db")).map_err(store_error)?;
+        Library::unique_blobs_go(&db).map_err(store_error)?;
         db.execute_batch("pragma foreign_keys = on; pragma journal_mode = wal;")
             .and_then(|()| db.execute_batch(SCHEMA))
             .and_then(|()| db.execute_batch(own::SCHEMA))
@@ -401,6 +454,86 @@ impl Library {
             files,
             db: Mutex::new(db),
         })
+    }
+
+    /// A catalogue from before shelves held each blob once (`blob ... unique`); with shelves, the
+    /// same audio may be on two people's. The table is made again without it (SQLite cannot drop
+    /// a constraint), its rows and ids kept.
+    fn unique_blobs_go(db: &Connection) -> rusqlite::Result<()> {
+        let sql: Option<String> = db
+            .query_row(
+                "select sql from sqlite_master where type = 'table' and name = 'songs'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if !sql.is_some_and(|sql| sql.contains("blob text not null unique")) {
+            return Ok(());
+        }
+        let columns: Vec<String> = {
+            let mut query = db.prepare("select name from pragma_table_info('songs')")?;
+            query.query_map([], |row| row.get(0))?.collect::<Result<_, _>>()?
+        };
+        let extra: String = columns
+            .iter()
+            .filter(|name| matches!(name.as_str(), "trashed" | "trashed_by" | "changed_by"))
+            .map(|name| format!(", {name} {}", if name == "trashed" { "integer" } else { "text" }))
+            .collect();
+        let list = columns.join(", ");
+        db.execute_batch(&format!(
+            "pragma foreign_keys = off;
+             begin;
+             create table songs_new (
+               id integer primary key,
+               path text not null unique,
+               blob text not null,
+               format text not null,
+               size integer not null,
+               added integer not null,
+               changed integer not null,
+               version integer not null default 1,
+               file text not null,
+               family text not null default '{{}}'{extra}
+             );
+             insert into songs_new ({list}) select {list} from songs;
+             drop table songs;
+             alter table songs_new rename to songs;
+             commit;
+             pragma foreign_keys = on;"
+        ))
+    }
+
+    /// Moves a library from before shelves onto `owner`'s shelf, shared with everyone (SH-D2): its
+    /// songs' paths and its small files under `@<owner>/`. Songs already on a shelf stay. How many
+    /// songs moved.
+    pub fn into_shelves(&self, owner: i64) -> Result<usize, Error> {
+        let moved = self
+            .db()
+            .execute(
+                "update songs set path = '@' || ?1 || '/' || path where substr(path, 1, 1) != '@'",
+                [owner],
+            )
+            .map_err(store_error)?;
+        let files = self.dir.join("files");
+        let shelf = files.join(format!("@{owner}"));
+        let loose: Vec<PathBuf> = fs::read_dir(&files)
+            .map_err(|error| Error::Io(error.to_string()))?
+            .filter_map(Result::ok)
+            .filter(|entry| !entry.file_name().to_string_lossy().starts_with('@'))
+            .map(|entry| entry.path())
+            .collect();
+        if !loose.is_empty() {
+            fs::create_dir_all(&shelf).map_err(|error| Error::Io(error.to_string()))?;
+            for path in loose {
+                if let Some(name) = path.file_name() {
+                    fs::rename(&path, shelf.join(name)).map_err(|error| Error::Io(error.to_string()))?;
+                }
+            }
+        }
+        if moved > 0 {
+            self.set_shares(owner, true, &[])?;
+        }
+        Ok(moved)
     }
 
     /// Its folder.
@@ -453,9 +586,17 @@ impl Library {
             .flatten()
     }
 
-    fn song_by_blob(&self, blob: &str) -> Option<Song> {
+    /// The song of this audio on the shelf `path` is on (or, for a path on none, on no shelf).
+    fn song_by_blob(&self, blob: &str, path: &str) -> Option<Song> {
+        let prefix = on_shelf(path).map_or(String::new(), |(shelf, _)| shelf_path(shelf, "") + "/");
         self.db()
-            .query_row(&format!("{SONG} where blob = ?1"), [blob], song_of)
+            .query_row(
+                &format!(
+                    "{SONG} where blob = ?1 and (case when ?2 = '' then substr(path, 1, 1) != '@' else substr(path, 1, length(?2)) = ?2 end)"
+                ),
+                params![blob, prefix],
+                song_of,
+            )
             .optional()
             .ok()
             .flatten()
@@ -524,7 +665,7 @@ impl Library {
         };
         let fields = FieldsJson::from(&examined.tags.0);
         let hash = examined.audio_sha256.clone();
-        if let Some(song) = self.song_by_blob(&hash) {
+        if let Some(song) = self.song_by_blob(&hash, &wanted) {
             if take {
                 let _ = fs::remove_file(source);
             }
@@ -856,6 +997,9 @@ impl Library {
             year: layer.year.clone(),
             genre: layer.genre.clone(),
             track: layer.track.clone(),
+            disc: layer.disc.clone(),
+            album_artist: layer.album_artist.clone(),
+            compilation: layer.compilation.clone(),
             cover: match &layer.cover {
                 None => CoverEdit::Keep,
                 Some(CoverLayer::Remove) => CoverEdit::Remove,
@@ -925,6 +1069,9 @@ impl Library {
         set(&mut layer.year, &edit.year, &under.year);
         set(&mut layer.genre, &edit.genre, &under.genre);
         set(&mut layer.track, &edit.track, &under.track);
+        set(&mut layer.disc, &edit.disc, &under.disc);
+        set(&mut layer.album_artist, &edit.album_artist, &under.album_artist);
+        set(&mut layer.compilation, &edit.compilation, &under.compilation);
         match &edit.cover {
             CoverEdit::Keep => {}
             CoverEdit::Set(cover) => {

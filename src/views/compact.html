@@ -86,11 +86,13 @@
   }
   /* In the desktop app's window the chassis is what the window is moved by. */
   .compact.window { cursor: grab; }
+  /* The card the chassis' whole width: the root follows the window (tokens.css, --mm-root-compact),
+     so a window stretched wider than its height allows gives the display the room, with no chassis
+     left bare at the card's sides. */
   .card {
     display: grid;
     gap: var(--mm-space-3);
     width: 100%;
-    max-width: 26rem;
   }
   .screen { min-width: 0; }
   /* The keys under the display: the transport in the middle, the mode's keys at the sides. */

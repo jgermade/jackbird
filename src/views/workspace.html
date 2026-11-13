@@ -53,7 +53,13 @@
   // `let` would be a store field written on every move. Once a frame at most, and with the room
   // and the root's size measured when the drag starts: read on each move, they made the page lay
   // itself out at once after every write (which WebKit, the macOS app, felt most).
-  let splitWidth: number = parseSplit(readStored(STORAGE_KEYS.splitWidth)) ?? SPLIT.initial
+  // Embedded in the landing page: its own width, the demo's kept one neither read nor written.
+  const { isEmbed } = await import("../lib/platform")
+  const firstSplit: number = isEmbed ? SPLIT.embed : SPLIT.initial
+  const storeSplit = (value: string) => {
+    if (!isEmbed) writeStored(STORAGE_KEYS.splitWidth, value)
+  }
+  let splitWidth: number = (isEmbed ? null : parseSplit(readStored(STORAGE_KEYS.splitWidth))) ?? firstSplit
   // The library's width as chosen (in rem), within the room: at least 16rem, leaving the sheet at
   // least 20rem (src/helpers/split.ts keeps the same bounds).
   const splitAt = (width: number): string => `clamp(16rem, ${width}rem, calc(100% - 20rem))`
@@ -78,7 +84,7 @@
     }
     const keep = (width: number) => {
       splitWidth = Math.round(width * 100) / 100
-      writeStored(STORAGE_KEYS.splitWidth, String(splitWidth))
+      storeSplit(String(splitWidth))
     }
     return {
       most: () => clampSplit(Number.POSITIVE_INFINITY, total()),
@@ -115,9 +121,9 @@
         keep(width)
       },
       reset() {
-        show(SPLIT.initial)
-        splitWidth = SPLIT.initial
-        writeStored(STORAGE_KEYS.splitWidth, "")
+        show(firstSplit)
+        splitWidth = firstSplit
+        storeSplit("")
       }
     }
   })()

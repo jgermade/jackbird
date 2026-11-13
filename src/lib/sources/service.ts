@@ -215,15 +215,31 @@ function serviceSource(client: ServiceClient, root: string, name: string): RootS
 /** What the session keeps for the library: it is the service's own, not a path. */
 export const LIBRARY = "@library";
 
-const inLibrary = (path = ""): string => `path=${encodeURIComponent(path)}`;
+/**
+ * A path of the library, on a shelf (SH-D1: each person's music; one's own when none), as a
+ * query.
+ */
+const inShelf = (path = "", shelf?: number): string => `path=${encodeURIComponent(path)}${shelf === undefined ? "" : `&shelf=${shelf}`}`;
+
+/** Someone's music shared with one (SH-D6): whose, and their name. */
+export type Shelf = { shelf: number; name: string };
+
+/** The music shared with one on a server (the one spoken to now unless given). */
+export const sharedShelves = (client: ServiceClient = current): Promise<Shelf[]> => client.json<Shelf[]>("library/shelves");
+
+/** Whom one's own music is shared with, and everyone who could be chosen (SH-D3). */
+export type Shares = { everyone: boolean; people: number[]; candidates: { id: number; name: string }[] };
+export const myShares = (): Promise<Shares> => json<Shares>("library/shares");
+export const setMyShares = (everyone: boolean, people: number[]): Promise<void> => json("library/shares", post({ everyone, people }));
 
 /**
  * The family library as a root: songs by their places in it, small files beside them. A small
  * file is written with the size and date it was read at (F4), so a shared playlist changed since
  * is not written over (`stale`).
  */
-function libraryVfs(client: ServiceClient, name: string): VFSAdapter {
+function libraryVfs(client: ServiceClient, name: string, shelf?: number): VFSAdapter {
   const { api, json } = client;
+  const inLibrary = (path = ""): string => inShelf(path, shelf);
   const seen = new Map<string, { size: number; mtime: number }>();
   const stat = async (path: string): Promise<VFSStat | null> => {
     const found = await json<(VFSStat & { size: number; mtime: number }) | null>(`library/stat?${inLibrary(path)}`);
@@ -248,7 +264,7 @@ function libraryVfs(client: ServiceClient, name: string): VFSAdapter {
       await api(`library/delete?${inLibrary(path)}`, post());
     },
     rename: async (from, to) => {
-      await api("library/rename", post({ from, to }));
+      await api("library/rename", post({ from, to, shelf }));
     },
     stat,
     mkdir: async (path) => {
@@ -257,21 +273,32 @@ function libraryVfs(client: ServiceClient, name: string): VFSAdapter {
   };
 }
 
-/** The family library of a server (the one spoken to now unless given), when it has one; null otherwise. */
-export async function librarySource(client: ServiceClient = current): Promise<RootSource | null> {
+/** What the session keeps for someone's music shared with one: the library's, with their id. */
+const shelfSaved = (shelf: number): string => `${LIBRARY}:${shelf}`;
+
+/**
+ * The library of a server (the one spoken to now unless given): one's own music, or, given a
+ * shelf, someone's shared with one (its tab named after them); null when there is none, or it is
+ * no longer shared.
+ */
+export async function librarySource(client: ServiceClient = current, shared?: Shelf): Promise<RootSource | null> {
   const { json } = client;
-  const info = await json<{ name: string }>("library").catch(() => null);
+  const shelf = shared?.shelf;
+  const info = await json<{ name: string; owner?: string }>(`library?${inShelf("", shelf)}`).catch(() => null);
   if (!info) return null;
-  const vfs = libraryVfs(client, info.name);
+  const vfs = libraryVfs(client, shared ? shared.name || info.owner || info.name : info.name, shelf);
+  const inLibrary = (path = ""): string => inShelf(path, shelf);
   return {
     kind: "library",
     vfs,
-    saved: savedOnServer(isHome(client) ? null : client.address, LIBRARY),
+    saved: savedOnServer(isHome(client) ? null : client.address, shelf === undefined ? LIBRARY : shelfSaved(shelf)),
     server: client,
-    walk: () => json("library/walk"),
-    inspect: (path, known) => json<Inspection>("library/inspect", post({ path, known: known ?? null })),
+    shelf,
+    walk: () => json(`library/walk${shelf === undefined ? "" : `?shelf=${shelf}`}`),
+    inspect: (path, known) => json<Inspection>("library/inspect", post({ path, known: known ?? null, shelf })),
+    // In someone else's music one saves one's own version (SH-D4).
     save: (path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine", expected?: string) =>
-      json<Inspection>("library/save", post({ path, previous, metadata, scope: scope ?? "family", expected })),
+      json<Inspection>("library/save", post({ path, previous, metadata, scope: shelf === undefined ? (scope ?? "family") : "mine", expected, shelf })),
     async openMedia(path): Promise<MediaHandle> {
       const before = await vfs.stat(path);
       const grant = client.usesToken ? `&t=${encodeURIComponent(await client.mediaToken())}` : "";
@@ -288,22 +315,26 @@ export async function librarySource(client: ServiceClient = current): Promise<Ro
   };
 }
 
-/** Where a song of the library is downloaded, with the family's tags. */
-export async function libraryDownloadUrl(path: string): Promise<string> {
+/** Where a song of the library (on a shelf, one's own when none) is downloaded, with its tags. */
+export async function libraryDownloadUrl(path: string, shelf?: number): Promise<string> {
   const grant = current.usesToken ? `&t=${encodeURIComponent(await current.mediaToken())}` : "";
-  return `${current.address}/api/library/download?${inLibrary(path)}${grant}`;
+  return `${current.address}/api/library/download?${inShelf(path, shelf)}${grant}`;
 }
 
 /** Other tags brought with a song's audio (until F3 makes them someone's own). */
-export type LibrarySuggestion = { fields: { title: string; artist: string; album: string; year: string; genre: string; track: string }; by: string; at: number };
+export type LibrarySuggestion = {
+  fields: { title: string; artist: string; album: string; year: string; genre: string; track: string; disc?: string; album_artist?: string; compilation?: string };
+  by: string;
+  at: number;
+};
 
-export const librarySuggestions = (path: string): Promise<LibrarySuggestion[]> =>
-  json<LibrarySuggestion[]>(`library/suggestions?${inLibrary(path)}`);
+export const librarySuggestions = (path: string, shelf?: number): Promise<LibrarySuggestion[]> =>
+  json<LibrarySuggestion[]>(`library/suggestions?${inShelf(path, shelf)}`);
 
 // ─── Each person's own (F3) ──────────────────────────────────────────────────
 
 /** What a song's tags are made of: the file's, what the family's layer sets, what one's own sets. */
-export type LayerJson = Partial<Record<"title" | "artist" | "album" | "year" | "genre" | "track", string>> & { cover?: { kind: string } };
+export type LayerJson = Partial<Record<"title" | "artist" | "album" | "year" | "genre" | "track" | "disc" | "album_artist" | "compilation", string>> & { cover?: { kind: string } };
 export type SongLayers = {
   file: LibrarySuggestion["fields"];
   family: LayerJson;
@@ -312,15 +343,18 @@ export type SongLayers = {
   favourite: boolean;
 };
 
-export const songLayers = (path: string): Promise<SongLayers> => json<SongLayers>(`library/layers?${inLibrary(path)}`);
-export const forgetMine = (path: string): Promise<void> => json("library/mine/forget", post({ path }));
-export const setFavourite = (path: string, on: boolean): Promise<void> => json("library/favourite", post({ path, on }));
+// A song's, on a shelf (someone's music shared with one; one's own when none).
+export const songLayers = (path: string, shelf?: number): Promise<SongLayers> => json<SongLayers>(`library/layers?${inShelf(path, shelf)}`);
+export const forgetMine = (path: string, shelf?: number): Promise<void> => json("library/mine/forget", post({ path, shelf }));
+export const setFavourite = (path: string, on: boolean, shelf?: number): Promise<void> => json("library/favourite", post({ path, on, shelf }));
 /** A play of a song of a server's library (F3), counted on that server (the one spoken to now unless given). */
-export const notePlayed = (path: string, client: ServiceClient = current): Promise<void> => client.json("library/played", post({ path }));
+export const notePlayed = (path: string, client: ServiceClient = current, shelf?: number): Promise<void> =>
+  client.json("library/played", post({ path, shelf }));
 export const clearHistory = (): Promise<void> => json("library/history/clear", post());
-export const applySuggestion = (path: string, id: number): Promise<Inspection> => json<Inspection>("library/suggestions/apply", post({ path, id }));
-export const readLibraryText = async (path: string): Promise<string> =>
-  new TextDecoder().decode(await (await current.api(`library/read?${inLibrary(path)}`)).arrayBuffer());
+export const applySuggestion = (path: string, id: number, shelf?: number): Promise<Inspection> =>
+  json<Inspection>("library/suggestions/apply", post({ path, id, shelf }));
+export const readLibraryText = async (path: string, shelf?: number): Promise<string> =>
+  new TextDecoder().decode(await (await current.api(`library/read?${inShelf(path, shelf)}`)).arrayBuffer());
 
 /** A person's settings, kept with them on the service. */
 export type MySettings = { theme: "light" | "dark" | null; language: string | null; mine: boolean };
@@ -338,7 +372,7 @@ export const importState = (): Promise<ImportState> => json<ImportState>("librar
 
 /** One file uploaded to the library as `path`; what became of it. */
 export const uploadToLibrary = (path: string, file: Blob): Promise<{ result: "added" | "existing" | "suggested" | "unreadable"; path?: string; why?: string }> =>
-  json(`library/upload?${inLibrary(path)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file });
+  json(`library/upload?${inShelf(path)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file });
 
 type Opened = { path: string; name: string };
 
@@ -351,6 +385,10 @@ export async function openServiceFolder(path: string, client: ServiceClient = cu
 /** Reopens a folder the session kept: as it is if the server has it open, else opened again (an owner's); null when it is gone. */
 export async function restoreServiceSource(path: string, client: ServiceClient = current): Promise<RootSource | null> {
   if (path === LIBRARY) return librarySource(client);
+  if (path.startsWith(`${LIBRARY}:`)) {
+    const shelf = Number(path.slice(LIBRARY.length + 1));
+    return Number.isInteger(shelf) ? librarySource(client, { shelf, name: "" }) : null;
+  }
   const open = await client.json<Opened[]>("roots").catch(() => [] as Opened[]);
   const found = open.find((opened) => opened.path === path);
   return found ? serviceSource(client, found.path, found.name) : openServiceFolder(path, client).catch(() => null);

@@ -39,12 +39,13 @@ export function dataUrlToCover(url: string): WireCover | null {
 
 /**
  * The edit that saves `metadata` over a track whose tags were `previous`:
- * every field (the engine leaves alone those that do not change, and removes
- * the empty ones); the cover kept when it is the track's own, removed when
+ * the first six fields (the engine leaves alone those that do not change, and
+ * removes the empty ones), and the disc, album artist and compilation when
+ * they change; the cover kept when it is the track's own, removed when
  * the form has none, else set.
  */
 export function editFor(previous: TrackMetadata, metadata: TrackMetadata): WireEdit {
-  const fields = {
+  const fields: WireEdit["fields"] = {
     title: metadata.title,
     artist: metadata.artist,
     album: metadata.album,
@@ -52,6 +53,12 @@ export function editFor(previous: TrackMetadata, metadata: TrackMetadata): WireE
     genre: metadata.genre,
     track: metadata.trackNumber
   };
+  // The fields that came later, only when they change: a library read before them holds them
+  // empty, which must not empty the file's (crates/api's edit_for does the same).
+  const later = { disc: "discNumber", albumArtist: "albumArtist", compilation: "compilation" } as const;
+  for (const [wire, field] of Object.entries(later) as [keyof typeof later, (typeof later)[keyof typeof later]][]) {
+    if (metadata[field] !== previous[field]) fields[wire] = metadata[field];
+  }
   if (metadata.coverDataUrl === previous.coverDataUrl) {
     return { fields, cover: { keep: true } };
   }

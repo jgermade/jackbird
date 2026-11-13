@@ -39,7 +39,7 @@ function emptyReport(): ImportReport {
 
 function refreshLibrary(): void {
   const server = currentServer();
-  const root = $toRaw(library).roots.find((item) => item.source.kind === "library" && item.source.server === server);
+  const root = $toRaw(library).roots.find((item) => item.source.kind === "library" && item.source.server === server && item.source.shelf === undefined);
   if (root) void refreshRoot(root.id);
 }
 
@@ -120,7 +120,10 @@ export async function loadSongExtras(path: string | null): Promise<void> {
   songExtras.download = "";
   songExtras.suggestions = [];
   if (!path) return;
-  const [download, suggestions] = await Promise.all([libraryDownloadUrl(path), librarySuggestions(path).catch(() => [])]);
+  // Of the music in view: one's own, or someone's shared with one (SH-D6).
+  const raw = $toRaw(library);
+  const shelf = raw.roots.find((root) => root.id === raw.activeRootId)?.source.shelf;
+  const [download, suggestions] = await Promise.all([libraryDownloadUrl(path, shelf), librarySuggestions(path, shelf).catch(() => [])]);
   if (songExtras.path === path) {
     songExtras.download = download;
     songExtras.suggestions = suggestions;

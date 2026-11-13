@@ -13,6 +13,7 @@
   const Modal = await import("../../theme/default/components/modal.html")
   const Select = await import("../../theme/default/components/select.html")
   const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
+  const Checkbox = await import("../../theme/default/components/checkbox.html")
   const Key = await import("../../theme/default/components/key.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
 
@@ -26,6 +27,7 @@
   const { describeAgent } = await import("../helpers/agent")
   const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
   const { importing } = await import("../lib/importing")
+  const { loadSharing, shareWith, shareWithEveryone, sharing } = await import("../lib/sharing")
   const { loadDevices, loadPhoneOutput, output, setBitPerfect, setOutputDevice, setOutputKind, soundingText } = await import("../lib/output")
   const { devicesFor } = await import("../helpers/output")
 
@@ -39,6 +41,7 @@
     if (open && account.active && account.me) {
       myName = account.me.name
       void loadMine()
+      void loadSharing()
     }
   }
   let myName: string = ""
@@ -151,6 +154,23 @@
           </div>
           <Key size="sm" variant="ghost" @click="clearHistory()">{{ t("account.clearHistory") }}</Key>
         </div>
+        <!-- Whom one's own music is shared with (SH-D3): everyone, or the people picked. -->
+        <div :if="importing.available && sharing.loaded" class="sub">
+          <div class="row own">
+            <div class="text">
+              <h4 class="mm-legend">{{ t("sharing.title") }}</h4>
+              <p class="hint">{{ t("sharing.hint") }}</p>
+            </div>
+            <SlideSwitch :label="t('sharing.everyone')" :on-legend="t('sharing.everyone')" :off-legend="t('sharing.some')" :disabled="sharing.busy" :model="sharing.everyone" @change="shareWithEveryone($event.detail)" />
+          </div>
+          <ul :if="!sharing.everyone && sharing.candidates.length > 0" class="people">
+            <li :each="person in sharing.candidates" :key="person.id">
+              <Checkbox :model="sharing.people.includes(person.id)" :disabled="sharing.busy" @change="shareWith(person.id, $event.detail)">{{ person.name }}</Checkbox>
+            </li>
+          </ul>
+          <p :if="!sharing.everyone && sharing.candidates.length === 0" class="hint">{{ t("sharing.nobody") }}</p>
+          <p :if="sharing.error" class="failure">{{ sharing.error }}</p>
+        </div>
         <div class="keys">
           <Key :if="can('admin')" variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
           <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
@@ -226,6 +246,8 @@
   .prefs > * { min-width: 0; }
   .account .state { color: var(--mm-fg); }
   .sub h4 { margin: 0; }
+  /* The people one may share one's music with, a box each. */
+  .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--mm-space-2); margin: 0; padding: 0; list-style: none; }
   .secret { overflow-wrap: anywhere; user-select: all; }
   .own { justify-content: space-between; align-items: center; }
   .row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--mm-space-2); }

@@ -1,5 +1,5 @@
-//! jackbird's tag engine: the six fields it edits (title, artist, album,
-//! year, genre, track) and the cover, over MP3 (ID3v2) and FLAC (Vorbis
+//! jackbird's tag engine: the fields it edits (title, artist, album, year,
+//! genre, track, disc, album artist, compilation) and the cover, over MP3 (ID3v2) and FLAC (Vorbis
 //! comments), the audio region its checksums hash, and writes that keep
 //! everything they do not edit.
 //!
@@ -33,7 +33,7 @@ pub enum Format {
     Flac,
 }
 
-/// One of the six fields.
+/// One of the fields.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Field {
     /// The track's title.
@@ -48,21 +48,32 @@ pub enum Field {
     Genre,
     /// The track number, `n` or `n/total`.
     Track,
+    /// The disc number, `n` or `n/total`.
+    Disc,
+    /// The album's artist, when it is not each track's.
+    AlbumArtist,
+    /// Part of a compilation: `1`, or as the file holds it (iTunes' `TCMP`,
+    /// Vorbis' `COMPILATION`).
+    Compilation,
 }
 
 impl Field {
-    /// The six, in the order the editor shows them.
-    pub const ALL: [Field; 6] = [
+    /// Every field, in the wire's order (`crates/tags-wasm`): the six the
+    /// engine started with, then those added after them.
+    pub const ALL: [Field; 9] = [
         Field::Title,
         Field::Artist,
         Field::Album,
         Field::Year,
         Field::Genre,
         Field::Track,
+        Field::Disc,
+        Field::AlbumArtist,
+        Field::Compilation,
     ];
 }
 
-/// The six fields as text, as jackbird's `TrackMetadata` holds them. An
+/// The fields as text, as jackbird's `TrackMetadata` holds them. An
 /// empty string is a field the file does not have.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Fields {
@@ -78,6 +89,12 @@ pub struct Fields {
     pub genre: String,
     /// The track number, `n` or `n/total`.
     pub track: String,
+    /// The disc number, `n` or `n/total`.
+    pub disc: String,
+    /// The album's artist.
+    pub album_artist: String,
+    /// Part of a compilation: `1`, or as the file holds it; empty when not.
+    pub compilation: String,
 }
 
 impl Fields {
@@ -90,6 +107,9 @@ impl Fields {
             Field::Year => &self.year,
             Field::Genre => &self.genre,
             Field::Track => &self.track,
+            Field::Disc => &self.disc,
+            Field::AlbumArtist => &self.album_artist,
+            Field::Compilation => &self.compilation,
         }
     }
 
@@ -101,6 +121,9 @@ impl Fields {
             Field::Year => self.year = value,
             Field::Genre => self.genre = value,
             Field::Track => self.track = value,
+            Field::Disc => self.disc = value,
+            Field::AlbumArtist => self.album_artist = value,
+            Field::Compilation => self.compilation = value,
         }
     }
 }
@@ -119,7 +142,7 @@ pub struct Cover {
 pub struct Tags {
     /// The file's format.
     pub format: Format,
-    /// The six fields.
+    /// The fields.
     pub fields: Fields,
     /// The cover shown: the front cover, else the first picture.
     pub cover: Option<Cover>,
@@ -156,6 +179,12 @@ pub struct Edit {
     pub genre: Option<String>,
     /// The new track number.
     pub track: Option<String>,
+    /// The new disc number.
+    pub disc: Option<String>,
+    /// The new album artist.
+    pub album_artist: Option<String>,
+    /// The new compilation mark (`1`, or empty to remove it).
+    pub compilation: Option<String>,
     /// What happens to the cover.
     pub cover: CoverEdit,
 }
@@ -170,6 +199,9 @@ impl Edit {
             year: Some(fields.year.clone()),
             genre: Some(fields.genre.clone()),
             track: Some(fields.track.clone()),
+            disc: Some(fields.disc.clone()),
+            album_artist: Some(fields.album_artist.clone()),
+            compilation: Some(fields.compilation.clone()),
             cover: CoverEdit::Keep,
         }
     }
@@ -183,6 +215,9 @@ impl Edit {
             Field::Year => self.year.as_deref(),
             Field::Genre => self.genre.as_deref(),
             Field::Track => self.track.as_deref(),
+            Field::Disc => self.disc.as_deref(),
+            Field::AlbumArtist => self.album_artist.as_deref(),
+            Field::Compilation => self.compilation.as_deref(),
         }
     }
 }
