@@ -30,7 +30,8 @@ import {
 } from "./sources/service";
 
 export const mine = $reactive({
-  favourites: [] as string[],
+  /** One's favourites, by the music they are in (one's own, "own"; someone's shared, their id). */
+  favourites: {} as Record<string, string[]>,
   /** Whether the person sees their own version (else the family's). */
   ownVersion: true,
   /** What the song open in Info is made of. */
@@ -39,12 +40,25 @@ export const mine = $reactive({
   error: ""
 });
 
-/** The library's root, if it is open. */
-function libraryRoot() {
-  // The library of the server spoken to now (E6b-D11): each server has its own.
+/** The library's roots of the server spoken to now (E6b-D11): one's own music, and those shared with one (SH-D6). */
+function libraryRoots() {
   const server = currentServer();
-  return $toRaw(library).roots.find((root) => root.source.kind === "library" && (root.source.server ?? null) === server) ?? null;
+  return $toRaw(library).roots.filter((root) => root.source.kind === "library" && (root.source.server ?? null) === server);
 }
+
+/** One's own music's root, if it is open. */
+function libraryRoot() {
+  return libraryRoots().find((root) => root.source.shelf === undefined) ?? null;
+}
+
+/** The library root in view, if the root in view is one: the songs the person acts on are its. */
+function rootInView() {
+  const active = $toRaw(library).activeRootId;
+  return libraryRoots().find((root) => root.id === active) ?? libraryRoot();
+}
+
+/** The key of a root's favourites in `mine.favourites`. */
+const shelfKey = (shelf: number | undefined): string => (shelf === undefined ? "own" : String(shelf));
 
 /** Whether a root is the family library. */
 export function isLibraryRoot(rootId: string | null | undefined): boolean {
@@ -52,37 +66,46 @@ export function isLibraryRoot(rootId: string | null | undefined): boolean {
 }
 
 async function reloadOwnPlaylists(): Promise<void> {
-  const root = libraryRoot();
+  const root = rootInView();
   if (!root) return;
   const walked = await root.source.walk();
   await loadPlaylists(root.id, walked.map((entry) => entry.path));
 }
 
-/** Reads one's favourites (the "My playlists/Favourites.m3u" the service makes). */
+/**
+ * Reads one's favourites in each music of the library open (the "My playlists/Favourites.m3u"
+ * the service makes in each: that music's songs).
+ */
 export async function loadFavourites(): Promise<void> {
-  if (!libraryRoot()) return;
-  const text = await readLibraryText("My playlists/Favourites.m3u").catch(() => "");
-  mine.favourites = ownPlaylistPaths(text);
+  const found: Record<string, string[]> = {};
+  for (const root of libraryRoots()) {
+    const text = await readLibraryText("My playlists/Favourites.m3u", root.source.shelf).catch(() => "");
+    found[shelfKey(root.source.shelf)] = ownPlaylistPaths(text);
+  }
+  mine.favourites = found;
 }
 
 export function isFavourite(path: string): boolean {
-  return mine.favourites.includes(path);
+  return (mine.favourites[shelfKey(rootInView()?.source.shelf)] ?? []).includes(path);
 }
 
-/** Marks a song as a favourite, or not. */
+/** Marks a song (of the music in view) as a favourite, or not. */
 export async function toggleFavourite(path: string): Promise<void> {
   const on = !isFavourite(path);
-  await setFavourite(path, on);
-  mine.favourites = on ? [...mine.favourites, path] : mine.favourites.filter((one) => one !== path);
+  const shelf = rootInView()?.source.shelf;
+  await setFavourite(path, on, shelf);
+  const key = shelfKey(shelf);
+  const before = mine.favourites[key] ?? [];
+  mine.favourites = { ...mine.favourites, [key]: on ? [...before, path] : before.filter((one) => one !== path) };
   if (mine.layersPath === path && mine.layers) mine.layers = { ...mine.layers, favourite: on };
   await reloadOwnPlaylists();
 }
 
 /** Records a play of a song of the library. */
 export function played(rootId: string, path: string): void {
-  // Counted on the root's own server, which may not be the one in front (E6b-D11).
+  // Counted on the root's own server, which may not be the one in front (E6b-D11), in its music.
   const root = $toRaw(library).roots.find((one) => one.id === rootId);
-  if (root?.source.kind === "library" && root.source.server) void notePlayed(path, root.source.server).catch(() => undefined);
+  if (root?.source.kind === "library" && root.source.server) void notePlayed(path, root.source.server, root.source.shelf).catch(() => undefined);
 }
 
 /** Loads what a song's tags are made of, for Info (or forgets it, given null). */
@@ -91,26 +114,26 @@ export async function loadLayers(path: string | null): Promise<void> {
   mine.layersPath = path ?? "";
   mine.layers = null;
   if (!path) return;
-  const layers = await songLayers(path).catch(() => null);
+  const layers = await songLayers(path, rootInView()?.source.shelf).catch(() => null);
   if (mine.layersPath === path) mine.layers = layers;
 }
 
 async function reread(path: string): Promise<void> {
   mine.layersPath = "";
   await loadLayers(path);
-  const root = libraryRoot();
+  const root = rootInView();
   if (root) await refreshRoot(root.id);
 }
 
 /** Back to the family's version of a song. */
 export async function backToFamily(path: string): Promise<void> {
-  await forget(path);
+  await forget(path, rootInView()?.source.shelf);
   await reread(path);
 }
 
 /** Applies a suggestion to the family's version (editors). */
 export async function applySuggestion(path: string, id: number): Promise<void> {
-  await applyToFamily(path, id);
+  await applyToFamily(path, id, rootInView()?.source.shelf);
   await reread(path);
 }
 

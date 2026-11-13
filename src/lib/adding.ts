@@ -15,7 +15,7 @@ import { isDesktop, isEmbed, isPhone, isService } from "./platform";
 import { recent, forgetRecent, type RecentRoot } from "./recent";
 import { hydrateRoot, openFolder, openSamples } from "./roots";
 import { restoreSource } from "./sources";
-import { currentServer, homeServer, serviceAt, serviceRoots } from "./sources/service";
+import { currentServer, homeServer, librarySource, serviceAt, serviceRoots, sharedShelves, type Shelf } from "./sources/service";
 
 export type SourceKind = "device" | "serverFolder" | "server";
 
@@ -29,8 +29,35 @@ export const adding = $reactive({
   /** Whether a service serves the page (asked once): then its folders are the server's, not the device's. */
   served: null as boolean | null,
   /** The demo's sample music, where the page has some beside it (GitHub Pages, the dev server). */
-  samples: null as SampleList | null
+  samples: null as SampleList | null,
+  /** The music shared with one on the server in front (SH-D6), each to open as a tab. */
+  shared: [] as Shelf[]
 });
+
+/** Asks the server in front for the music shared with one (none without a server or a session). */
+export async function loadShared(): Promise<void> {
+  adding.shared = account.active ? await sharedShelves().catch(() => []) : [];
+}
+
+/** A shared music's tab: "Ana's music". */
+export const sharedLabel = (name: string): string => t("sources.sharedBy", { name });
+
+/** Opens someone's music shared with one as a tab of its own, or shows it if it is open. */
+export async function openShared(shelf: Shelf): Promise<void> {
+  adding.open = false;
+  const server = currentServer();
+  const open = $toRaw(library).roots.find((root) => root.source.kind === "library" && root.source.server === server && root.source.shelf === shelf.shelf);
+  if (open) {
+    library.activeRootId = open.id;
+    return;
+  }
+  const source = await librarySource(server, shelf);
+  if (!source) {
+    library.errorMessage = t("sources.noLongerShared", { name: shelf.name });
+    return;
+  }
+  await hydrateRoot(source, { setActive: true, rootLabel: sharedLabel(shelf.name) });
+}
 
 void isService().then((answer) => {
   adding.served = answer;
@@ -73,7 +100,7 @@ export const folderSources = (): SourceKind[] => sourcesHere().filter((kind) => 
 /** The dialog's tabs: "Folder" wherever folders are offered; "Server" in the apps. */
 export function tabsHere(): ("folder" | "server")[] {
   const tabs: ("folder" | "server")[] = [];
-  if (folderSources().length > 0 || recent.list.length > 0) tabs.push("folder");
+  if (folderSources().length > 0 || recent.list.length > 0 || adding.shared.length > 0) tabs.push("folder");
   if (sourcesHere().includes("server")) tabs.push("server");
   return tabs;
 }
@@ -89,9 +116,10 @@ export function openAdding(): void {
     window.parent.postMessage({ type: "jackbird:demo" }, location.origin);
     return;
   }
+  void loadShared();
   const tabs = tabsHere();
   const folders = folderSources();
-  if (tabs.length === 1 && tabs[0] === "folder" && folders.length === 1) {
+  if (tabs.length === 1 && tabs[0] === "folder" && folders.length === 1 && adding.shared.length === 0) {
     void addFrom(folders[0]);
     return;
   }
@@ -160,6 +188,7 @@ export async function addServer(typed: string): Promise<void> {
     }
     importing.available = $toRaw(library).roots.some((root) => root.source.kind === "library" && root.source.server === currentServer());
     if (first === null) library.infoMessage = t("sources.nothingOpen", { server: serverName() });
+    void loadShared();
   } catch (error) {
     adding.open = true;
     adding.error = error instanceof Error ? error.message : String(error);

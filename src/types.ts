@@ -180,6 +180,8 @@ export type RootSource = {
   readonly saved: FileSystemDirectoryHandle | string;
   /** The server it is on (E6b-D11); none for the browser's and the device's own folders. */
   readonly server?: ServiceClient;
+  /** In a server's library, whose music it is when not one's own (SH-D6): their id. */
+  readonly shelf?: number;
   /** Every file under it, with its size and date. */
   walk(): Promise<WalkedFile[]>;
   /** One file's checksums, size and date; its tags too, unless its full checksum is still `known`. */
