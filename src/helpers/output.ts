@@ -5,7 +5,12 @@
 
 export type OutputKind = "embedded" | "shared" | "exclusive";
 export type OutputMode = "shared" | "exclusive";
-export type Fidelity = "bit-perfect" | "mixer" | "converted";
+/**
+ * How faithful the way to the device is: bit-perfect; through the system's mixer; converted (another
+ * rate or depth); or, on a phone (E6b-D10), bit-perfect but for the phone's volume, which jackbird
+ * applies itself below its top since Android leaves it to the DAC.
+ */
+export type Fidelity = "bit-perfect" | "mixer" | "converted" | "volume";
 
 /** What a song decodes to. */
 export type PcmFormat = { rate: number; channels: number; bits: number };

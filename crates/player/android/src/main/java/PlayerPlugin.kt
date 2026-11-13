@@ -170,7 +170,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
   /**
    * What sounds (E6b-D10), as the desktop's output says it (src/lib/native-audio.ts' `started`): the
-   * song's codec, depth and rate, and its way to the device, bit-perfect or through Android's mixer.
+   * song's codec, depth and rate, and its way to the device: bit-perfect, bit-perfect but for the
+   * phone's volume (below its top, applied by the sink: Volume.kt), or through Android's mixer.
    */
   private fun sendSounding() {
     val player = player ?: return
@@ -208,7 +209,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       put("mode", if (way?.bitPerfect == true) "exclusive" else "shared")
       put("rate", way?.rate ?: rate)
       put("sample", way?.sample ?: "")
-      put("fidelity", if (way?.bitPerfect == true) "bit-perfect" else "mixer")
+      put("fidelity", if (way?.bitPerfect != true) "mixer" else if (Volume.atTop) "bit-perfect" else "volume")
     })
     event.put("offered", way?.offered ?: "")
     trigger("sounding", event)
@@ -458,7 +459,9 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   /**
    * The person's output setting (E6b-D10): bit-perfect to a USB DAC, at once. The playing track's
    * AudioTrack keeps the mixer it was made with (and the player reuses it for songs of the same
-   * format), so a seek to where it is makes a new one, for which BitPerfectSink asks again.
+   * format), so a seek makes a new one, for which BitPerfectSink asks again. Media3 ignores a seek
+   * to the millisecond the player is at (always while paused): the seek goes one back (one forward
+   * at the very start). Ended or idle, the next play makes a new AudioTrack anyway.
    */
   @Command
   fun setOutput(invoke: Invoke) {
@@ -471,7 +474,11 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
     BitPerfect.pending = true
     withPlayer(invoke) { player ->
-      if (player.mediaItemCount > 0) player.seekTo(player.currentPosition)
+      val ready = player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING
+      if (player.mediaItemCount > 0 && ready) {
+        val at = player.currentPosition
+        player.seekTo(if (at > 0) at - 1 else 1)
+      }
       invoke.resolve()
     }
   }
