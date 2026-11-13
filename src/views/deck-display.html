@@ -7,7 +7,10 @@
   // page's width (the compact player's card). A view over lib/player.ts and lib/output.ts.
   // See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 06:30).
 
-  type Props = { bands?: number; small?: boolean }
+  type Props = { bands?: number; small?: boolean | "" }
+  // A bare attribute (`<DeckDisplay small>`) comes as "", which is falsy: read as the theme's
+  // components read theirs (display.html).
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
 
   const Counter = await import("../../theme/default/components/counter.html")
   const Display = await import("../../theme/default/components/display.html")
@@ -131,7 +134,7 @@
 
 <div class="unit">
   <Display live joined>
-    <div class="lcd" :class.small="small">
+    <div class="lcd" :class.small="flag(small)">
       <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
       <button :if="playback.playing" type="button" class="lcd-mark playing"
               :aria-label="t(MARK_LABELS[nextMarkView()])"

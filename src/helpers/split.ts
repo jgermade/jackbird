@@ -4,8 +4,11 @@
  * RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 01:10).
  */
 
-/** The library's width when none was chosen, and the least each pane keeps. */
-export const SPLIT = { initial: 23.75, minLibrary: 16, minSheet: 20 } as const;
+/**
+ * The library's width when none was chosen, and in the landing page's window (`embed`, the app
+ * embedded: chosen nowhere, kept nowhere); and the least each pane keeps.
+ */
+export const SPLIT = { initial: 23.75, embed: 19, minLibrary: 16, minSheet: 20 } as const;
 
 /**
  * The library's width within the panes' (`total`, both in rem): at least `minLibrary`, leaving the
