@@ -10,7 +10,7 @@
 //!   one that could not be written there, which goes once.
 //! - `checksums`: each file's checksums (the whole file read), the same way, after.
 //!
-//! See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-14).
+//! See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 19:35 UTC).
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};

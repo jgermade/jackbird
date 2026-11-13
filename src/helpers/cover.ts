@@ -45,7 +45,7 @@ export function fromBase64(text: string): Uint8Array | null {
 }
 
 /**
- * A cover kept once (RECORD/2026-11-03.deck-design-system.WIP.md, 2026-11-14): the library holds
+ * A cover kept once (RECORD/2026-11-03.deck-design-system.WIP.md, 2026-11-13 19:35 UTC): the library holds
  * a reference to it, `jackbird-cover:<name>`, in place of the picture itself; the picture is in
  * memory once (lib/covers.ts) and in the folder's `.meta/covers/<name>`. The name is made from
  * the bytes (two FNV-1a hashes and the length), the same as crates/api's `cover_name`, so the same

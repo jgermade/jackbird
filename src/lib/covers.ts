@@ -4,7 +4,7 @@
 // the first time it is shown; one only named (by a `.meta/` read at opening) is read from its
 // folder then. Before, every track carried its cover as a data URL: twelve copies of an album's
 // picture in memory, in `.meta/`, over the desktop app's IPC and in the page, which made opening a
-// folder slow, the more so in WebKit. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-14).
+// folder slow, the more so in WebKit. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 19:35 UTC).
 
 import type { VFSAdapter } from "@cloudauthn/vfs-sync";
 import { $reactive } from "jq79";
