@@ -193,7 +193,7 @@ fn writes_in_a_v24_originals_version_the_year_as_tdrc_in_place() {
 fn drops_a_frame_flagged_to_be_discarded_when_the_tag_is_altered() {
     let v3 = file(
         Version::V23,
-        &[flagged(text("TPOS", "1/2"), [0x80, 0]), text("TPE2", "Kept")],
+        &[flagged(text("TCOM", "1/2"), [0x80, 0]), text("TPE2", "Kept")],
     );
     let out = write(
         &v3,
@@ -206,7 +206,7 @@ fn drops_a_frame_flagged_to_be_discarded_when_the_tag_is_altered() {
     assert_eq!(ids(&out), ["TPE2", "TIT2"]);
     let v4 = file(
         Version::V24,
-        &[flagged(text("TPOS", "1/2"), [0x40, 0]), text("TPE2", "Kept")],
+        &[flagged(text("TCOM", "1/2"), [0x40, 0]), text("TPE2", "Kept")],
     );
     let out = write(
         &v4,
@@ -506,7 +506,7 @@ fn safeguard_3_refuses_a_result_that_lost_or_changed_a_frame() {
         Version::V23,
         &[
             text("TIT2", "Before"),
-            text("TPOS", "1/2"),
+            text("TCOM", "1/2"),
             picture(3, "front"),
             picture(4, "back"),
         ],
@@ -522,12 +522,12 @@ fn safeguard_3_refuses_a_result_that_lost_or_changed_a_frame() {
         &[text("TIT2", "After"), picture(3, "front"), picture(4, "back")],
     );
     let error = verify(Format::Mp3, &source, &lost, &change(&changes, &fields, Some(&shown))).unwrap_err();
-    assert_eq!(error, Error::Refused(Refusal::Kept("the TPOS frame".into())));
+    assert_eq!(error, Error::Refused(Refusal::Kept("the TCOM frame".into())));
     let changed = file(
         Version::V23,
         &[
             text("TIT2", "After"),
-            text("TPOS", "1/3"),
+            text("TCOM", "1/3"),
             picture(3, "front"),
             picture(4, "back"),
         ],
@@ -540,7 +540,7 @@ fn safeguard_3_refuses_a_result_that_lost_or_changed_a_frame() {
     );
     let no_back = file(
         Version::V23,
-        &[text("TIT2", "After"), text("TPOS", "1/2"), picture(3, "front")],
+        &[text("TIT2", "After"), text("TCOM", "1/2"), picture(3, "front")],
     );
     let error = verify(Format::Mp3, &source, &no_back, &change(&changes, &fields, Some(&shown))).unwrap_err();
     assert_eq!(error, Error::Refused(Refusal::Kept("a picture".into())));
@@ -548,7 +548,7 @@ fn safeguard_3_refuses_a_result_that_lost_or_changed_a_frame() {
         Version::V23,
         &[
             text("TIT2", "After"),
-            text("TPOS", "1/2"),
+            text("TCOM", "1/2"),
             picture(3, "front"),
             picture(4, "back"),
         ],
@@ -718,6 +718,9 @@ fn fields_and_edits_by_field() {
         year: "y".into(),
         genre: "g".into(),
         track: "n".into(),
+        disc: "d".into(),
+        album_artist: "aa".into(),
+        compilation: "1".into(),
     };
     let edit = Edit::all(&fields);
     for field in Field::ALL {

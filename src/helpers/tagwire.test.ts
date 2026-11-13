@@ -7,13 +7,13 @@ const run = (bytes: number[]) => [...u32(bytes.length), ...bytes];
 const text = (value: string) => run([...new TextEncoder().encode(value)]);
 
 describe("decodeTags", () => {
-  it("reads the format, the six fields in order and the cover, as crates/tags-wasm writes them", () => {
+  it("reads the format, the fields in order and the cover, as crates/tags-wasm writes them", () => {
     // The bytes of wire.rs' test `writes_tags_errors_and_regions`.
-    const bytes = Uint8Array.from([1, ...text("T"), ...text(""), ...text(""), ...text("1959"), ...text(""), ...text(""), 1, ...text("image/jpeg"), ...run([1, 2])]);
+    const bytes = Uint8Array.from([1, ...text("T"), ...text(""), ...text(""), ...text("1959"), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), 1, ...text("image/jpeg"), ...run([1, 2])]);
     const tags = decodeTags(bytes);
     assert.deepEqual(tags, {
       format: "flac",
-      fields: { title: "T", artist: "", album: "", year: "1959", genre: "", track: "" },
+      fields: { title: "T", artist: "", album: "", year: "1959", genre: "", track: "", disc: "", albumArtist: "", compilation: "" },
       cover: { mime: "image/jpeg", data: Uint8Array.of(1, 2) }
     });
     // The cover is a copy: changing the answer's buffer leaves it alone.
@@ -22,10 +22,10 @@ describe("decodeTags", () => {
   });
 
   it("reads an MP3 without a cover, and UTF-8", () => {
-    const bytes = Uint8Array.from([0, ...text("Título"), ...text("Artist"), ...text(""), ...text(""), ...text("(17)"), ...text("3/12"), 0]);
+    const bytes = Uint8Array.from([0, ...text("Título"), ...text("Artist"), ...text(""), ...text(""), ...text("(17)"), ...text("3/12"), ...text("1/2"), ...text("Various Artists"), ...text("1"), 0]);
     assert.deepEqual(decodeTags(bytes), {
       format: "mp3",
-      fields: { title: "Título", artist: "Artist", album: "", year: "", genre: "(17)", track: "3/12" },
+      fields: { title: "Título", artist: "Artist", album: "", year: "", genre: "(17)", track: "3/12", disc: "1/2", albumArtist: "Various Artists", compilation: "1" },
       cover: null
     });
   });
@@ -87,16 +87,16 @@ describe("encodeLayout and encodeRead", () => {
 describe("encodeWrite", () => {
   it("writes the fields given, in order, then the cover, the layout and the head", () => {
     const head = Uint8Array.of(0x66, 0x4c, 0x61, 0x43);
-    const bytes = encodeWrite({ fields: { title: "Título", album: "", year: "1959", track: "3/12" }, cover: { set: { mime: "image/png", data: Uint8Array.of(9, 8, 7) } } }, flac, head);
+    const bytes = encodeWrite({ fields: { title: "Título", album: "", year: "1959", track: "3/12", disc: "2/2", albumArtist: "Various Artists", compilation: "1" }, cover: { set: { mime: "image/png", data: Uint8Array.of(9, 8, 7) } } }, flac, head);
     // The request of wire.rs' test `reads_a_write_request`.
     assert.deepEqual(
       bytes,
-      Uint8Array.from([1, ...text("Título"), 0, 1, ...text(""), 1, ...text("1959"), 0, 1, ...text("3/12"), 1, ...text("image/png"), ...run([9, 8, 7]), ...LAYOUT, 0x66, 0x4c, 0x61, 0x43])
+      Uint8Array.from([1, ...text("Título"), 0, 1, ...text(""), 1, ...text("1959"), 0, 1, ...text("3/12"), 1, ...text("2/2"), 1, ...text("Various Artists"), 1, ...text("1"), 1, ...text("image/png"), ...run([9, 8, 7]), ...LAYOUT, 0x66, 0x4c, 0x61, 0x43])
     );
   });
 
   it("marks a cover kept with 0 and removed with 2", () => {
-    const none = [0, 0, 0, 0, 0, 0];
+    const none = WIRE_FIELDS.map(() => 0);
     assert.deepEqual(encodeWrite({ fields: {}, cover: { keep: true } }, flac, Uint8Array.of(5)), Uint8Array.from([...none, 0, ...LAYOUT, 5]));
     assert.deepEqual(encodeWrite({ fields: {}, cover: { remove: true } }, flac, Uint8Array.of()), Uint8Array.from([...none, 2, ...LAYOUT]));
   });

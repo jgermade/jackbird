@@ -295,7 +295,11 @@ export async function libraryDownloadUrl(path: string): Promise<string> {
 }
 
 /** Other tags brought with a song's audio (until F3 makes them someone's own). */
-export type LibrarySuggestion = { fields: { title: string; artist: string; album: string; year: string; genre: string; track: string }; by: string; at: number };
+export type LibrarySuggestion = {
+  fields: { title: string; artist: string; album: string; year: string; genre: string; track: string; disc?: string; album_artist?: string; compilation?: string };
+  by: string;
+  at: number;
+};
 
 export const librarySuggestions = (path: string): Promise<LibrarySuggestion[]> =>
   json<LibrarySuggestion[]>(`library/suggestions?${inLibrary(path)}`);
@@ -303,7 +307,7 @@ export const librarySuggestions = (path: string): Promise<LibrarySuggestion[]> =
 // ─── Each person's own (F3) ──────────────────────────────────────────────────
 
 /** What a song's tags are made of: the file's, what the family's layer sets, what one's own sets. */
-export type LayerJson = Partial<Record<"title" | "artist" | "album" | "year" | "genre" | "track", string>> & { cover?: { kind: string } };
+export type LayerJson = Partial<Record<"title" | "artist" | "album" | "year" | "genre" | "track" | "disc" | "album_artist" | "compilation", string>> & { cover?: { kind: string } };
 export type SongLayers = {
   file: LibrarySuggestion["fields"];
   family: LayerJson;

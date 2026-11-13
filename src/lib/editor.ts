@@ -78,6 +78,16 @@ export function confirmField(field: string, on: boolean): void {
   }
 }
 
+/**
+ * The "Compilation" box, in the album artist's field: ticked, every track is marked one ("1");
+ * unticked, none is (the mark empties, on every track even where the selection varied).
+ */
+export function setCompilation(on: boolean): void {
+  const rest = editor.confirmed.filter((one) => one !== "compilation");
+  editor.confirmed = on ? rest : [...rest, "compilation"];
+  editor.form = { ...editor.form, compilation: on ? "1" : "" };
+}
+
 /** Why a track could not be saved, in the interface's language. */
 function reasonOf(error: unknown, metadata: EditableMetadata): string {
   if (error instanceof TagError) {

@@ -1,10 +1,13 @@
 import type { Track } from "../types.ts";
 
 /**
- * The disc a track sits on, from a `CD2`, `disc 2` or `Disc_2` folder in its
- * path; disc 1 when there is none. A number, not a label: the view words it.
+ * The disc a track sits on: its disc tag's number (`2` or `2/3`), else a `CD2`,
+ * `disc 2` or `Disc_2` folder in its path; disc 1 when there is neither. A
+ * number, not a label: the view words it.
  */
 export function inferDiscNumber(track: Track): number {
+  const byTag = Number((track.metadata.discNumber ?? "").match(/\d+/)?.[0]);
+  if (byTag > 0) return byTag;
   const byPath = track.relativePath.match(/(?:^|\/)(?:cd|disc)[ _-]?(\d+)(?:\/|$)/i);
   return byPath ? Number(byPath[1]) : 1;
 }

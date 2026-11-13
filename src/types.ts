@@ -8,6 +8,12 @@ export type TrackMetadata = {
   year: string;
   genre: string;
   trackNumber: string;
+  /** The disc, `n` or `n/total`. */
+  discNumber: string;
+  /** The album's artist, when it is not each track's. */
+  albumArtist: string;
+  /** Part of a compilation: "1" (or as the file holds it); "" when not. */
+  compilation: string;
   coverDataUrl: string | null;
 };
 

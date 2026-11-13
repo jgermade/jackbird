@@ -353,6 +353,9 @@ impl Catalogue {
         if let Some(track) = track_number(&fields.track) {
             value["track"] = json!(track);
         }
+        if let Some(disc) = track_number(&fields.disc) {
+            value["discNumber"] = json!(disc);
+        }
         if let Some(year) = year_of(&fields.year) {
             value["year"] = json!(year);
         }

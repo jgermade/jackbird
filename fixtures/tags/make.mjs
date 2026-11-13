@@ -120,8 +120,11 @@ function e0Frames(version) {
   ].map((f) => (f.id === "TPE4" ? { ...f, flags: [version === 4 ? 0x40 : 0x80, 0] } : f));
 }
 
-const E0_FIELDS = { title: "Before", artist: "Artist", album: "Album", year: "1959", genre: "Jazz", track: "3/12" };
-const EMPTY = { title: "", artist: "", album: "", year: "", genre: "", track: "" };
+const EMPTY = { title: "", artist: "", album: "", year: "", genre: "", track: "", disc: "", albumArtist: "", compilation: "" };
+/** E0's first six frames: the six fields the engine started with. */
+const E0_SIX = { ...EMPTY, title: "Before", artist: "Artist", album: "Album", year: "1959", genre: "Jazz", track: "3/12" };
+/** All of E0's: TPOS, TPE2 and TCMP too. */
+const E0_FIELDS = { ...E0_SIX, disc: "1/2", albumArtist: "Album Artist", compilation: "1" };
 const COVER1 = { file: "covers/cover1.jpg", mime: "image/jpeg" };
 
 const id3v1 = bytes("TAG", "Before".padEnd(30, " "), "Artist".padEnd(30, " "), "Album".padEnd(30, " "), "1959", "v1 comment".padEnd(28, " "), [0, 3, 8]);
@@ -190,7 +193,7 @@ const fullBlocks = [
   picture(4, "image/jpeg", "back", cover("cover2.jpg"), [24, 24, 24]),
   block(1, new Uint8Array(512)),
 ];
-const FLAC_FIELDS = { title: "Before", artist: "One", album: "Album", year: "1959", genre: "Jazz", track: "3" };
+const FLAC_FIELDS = { ...EMPTY, title: "Before", artist: "One", album: "Album", year: "1959", genre: "Jazz", track: "3", disc: "1", albumArtist: "Album Artist" };
 
 // ---------------------------------------------------------------- cases
 
@@ -213,11 +216,11 @@ mp3("mp3-v23-padded", tag(3, e0Frames(3), { padding: 256 }), expect(E0_FIELDS, C
 mp3("mp3-v24-padded", tag(4, e0Frames(4), { padding: 256 }), expect(E0_FIELDS, COVER1), { about: "E0's eighteen frames in v2.4 (UTF-8, TDRC), with padding" });
 mp3("mp3-v23-unsync", tag(3, e0Frames(3), { unsync: true }), expect(E0_FIELDS, COVER1), { about: "v2.3 with the whole tag unsynchronised, no padding" });
 mp3("mp3-v24-plain-sizes", tag(4, e0Frames(4), { plainSizes: true }), expect(E0_FIELDS, COVER1), { about: "v2.4 with plain frame sizes, as old iTunes wrote them" });
-mp3("mp3-v23-ext-header", tag(3, e0Frames(3).slice(0, 6), { padding: 64, extended: [0, 0, 0, 6, 0, 0, 0, 0, 0, 64] }), expect(E0_FIELDS), { about: "v2.3 with an extended header" });
-mp3("mp3-v24-ext-header", tag(4, e0Frames(4).slice(0, 6), { padding: 64, extended: [0, 0, 0, 6, 1, 0] }), expect(E0_FIELDS), { about: "v2.4 with an extended header" });
-mp3("mp3-v24-footer", tag(4, e0Frames(4).slice(0, 6), { footer: true }), expect(E0_FIELDS), { about: "v2.4 with a footer, which the audio region starts after" });
+mp3("mp3-v23-ext-header", tag(3, e0Frames(3).slice(0, 6), { padding: 64, extended: [0, 0, 0, 6, 0, 0, 0, 0, 0, 64] }), expect(E0_SIX), { about: "v2.3 with an extended header" });
+mp3("mp3-v24-ext-header", tag(4, e0Frames(4).slice(0, 6), { padding: 64, extended: [0, 0, 0, 6, 1, 0] }), expect(E0_SIX), { about: "v2.4 with an extended header" });
+mp3("mp3-v24-footer", tag(4, e0Frames(4).slice(0, 6), { footer: true }), expect(E0_SIX), { about: "v2.4 with a footer, which the audio region starts after" });
 mp3("mp3-v23-id3v1", tag(3, e0Frames(3), { padding: 128 }), expect(E0_FIELDS, COVER1), { tail: id3v1, about: "v2.3 and an ID3v1 tag at the end" });
-mp3("mp3-v24-ape", tag(4, e0Frames(4).slice(0, 6), { padding: 32 }), expect(E0_FIELDS), { tail: apeTag(), about: "v2.4 and an APEv2 tag at the end" });
+mp3("mp3-v24-ape", tag(4, e0Frames(4).slice(0, 6), { padding: 32 }), expect(E0_SIX), { tail: apeTag(), about: "v2.4 and an APEv2 tag at the end" });
 mp3("mp3-no-tag", bytes(), expect(EMPTY), { about: "no tag at all" });
 
 {
@@ -241,7 +244,7 @@ mp3("mp3-v23-utf16", tag(3, [text("TIT2", 1, "Ñandú — 東京"), frame("TPE1"
 mp3("mp3-v24-unicode", tag(4, [text("TIT2", 2, "東京"), text("TPE1", 3, "One\0Two"), frame("TALB", bytes([1], encoded(1, "A"), [0, 0], encoded(1, "B")))], { padding: 64 }),
   expect({ ...EMPTY, title: "東京", artist: "One/Two", album: "A/B" }), { about: "UTF-16BE, and several values in UTF-8 and in UTF-16" });
 mp3("mp3-v22", tag22([frame("TT2", bytes([0], "Old")), frame("TP1", bytes([0], "Artist")), frame("TAL", bytes([0], "Album")), frame("TYE", bytes([0], "1990")), frame("TCO", bytes([0], "Rock")), frame("TRK", bytes([0], "1/9")), frame("PIC", bytes([0], "JPG", [3, 0], cover("cover2.jpg"))), frame("COM", bytes([0], "eng", [0], "hi"))], 32),
-  expect({ title: "Old", artist: "Artist", album: "Album", year: "1990", genre: "Rock", track: "1/9" }, { file: "covers/cover2.jpg", mime: "image/jpeg" }, "id3v22"), { about: "ID3v2.2 (read; a save is refused)" });
+  expect({ ...EMPTY, title: "Old", artist: "Artist", album: "Album", year: "1990", genre: "Rock", track: "1/9" }, { file: "covers/cover2.jpg", mime: "image/jpeg" }, "id3v22"), { about: "ID3v2.2 (read; a save is refused)" });
 mp3("mp3-junk", tag(3, [text("TIT2", 0, "Junk"), text("TPE1", 0, "Artist")], { padding: 16, junk: [1, 2, 3, 4] }),
   expect({ ...EMPTY, title: "Junk", artist: "Artist" }, null, "unreadable"), { about: "bytes after the frames that are neither a frame nor padding (read; a save is refused)" });
 

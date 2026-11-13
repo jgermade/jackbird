@@ -170,7 +170,8 @@ mod tests {
 
         let mut request = vec![1, 5, 0, 0, 0];
         request.extend_from_slice(b"Blue!");
-        request.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+        // The other fields left, the cover kept.
+        request.extend_from_slice(&[0; 9]);
         request.extend_from_slice(&layout);
         request.extend_from_slice(&file[..25]);
         let (status, out) = call(&request, tags_write);

@@ -10,7 +10,7 @@ const snapshot: MetaSnapshot = {
     "Jazz/01.mp3": {
       checksum: "abc",
       size: 1000,
-      metadata: { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", trackNumber: "1", coverDataUrl: null },
+      metadata: { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", trackNumber: "1", discNumber: "", albumArtist: "", compilation: "", coverDataUrl: null },
       updatedAt: "2026-11-03T19:00:00.000Z"
     }
   }

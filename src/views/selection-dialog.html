@@ -23,7 +23,7 @@
   const { formatBytes } = await import("../helpers/format")
   const { audioFormatOf } = await import("../helpers/formats")
   const { getVariedFields } = await import("../helpers/metadata")
-  const { closeSelection, confirmField, editor, saveEdits } = await import("../lib/editor")
+  const { closeSelection, confirmField, editor, saveEdits, setCompilation } = await import("../lib/editor")
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { loadSongExtras, songExtras } = await import("../lib/importing")
@@ -51,17 +51,20 @@
     fullChecksum?: string
     audioChecksum?: string
     lastVerifiedAt?: string
-    metadata: { title: string; artist: string; album: string; year: string; genre: string; trackNumber: string; coverDataUrl: string | null }
+    metadata: { title: string; artist: string; album: string; year: string; genre: string; trackNumber: string; discNumber: string; albumArtist: string; compilation: string; coverDataUrl: string | null }
   }
 
   // `plain` examples are shown as they are; the others as "e.g. …".
   const FIELDS = [
     { key: "title", label: "field.title", example: "Bohemian Rhapsody", wide: true },
     { key: "artist", label: "field.artist", example: "Queen" },
+    // With the "Compilation" box inside it, at its right.
+    { key: "albumArtist", label: "field.albumArtist", example: "Queen" },
     { key: "album", label: "field.album", example: "A Night at the Opera" },
     { key: "year", label: "field.year", example: "1975", plain: true, numeric: true },
-    { key: "genre", label: "field.genre", example: "Rock", plain: true },
-    { key: "trackNumber", label: "field.track", example: "1/12", plain: true, numeric: true }
+    { key: "trackNumber", label: "field.track", example: "1/12", plain: true, numeric: true },
+    { key: "discNumber", label: "field.disc", example: "1/2", plain: true, numeric: true },
+    { key: "genre", label: "field.genre", example: "Rock", plain: true, wide: true }
   ] as const
   type FieldSpec = (typeof FIELDS)[number]
 
@@ -97,6 +100,10 @@
     varied()[field.key] ? t("editor.multipleValues") : "plain" in field ? field.example : t("editor.example", { value: field.example })
   // A varied field's "Override" box: ticked while it has text, or ticked on it empty.
   const isConfirmed = (field: FieldSpec): boolean => !!editor.form[field.key] || editor.confirmed.includes(field.key)
+  // The "Compilation" box: ticked when the form marks one; neither ticked nor not where the
+  // selection varies and nothing was chosen yet.
+  const compilationOn = (): boolean => editor.form.compilation.trim() === "1"
+  const compilationMixed = (): boolean => varied().compilation && !compilationOn() && !editor.confirmed.includes("compilation")
   const coverFailed = (message: string) => {
     library.errorMessage = message
   }
@@ -109,7 +116,10 @@
       { label: t("field.title"), text: track.metadata.title || none },
       { label: t("field.artist"), text: track.metadata.artist || none },
       { label: t("field.album"), text: track.metadata.album || none },
+      { label: t("field.albumArtist"), text: track.metadata.albumArtist || none },
       { label: t("field.track"), text: track.metadata.trackNumber || none },
+      { label: t("field.disc"), text: track.metadata.discNumber || none },
+      { label: t("field.compilation"), text: track.metadata.compilation.trim() === "1" ? t("common.yes") : t("common.no") },
       { label: t("field.year"), text: track.metadata.year || none },
       { label: t("field.genre"), text: track.metadata.genre || none },
       { label: t("info.relativePath"), text: track.relativePath, mono: true },
@@ -196,6 +206,11 @@
                          :numeric="'numeric' in field"
                          :inputmode="field.key === 'year' ? 'numeric' : ''">
                 <template :slot.end>
+                  <label :if="field.key === 'albumArtist'" class="override compilation" :class.on="compilationOn()" :class.mixed="compilationMixed()" :title="t('field.compilationTitle')">
+                    <input type="checkbox" class="override-input" :checked="compilationOn()" @change="setCompilation($event.target.checked)">
+                    <span>{{ t("field.compilation") }}</span>
+                    <svg class="box" viewBox="0 0 16 16" aria-hidden="true"><rect class="box-frame" x="1.5" y="1.5" width="13" height="13" rx="2" /><path :if="compilationOn()" class="box-tick" d="M4.4 8.3 6.9 10.8 11.7 5.6" /><path :elseif="compilationMixed()" class="box-tick" d="M4.5 8h7" /></svg>
+                  </label>
                   <label :if="varied()[field.key]" class="override" :class.on="isConfirmed(field)" :title="t('editor.overrideTitle')">
                     <input type="checkbox" class="override-input" :checked="isConfirmed(field)" @change="confirmField(field.key, $event.target.checked)">
                     <svg :if="isConfirmed(field)" class="warn" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 15.2 14.4H.8z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><path d="M8 6v3.6" stroke="var(--mm-on-accent)" stroke-width="1.6" stroke-linecap="round" /><circle cx="8" cy="11.9" r=".95" fill="var(--mm-on-accent)" /></svg>
@@ -363,6 +378,10 @@
      native checkbox stays, unseen, for the keyboard and screen readers. */
   .override { position: relative; display: inline-flex; align-items: center; gap: var(--mm-space-1); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); cursor: pointer; user-select: none; }
   .override.on { color: var(--mm-fg); }
+  /* The compilation's box beside the album artist's own "Override", when both show. */
+  .compilation + .override { margin-left: var(--mm-space-2); }
+  .mixed .box-frame { fill: var(--mm-accent-soft); stroke: var(--mm-accent); }
+  .mixed .box-tick { stroke: var(--mm-accent); }
   .override-input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
   .warn { width: .875rem; height: .875rem; color: var(--mm-warn-led); }
   .box { width: 1rem; height: 1rem; border-radius: 3px; }

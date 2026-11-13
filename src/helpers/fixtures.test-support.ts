@@ -15,6 +15,9 @@ export function track(relativePath: string, metadata: Partial<TrackMetadata> = {
       year: "",
       genre: "",
       trackNumber: "",
+      discNumber: "",
+      albumArtist: "",
+      compilation: "",
       coverDataUrl: null,
       ...metadata
     }

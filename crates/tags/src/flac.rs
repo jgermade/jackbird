@@ -1,4 +1,4 @@
-//! FLAC: the six fields over the first `VORBIS_COMMENT` block, the cover over
+//! FLAC: the fields over the first `VORBIS_COMMENT` block, the cover over
 //! the `PICTURE` blocks.
 
 use jackbird_flac::{
@@ -23,6 +23,9 @@ fn keys(field: Field) -> &'static [&'static str] {
         Field::Year => &["DATE", "YEAR"],
         Field::Genre => &["GENRE"],
         Field::Track => &["TRACKNUMBER", "TRACKTOTAL", "TOTALTRACKS"],
+        Field::Disc => &["DISCNUMBER", "DISCTOTAL", "TOTALDISCS"],
+        Field::AlbumArtist => &["ALBUMARTIST", "ALBUM ARTIST"],
+        Field::Compilation => &["COMPILATION"],
     }
 }
 
@@ -35,24 +38,31 @@ fn first_comments(metadata: &Metadata) -> Option<(usize, Result<Comments, meta::
     Some((index, Comments::parse(&metadata.blocks[index].body)))
 }
 
-fn fields_of(comments: &Comments) -> Fields {
-    let get = |key: &str| comments.get(key).unwrap_or_default();
-    let number = get("TRACKNUMBER");
+/// A number and its total (`TRACKNUMBER` and `TRACKTOTAL`, or `TOTALTRACKS`), as `n/total`.
+fn numbered(comments: &Comments, [number, total, other]: [&str; 3]) -> String {
+    let number = comments.get(number).unwrap_or_default();
     let total = comments
-        .get("TRACKTOTAL")
+        .get(total)
         .filter(|total| !total.is_empty())
-        .or_else(|| comments.get("TOTALTRACKS"));
-    let track = match total {
+        .or_else(|| comments.get(other));
+    match total {
         Some(total) if !total.is_empty() && !number.is_empty() && !number.contains('/') => format!("{number}/{total}"),
         _ => number,
-    };
+    }
+}
+
+fn fields_of(comments: &Comments) -> Fields {
+    let get = |key: &str| comments.get(key).unwrap_or_default();
     Fields {
         title: get("TITLE"),
         artist: get("ARTIST"),
         album: get("ALBUM"),
         year: comments.get("DATE").unwrap_or_else(|| get("YEAR")),
         genre: get("GENRE"),
-        track,
+        track: numbered(comments, ["TRACKNUMBER", "TRACKTOTAL", "TOTALTRACKS"]),
+        disc: numbered(comments, ["DISCNUMBER", "DISCTOTAL", "TOTALDISCS"]),
+        album_artist: comments.get("ALBUMARTIST").unwrap_or_else(|| get("ALBUM ARTIST")),
+        compilation: get("COMPILATION"),
     }
 }
 
@@ -120,25 +130,34 @@ fn apply(comments: &mut Comments, field: Field, value: &str) {
             };
             set_first(comments, key, value);
         }
-        Field::Track => {
+        Field::Track | Field::Disc => {
+            let [number_key, total_key, other_key] = [all[0], all[1], all[2]];
             let (number, total) = match value.split_once('/') {
                 Some((number, total)) => (number, Some(total)),
                 None => (value, None),
             };
-            set_first(comments, "TRACKNUMBER", number);
+            set_first(comments, number_key, number);
             match total {
                 Some(total) => {
-                    let key = if comments.positions("TRACKTOTAL").is_empty()
-                        && !comments.positions("TOTALTRACKS").is_empty()
-                    {
-                        "TOTALTRACKS"
+                    let key = if comments.positions(total_key).is_empty() && !comments.positions(other_key).is_empty() {
+                        other_key
                     } else {
-                        "TRACKTOTAL"
+                        total_key
                     };
                     set_first(comments, key, total);
                 }
-                None => remove_all(comments, &["TRACKTOTAL", "TOTALTRACKS"]),
+                None => remove_all(comments, &[total_key, other_key]),
             }
+        }
+        Field::AlbumArtist => {
+            // The entry it was read from: ALBUMARTIST, else ALBUM ARTIST, else a new ALBUMARTIST.
+            let key = if comments.positions("ALBUMARTIST").is_empty() && !comments.positions("ALBUM ARTIST").is_empty()
+            {
+                "ALBUM ARTIST"
+            } else {
+                "ALBUMARTIST"
+            };
+            set_first(comments, key, value);
         }
         _ => set_first(comments, all[0], value),
     }

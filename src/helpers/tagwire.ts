@@ -6,8 +6,8 @@
  * See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-07 20:16, E2-D2).
  */
 
-/** The six fields, in the engine's order (`Field::ALL`). */
-export const WIRE_FIELDS = ["title", "artist", "album", "year", "genre", "track"] as const;
+/** The fields, in the engine's order (`Field::ALL`). */
+export const WIRE_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "albumArtist", "compilation"] as const;
 
 export type WireField = (typeof WIRE_FIELDS)[number];
 

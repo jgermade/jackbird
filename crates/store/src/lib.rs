@@ -61,7 +61,8 @@ fn store_error(error: rusqlite::Error) -> Error {
     Error::Io(format!("the library's catalogue: {error}"))
 }
 
-/// The six fields, as the catalogue keeps them.
+/// The fields, as the catalogue keeps them. The disc, the album artist and the compilation came
+/// later: a song imported before them has them empty (`serde(default)`).
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct FieldsJson {
     /// The title.
@@ -76,6 +77,15 @@ pub struct FieldsJson {
     pub genre: String,
     /// The track number.
     pub track: String,
+    /// The disc number.
+    #[serde(default)]
+    pub disc: String,
+    /// The album's artist.
+    #[serde(default)]
+    pub album_artist: String,
+    /// Part of a compilation (`1`), or empty.
+    #[serde(default)]
+    pub compilation: String,
 }
 
 impl From<&Fields> for FieldsJson {
@@ -87,6 +97,9 @@ impl From<&Fields> for FieldsJson {
             year: fields.year.clone(),
             genre: fields.genre.clone(),
             track: fields.track.clone(),
+            disc: fields.disc.clone(),
+            album_artist: fields.album_artist.clone(),
+            compilation: fields.compilation.clone(),
         }
     }
 }
@@ -100,6 +113,9 @@ impl From<&FieldsJson> for Fields {
             year: fields.year.clone(),
             genre: fields.genre.clone(),
             track: fields.track.clone(),
+            disc: fields.disc.clone(),
+            album_artist: fields.album_artist.clone(),
+            compilation: fields.compilation.clone(),
         }
     }
 }
@@ -140,6 +156,15 @@ pub struct Layer {
     /// The track number it sets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub track: Option<String>,
+    /// The disc number it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disc: Option<String>,
+    /// The album artist it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub album_artist: Option<String>,
+    /// The compilation mark it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compilation: Option<String>,
     /// What it does to the cover.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<CoverLayer>,
@@ -160,6 +185,9 @@ impl Layer {
             year: self.year.clone().or_else(|| under.year.clone()),
             genre: self.genre.clone().or_else(|| under.genre.clone()),
             track: self.track.clone().or_else(|| under.track.clone()),
+            disc: self.disc.clone().or_else(|| under.disc.clone()),
+            album_artist: self.album_artist.clone().or_else(|| under.album_artist.clone()),
+            compilation: self.compilation.clone().or_else(|| under.compilation.clone()),
             cover: self.cover.clone().or_else(|| under.cover.clone()),
         }
     }
@@ -174,6 +202,9 @@ impl Layer {
             year: pick(&self.year, &file.year),
             genre: pick(&self.genre, &file.genre),
             track: pick(&self.track, &file.track),
+            disc: pick(&self.disc, &file.disc),
+            album_artist: pick(&self.album_artist, &file.album_artist),
+            compilation: pick(&self.compilation, &file.compilation),
         }
     }
 }
@@ -856,6 +887,9 @@ impl Library {
             year: layer.year.clone(),
             genre: layer.genre.clone(),
             track: layer.track.clone(),
+            disc: layer.disc.clone(),
+            album_artist: layer.album_artist.clone(),
+            compilation: layer.compilation.clone(),
             cover: match &layer.cover {
                 None => CoverEdit::Keep,
                 Some(CoverLayer::Remove) => CoverEdit::Remove,
@@ -925,6 +959,9 @@ impl Library {
         set(&mut layer.year, &edit.year, &under.year);
         set(&mut layer.genre, &edit.genre, &under.genre);
         set(&mut layer.track, &edit.track, &under.track);
+        set(&mut layer.disc, &edit.disc, &under.disc);
+        set(&mut layer.album_artist, &edit.album_artist, &under.album_artist);
+        set(&mut layer.compilation, &edit.compilation, &under.compilation);
         match &edit.cover {
             CoverEdit::Keep => {}
             CoverEdit::Set(cover) => {

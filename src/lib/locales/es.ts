@@ -220,6 +220,12 @@ export const es: Record<MessageKey, string> = {
   "field.year": "Año",
   "field.genre": "Género",
   "field.track": "Pista",
+  "field.albumArtist": "Artista del álbum",
+  "field.disc": "Disco",
+  "field.compilation": "Recopilación",
+  "field.compilationTitle": "Parte de un álbum de varios artistas",
+  "common.yes": "Sí",
+  "common.no": "No",
 
   "editor.variousArtists": "(Varios artistas)",
   "editor.sharedArtist": "Artista común",

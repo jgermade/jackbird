@@ -65,6 +65,9 @@ export async function readTags(bytes: Uint8Array): Promise<TrackMetadata> {
     year: tags.fields.year,
     genre: tags.fields.genre,
     trackNumber: tags.fields.track,
+    discNumber: tags.fields.disc,
+    albumArtist: tags.fields.albumArtist,
+    compilation: tags.fields.compilation,
     coverDataUrl: tags.cover ? coverToDataUrl(tags.cover) : null
   };
 }

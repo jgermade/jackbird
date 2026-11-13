@@ -6,7 +6,7 @@ const track = (relativePath: string, metadata: Partial<{ title: string; artist: 
   id: relativePath,
   name: relativePath.split("/").pop() ?? relativePath,
   relativePath,
-  metadata: { title: "", artist: "", album: "", year: "", genre: "", trackNumber: "", coverDataUrl: null, ...metadata }
+  metadata: { title: "", artist: "", album: "", year: "", genre: "", trackNumber: "", discNumber: "", albumArtist: "", compilation: "", coverDataUrl: null, ...metadata }
 });
 
 const soWhat = track("Jazz/Kind of Blue/01 so what.mp3", { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", trackNumber: "1/5" });

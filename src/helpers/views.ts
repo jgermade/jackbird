@@ -8,6 +8,7 @@
  */
 
 import type { LibraryView, Track, Playlist, WizardTreeRow } from "../types.ts";
+import { isCompilation } from "./metadata.ts";
 import { orderDetailPlaylist } from "./tracks.ts";
 
 /** The words and the order a view needs. */
@@ -65,14 +66,43 @@ const artistsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] =>
 /** How many artists an album's tracks have (without case). */
 const artistCount = (tracks: readonly Track[]): number => new Set(tracks.map((track) => track.metadata.artist.trim().toLowerCase())).size;
 
+/** Whether an album is a compilation: a track marked so, or tracks by more than one artist with no album artist to join them. */
+const isCompilationAlbum = (tracks: readonly Track[]): boolean =>
+  tracks.some((track) => isCompilation(track.metadata)) || (artistCount(tracks) > 1 && !tracks.some((track) => track.metadata.albumArtist.trim()));
+
+/**
+ * Who an album is by: its album artist; "Various artists" for a compilation without one; else its
+ * tracks' artist. Empty when unknown.
+ */
+export function albumArtistOf(tracks: readonly Track[], variousArtists: string): string {
+  const tagged = tracks.find((track) => track.metadata.albumArtist.trim())?.metadata.albumArtist.trim();
+  if (tagged) return tagged;
+  return isCompilationAlbum(tracks) ? variousArtists : (tracks[0]?.metadata.artist.trim() ?? "");
+}
+
 const albumsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] =>
   grouped(
     tracks,
     albumKey,
     (track) => track.metadata.album.trim(),
-    (members) => (artistCount(members) > 1 ? labels.variousArtists : members[0].metadata.artist.trim() || labels.unknownArtist),
+    (members) => albumArtistOf(members, labels.variousArtists) || labels.unknownArtist,
     labels.locale
   ).map((group) => ({ ...group, label: group.label || labels.unknownAlbum }));
+
+/**
+ * The artists of the albums, for Albums by artist: each album under who it is by (its album
+ * artist, or "Various artists" for a compilation), so a compilation's tracks stay together.
+ */
+const albumArtistsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] => {
+  const byAlbum = new Map<string, Track[]>();
+  for (const track of tracks) byAlbum.set(albumKey(track), [...(byAlbum.get(albumKey(track)) ?? []), track]);
+  const artistOfAlbum = new Map([...byAlbum.entries()].map(([key, members]) => [key, albumArtistOf(members, labels.variousArtists)]));
+  const artistOf = (track: Track): string => artistOfAlbum.get(albumKey(track)) ?? "";
+  return grouped(tracks, (track) => `@artist:${artistOf(track).toLowerCase()}`, artistOf, () => "", labels.locale).map((group) => ({
+    ...group,
+    label: group.label || labels.unknownArtist
+  }));
+};
 
 /**
  * The rows of `view` (not Files) for a root's `tracks`: a group's tracks
@@ -125,7 +155,9 @@ export function buildViewRows(
     const byTitle = [...tracks].sort(
       (left, right) => (left.metadata.title || left.name).localeCompare(right.metadata.title || right.name, labels.locale) || left.relativePath.localeCompare(right.relativePath)
     );
-    for (const track of byTitle) trackRow(track, null, 0, track.metadata.artist);
+    // "Artist - Album", so two songs of one title tell themselves apart.
+    const byWhom = (track: Track): string => [track.metadata.artist.trim(), track.metadata.album.trim()].filter(Boolean).join(" - ");
+    for (const track of byTitle) trackRow(track, null, 0, byWhom(track));
   } else if (view === "artists") {
     for (const artist of artistsOf(tracks, labels)) {
       if (groupRow(artist, null, 0)) {
@@ -133,7 +165,7 @@ export function buildViewRows(
       }
     }
   } else if (view === "albumsByArtist") {
-    for (const artist of artistsOf(tracks, labels)) {
+    for (const artist of albumArtistsOf(tracks, labels)) {
       if (!groupRow(artist, null, 0)) continue;
       for (const album of albumsOf(artist.tracks, labels)) {
         const sub = { ...album, key: `@aba:${artist.key.slice(8)}::${album.key.slice(7)}`, meta: "" };
@@ -143,7 +175,7 @@ export function buildViewRows(
       }
     }
   } else if (view === "albums" || view === "compilations") {
-    const albums = albumsOf(tracks, labels).filter((album) => view === "albums" || artistCount(album.tracks) > 1);
+    const albums = albumsOf(tracks, labels).filter((album) => view === "albums" || isCompilationAlbum(album.tracks));
     for (const album of albums) {
       if (groupRow(album, null, 0)) {
         for (const track of album.tracks) trackRow(track, album.key, 1, track.metadata.artist);

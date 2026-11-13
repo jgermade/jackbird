@@ -211,6 +211,9 @@ impl Library {
         layer.year = pick(&fields.year, &under.year);
         layer.genre = pick(&fields.genre, &under.genre);
         layer.track = pick(&fields.track, &under.track);
+        layer.disc = pick(&fields.disc, &under.disc);
+        layer.album_artist = pick(&fields.album_artist, &under.album_artist);
+        layer.compilation = pick(&fields.compilation, &under.compilation);
         self.put_own_layer(person, song.id, &layer)
     }
 

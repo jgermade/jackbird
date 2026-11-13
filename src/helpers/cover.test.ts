@@ -41,6 +41,13 @@ describe("editFor", () => {
     assert.deepEqual(edit.fields, { title: "Freddie Freeloader", artist: "", album: "", year: "", genre: "", track: "2/5" });
   });
 
+  it("gives the disc, the album artist and the compilation only when they change", () => {
+    const edit = editFor({ ...before, discNumber: "1/2", albumArtist: "Various" }, { ...before, discNumber: "2/2", albumArtist: "Various", compilation: "1" });
+    assert.deepEqual(edit.fields, { title: "So What", artist: "", album: "", year: "", genre: "", track: "1", disc: "2/2", compilation: "1" });
+    assert.equal("albumArtist" in editFor(before, { ...before, albumArtist: "" }).fields, false);
+    assert.equal(editFor({ ...before, discNumber: "1" }, { ...before, discNumber: "" }).fields.disc, "");
+  });
+
   it("keeps the cover when it is the track's own", () => {
     assert.deepEqual(editFor(before, { ...before }).cover, { keep: true });
     assert.deepEqual(editFor(emptyMetadata(), emptyMetadata()).cover, { keep: true });

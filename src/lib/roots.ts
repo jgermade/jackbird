@@ -4,7 +4,7 @@
 
 import { $toRaw } from "jq79";
 import type { SampleList } from "../helpers/samples";
-import { emptyMetadata } from "../helpers/metadata";
+import { emptyMetadata, readsEveryField, withEveryField } from "../helpers/metadata";
 import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
@@ -63,7 +63,7 @@ export async function hydrateRoot(
     fullChecksum: stored.fullChecksum || stored.checksum,
     audioChecksum: stored.audioChecksum,
     lastVerifiedAt: stored.lastVerifiedAt,
-    metadata: stored.metadata
+    metadata: withEveryField(stored.metadata)
   }));
 
   updateRoots((currentRoots) => {
@@ -137,7 +137,8 @@ export async function hydrateRoot(
       // Files that exist in both but have changed size/lastModified
       const modifiedFiles = audioFiles.filter((f) => {
         const stored = snapshot.tracks[f.relativePath];
-        return stored && (stored.size !== f.size || stored.lastModified !== f.lastModified);
+        // Kept before the disc, album artist and compilation were read: read again, for them.
+        return stored && (stored.size !== f.size || stored.lastModified !== f.lastModified || !readsEveryField(stored.metadata));
       });
 
       const staleOrNewFiles = [...newFiles, ...modifiedFiles];
@@ -229,10 +230,11 @@ export async function hydrateRoot(
       async function readOne(file: (typeof staleOrNewFiles)[number]): Promise<void> {
         const readFrom = checksumNow(file.relativePath);
         const stored = snapshot.tracks[file.relativePath];
-        const known = stored ? stored.fullChecksum || stored.checksum : undefined;
+        // With no checksum to compare, the tags come back even when the file has not changed.
+        const known = stored && readsEveryField(stored.metadata) ? stored.fullChecksum || stored.checksum : undefined;
         const found = await source.inspect(file.relativePath, known);
         const { fullChecksum, audioChecksum } = found;
-        const metadata = found.metadata ?? stored?.metadata ?? emptyMetadata();
+        const metadata = withEveryField(found.metadata ?? stored?.metadata ?? emptyMetadata());
 
         const nowIso = new Date().toISOString();
         pendingUpdates.push({

@@ -219,6 +219,12 @@ export const en = {
   "field.year": "Year",
   "field.genre": "Genre",
   "field.track": "Track",
+  "field.albumArtist": "Album artist",
+  "field.disc": "Disc",
+  "field.compilation": "Compilation",
+  "field.compilationTitle": "Part of an album by various artists",
+  "common.yes": "Yes",
+  "common.no": "No",
 
   "editor.variousArtists": "(Various artists)",
   "editor.sharedArtist": "Shared artist",
