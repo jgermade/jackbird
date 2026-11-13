@@ -102,7 +102,16 @@ async function windowCompact(keepFull: boolean): Promise<void> {
     // At the full window's top left (macOS sizes from the bottom: it would land where the bottom was).
     if (saved.full) await win.setPosition(new PhysicalPosition(saved.full.x, saved.full.y));
   }
-  await win.setAlwaysOnTop(compact.onTop);
+  await keepOnTop(win, compact.onTop);
+}
+
+/**
+ * On top of the other windows, and on every desktop (workspace, Space) with them, so it follows the
+ * person from one to another; or neither. Where a system has no such thing, the second does nothing.
+ */
+async function keepOnTop(win: Awaited<ReturnType<typeof windowApi>>["win"], on: boolean): Promise<void> {
+  await win.setAlwaysOnTop(on);
+  await win.setVisibleOnAllWorkspaces(on).catch(() => undefined);
 }
 
 /**
@@ -141,7 +150,7 @@ async function placeAndSize(place: { x: number; y: number }, width: number, heig
 
 async function windowFull(): Promise<void> {
   const { win, LogicalSize } = await windowApi();
-  await win.setAlwaysOnTop(false);
+  await keepOnTop(win, false);
   await win.setDecorations(true);
   await win.setMinSize(new LogicalSize(FULL_MIN.width, FULL_MIN.height));
   // The title bar comes asynchronously on macOS: give it a moment before sizing (placeAndSize checks after).
@@ -189,7 +198,7 @@ export async function setOnTop(on: boolean): Promise<void> {
   save();
   if (compact.mode === "window") {
     const { win } = await windowApi();
-    await win.setAlwaysOnTop(on);
+    await keepOnTop(win, on);
   }
 }
 
