@@ -280,6 +280,10 @@ html[data-mm-compact] { font-size: var(--mm-root-compact); }
    what the window grew by. */
 :root { --mm-root-compact-list: 4.5vw; }
 html[data-mm-compact="list"] { font-size: var(--mm-root-compact-list); }
+/* The desktop window turning between full and compact (lib/compact.ts): the content hidden at
+   once while the window changes size, the page's ground left; back with a short fade. */
+html[data-mm-turning] body { opacity: 0; }
+html:not([data-mm-turning]) body { transition: opacity var(--mm-duration) var(--mm-ease); }
 
 /* Once, here, instead of a media query in every component: every transition
    and animation a component writes takes its time from these. The looping

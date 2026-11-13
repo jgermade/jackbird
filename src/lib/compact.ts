@@ -329,6 +329,29 @@ function floatClosed(): void {
 
 // ── Turning it ────────────────────────────────────────────────────────────────
 
+const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+/**
+ * The desktop window's turn, its content out of sight: hidden at once (the page's ground stays),
+ * the layout and the window changed under it, and shown again once the window has its size and
+ * has drawn at it. Otherwise the full layout shows squeezed into the shrinking window, and the
+ * compact one (sized by the window: tokens.css) blown up as the window grows back in steps.
+ */
+async function unseen(work: () => Promise<void>): Promise<void> {
+  const root = document.documentElement;
+  root.setAttribute("data-mm-turning", "");
+  // Drawn hidden before the window moves.
+  await frame();
+  await frame();
+  try {
+    await work();
+  } finally {
+    await frame();
+    await frame();
+    root.removeAttribute("data-mm-turning");
+  }
+}
+
 async function turn(work: () => Promise<void>): Promise<void> {
   if (compact.busy) return;
   compact.busy = true;
@@ -346,8 +369,10 @@ export function enterCompact(): Promise<void> {
   return turn(async () => {
     if (compact.mode !== "full" || !compactPlace) return;
     if (compactPlace === "window") {
-      await windowCompact(true);
-      compact.mode = "window";
+      await unseen(async () => {
+        await windowCompact(true);
+        compact.mode = "window";
+      });
       saved.on = true;
       save();
     } else if (compactPlace === "pip") {
@@ -366,7 +391,12 @@ export function leaveCompact(): Promise<void> {
       saved.compact = await boundsOf();
       saved.on = false;
       save();
-      await windowFull();
+      // The full layout first, unseen, so the compact one is never drawn in the growing window.
+      await unseen(async () => {
+        compact.mode = "full";
+        await windowFull();
+      });
+      return;
     } else if (compact.mode === "pip") {
       floating?.pip.close();
       floatClosed();
@@ -398,10 +428,12 @@ export function startCompact(): void {
   if (compactPlace !== "window") return;
   void followWindow().catch(() => undefined);
   if (saved.on) {
-    void turn(async () => {
-      await windowCompact(false);
-      compact.mode = "window";
-    });
+    void turn(() =>
+      unseen(async () => {
+        await windowCompact(false);
+        compact.mode = "window";
+      })
+    );
   }
 }
 
