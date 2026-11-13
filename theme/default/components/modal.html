@@ -1,4 +1,4 @@
-<script :setup="{ open = false, title = '', eyebrow = '', size = 'md', closeLabel = 'Close' }: Props" lang="ts">
+<script :setup="{ open = false, title = '', eyebrow = '', size = 'md', closeLabel = 'Close', sections = false }: Props" lang="ts">
   // A modal on the platform's `<dialog>`, opened with `showModal()`: Escape,
   // the focus held inside, the page behind made inert, and a backdrop.
   //
@@ -27,6 +27,19 @@
   // emits `close`; short of that it springs back. Keys and tabs in the header
   // still take their clicks, unless the press turned into a drag.
   //
+  // `sections`: the `nav` holds the dialog's sections, and the header shows
+  // no title (it still names the dialog). On a computer they go in the
+  // header's own row, from its left, the close key at its end, and the
+  // dialog is as wide as a large one; as a sheet they are drawn at its
+  // bottom, under the body, and the header is only its handle (a `Tabs` with `bar` there looks like a bar of
+  // options, not tabs).
+  //
+  // A sheet rests on a phone's on-screen keyboard and fits in what it
+  // leaves (`--mm-keyboard` and `--mm-viewport`, which the app sets on the
+  // root; none, none covered): its head and foot stay, its body scrolls, and
+  // the field taking the focus is brought into view once the keyboard is up
+  // (the app's `mm-keyboard` event on the document, or a moment after).
+  //
   // A `SubModal` written in its body comes down out of its head, over the
   // body alone (see sub-modal.html).
   //
@@ -34,12 +47,18 @@
   // `tokens.css` (and `content.css` for the eyebrow). See
   // `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
-  type Props = { open?: boolean | ""; title?: string; eyebrow?: string; size?: "sm" | "md" | "lg"; closeLabel?: string }
+  type Props = { open?: boolean | ""; title?: string; eyebrow?: string; size?: "sm" | "md" | "lg"; closeLabel?: string; sections?: boolean | "" }
 
   const Key = await import("./key.html")
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: isOpen = flag(open)
+  // A sheet at 720px and below; with `sections`, its nav goes to the bottom.
+  const SHEET_WIDTH = matchMedia("(max-width: 720px)")
+  let sheet: boolean = SHEET_WIDTH.matches
+  SHEET_WIDTH.addEventListener("change", (event) => (sheet = event.matches))
+  $: hasSections = flag(sections)
+  $: navBelow = hasSections && sheet
   const titleId = `mm-modal-${Math.random().toString(36).slice(2, 10)}`
 
   // The way in and out. The state lives in this closure, not in the store.
@@ -115,6 +134,18 @@
     $emit("close")
   }
 
+  // A field taking the focus, brought into the body's view once the keyboard has come up.
+  const reveal = (event: FocusEvent) => {
+    const field = event.target as HTMLElement | null
+    if (!field?.matches?.("input, textarea, select, [contenteditable]")) return
+    const show = () => {
+      document.removeEventListener("mm-keyboard", show)
+      if (document.activeElement === field) field.scrollIntoView({ block: "nearest" })
+    }
+    document.addEventListener("mm-keyboard", show)
+    window.setTimeout(show, 400)
+  }
+
   // Dragging the sheet down (phones). The state lives in this closure, not
   // in the store: a top-level `let` would be a reactive field written on
   // every move.
@@ -187,22 +218,27 @@
 <dialog class="modal"
         :class="`size-${size}`"
         :class.with-nav="$slots.nav"
+        :class.sections="hasSections"
         :aria-labelledby="titleId"
         @cancel="cancel($event)"
+        @focusin="reveal($event)"
         @click.self="$emit('close')">
-  <header class="head" :class.with-nav="$slots.nav"
+  <header class="head" :class.with-nav="$slots.nav && !navBelow" :class.sections="hasSections"
           @pointerdown="drag.down($event)" @pointermove="drag.move($event)" @pointerup="drag.up($event)" @pointercancel="drag.up($event)">
     <span class="grab" aria-hidden="true"></span>
     <div class="titles">
       <span :if="eyebrow" class="mm-legend">{{ eyebrow }}</span>
       <h2 class="title" :id="titleId">{{ title }}</h2>
     </div>
-    <Key variant="ghost" square :label="closeLabel" :title="closeLabel" @click="$emit('close')">
-      <svg class="close-icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
-    </Key>
-    <div :if="$slots.nav" class="nav"><slot.nav /></div>
+    <span class="close">
+      <Key variant="ghost" square :label="closeLabel" :title="closeLabel" @click="$emit('close')">
+        <svg class="close-icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+      </Key>
+    </span>
+    <div :if="$slots.nav && !navBelow" class="nav"><slot.nav /></div>
   </header>
   <div class="body"><slot /></div>
+  <div :if="$slots.nav && navBelow" class="nav-below"><slot.nav /></div>
   <footer :if="$slots.foot" class="foot"><slot.foot /></footer>
 </dialog>
 
@@ -253,6 +289,22 @@
     font-size: var(--mm-text-lg);
     line-height: var(--mm-leading-tight);
   }
+  /* The sections in the header's row, from its left, and the close key at its end. */
+  .modal.sections { --width: 47.5rem; }
+  .head.with-nav.sections { grid-template-columns: minmax(0, 1fr) auto; padding-top: var(--mm-space-2); padding-left: var(--mm-space-2); }
+  .head.with-nav.sections .nav { display: flex; grid-column: 1; grid-row: 1; align-self: end; min-width: 0; margin: 0; }
+  .head.sections .close { grid-column: 2; grid-row: 1; }
+  /* With sections the header shows no title: the sections say where one is. It is still the
+     dialog's name for a screen reader. */
+  .head.sections .titles { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* As a sheet, at its bottom, over the navigation bar's room. */
+  .nav-below {
+    flex: none;
+    padding-bottom: max(0px, calc(var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)) - var(--mm-keyboard, 0px)));
+    border-top: var(--mm-border-width) solid var(--mm-chassis-lo);
+    background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+  }
+  .close { display: flex; }
   .close-icon { width: .75rem; height: .75rem; }
   .grab { display: none; }
   .body { flex: 1 1 auto; padding: var(--mm-space-5); overflow: auto; }
@@ -274,13 +326,17 @@
     .modal {
       width: 100%;
       max-width: none;
-      max-height: 90dvh;
-      margin: auto 0 0;
+      /* On the keyboard, if one is up, and no taller than what it leaves, below the status bar. */
+      max-height: min(90dvh, calc(var(--mm-viewport, calc(100dvh - var(--mm-keyboard, 0px))) - var(--mm-safe-top, env(safe-area-inset-top, 0px)) - var(--mm-space-3)));
+      margin: auto 0 var(--mm-keyboard, 0px);
       border-bottom-width: 0;
       border-radius: var(--mm-radius-lg) var(--mm-radius-lg) 0 0;
     }
     /* A phone's navigation bar under the sheet (--mm-safe-bottom, set by the app on Android). */
-    .modal { padding-bottom: var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)); }
+    /* The keyboard, when up, covers that bar: then the sheet needs none of its room. */
+    .modal { padding-bottom: max(0px, calc(var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)) - var(--mm-keyboard, 0px))); }
+    /* With the sections at the bottom, they take that room (.nav-below). */
+    .modal.sections { padding-bottom: 0; }
     /* The header is where the sheet is dragged from: its handle says so. */
     .head { touch-action: none; padding-top: var(--mm-space-4); }
     .grab {
@@ -295,5 +351,9 @@
       transform: translateX(-50%);
     }
     .head { position: relative; }
+    /* With sections, no header: only its handle, on the sheet's own ground, to drag it down by
+       (the backdrop and Escape close it too). */
+    .head.sections { min-height: 1.25rem; padding: 0; border-bottom: 0; background: var(--mm-surface); }
+    .head.sections .close { display: none; }
   }
 </style>

@@ -1,18 +1,18 @@
 //! The spectrum of what the device took, as Web Audio's `AnalyserNode` gives it with
-//! `getByteFrequencyData` (fftSize 1024, smoothing 0.8, -100 to -10 dB, the range the page sets on its
+//! `getByteFrequencyData` (fftSize 8192, smoothing 0.6, -90 to -10 dB, the range the page sets on its
 //! analyser: `SPECTRUM_DECIBELS` in `src/helpers/spectrum.ts`, headroom so loud bass does not clip): a Blackman window, the
 //! magnitudes over the window's length, smoothed with the previous ones, in decibels, scaled to
 //! 0–255. The interface turns the bins into bands as it does for the embedded output
-//! (`src/helpers/spectrum.ts`). The FFT is written here: 1024 points, radix 2.
+//! (`src/helpers/spectrum.ts`). The FFT is written here: 8192 points, radix 2.
 
 use std::f32::consts::PI;
 
 /// Points of the transform (Web Audio's `fftSize`).
-pub const SIZE: usize = 1024;
+pub const SIZE: usize = 8192;
 /// Bins it gives (Web Audio's `frequencyBinCount`).
 pub const BINS: usize = SIZE / 2;
-const SMOOTHING: f32 = 0.8;
-const MIN_DB: f32 = -100.0;
+const SMOOTHING: f32 = 0.6;
+const MIN_DB: f32 = -90.0;
 const MAX_DB: f32 = -10.0;
 
 /// The analyser's state between readings (the smoothing needs the previous magnitudes).

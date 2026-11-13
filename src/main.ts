@@ -82,8 +82,11 @@ if (isDesktop && !isPhone) {
   void import("./lib/sources/check").then((check) => check.runCheckIfAsked());
 }
 // An Android phone draws the app under its bars and camera: the page keeps clear of them.
+// Its keyboard too; in a browser (and the iPhone app), the page follows it from the visual viewport.
 if (isPhone && /Android/.test(navigator.userAgent)) {
   void import("./lib/safe-area").then((area) => area.keepClearOfEdges());
+} else if (!isDesktop || isPhone) {
+  void import("./lib/keyboard").then((keyboard) => keyboard.followKeyboard());
 }
 // A phone's (mobile.yml), only in a build made for it.
 if (isPhone) {

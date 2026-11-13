@@ -104,6 +104,8 @@ export type MetaSnapshot = {
 };
 
 export type Theme = "light" | "dark";
+/** How tall the lists' rows are (helpers/density.ts). */
+export type Density = "compact" | "comfortable" | "spacious";
 
 /** The interface languages; English is the source and the fallback. */
 export type Language = "en" | "es";

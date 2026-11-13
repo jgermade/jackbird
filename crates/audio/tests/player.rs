@@ -240,12 +240,13 @@ fn the_spectrum_shows_the_tones_played() {
     let (player, _, events) = paced(None, 1);
     player.load(&fixture("flac-16-44.flac"), "one", 0.0, true);
     until(&events, |event| started(event).is_some());
-    std::thread::sleep(Duration::from_millis(100));
+    // Long enough for the 8192 frames the spectrum reads (186 ms at 44.1 kHz).
+    std::thread::sleep(Duration::from_millis(250));
     let (bins, rate) = player.spectrum().expect("it plays");
     assert_eq!(rate, 44100);
-    assert_eq!(bins.len(), 512);
-    // 440 and 880 Hz: bins 10 and 20 at 44.1 kHz over 1024 points.
+    assert_eq!(bins.len(), 4096);
+    // 440 and 880 Hz: bins 82 and 163 at 44.1 kHz over 8192 points.
     let loudest = bins.iter().enumerate().max_by_key(|(_, level)| **level).unwrap().0;
-    assert!((9..=21).contains(&loudest), "{loudest}");
-    assert!(bins[200] < bins[10], "nothing up at 8.6 kHz");
+    assert!((78..=168).contains(&loudest), "{loudest}");
+    assert!(bins[1600] < bins[loudest], "nothing up at 8.6 kHz");
 }

@@ -1,8 +1,17 @@
 /** The frequencies a spectrum display shows, in Hz: where music has something to show. */
 export const SPECTRUM_RANGE = { low: 40, high: 16000 } as const;
 
-/** The decibels an analyser's bins span, from 0 to 255: -100 to -10 dB, so loud bass does not clip. */
-export const SPECTRUM_DECIBELS = { min: -100, max: -10 } as const;
+/** The decibels an analyser's bins span, from 0 to 255: -90 to -10 dB, so loud bass does not clip. */
+export const SPECTRUM_DECIBELS = { min: -90, max: -10 } as const;
+
+/**
+ * An analyser's points (Web Audio's `fftSize`): 8192, so the bass bands are each made of bins of
+ * their own (5.9 Hz a bin at 48 kHz). crates/audio's and the phone's spectrum use the same.
+ */
+export const SPECTRUM_FFT = 8192;
+
+/** How much each reading keeps of the one before (Web Audio's `smoothingTimeConstant`): lively, not jumpy. */
+export const SPECTRUM_SMOOTHING = 0.6;
 
 /**
  * How much a display lifts each octave over the one below, in dB: music, like pink noise, loses
@@ -58,4 +67,23 @@ export function spectrumBands(
     start = end;
   }
   return levels;
+}
+
+/** The bands a display's spectrum shows at its widest (the faceplate's LCD): what a row's bars are folded from. */
+export const DISPLAY_BANDS = 24;
+
+/**
+ * A display's band levels folded into `groups` (a playing row's three bars), on the display's own
+ * scale: the bands split into runs as even as can be, low first, each group the highest band of
+ * its run, as the eye reads the display's tallest column there. No levels or no groups give none.
+ */
+export function foldBands(levels: readonly number[], groups: number): number[] {
+  if (levels.length === 0 || groups <= 0) return [];
+  return Array.from({ length: groups }, (_, group) => {
+    const from = Math.floor((group * levels.length) / groups);
+    const to = Math.max(from + 1, Math.floor(((group + 1) * levels.length) / groups));
+    let highest = 0;
+    for (let band = from; band < Math.min(to, levels.length); band += 1) highest = Math.max(highest, levels[band]);
+    return highest;
+  });
 }

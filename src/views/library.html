@@ -13,11 +13,13 @@
   const Reel = await import("../../theme/default/components/reel.html")
 
   const { formatTrackNumber, trackLead } = await import("../helpers/format")
+  const { rowHeights } = await import("../helpers/density")
+  const { preferences } = await import("../lib/preferences")
   const { t } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { ui } = await import("../lib/ui")
-  const { nowPlaying, readSpectrum } = await import("../lib/player")
+  const { nowPlaying, readRowSpectrum } = await import("../lib/player")
   const { onRowMenu, rowMenu } = await import("../lib/menus")
   const { rescanRoot } = await import("../lib/roots")
   const {
@@ -56,10 +58,11 @@
   // The views, as keys in the head: the open one is down.
   const view = (): string => root()?.view ?? "files"
   // The songs view, one row per track and nothing else: drawn a window at a time (jq79's
-  // `:window`), its rows all SONG_ROW rem tall. `:window` takes the height in pixels.
-  const SONG_ROW = 2.25
+  // `:window`), its rows all songRow() rem tall, as the density says (helpers/density.ts).
+  // `:window` takes the height in pixels.
+  const songRow = (): number => rowHeights(preferences.density).song
   const windowed = (): boolean => view() === "songs"
-  const rowPx = (): number => (windowed() ? SONG_ROW * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) : 0)
+  const rowPx = (): number => (windowed() ? songRow() * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) : 0)
   // A track's artist goes under its title (`sub`), not at the row's end.
   const rowSub = (row: Row): string => (row.kind === "track" && row.trackId ? (row.artist ?? "") : "")
   const rowMeta = (row: Row): string => (rowSub(row) && row.meta === row.artist ? "" : (row.meta ?? ""))
@@ -214,7 +217,7 @@
     <ListRow :each="row in listed()"
              :key="row.key"
              :window="rowPx()"
-             :height="windowed() ? SONG_ROW : 0"
+             :height="windowed() ? songRow() : 0"
              :kind="row.kind === 'album' ? 'folder' : 'item'"
              :glyph="glyphOf(row)"
              :depth="phone ? 0 : row.depth"
@@ -227,7 +230,7 @@
              :current="isCurrent(row)"
              :playing="row.kind === 'track' && row.trackId === playingId()"
              :playing-active="playback.playing"
-             :playing-source="readSpectrum"
+             :playing-source="readRowSpectrum"
              :row-id="rowDomId(row.key)"
              :selectable="row.kind === 'track' && !!row.trackId"
              :playable="row.kind === 'track' && !!row.trackId"

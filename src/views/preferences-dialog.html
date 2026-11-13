@@ -6,7 +6,10 @@
   // lib/desktop-service.ts. With the service's people (S3), the account: who
   // is in, their name, their passkeys and sessions (with sign-in on), signing
   // out or switching profile, and, for admins and owners, "People and
-  // sign-in". See RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7)
+  // sign-in". In sections, a bar of them at the top: General (the tone, the
+  // rows' density, the language), Library, Sound, Account, Sharing, Service,
+  // each only where it applies (2026-11-14). See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7)
   // and RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S2, S3).
 
   const Field = await import("../../theme/default/components/field.html")
@@ -16,9 +19,12 @@
   const Checkbox = await import("../../theme/default/components/checkbox.html")
   const Key = await import("../../theme/default/components/key.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
+  const Choice = await import("../../theme/default/components/choice.html")
+  const Tabs = await import("../../theme/default/components/tabs.html")
 
   const { languageName, t } = await import("../lib/i18n")
-  const { LANGUAGES, preferences, setLanguage, setSongsInTree, setTheme } = await import("../lib/preferences")
+  const { LANGUAGES, preferences, setDensity, setLanguage, setSongsInTree, setThemeChoice } = await import("../lib/preferences")
+  const { DENSITIES, densityOf } = await import("../helpers/density")
   const { ui } = await import("../lib/ui")
   const { isDesktop, isPhone } = await import("../lib/platform")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
@@ -76,29 +82,111 @@
   ]
   const pickKind = (kind: string) => setOutputKind(kind === "exclusive" || kind === "embedded" ? kind : "shared")
 
-  $: isDark = preferences.theme === "dark"
+  // The tone: automatic (the system's), light or dark, as icons.
+  const TONE_ICONS = {
+    auto: "M2 2.75h12v8.5H2zM5.5 14h5M8 11.25V14",
+    light: "M8 5.25a2.75 2.75 0 1 0 0 5.5a2.75 2.75 0 1 0 0-5.5M8 1.25v1.5M8 13.25v1.5M1.25 8h1.5M13.25 8h1.5M3.2 3.2l1.05 1.05M11.75 11.75l1.05 1.05M3.2 12.8l1.05-1.05M11.75 4.25l1.05-1.05",
+    dark: "M13.25 9.75A5.75 5.75 0 0 1 6.25 2.75a5.75 5.75 0 1 0 7 7z"
+  } as const
+  const tones = () => (["auto", "light", "dark"] as const).map((tone) => ({ value: tone, label: t(`preferences.tone.${tone}`), icon: TONE_ICONS[tone] }))
+  const toneOf = (value: string) => (value === "light" || value === "dark" ? value : "auto")
+  const toneText = (): string =>
+    preferences.themeChoice === "auto" ? t("preferences.toneAutoOn") : preferences.theme === "dark" ? t("preferences.darkOn") : t("preferences.lightOn")
+  // The sections, each in the bar where it applies (an SVG path on a 16 × 16 grid for its icon);
+  // the open one is ui.preferencesSection, General when it does not apply (signed out).
+  const ICONS = {
+    general: "M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M10.5 2.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3M5.5 6.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3M12.5 10.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3",
+    library: "M1.75 3.25h4.5l1.5 1.5h6.5v8H1.75z",
+    sound: "M2 6h2.5L8 3v10L4.5 10H2zM10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6.25 6.25 0 0 1 0 9",
+    account: "M8 2.25a2.75 2.75 0 1 0 0 5.5a2.75 2.75 0 1 0 0-5.5M2.5 13.75c.75-2.75 3-4 5.5-4s4.75 1.25 5.5 4",
+    sharing: "M11.5 2.25a1.75 1.75 0 1 0 0 3.5a1.75 1.75 0 1 0 0-3.5M4.5 6.25a1.75 1.75 0 1 0 0 3.5a1.75 1.75 0 1 0 0-3.5M11.5 10.25a1.75 1.75 0 1 0 0 3.5a1.75 1.75 0 1 0 0-3.5M6.1 7.15l3.8-2.2M6.1 8.85l3.8 2.2",
+    service: "M2.5 2.5h11V7h-11zM2.5 9h11v4.5h-11zM5 4.75h.01M5 11.25h.01"
+  } as const
+  type Section = keyof typeof ICONS
+  const shown = (): Section[] => {
+    const signedIn = !!(account.active && account.me)
+    return (Object.keys(ICONS) as Section[]).filter((id) =>
+      id === "sound" ? output.available || output.phone :
+      id === "account" ? signedIn :
+      id === "sharing" ? signedIn && importing.available :
+      id === "service" ? isDesktop && !isPhone :
+      true)
+  }
+  const section = (): Section => {
+    const open = ui.preferencesSection as Section
+    return shown().includes(open) ? open : "general"
+  }
+  const sections = () => shown().map((id) => ({ id, label: t(`preferences.section.${id}` as "preferences.section.general"), icon: ICONS[id] }))
+  const densities = () => DENSITIES.map((density) => ({ value: density, label: t(`preferences.density.${density}` as "preferences.density.compact") }))
   const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
 </script>
 
 <div class="preferences-dialog">
-  <Modal :open="ui.preferencesOpen" :eyebrow="t('app.name')" :title="t('preferences.title')" size="sm" :close-label="t('preferences.close')" @close="ui.preferencesOpen = false">
-    <div class="prefs">
-      <section class="pref">
+  <Modal sections :open="ui.preferencesOpen" :eyebrow="t('app.name')" :title="t('preferences.title')" :close-label="t('preferences.close')" @close="ui.preferencesOpen = false">
+    <template :slot.nav>
+      <Tabs plain bar :label="t('preferences.sections')" :items="sections()" :model="section()" @change="ui.preferencesSection = $event.detail" />
+    </template>
+    <div :if="section() === 'general'" class="prefs">
+      <section class="pref inline">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("preferences.appearance") }}</h3>
-          <p>{{ isDark ? t("preferences.darkOn") : t("preferences.lightOn") }}</p>
+          <p>{{ toneText() }}</p>
         </div>
-        <SlideSwitch :label="t('faceplate.tone')" :off-legend="t('faceplate.light')" :on-legend="t('faceplate.dark')" :model="isDark" @change="setTheme($event.detail ? 'dark' : 'light')" />
+        <Choice icons :label="t('preferences.appearance')" :model="preferences.themeChoice" :options="tones()" @change="setThemeChoice(toneOf($event.detail))" />
       </section>
-      <!-- The library's tree with its songs, or its folders only (helpers/folders.ts). -->
+      <!-- How tall the lists' rows are (helpers/density.ts). -->
+      <section class="pref density">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("preferences.density") }}</h3>
+          <p>{{ t("preferences.densityHint") }}</p>
+        </div>
+        <Choice :label="t('preferences.density')" :model="preferences.density" :options="densities()" @change="setDensity(densityOf($event.detail))" />
+      </section>
       <section class="pref">
+        <Field :label="t('preferences.language')" control="preferences-language" :hint="t('preferences.languageHint')">
+          <Select id="preferences-language" describedby="preferences-language-note" :model="preferences.language" :options="languages()" @change="setLanguage($event.detail)" />
+        </Field>
+      </section>
+    </div>
+    <div :if="section() === 'library'" class="prefs">
+      <!-- The library's tree with its songs, or its folders only (helpers/folders.ts). -->
+      <section class="pref inline">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("preferences.library") }}</h3>
           <p>{{ preferences.songsInTree ? t("preferences.songsInTreeOn") : t("preferences.songsInTreeOff") }}</p>
         </div>
         <SlideSwitch :label="t('preferences.songsInTree')" :model="preferences.songsInTree" @change="setSongsInTree($event.detail)" />
       </section>
-      <section :if="account.active && account.me" class="pref account">
+    </div>
+    <div :if="section() === 'sound'" class="prefs">
+      <section :if="output.available" class="pref output">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("output.title") }}</h3>
+          <p>{{ t("output.about") }}</p>
+          <p :if="soundingText()" class="state">{{ soundingText() }}</p>
+        </div>
+        <Field :label="t('output.kind')" control="output-kind" :hint="t('output.kindHint')">
+          <Select id="output-kind" :model="output.kind" :options="kinds()" @change="pickKind($event.detail)" />
+        </Field>
+        <Field :if="output.kind !== 'embedded'" :label="t('output.device')" control="output-device">
+          <Select id="output-device" :model="output.device ?? ''" :options="deviceOptions()" @change="setOutputDevice($event.detail || null)" />
+        </Field>
+        <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
+      </section>
+      <section :if="output.phone" class="pref output">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("output.title") }}</h3>
+          <p>{{ t("output.phoneAbout") }}</p>
+          <p :if="soundingText()" class="state">{{ soundingText() }}</p>
+        </div>
+        <SlideSwitch :label="t('output.bitPerfect')" :model="output.bitPerfect" :disabled="!output.bitPerfectPossible" @change="setBitPerfect($event.detail)" />
+        <p class="hint">{{ output.bitPerfectPossible ? t("output.bitPerfectHint") : t("output.bitPerfectOld") }}</p>
+        <p :if="output.bitPerfectPossible" class="hint">{{ output.usb ? t("output.usb", { device: output.usb }) : t("output.noUsb") }}</p>
+        <p :if="output.bitPerfect && output.offered" class="hint">{{ t("output.offered", { formats: output.offered }) }}</p>
+      </section>
+    </div>
+    <div :if="section() === 'account'" class="prefs">
+      <section class="pref account">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("account.title") }}</h3>
           <p class="state">{{ t("account.as", { name: account.me?.name ?? "", role: role(account.me?.role ?? "listener") }) }}<span :if="account.me?.email"> · {{ account.me?.email }}</span></p>
@@ -152,6 +240,14 @@
             <Key size="sm" :disabled="account.busy || !keyName.trim()" @click="newKey()">{{ t("account.addKey") }}</Key>
           </div>
         </div>
+        <div class="keys">
+          <Key :if="can('admin')" variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
+          <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
+        </div>
+      </section>
+    </div>
+    <div :if="section() === 'sharing'" class="prefs">
+      <section class="pref account">
         <div :if="importing.available" class="sub">
           <div class="row own">
             <div class="text">
@@ -179,37 +275,10 @@
           <p :if="!sharing.everyone && sharing.candidates.length === 0" class="hint">{{ t("sharing.nobody") }}</p>
           <p :if="sharing.error" class="failure">{{ sharing.error }}</p>
         </div>
-        <div class="keys">
-          <Key :if="can('admin')" variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
-          <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
-        </div>
       </section>
-      <section :if="output.available" class="pref output">
-        <div class="text">
-          <h3 class="mm-legend is-ink">{{ t("output.title") }}</h3>
-          <p>{{ t("output.about") }}</p>
-          <p :if="soundingText()" class="state">{{ soundingText() }}</p>
-        </div>
-        <Field :label="t('output.kind')" control="output-kind" :hint="t('output.kindHint')">
-          <Select id="output-kind" :model="output.kind" :options="kinds()" @change="pickKind($event.detail)" />
-        </Field>
-        <Field :if="output.kind !== 'embedded'" :label="t('output.device')" control="output-device">
-          <Select id="output-device" :model="output.device ?? ''" :options="deviceOptions()" @change="setOutputDevice($event.detail || null)" />
-        </Field>
-        <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
-      </section>
-      <section :if="output.phone" class="pref output">
-        <div class="text">
-          <h3 class="mm-legend is-ink">{{ t("output.title") }}</h3>
-          <p>{{ t("output.phoneAbout") }}</p>
-          <p :if="soundingText()" class="state">{{ soundingText() }}</p>
-        </div>
-        <SlideSwitch :label="t('output.bitPerfect')" :model="output.bitPerfect" :disabled="!output.bitPerfectPossible" @change="setBitPerfect($event.detail)" />
-        <p class="hint">{{ output.bitPerfectPossible ? t("output.bitPerfectHint") : t("output.bitPerfectOld") }}</p>
-        <p :if="output.bitPerfectPossible" class="hint">{{ output.usb ? t("output.usb", { device: output.usb }) : t("output.noUsb") }}</p>
-        <p :if="output.bitPerfect && output.offered" class="hint">{{ t("output.offered", { formats: output.offered }) }}</p>
-      </section>
-      <section :if="isDesktop && !isPhone" class="pref service">
+    </div>
+    <div :if="section() === 'service'" class="prefs">
+      <section class="pref service">
         <div class="text">
           <h3 class="mm-legend is-ink">{{ t("service.title") }}</h3>
           <p>{{ t("service.about") }}</p>
@@ -230,11 +299,6 @@
           <Key variant="danger" :disabled="serviceState.busy" @click="uninstallService()">{{ t("service.uninstall") }}</Key>
         </div>
       </section>
-      <section class="pref">
-        <Field :label="t('preferences.language')" control="preferences-language" :hint="t('preferences.languageHint')">
-          <Select id="preferences-language" describedby="preferences-language-note" :model="preferences.language" :options="languages()" @change="setLanguage($event.detail)" />
-        </Field>
-      </section>
     </div>
   </Modal>
 </div>
@@ -243,10 +307,11 @@
   .preferences-dialog { display: contents; }
   .prefs { display: grid; gap: var(--mm-space-5); }
   .pref + .pref { padding-top: var(--mm-space-5); border-top: var(--mm-border-width) solid var(--mm-border); }
-  .pref:first-child { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--mm-space-3); }
+  .pref.inline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--mm-space-3); }
   .text { display: grid; gap: var(--mm-space-1); }
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .density { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); justify-items: start; }
   .service, .output { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
   .output .state { color: var(--mm-fg); }
   .service .state { color: var(--mm-fg); }

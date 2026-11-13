@@ -14,7 +14,7 @@
   const { coverSrc } = await import("../lib/covers")
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
-  const { nowPlaying, readSpectrum } = await import("../lib/player")
+  const { nowPlaying, readRowSpectrum } = await import("../lib/player")
   const { onTrackMenu, trackMenu } = await import("../lib/menus")
   const { openFolder } = await import("../lib/roots")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
@@ -178,7 +178,7 @@
                     <td :if="discNumbered(disc)" class="mm-num num-cell">{{ track.metadata.trackNumber?.trim() ?? "" }}</td>
                     <td><span class="mm-title">{{ titleOf(track) }}</span></td>
                     <td class="cue-cell" aria-hidden="true">
-                      <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readSpectrum" />
+                      <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
                       <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
                     </td>
                     <td class="menu-cell">

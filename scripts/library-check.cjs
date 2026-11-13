@@ -159,6 +159,7 @@ async function report(page) {
 
     // ── The owner shares their music with everyone.
     await owner.getByRole("button", { name: "Open preferences" }).first().click();
+    await owner.getByRole("tab", { name: "Sharing", exact: true }).click();
     await owner.getByRole("switch", { name: "With everyone" }).or(owner.getByLabel("With everyone")).first().click();
     for (let step = 0; step < 50; step += 1) {
       if (await owner.evaluate(async () => (await (await fetch("/api/library/shares")).json()).everyone)) break;
@@ -240,6 +241,7 @@ async function report(page) {
 
     // The switch: the family's version.
     await listener.getByRole("button", { name: "Open preferences" }).first().click();
+    await listener.getByRole("tab", { name: "Sharing", exact: true }).click();
     await Promise.all([listener.waitForEvent("load"), listener.getByRole("switch", { name: "Your version" }).or(listener.getByLabel("Your version")).first().click()]);
     await listener.getByText("Retitled by the owner").first().waitFor({ timeout: 30000 });
     console.log("listener switched to the family's version");
@@ -273,6 +275,7 @@ async function report(page) {
     const deleted = await editor.evaluate(async () => (await fetch("/api/library/delete?path=Uploads%2FLuis%2Fape.mp3", { method: "POST" })).status);
     if (deleted !== 204) fail(`the delete answered ${deleted}`);
     await owner.getByRole("button", { name: "Open preferences" }).first().click();
+    await owner.getByRole("tab", { name: "Account", exact: true }).click();
     await owner.getByRole("button", { name: "People and sign-in…" }).click();
     await owner.getByRole("tab", { name: "Trash" }).click();
     await owner.getByText("Uploads/Luis/ape.mp3").waitFor({ timeout: 15000 });

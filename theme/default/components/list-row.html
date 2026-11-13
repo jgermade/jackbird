@@ -144,7 +144,8 @@
     grid-auto-flow: column;
     align-items: center;
     gap: var(--mm-space-2);
-    min-height: 1.75rem;
+    /* As tall as the density says (tokens.css); `height` sets a windowed list's rows. */
+    min-height: var(--mm-row);
     /* Each folder one step in from the one that holds it; an item one step less, so its number
        (or its box) sits under its folder's icon and its title under the folder's name. */
     padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + var(--indent, var(--depth)) * 1rem);
@@ -155,7 +156,7 @@
     user-select: none;
     /* A row out of view is not laid out or painted (a long tree, the splitter dragged). */
     content-visibility: auto;
-    contain-intrinsic-size: auto 1.75rem;
+    contain-intrinsic-size: auto var(--mm-row);
   }
   /* A row ends in its keys (a small square key's glyph sits .5rem in from its edge): the room
      to the right of its last glyph is about the room to the left of its own. A track's cue (its ▶
@@ -193,6 +194,8 @@
   .label.led .title { grid-column: 2; grid-row: 1; }
   .label.led .sub { grid-column: 2; grid-row: 2; }
   .two .label { row-gap: .0625rem; padding-block: var(--mm-space-1); }
+  /* A row with a line under its title, as tall as the density says for two lines (tokens.css). */
+  .row.two { min-height: var(--mm-row-two); contain-intrinsic-size: auto var(--mm-row-two); }
   /* A row's box: smaller than a form's, and dimmed until it is ticked or the row is pointed at. */
   .icon.pick > * { grid-area: 1 / 1; }
   .icon .box { display: grid; place-items: center; transform: scale(.75); opacity: .55; transition: opacity var(--mm-duration) var(--mm-ease); }

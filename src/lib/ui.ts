@@ -22,6 +22,8 @@ export type Pane = "library" | "details";
 
 export const ui = $reactive({
   preferencesOpen: false,
+  /** The section open in the preferences (views/preferences-dialog.html); not saved. */
+  preferencesSection: "general",
   queueOpen: false,
   selectionOpen: false,
   selectionTab: "edit" as SelectionTab,
