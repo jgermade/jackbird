@@ -12,10 +12,18 @@ import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import android.os.Handler
+import androidx.media3.common.Format
+import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.FormatHolder
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 
@@ -25,11 +33,38 @@ class PlayerService : MediaSessionService() {
   override fun onCreate() {
     super.onCreate()
     // Decoded to float (24-bit songs keep their depth), through a sink that prepares Android's mixer
-    // for bit-perfect output to a USB DAC when the person wants it (E6b-D10, BitPerfect.kt).
+    // for bit-perfect output to a USB DAC when the person wants it, and writes integers to a DAC
+    // that takes only those (E6b-D10, BitPerfect.kt). The renderer tells it each song's own depth.
     val context = this
     val renderers = object : DefaultRenderersFactory(context) {
-      override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
-        BitPerfectSink(context, DefaultAudioSink.Builder(context).setEnableFloatOutput(true).build())
+      override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {
+        var sink: BitPerfectSink? = null
+        val tracks = IntegerTracks { sink?.output ?: Output.FLOAT }
+        val made = BitPerfectSink(context, DefaultAudioSink.Builder(context).setEnableFloatOutput(true).setAudioTrackProvider(tracks).build())
+        sink = made
+        return made
+      }
+
+      override fun buildAudioRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        audioSink: AudioSink,
+        eventHandler: Handler,
+        eventListener: AudioRendererEventListener,
+        out: ArrayList<Renderer>
+      ) {
+        val adapters = getCodecAdapterFactory()
+        out.add(object : MediaCodecAudioRenderer(context, adapters, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, audioSink) {
+          // The song's own sample, as its file says (a FLAC's depth), before its decoded samples
+          // reach the sink.
+          override fun onInputFormatChanged(formatHolder: FormatHolder): DecoderReuseEvaluation? {
+            BitPerfect.sourceEncoding = formatHolder.format?.pcmEncoding ?: Format.NO_VALUE
+            return super.onInputFormatChanged(formatHolder)
+          }
+        })
+      }
     }
     val player = ExoPlayer.Builder(this, renderers)
       // Music: it takes the audio focus (and gives it back to a call), and pauses when a headset is
