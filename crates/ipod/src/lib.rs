@@ -10,7 +10,8 @@
 //! - [`chunk`]: an `iTunesDB` as a tree of chunks, written back byte for byte;
 //! - [`hashab`]: the signature the nano 6G and 7G check on their databases;
 //! - [`library`]: the SQLite library of the nano 6G and 7G, as data: its
-//!   schema, its post-process and its rows.
+//!   schema, its post-process and its rows;
+//! - [`song`]: a song as jackbird adds it, and its `mhit` and rows.
 //!
 //! No I/O: the caller reads the files (or the USB request) and hands the bytes
 //! in. Malformed input is an [`Error`] that names its offset, never a panic.
@@ -22,6 +23,7 @@ pub mod db;
 pub mod device;
 pub mod hashab;
 pub mod library;
+pub mod song;
 pub mod sysinfo;
 
 mod bytes;

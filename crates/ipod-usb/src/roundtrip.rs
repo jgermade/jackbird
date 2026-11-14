@@ -14,7 +14,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use jackbird_ipod::device::find_guid;
+use jackbird_ipod::library::Value;
 use jackbird_ipod::library::{self, schema::FILES};
+use jackbird_ipod::song::{self, MHIT_NOT_KNOWN, Song, Stamp};
 use jackbird_ipod::{cdb, chunk, db, hashab, sysinfo};
 use jackbird_ipod_sqlite as sqlite;
 
@@ -86,6 +88,10 @@ fn run(itunes: &Path, extended: &Path, out: &Path) -> Result<bool, String> {
     all &= check(a.is_ok() && a == b, "and lists the same tracks and playlists");
     std::fs::write(out.join("iTunesCDB"), &written).map_err(|e| format!("writing iTunesCDB: {e}"))?;
     println!("     {} bytes written ({} read)", written.len(), raw.len());
+
+    // Every MP3 rebuilt from its rows, against Apple's mhit.
+    let itlp_in_songs = itunes.join("iTunes Library.itlp");
+    all &= check_songs(&tree, &sqlite::read(&itlp_in_songs).map_err(|e| e.to_string())?);
 
     // The SQLite library.
     let itlp_in = itunes.join("iTunes Library.itlp");
@@ -177,4 +183,233 @@ fn mask_signature(db: &[u8]) -> Vec<u8> {
         copy[hashab::DATABASE_SIGNATURE].fill(0);
     }
     copy
+}
+
+/// The local offset in Madrid (CET, CEST from the last Sunday of March to the
+/// last Sunday of October, at 01:00 UTC), to check that the `mhit`'s dates are
+/// local time: the rule is the EU's, not taken from the data checked.
+fn madrid_offset(unix: i64) -> i32 {
+    let (year, ..) = civil(unix);
+    let last_sunday = |month: u32| {
+        let first_next = days_from_civil(year, month + 1, 1);
+        // 1970-01-01 was a Thursday.
+        let weekday = (first_next + 4).rem_euclid(7); // 0 = Sunday
+        first_next - if weekday == 0 { 7 } else { weekday }
+    };
+    let start = last_sunday(3) * 86_400 + 3600;
+    let end = last_sunday(10) * 86_400 + 3600;
+    if unix >= start && unix < end { 7200 } else { 3600 }
+}
+
+fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
+    let (y, m) = if m > 12 { (y + 1, m - 12) } else { (y, m) };
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = i64::from((m + 9) % 12);
+    let doy = (153 * mp + 2) / 5 + i64::from(d) - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+fn civil(unix: i64) -> (i64, u32, u32) {
+    let z = unix.div_euclid(86_400) + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    (if m <= 2 { era * 400 + yoe + 1 } else { era * 400 + yoe }, m, d)
+}
+
+/// Rebuilds every MP3 of the device from its rows with [`Song::mhit`], and
+/// compares each with the `mhit` Apple wrote: the header but for
+/// [`MHIT_NOT_KNOWN`], and the `mhod`s byte for byte.
+fn check_songs(tree: &chunk::Chunk, rows: &[library::Rows]) -> bool {
+    use std::collections::{BTreeMap, HashMap};
+    let table = |file: &str, name: &str| {
+        rows.iter()
+            .find(|r| r.file == file)
+            .and_then(|r| r.table(name))
+            .cloned()
+            .unwrap_or_default()
+    };
+    let by_pid = |t: &library::Table, key: &str| -> HashMap<i64, Vec<Value>> {
+        let k = t.column(key).unwrap_or(0);
+        t.rows
+            .iter()
+            .filter_map(|r| match r[k] {
+                Value::Integer(p) => Some((p, r.clone())),
+                _ => None,
+            })
+            .collect()
+    };
+    let (item, av, loc, kinds) = (
+        table("Library.itdb", "item"),
+        table("Library.itdb", "avformat_info"),
+        table("Locations.itdb", "location"),
+        table("Library.itdb", "location_kind_map"),
+    );
+    let (avs, locs) = (by_pid(&av, "item_pid"), by_pid(&loc, "item_pid"));
+    let kind_names = by_pid(&kinds, "id");
+    let get = |t: &library::Table, row: &[Value], c: &str| t.column(c).map(|i| row[i].clone()).unwrap_or(Value::Null);
+    let int = |v: Value| match v {
+        Value::Integer(i) => i,
+        Value::Real(r) => r as i64,
+        _ => 0,
+    };
+    let text = |v: Value| match v {
+        Value::Text(t) => Some(t),
+        _ => None,
+    };
+    let mhits: Vec<&chunk::Chunk> = tree
+        .children()
+        .iter()
+        .filter(|s| s.header[12..16] == 1u32.to_le_bytes())
+        .flat_map(|s| s.children().iter().flat_map(|l| l.children()))
+        .collect();
+    let (mut songs, mut same_header, mut same_mhods) = (0, 0, 0);
+    let mut offsets: BTreeMap<usize, usize> = BTreeMap::new();
+    let mut mhod_examples = Vec::new();
+    let mut columns: BTreeMap<&str, usize> = BTreeMap::new();
+    for apple in mhits {
+        let h = &apple.header;
+        let u32_at = |at: usize| u32::from_le_bytes(h[at..at + 4].try_into().unwrap());
+        if u32_at(0x18) != song::MP3 {
+            continue;
+        }
+        let pid = i64::from_le_bytes(h[0x70..0x78].try_into().unwrap());
+        let Some(row) = item.rows.iter().find(|r| int(r[0].clone()) == pid) else {
+            continue;
+        };
+        let (Some(a), Some(l)) = (avs.get(&pid), locs.get(&pid)) else {
+            continue;
+        };
+        let g = |c: &str| get(&item, row, c);
+        let unix_2001 = |v: i64| if v == 0 { 0 } else { v + song::UNIX_TO_2001 };
+        let stamp = |since_2001: i64| {
+            let unix = unix_2001(since_2001);
+            Stamp {
+                unix,
+                offset: madrid_offset(unix),
+            }
+        };
+        let kind_id = int(get(&loc, l, "kind_id"));
+        let s = Song {
+            pid,
+            track_id: u32_at(0x10),
+            title: text(g("title")),
+            artist: text(g("artist")),
+            album: text(g("album")),
+            album_artist: text(g("album_artist")),
+            genre: None,
+            composer: text(g("composer")),
+            comment: text(g("comment")),
+            sort_title: None,
+            sort_artist: None,
+            sort_album: None,
+            sort_album_artist: None,
+            sort_composer: None,
+            kind: kind_names
+                .get(&kind_id)
+                .and_then(|k| text(k[1].clone()))
+                .unwrap_or_default(),
+            path: text(get(&loc, l, "location")).unwrap_or_default(),
+            size: int(get(&loc, l, "file_size")) as u32,
+            length_ms: int(g("total_time_ms")) as u32,
+            samples: int(get(&av, a, "duration")) as u64,
+            bitrate: int(get(&av, a, "bit_rate")) as u32,
+            sample_rate: int(get(&av, a, "sample_rate")) as u32,
+            vbr: h[0x1c] == 1,
+            track_number: int(g("track_number")) as u32,
+            track_count: int(g("track_count")) as u32,
+            disc_number: int(g("disc_number")) as u32,
+            disc_count: int(g("disc_count")) as u32,
+            year: int(g("year")) as u32,
+            bpm: int(g("bpm")) as u16,
+            compilation: int(g("is_compilation")) == 1,
+            modified: stamp(int(g("date_modified"))),
+            added: stamp(int(get(&loc, l, "date_created"))),
+            album_id: u32_at(0x120),
+            album_pid: None,
+            artist_id: u32_at(0x1e0),
+            artist_pid: None,
+            composer_pid: 0,
+            genre_id: 0,
+        };
+        // The genre's name is in genre_map; take it from Apple's mhod 5 to
+        // check the rest (genres are N4b's).
+        let genre = apple
+            .children()
+            .iter()
+            .find(|m| m.header[12..16] == 5u32.to_le_bytes())
+            .map(|m| match &m.body {
+                chunk::Body::Raw(b) => String::from_utf16_lossy(
+                    &b[16..]
+                        .chunks(2)
+                        .map(|p| u16::from_le_bytes([p[0], p[1]]))
+                        .collect::<Vec<_>>(),
+                ),
+                _ => String::new(),
+            });
+        let s = Song { genre, ..s };
+        songs += 1;
+        for (column, value) in s.item_row() {
+            let skip = ["genre_id", "album_pid", "artist_pid", "composer_pid", "artwork_status"];
+            if !skip.contains(&column) && g(column) != value {
+                *columns.entry(column).or_default() += 1;
+            }
+        }
+        let ours = s.mhit();
+        let mut differs = false;
+        for (at, (mine, theirs)) in ours.header.iter().zip(h.iter()).enumerate() {
+            if MHIT_NOT_KNOWN.iter().any(|(o, n, _)| at >= *o && at < o + n) {
+                continue;
+            }
+            if mine != theirs {
+                *offsets.entry(at & !3).or_default() += 1;
+                differs = true;
+            }
+        }
+        same_header += usize::from(!differs);
+        let (a_mhods, o_mhods) = (apple.children(), ours.children());
+        let bytes = |c: &[chunk::Chunk]| c.iter().map(|m| m.write().unwrap()).collect::<Vec<_>>();
+        if bytes(a_mhods) == bytes(o_mhods) {
+            same_mhods += 1;
+        } else if mhod_examples.len() < 5 {
+            let types = |c: &[chunk::Chunk]| {
+                c.iter()
+                    .map(|m| u32::from_le_bytes(m.header[12..16].try_into().unwrap()))
+                    .collect::<Vec<_>>()
+            };
+            mhod_examples.push(format!(
+                "{:?} against Apple's {:?} ({})",
+                types(o_mhods),
+                types(a_mhods),
+                s.title.clone().unwrap_or_default()
+            ));
+        }
+    }
+    println!("info {songs} MP3s rebuilt from their rows");
+    for (at, n) in &offsets {
+        println!("     the header differs at {at:#05x} in {n}");
+    }
+    for (column, n) in &columns {
+        println!("     item.{column} differs in {n}");
+    }
+    for e in &mhod_examples {
+        println!("     mhods: {e}");
+    }
+    let header_ok = check(
+        same_header == songs,
+        &format!("every MP3's mhit header, but for what a new song cannot know ({same_header}/{songs})"),
+    );
+    let mhods_ok = check(
+        same_mhods == songs,
+        &format!("every MP3's mhods, byte for byte ({same_mhods}/{songs})"),
+    );
+    let rows_ok = check(columns.is_empty(), "every MP3's item row, in the columns a song sets");
+    header_ok && mhods_ok && rows_ok
 }

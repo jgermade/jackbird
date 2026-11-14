@@ -465,6 +465,12 @@ pub(crate) mod tests {
         )
     }
 
+    /// A database holding these `mhit`s (whole chunks, their `mhod`s included)
+    /// and no playlist.
+    pub(crate) fn database_with_tracks(mhits: &[Vec<u8>]) -> Vec<u8> {
+        mhbd(&[mhsd(1, &list(b"mhlt", mhits))])
+    }
+
     /// Two tracks, an album section to skip, the old playlist section and
     /// the podcast-aware one (which wins).
     pub(crate) fn sample_database() -> Vec<u8> {
