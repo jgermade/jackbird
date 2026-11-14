@@ -108,6 +108,12 @@ fn fold(text: &str) -> Vec<char> {
     out
 }
 
+/// `text` in lower case, with accents off (but `ñ`), for finding songs by
+/// name.
+pub fn fold_for_search(text: &str) -> String {
+    fold(text).into_iter().collect()
+}
+
 /// The sort key of `text`.
 pub fn key(text: &str) -> Key {
     let folded = fold(text);

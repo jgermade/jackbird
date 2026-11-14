@@ -7,6 +7,7 @@
 //!   audio ([`mpeg`]), its size and date.
 //! - [`Device::add`] places each song under `iPod_Control/Music/Fnn/` and adds it
 //!   to the databases in memory ([`jackbird_ipod::add`]).
+//! - [`Device::remove`] takes a song out of them ([`jackbird_ipod::remove`]).
 //! - [`Device::commit`] writes it all: the new databases are made in a staging
 //!   folder and checked, the MP3s copied, then each database is swapped in,
 //!   its old file kept, the `iTunesCDB` last. A failure at
@@ -71,6 +72,8 @@ pub struct Device {
     /// Files to copy onto it on [`Device::commit`]: from, and to (under
     /// `iPod_Control/Music/`).
     pub copies: Vec<(PathBuf, String)>,
+    /// Files to delete from it on [`Device::commit`] (under `iPod_Control/Music/`).
+    pub removals: Vec<String>,
 }
 
 /// The folder of the iPod's databases.
@@ -116,6 +119,7 @@ pub fn open(root: &Path) -> Result<Device, Error> {
         extended,
         ipod: Ipod { tree, rows },
         copies: Vec::new(),
+        removals: Vec::new(),
     })
 }
 
@@ -244,7 +248,22 @@ impl Device {
         Ok(added)
     }
 
-    /// Writes what [`Device::add`] added: see the module's documentation.
+    /// Takes the song `pid` out of the databases in memory; its file is
+    /// deleted on [`Device::commit`] (or not copied, if it was added in this
+    /// same session).
+    pub fn remove(&mut self, pid: i64) -> Result<jackbird_ipod::remove::Removed, Error> {
+        let removed = jackbird_ipod::remove::remove(&mut self.ipod, pid).map_err(err)?;
+        if let Some(path) = &removed.path {
+            let before = self.copies.len();
+            self.copies.retain(|(_, p)| p != path);
+            if self.copies.len() == before {
+                self.removals.push(path.clone());
+            }
+        }
+        Ok(removed)
+    }
+
+    /// Writes what [`Device::add`] added and [`Device::remove`] took out: see the module's documentation.
     /// Gives back the backups it kept.
     pub fn commit(&self) -> Result<Vec<PathBuf>, Error> {
         let itunes = itunes(&self.root);
@@ -280,14 +299,15 @@ impl Device {
 
         let result = self
             .stage(&staging)
-            .and_then(|()| self.copy_and_swap(&targets, &backup));
+            .and_then(|()| self.copy_and_swap(&targets, &backup, &backups.join("Music")));
         let _ = std::fs::remove_dir_all(&staging);
         if result.is_err() {
-            // Everything was put back: the folder is empty (remove_dir refuses otherwise).
-            let _ = std::fs::remove_dir(backups.join("iTunes Library.itlp"));
-            let _ = std::fs::remove_dir(&backups);
+            // Everything was put back: only empty folders are left.
+            remove_empty_dirs(&backups);
         }
         result?;
+        // The removed songs' files, kept until all was in place: now gone.
+        let _ = std::fs::remove_dir_all(backups.join("Music"));
         Ok(targets
             .iter()
             .map(|(_, live)| backup(live))
@@ -334,14 +354,23 @@ impl Device {
 
     /// Copies the MP3s, then swaps each staged database in; undoes all of it
     /// on any failure.
-    fn copy_and_swap(&self, targets: &[(PathBuf, PathBuf)], backup: &dyn Fn(&Path) -> PathBuf) -> Result<(), Error> {
+    fn copy_and_swap(
+        &self,
+        targets: &[(PathBuf, PathBuf)],
+        backup: &dyn Fn(&Path) -> PathBuf,
+        trash: &Path,
+    ) -> Result<(), Error> {
         let music = self.root.join("iPod_Control").join("Music");
         let mut copied: Vec<PathBuf> = Vec::new();
+        let mut moved: Vec<(PathBuf, PathBuf)> = Vec::new();
         let mut swapped: Vec<&Path> = Vec::new();
-        let undo = |copied: &[PathBuf], swapped: &[&Path]| {
+        let undo = |copied: &[PathBuf], moved: &[(PathBuf, PathBuf)], swapped: &[&Path]| {
             for live in swapped.iter().rev() {
                 let _ = std::fs::remove_file(live);
                 let _ = std::fs::rename(backup(live), live);
+            }
+            for (from, to) in moved {
+                let _ = std::fs::rename(to, from);
             }
             for file in copied {
                 let _ = std::fs::remove_file(file);
@@ -357,6 +386,19 @@ impl Device {
                 std::fs::copy(from, &to).map_err(io(&to))?;
                 sync(&to)?;
             }
+            // The removed songs' files: aside, so that a failure can put them back.
+            for path in &self.removals {
+                let from = music.join(path);
+                if !from.exists() {
+                    continue;
+                }
+                let to = trash.join(path);
+                if let Some(parent) = to.parent() {
+                    std::fs::create_dir_all(parent).map_err(io(parent))?;
+                }
+                std::fs::rename(&from, &to).map_err(io(&from))?;
+                moved.push((from, to));
+            }
             for (staged, live) in targets {
                 if live.exists() {
                     std::fs::rename(live, backup(live)).map_err(io(live))?;
@@ -367,10 +409,23 @@ impl Device {
             Ok(())
         })();
         if run.is_err() {
-            undo(&copied, &swapped);
+            undo(&copied, &moved, &swapped);
         }
         run
     }
+}
+
+/// Removes `dir` and the folders under it that are empty; a folder holding a
+/// file is kept, with the file.
+fn remove_empty_dirs(dir: &Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for e in entries.flatten() {
+            if e.file_type().is_ok_and(|t| t.is_dir()) {
+                remove_empty_dirs(&e.path());
+            }
+        }
+    }
+    let _ = std::fs::remove_dir(dir);
 }
 
 fn sync(path: &Path) -> Result<(), Error> {

@@ -35,7 +35,7 @@ fn playlist(pid: i64, master: bool, name: &str) -> Chunk {
     )
 }
 
-fn ipod() -> Ipod {
+pub(crate) fn ipod() -> Ipod {
     let tree = chunk(
         b"mhbd",
         0xf4,
@@ -97,7 +97,7 @@ fn ipod() -> Ipod {
     ipod
 }
 
-fn song(title: &str, path: &str) -> Song {
+pub(crate) fn song(title: &str, path: &str) -> Song {
     Song {
         title: Some(title.into()),
         artist: Some("The Someones".into()),
@@ -113,7 +113,7 @@ fn song(title: &str, path: &str) -> Song {
     }
 }
 
-fn counter() -> impl FnMut() -> u64 {
+pub(crate) fn counter() -> impl FnMut() -> u64 {
     let mut n = 0x1000u64;
     move || {
         n += 0x1_0001;
@@ -121,11 +121,11 @@ fn counter() -> impl FnMut() -> u64 {
     }
 }
 
-fn rows<'a>(ipod: &'a Ipod, file: &str, table: &str) -> &'a Table {
+pub(crate) fn rows<'a>(ipod: &'a Ipod, file: &str, table: &str) -> &'a Table {
     ipod.rows.iter().find(|r| r.file == file).unwrap().table(table).unwrap()
 }
 
-const NOW: Stamp = Stamp {
+pub(crate) const NOW: Stamp = Stamp {
     unix: 1_763_150_000,
     offset: 3600,
 };

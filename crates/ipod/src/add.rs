@@ -16,10 +16,12 @@ use crate::library::{Rows, Value};
 use crate::song::{self, Song, Stamp, mhod_string, sort_column, sort_mhod};
 
 /// The `mhsd` types the nano 7G's `iTunesCDB` has.
-const SECTION_TRACKS: u32 = 1;
-const SECTION_PLAYLISTS: u32 = 3;
-const SECTION_ALBUMS: u32 = 4;
-const SECTION_ARTISTS: u32 = 8;
+pub(crate) const SECTION_TRACKS: u32 = 1;
+pub(crate) const SECTION_PLAYLISTS: u32 = 3;
+pub(crate) const SECTION_ALBUMS: u32 = 4;
+pub(crate) const SECTION_ARTISTS: u32 = 8;
+/// Apple's hidden playlists (music, films, …).
+pub(crate) const SECTION_HIDDEN_PLAYLISTS: u32 = 5;
 
 /// The fallback name of an MP3's kind, when the device names none yet.
 pub const MP3_KIND: &str = "MPEG audio file";
@@ -59,28 +61,28 @@ impl std::fmt::Display for AddError {
 
 impl std::error::Error for AddError {}
 
-fn u32_at(header: &[u8], at: usize) -> u32 {
+pub(crate) fn u32_at(header: &[u8], at: usize) -> u32 {
     header
         .get(at..at + 4)
         .map_or(0, |b| u32::from_le_bytes(b.try_into().expect("four bytes")))
 }
 
-fn i64_at(header: &[u8], at: usize) -> i64 {
+pub(crate) fn i64_at(header: &[u8], at: usize) -> i64 {
     header
         .get(at..at + 8)
         .map_or(0, |b| i64::from_le_bytes(b.try_into().expect("eight bytes")))
 }
 
-fn put(header: &mut [u8], at: usize, bytes: &[u8]) {
+pub(crate) fn put(header: &mut [u8], at: usize, bytes: &[u8]) {
     header[at..at + bytes.len()].copy_from_slice(bytes);
 }
 
-fn kind_of(chunk: &Chunk) -> u32 {
+pub(crate) fn kind_of(chunk: &Chunk) -> u32 {
     u32_at(&chunk.header, 0x0c)
 }
 
 /// The text of a string `mhod`.
-fn mhod_text(mhod: &Chunk) -> Option<String> {
+pub(crate) fn mhod_text(mhod: &Chunk) -> Option<String> {
     let Body::Raw(body) = &mhod.body else { return None };
     let len = u32_at(body, 4) as usize;
     let bytes = body.get(16..16 + len)?;
@@ -93,7 +95,7 @@ fn mhod_text(mhod: &Chunk) -> Option<String> {
     Some(String::from_utf16_lossy(&units))
 }
 
-fn strings_of(chunk: &Chunk) -> Vec<(u32, String)> {
+pub(crate) fn strings_of(chunk: &Chunk) -> Vec<(u32, String)> {
     chunk
         .children()
         .iter()
@@ -103,7 +105,7 @@ fn strings_of(chunk: &Chunk) -> Vec<(u32, String)> {
 }
 
 /// The list (`mhlt`, `mhla`, …) of the section of `kind`.
-fn list_mut<'a>(tree: &'a mut Chunk, kind: u32, what: &'static str) -> Result<&'a mut Vec<Chunk>, AddError> {
+pub(crate) fn list_mut<'a>(tree: &'a mut Chunk, kind: u32, what: &'static str) -> Result<&'a mut Vec<Chunk>, AddError> {
     tree.children_mut()
         .ok_or(AddError::Missing("sections"))?
         .iter_mut()
@@ -113,7 +115,7 @@ fn list_mut<'a>(tree: &'a mut Chunk, kind: u32, what: &'static str) -> Result<&'
         .ok_or(AddError::Missing(what))
 }
 
-fn list(tree: &Chunk, kind: u32) -> &[Chunk] {
+pub(crate) fn list(tree: &Chunk, kind: u32) -> &[Chunk] {
     tree.children()
         .iter()
         .find(|s| s.name() == *b"mhsd" && kind_of(s) == kind)
@@ -227,20 +229,24 @@ fn text(s: Option<&str>) -> Value {
     s.map_or(Value::Null, |s| Value::Text(s.to_string()))
 }
 
-fn int(v: &Value) -> Option<i64> {
+pub(crate) fn int(v: &Value) -> Option<i64> {
     match v {
         Value::Integer(i) => Some(*i),
         _ => None,
     }
 }
 
-fn rows_mut<'a>(rows: &'a mut [Rows], file: &str) -> Result<&'a mut Rows, AddError> {
+pub(crate) fn rows_mut<'a>(rows: &'a mut [Rows], file: &str) -> Result<&'a mut Rows, AddError> {
     rows.iter_mut()
         .find(|r| r.file == file)
         .ok_or_else(|| AddError::Row(format!("no rows for {file}")))
 }
 
-fn table_mut<'a>(rows: &'a mut [Rows], file: &str, table: &str) -> Result<&'a mut crate::library::Table, AddError> {
+pub(crate) fn table_mut<'a>(
+    rows: &'a mut [Rows],
+    file: &str,
+    table: &str,
+) -> Result<&'a mut crate::library::Table, AddError> {
     rows_mut(rows, file)?
         .table_mut(table)
         .ok_or_else(|| AddError::Row(format!("{file} has no table {table}")))
@@ -533,4 +539,4 @@ pub fn add(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
