@@ -171,6 +171,38 @@ fn base64(bytes: &[u8]) -> String {
     out
 }
 
+/// Where the installed service keeps its configuration, as `jackbird-service` finds it
+/// (`crates/service/src/config.rs`, `default_path`).
+fn service_config() -> PathBuf {
+    if let Some(path) = std::env::var_os("JACKBIRD_SERVICE_CONFIG") {
+        return PathBuf::from(path);
+    }
+    let var = |name: &str| std::env::var_os(name).map(PathBuf::from);
+    let base = if cfg!(windows) {
+        var("APPDATA").unwrap_or_else(|| PathBuf::from("."))
+    } else if cfg!(target_os = "macos") {
+        var("HOME").map_or_else(|| PathBuf::from("."), |home| home.join("Library/Application Support"))
+    } else {
+        var("XDG_CONFIG_HOME")
+            .unwrap_or_else(|| var("HOME").map_or_else(|| PathBuf::from("."), |home| home.join(".config")))
+    };
+    base.join("jackbird").join("service.json")
+}
+
+/// The folders the installed service serves (its `roots`): when the app is the service's
+/// interface, its folders are these, and a song sent from one is read from there.
+fn service_roots() -> Vec<String> {
+    std::fs::read(service_config())
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|config| {
+            config["roots"]
+                .as_array()
+                .map(|roots| roots.iter().filter_map(|r| r.as_str().map(str::to_owned)).collect())
+        })
+        .unwrap_or_default()
+}
+
 /// A file of one of the app's open folders, to send.
 #[derive(Deserialize)]
 pub struct FileRef {
@@ -190,7 +222,7 @@ pub struct SentJson {
     cover: bool,
 }
 
-/// Sends files of the app's open folders to the iPod at `path` (its master playlist, and
+/// Sends files of the app's open folders (or the installed service's) to the iPod at `path` (its master playlist, and
 /// `playlist` when named), with their covers: MP3s only. All or nothing.
 #[tauri::command]
 pub async fn ipod_send(
@@ -201,10 +233,15 @@ pub async fn ipod_send(
 ) -> Answer<Vec<SentJson>> {
     let root = ipod_at(&path)?;
     let mut resolved = Vec::new();
+    let served = service_roots();
     for file in files {
-        let from = root_of(&roots, &file.root)?
-            .resolve(&file.path)
-            .map_err(Failure::from)?;
+        // A folder the app opened, or one the installed service serves (the app as its interface).
+        let root = match root_of(&roots, &file.root) {
+            Ok(root) => root,
+            Err(_) if served.contains(&file.root) => jackbird_core::Root::open(&file.root).map_err(Failure::from)?,
+            Err(refused) => return Err(refused),
+        };
+        let from = root.resolve(&file.path).map_err(Failure::from)?;
         resolved.push((file.path, from));
     }
     blocking(move || {

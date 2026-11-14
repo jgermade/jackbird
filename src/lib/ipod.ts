@@ -4,6 +4,7 @@
 // and USB through its commands (src-tauri/src/ipod.rs).
 
 import { $reactive, $toRaw } from "jq79";
+import { parseSaved } from "../helpers/instance";
 import { isSendable, likelyDuplicates } from "../helpers/ipod";
 import type { RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
@@ -85,9 +86,21 @@ async function reloadIpod(path: string): Promise<void> {
   await hydrateRoot(await openIpod(info), { rootId: open.id, rootLabel: open.label, setActive: false });
 }
 
+/**
+ * The folder of this machine a root's files are in, by its path: a folder the app opened, or one
+ * the installed service serves (the app as its interface: a root of the home server, kept by its
+ * path alone). Null for any other root.
+ */
+function localFolder(root: RootWorkspace): string | null {
+  if (root.source.ipod || typeof root.source.saved !== "string") return null;
+  if (root.source.kind === "desktop") return root.source.saved;
+  const saved = parseSaved(root.source.saved);
+  return root.source.kind === "service" && saved.server === null ? saved.path : null;
+}
+
 /** Whether "Send to iPod" is offered for the active root's songs: an iPod can take them, and they are in a folder of this machine. */
 export function canSendFrom(root: RootWorkspace | null): boolean {
-  return !!root && root.source.kind === "desktop" && !root.source.ipod && typeof root.source.saved === "string" && ipods.found.some((one) => one.writable);
+  return !!root && localFolder(root) !== null && ipods.found.some((one) => one.writable);
 }
 
 /** Asks before sending songs of a root to an iPod. */
@@ -95,14 +108,15 @@ export async function askSend(rootId: string, trackIds: string[]): Promise<void>
   await lookForIpods();
   const root = $toRaw(library).roots.find((one) => one.id === rootId);
   const targets = ipods.found.filter((one) => one.writable);
-  if (!root || typeof root.source.saved !== "string" || targets.length === 0) return;
+  const folder = root ? localFolder(root) : null;
+  if (!root || folder === null || targets.length === 0) return;
   const tracks = trackIds
     .map((id) => root.tracks.find((track) => track.id === id))
     .filter((track) => !!track);
   const sendable = tracks.filter((track) => isSendable(track.relativePath));
   const target = targets[0].path;
   const files = sendable.map((track) => ({
-    root: root.source.saved as string,
+    root: folder,
     path: track.relativePath,
     title: track.metadata.title || track.name,
     artist: track.metadata.artist
