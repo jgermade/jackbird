@@ -141,40 +141,71 @@ pub fn list(root: &Path) -> Result<Listing, Error> {
     Ok(Listing { name, songs })
 }
 
-/// The cover of image `id` on the iPod at `root`, as a PNG: its largest size,
-/// decoded from its image file. `None` when there is no such image.
+/// An iPod's covers, its `ArtworkDB` and image files read once, each image given as a PNG.
+pub struct Covers {
+    root: PathBuf,
+    images: std::collections::HashMap<u32, artwork::Image>,
+    files: std::collections::HashMap<String, Option<Vec<u8>>>,
+}
+
+impl Covers {
+    /// The covers of the iPod at `root`; none when it has no `ArtworkDB`.
+    pub fn open(root: &Path) -> Covers {
+        let images = std::fs::read(artwork_dir(root).join("ArtworkDB"))
+            .ok()
+            .and_then(|bytes| ArtworkDb::parse(&bytes).ok())
+            .map(|db| db.images().into_iter().map(|i| (i.id, i)).collect())
+            .unwrap_or_default();
+        Covers {
+            root: root.to_path_buf(),
+            images,
+            files: Default::default(),
+        }
+    }
+
+    /// Image `id` as a PNG: its largest size, decoded from its image file (read the first time
+    /// an image needs it). `None` when there is no such image or it cannot be read.
+    pub fn png(&mut self, id: u32) -> Option<Vec<u8>> {
+        let image = self.images.get(&id)?;
+        let thumb = image
+            .thumbs
+            .iter()
+            .max_by_key(|t| u32::from(t.width) * u32::from(t.height))?
+            .clone();
+        let rows = usize::from(thumb.height);
+        if rows == 0 || thumb.width == 0 {
+            return None;
+        }
+        let row_bytes = thumb.size as usize / rows;
+        let name = thumb.file.trim_start_matches(':').to_string();
+        let dir = artwork_dir(&self.root);
+        let file = self
+            .files
+            .entry(name.clone())
+            .or_insert_with(|| std::fs::read(dir.join(&name)).ok())
+            .as_ref()?;
+        let slot = file.get(thumb.offset as usize..thumb.offset as usize + thumb.size as usize)?;
+        // A cover Apple centres keeps blank rows above it: they are left out.
+        let top = usize::try_from(thumb.top.max(0)).unwrap_or(0).min(rows);
+        let height = thumb.height - top as u16;
+        let rgb = artwork::decode(&slot[top * row_bytes..], thumb.width, height, row_bytes);
+        let mut out = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut out, u32::from(thumb.width), u32::from(height));
+            encoder.set_color(png::ColorType::Rgb);
+            encoder.set_depth(png::BitDepth::Eight);
+            // `fdeflate`'s fast mode: a cover a little larger, made many times faster.
+            encoder.set_compression(png::Compression::Fast);
+            let mut writer = encoder.write_header().ok()?;
+            writer.write_image_data(&rgb).ok()?;
+        }
+        Some(out)
+    }
+}
+
+/// The cover of image `id` on the iPod at `root`, as a PNG (one image: [`Covers`] for many).
 pub fn cover_png(root: &Path, id: u32) -> Option<Vec<u8>> {
-    let dir = artwork_dir(root);
-    let db = ArtworkDb::parse(&std::fs::read(dir.join("ArtworkDB")).ok()?).ok()?;
-    let image = db.images().into_iter().find(|i| i.id == id)?;
-    let thumb = image
-        .thumbs
-        .iter()
-        .max_by_key(|t| u32::from(t.width) * u32::from(t.height))?;
-    let rows = usize::from(thumb.height);
-    if rows == 0 || thumb.width == 0 {
-        return None;
-    }
-    let row_bytes = thumb.size as usize / rows.max(1);
-    let file = std::fs::read(dir.join(thumb.file.trim_start_matches(':'))).ok()?;
-    let slot = file.get(thumb.offset as usize..thumb.offset as usize + thumb.size as usize)?;
-    // A cover Apple centres keeps blank rows above it: they are left out.
-    let top = usize::try_from(thumb.top.max(0)).unwrap_or(0).min(rows);
-    let rgb = artwork::decode(
-        &slot[top * row_bytes..],
-        thumb.width,
-        thumb.height - top as u16,
-        row_bytes,
-    );
-    let mut out = Vec::new();
-    {
-        let mut encoder = png::Encoder::new(&mut out, u32::from(thumb.width), u32::from(thumb.height) - top as u32);
-        encoder.set_color(png::ColorType::Rgb);
-        encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = encoder.write_header().ok()?;
-        writer.write_image_data(&rgb).ok()?;
-    }
-    Some(out)
+    Covers::open(root).png(id)
 }
 
 #[cfg(test)]
@@ -213,5 +244,17 @@ mod tests {
             listing.songs.len(),
             out.display()
         );
+        // Every image the songs show, as a PNG that decodes again.
+        let ids: std::collections::BTreeSet<u32> = listing.songs.iter().filter_map(|s| s.track.artwork_id).collect();
+        let mut covers = Covers::open(&root);
+        for id in &ids {
+            let png = covers.png(*id).unwrap_or_else(|| panic!("image {id}"));
+            let mut reader = png::Decoder::new(std::io::Cursor::new(png)).read_info().unwrap();
+            let mut buf = vec![0; reader.output_buffer_size().unwrap()];
+            reader
+                .next_frame(&mut buf)
+                .unwrap_or_else(|e| panic!("image {id}: {e}"));
+        }
+        eprintln!("{} images, every one a PNG", ids.len());
     }
 }

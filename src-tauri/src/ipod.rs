@@ -108,6 +108,7 @@ pub async fn ipod_tracks(path: String, known_covers: Vec<String>) -> Answer<Ipod
     let root = ipod_at(&path)?;
     blocking(move || {
         let listing = listing::list(&root).map_err(sync_failure)?;
+        let mut images = listing::Covers::open(&root);
         let mut covers = Vec::new();
         let mut sent = std::collections::HashSet::new();
         let mut tracks = Vec::new();
@@ -118,7 +119,7 @@ pub async fn ipod_tracks(path: String, known_covers: Vec<String>) -> Answer<Ipod
                 let name = cover_name(&root, id);
                 if !known_covers.contains(&name)
                     && sent.insert(name.clone())
-                    && let Some(png) = listing::cover_png(&root, id)
+                    && let Some(png) = images.png(id)
                 {
                     covers.push(CoverJson {
                         name: name.clone(),

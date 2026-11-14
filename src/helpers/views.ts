@@ -24,8 +24,15 @@ type Group = { key: string; label: string; meta: string; tracks: Track[]; known:
 
 const DISC_FOLDER = /^(?:cd|disc)[ _-]?\d+$/i;
 
-/** The folder an album is in: a track's folder, its parent when that is a "Disc N" or "CD N" one. */
+/** An iPod's music folders (`iPod_Control/Music/F00` to `F49`): its songs are spread over them at random. */
+const IPOD_FOLDER = /^ipod_control\/music\/f\d+\//i;
+
+/**
+ * The folder an album is in: a track's folder, its parent when that is a "Disc N" or "CD N" one.
+ * None for an iPod's song: its folder says nothing of its album, which its tags alone tell.
+ */
 export function albumFolder(track: Pick<Track, "relativePath">): string {
+  if (IPOD_FOLDER.test(track.relativePath)) return "";
   const folders = track.relativePath.split("/").slice(0, -1);
   if (folders.length > 0 && DISC_FOLDER.test(folders[folders.length - 1])) {
     folders.pop();
