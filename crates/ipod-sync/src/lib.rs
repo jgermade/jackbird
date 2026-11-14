@@ -6,7 +6,8 @@
 //! - [`read_mp3`] makes a [`Song`] of a file: its tags (`jackbird-tags`), its
 //!   audio ([`mpeg`]), its size and date.
 //! - [`Device::add`] places each song under `iPod_Control/Music/Fnn/` and adds it
-//!   to the databases in memory ([`jackbird_ipod::add`]).
+//!   to the databases in memory ([`jackbird_ipod::add`]), with its cover when it
+//!   has one ([`jackbird_ipod::artwork`]).
 //! - [`Device::remove`] takes a song out of them ([`jackbird_ipod::remove`]).
 //! - [`Device::commit`] writes it all: the new databases are made in a staging
 //!   folder and checked, the MP3s copied, then each database is swapped in,
@@ -20,6 +21,7 @@ pub mod mpeg;
 use std::path::{Path, PathBuf};
 
 use jackbird_ipod::add::{self, Ipod};
+use jackbird_ipod::artwork::{self, ArtworkDb, Format, Thumb};
 use jackbird_ipod::device::{Guid, find_guid};
 use jackbird_ipod::library::{self, schema::FILES};
 use jackbird_ipod::song::{Song, Stamp};
@@ -74,6 +76,31 @@ pub struct Device {
     pub copies: Vec<(PathBuf, String)>,
     /// Files to delete from it on [`Device::commit`] (under `iPod_Control/Music/`).
     pub removals: Vec<String>,
+    /// Its `ArtworkDB` (an empty one when it has none yet).
+    pub artwork: ArtworkDb,
+    /// The cover sizes it shows (its `SysInfoExtended`'s `AlbumArt2`).
+    pub formats: Vec<Format>,
+    /// Pixels to append to its image files on [`Device::commit`]: the file
+    /// (under `iPod_Control/Artwork/`) and the bytes, in order.
+    pub appends: Vec<(String, Vec<u8>)>,
+    /// Whether the `ArtworkDB` changed.
+    pub artwork_changed: bool,
+}
+
+/// A cover's pixels: RGB, three bytes each, row by row.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Cover {
+    /// Width in pixels.
+    pub width: u32,
+    /// Height in pixels.
+    pub height: u32,
+    /// The pixels.
+    pub rgb: Vec<u8>,
+}
+
+/// The folder of the iPod's artwork.
+pub fn artwork_dir(root: &Path) -> PathBuf {
+    root.join("iPod_Control").join("Artwork")
 }
 
 /// The folder of the iPod's databases.
@@ -113,6 +140,13 @@ pub fn open(root: &Path) -> Result<Device, Error> {
             library::strip_post_processed(r);
         }
     }
+    let artwork_path = artwork_dir(root).join("ArtworkDB");
+    let artwork = match std::fs::read(&artwork_path) {
+        Ok(bytes) => ArtworkDb::parse(&bytes).map_err(|e| err(format!("ArtworkDB: {e}")))?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => ArtworkDb::empty(),
+        Err(e) => return Err(io(&artwork_path)(e)),
+    };
+    let formats = artwork::album_art_formats(&extended);
     Ok(Device {
         root: root.to_path_buf(),
         guid,
@@ -120,6 +154,10 @@ pub fn open(root: &Path) -> Result<Device, Error> {
         ipod: Ipod { tree, rows },
         copies: Vec::new(),
         removals: Vec::new(),
+        artwork,
+        formats,
+        appends: Vec::new(),
+        artwork_changed: false,
     })
 }
 
@@ -237,22 +275,82 @@ impl Device {
     /// Adds an MP3 to the databases in memory, into the master playlist and
     /// `playlist` when one is named; the file is copied on [`Device::commit`].
     /// `now` is when it is added, with its local offset.
-    pub fn add(&mut self, file: &Path, song: Song, playlist: Option<&str>, now: Stamp) -> Result<Song, Error> {
+    /// With a `cover`, the song shows it: its album's image when another of
+    /// its songs has one already (the album's songs share it), else a new image
+    /// at every size the iPod shows.
+    pub fn add(
+        &mut self,
+        file: &Path,
+        song: Song,
+        playlist: Option<&str>,
+        now: Stamp,
+        cover: Option<&Cover>,
+    ) -> Result<Song, Error> {
         let path = self.place("mp3")?;
         let song = Song {
             path: path.clone(),
             ..song
         };
-        let added = add::add(&mut self.ipod, song, playlist, now, &mut random_u64).map_err(err)?;
+        let mut added = add::add(&mut self.ipod, song, playlist, now, &mut random_u64).map_err(err)?;
         self.copies.push((file.to_path_buf(), path));
+        if let Some(cover) = cover.filter(|c| c.width > 0 && c.height > 0 && !self.formats.is_empty()) {
+            let id = match artwork::album_image(&self.ipod, added.pid) {
+                Some(id) if self.artwork.share(id) => id,
+                _ => self.add_image(added.pid, cover)?,
+            };
+            artwork::set_image(&mut self.ipod, added.pid, id);
+            added.artwork_id = Some(id);
+            self.artwork_changed = true;
+        }
         Ok(added)
+    }
+
+    /// Scales a cover to every size, queues its pixels for the image files,
+    /// and adds its image to the `ArtworkDB`.
+    fn add_image(&mut self, song: i64, cover: &Cover) -> Result<u32, Error> {
+        let dir = artwork_dir(&self.root);
+        let mut thumbs = Vec::new();
+        for format in self.formats.clone() {
+            let (w, h) = artwork::fit(cover.width, cover.height, format.width.min(format.height));
+            let rgb = artwork::scale(&cover.rgb, cover.width, cover.height, w, h);
+            let slot = artwork::encode(&rgb, w, h, format.row_bytes(format.width), format.slot());
+            let name = format.file();
+            let on_disk = std::fs::metadata(dir.join(&name)).map_or(0, |m| m.len());
+            let queued: u64 = self
+                .appends
+                .iter()
+                .filter(|(f, _)| *f == name)
+                .map(|(_, b)| b.len() as u64)
+                .sum();
+            let offset = u32::try_from(on_disk + queued).map_err(|_| err(format!("{name} is full")))?;
+            thumbs.push(Thumb {
+                format: format.id,
+                file: format!(":{name}"),
+                offset,
+                size: slot.len() as u32,
+                height: h,
+                width: w,
+                top: 0,
+                left: 0,
+            });
+            self.appends.push((name, slot));
+        }
+        self.artwork
+            .add(song, &thumbs)
+            .ok_or_else(|| err("the ArtworkDB lacks its sections"))
     }
 
     /// Takes the song `pid` out of the databases in memory; its file is
     /// deleted on [`Device::commit`] (or not copied, if it was added in this
     /// same session).
     pub fn remove(&mut self, pid: i64) -> Result<jackbird_ipod::remove::Removed, Error> {
+        let image = artwork::image_of(&self.ipod, pid);
         let removed = jackbird_ipod::remove::remove(&mut self.ipod, pid).map_err(err)?;
+        if let Some(id) = image {
+            let other = artwork::other_song_of(&self.ipod, id, pid);
+            self.artwork.unshare(id, pid, other);
+            self.artwork_changed = true;
+        }
         if let Some(path) = &removed.path {
             let before = self.copies.len();
             self.copies.retain(|(_, p)| p != path);
@@ -284,6 +382,9 @@ impl Device {
             staging.join("iTunes Library.itlp").join("Locations.itdb.cbk"),
             itlp.join("Locations.itdb.cbk"),
         ));
+        if self.artwork_changed {
+            targets.push((staging.join("ArtworkDB"), artwork_dir(&self.root).join("ArtworkDB")));
+        }
         targets.push((staging.join("iTunesCDB"), itunes.join("iTunesCDB")));
         // The old files go to a folder of this sync's own, outside the
         // library's folder (the firmware reads whatever is in it).
@@ -295,7 +396,11 @@ impl Device {
             return Err(err(format!("{} is there already; try again", backups.display())));
         }
         std::fs::create_dir_all(backups.join("iTunes Library.itlp")).map_err(io(&backups))?;
-        let backup = |live: &Path| backups.join(live.strip_prefix(&itunes).unwrap_or(live));
+        let control = self.root.join("iPod_Control");
+        let backup = |live: &Path| {
+            let relative = live.strip_prefix(&itunes).or_else(|_| live.strip_prefix(&control));
+            backups.join(relative.unwrap_or(live))
+        };
 
         let result = self
             .stage(&staging)
@@ -321,6 +426,11 @@ impl Device {
         std::fs::create_dir_all(&itlp).map_err(io(&itlp))?;
         let commands = library::post_process(&self.extended, FILES[0].user_version).map_err(err)?;
         let failed = sqlite::write(&itlp, &self.ipod.rows, &commands).map_err(err)?;
+        if self.artwork_changed {
+            let bytes = self.artwork.write().map_err(|e| err(format!("ArtworkDB: {e}")))?;
+            ArtworkDb::parse(&bytes).map_err(|e| err(format!("the new ArtworkDB: {e}")))?;
+            write_synced(&staging.join("ArtworkDB"), &bytes)?;
+        }
         if let Some(f) = failed.iter().find(|f| !f.is_duplicate_column()) {
             return Err(err(format!(
                 "the library's post-process failed at {}: {}",
@@ -363,19 +473,34 @@ impl Device {
         let music = self.root.join("iPod_Control").join("Music");
         let mut copied: Vec<PathBuf> = Vec::new();
         let mut moved: Vec<(PathBuf, PathBuf)> = Vec::new();
+        let mut grown: Vec<(PathBuf, Option<u64>)> = Vec::new();
         let mut swapped: Vec<&Path> = Vec::new();
-        let undo = |copied: &[PathBuf], moved: &[(PathBuf, PathBuf)], swapped: &[&Path]| {
-            for live in swapped.iter().rev() {
-                let _ = std::fs::remove_file(live);
-                let _ = std::fs::rename(backup(live), live);
-            }
-            for (from, to) in moved {
-                let _ = std::fs::rename(to, from);
-            }
-            for file in copied {
-                let _ = std::fs::remove_file(file);
-            }
-        };
+        let undo =
+            |copied: &[PathBuf], moved: &[(PathBuf, PathBuf)], grown: &[(PathBuf, Option<u64>)], swapped: &[&Path]| {
+                for (file, was) in grown.iter().rev() {
+                    match was {
+                        Some(len) => {
+                            let _ = std::fs::OpenOptions::new()
+                                .write(true)
+                                .open(file)
+                                .and_then(|f| f.set_len(*len));
+                        }
+                        None => {
+                            let _ = std::fs::remove_file(file);
+                        }
+                    }
+                }
+                for live in swapped.iter().rev() {
+                    let _ = std::fs::remove_file(live);
+                    let _ = std::fs::rename(backup(live), live);
+                }
+                for (from, to) in moved {
+                    let _ = std::fs::rename(to, from);
+                }
+                for file in copied {
+                    let _ = std::fs::remove_file(file);
+                }
+            };
         let run = (|| -> Result<(), Error> {
             for (from, to) in &self.copies {
                 let to = music.join(to);
@@ -385,6 +510,23 @@ impl Device {
                 copied.push(to.clone());
                 std::fs::copy(from, &to).map_err(io(&to))?;
                 sync(&to)?;
+            }
+            // The covers' pixels, appended to their files (cut back on a failure).
+            let art = artwork_dir(&self.root);
+            for (name, bytes) in &self.appends {
+                use std::io::Write;
+                std::fs::create_dir_all(&art).map_err(io(&art))?;
+                let file = art.join(name);
+                if !grown.iter().any(|(f, _)| *f == file) {
+                    grown.push((file.clone(), std::fs::metadata(&file).ok().map(|m| m.len())));
+                }
+                let mut f = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&file)
+                    .map_err(io(&file))?;
+                f.write_all(bytes).map_err(io(&file))?;
+                f.sync_all().map_err(io(&file))?;
             }
             // The removed songs' files: aside, so that a failure can put them back.
             for path in &self.removals {
@@ -401,7 +543,13 @@ impl Device {
             }
             for (staged, live) in targets {
                 if live.exists() {
-                    std::fs::rename(live, backup(live)).map_err(io(live))?;
+                    let kept = backup(live);
+                    if let Some(parent) = kept.parent() {
+                        std::fs::create_dir_all(parent).map_err(io(parent))?;
+                    }
+                    std::fs::rename(live, kept).map_err(io(live))?;
+                } else if let Some(parent) = live.parent() {
+                    std::fs::create_dir_all(parent).map_err(io(parent))?;
                 }
                 swapped.push(live);
                 std::fs::rename(staged, live).map_err(io(live))?;
@@ -409,7 +557,7 @@ impl Device {
             Ok(())
         })();
         if run.is_err() {
-            undo(&copied, &moved, &swapped);
+            undo(&copied, &moved, &grown, &swapped);
         }
         run
     }

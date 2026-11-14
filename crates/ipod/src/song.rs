@@ -130,6 +130,8 @@ pub struct Song {
     pub composer_pid: i64,
     /// `genre_map.id`, 0 for none.
     pub genre_id: i64,
+    /// Its cover's image in the `ArtworkDB` (`mhii` `0x10`), when it has one.
+    pub artwork_id: Option<u32>,
 }
 
 /// The `mhod` types of a song's strings, in the order Apple writes them.
@@ -194,7 +196,9 @@ impl Song {
         put(0x7e, &0xffffu16.to_le_bytes());
         put(0x88, &(self.sample_rate as f32).to_le_bytes());
         put(0x90, &0x0cu16.to_le_bytes()); // MPEG audio (AAC has 0x33)
-        put(0xa4, &[2]); // no artwork
+        // Artwork: 1 and the image's ID; 2 for none.
+        put(0xa4, &[if self.artwork_id.is_some() { 1 } else { 2 }]);
+        put(0x160, &self.artwork_id.unwrap_or(0).to_le_bytes());
         put(0xa8, &self.pid.to_le_bytes());
         put(0xb2, &2u16.to_le_bytes()); // not played yet
         put(0xbc, &self.samples.to_le_bytes());
@@ -237,7 +241,14 @@ impl Song {
             ("date_modified", Value::Integer(self.modified.since_2001())),
             ("year", int(self.year)),
             ("is_compilation", Value::Integer(i64::from(self.compilation))),
-            ("artwork_status", Value::Integer(2)),
+            (
+                "artwork_status",
+                Value::Integer(if self.artwork_id.is_some() { 1 } else { 2 }),
+            ),
+            (
+                "artwork_cache_id",
+                Value::Integer(i64::from(self.artwork_id.unwrap_or(0))),
+            ),
             ("total_time_ms", Value::Real(f64::from(self.length_ms))),
             ("track_number", int(self.track_number)),
             ("track_count", int(self.track_count)),

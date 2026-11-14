@@ -90,8 +90,14 @@ pub struct Thumb {
     pub offset: u32,
     /// Its slot's bytes.
     pub size: u32,
-    /// Its pixels' height.
+    /// Its pixels' height, counting `top` (the image is in rows `top` to
+    /// `height - 1`).
     pub height: u16,
+    /// Blank rows above the image (`mhni` `0x1C`): Apple centres a large
+    /// cover that is not square; jackbird writes 0, as Apple does for small ones.
+    pub top: i16,
+    /// Blank columns left of it (`0x1E`); 0 on the owner's nano.
+    pub left: i16,
     /// Its pixels' width.
     pub width: u16,
 }
@@ -156,6 +162,8 @@ fn thumb_of(mhod: &Chunk) -> Option<Thumb> {
         file,
         offset: u32_at(h, 0x14),
         size: u32_at(h, 0x18),
+        top: u16_at(h, 0x1c) as i16,
+        left: u16_at(h, 0x1e) as i16,
         height: u16_at(h, 0x20),
         width: u16_at(h, 0x22),
     })
@@ -179,6 +187,8 @@ pub fn thumb_mhod(t: &Thumb) -> Chunk {
     put(&mut mhni, 0x10, &t.format.to_le_bytes());
     put(&mut mhni, 0x14, &t.offset.to_le_bytes());
     put(&mut mhni, 0x18, &t.size.to_le_bytes());
+    put(&mut mhni, 0x1c, &t.top.to_le_bytes());
+    put(&mut mhni, 0x1e, &t.left.to_le_bytes());
     put(&mut mhni, 0x20, &t.height.to_le_bytes());
     put(&mut mhni, 0x22, &t.width.to_le_bytes());
     put(&mut mhni, 0x28, &t.size.to_le_bytes());
@@ -223,6 +233,30 @@ impl ArtworkDb {
         Ok(ArtworkDb {
             tree: chunk::parse_rooted(data, "mhfd")?,
         })
+    }
+
+    /// An `ArtworkDB` with no image, for an iPod that has none yet: the three
+    /// sections, empty, and the next image ID at 100.
+    pub fn empty() -> ArtworkDb {
+        let section = |kind: u16, list: &[u8; 4]| {
+            let mut h = header(b"mhsd", 0x60);
+            put(&mut h, 0x0c, &kind.to_le_bytes());
+            Chunk {
+                header: h,
+                body: Body::Children(vec![Chunk {
+                    header: header(list, 0x5c),
+                    body: Body::List(vec![]),
+                }]),
+            }
+        };
+        let mut h = header(b"mhfd", 0x84);
+        put(&mut h, 0x1c, &100u32.to_le_bytes());
+        ArtworkDb {
+            tree: Chunk {
+                header: h,
+                body: Body::Children(vec![section(1, b"mhli"), section(2, b"mhla"), section(3, b"mhlf")]),
+            },
+        }
     }
 
     /// Writes it back.
@@ -346,6 +380,96 @@ impl ArtworkDb {
     }
 }
 
+fn item_value(ipod: &crate::add::Ipod, pid: i64, column: &str) -> Option<crate::library::Value> {
+    let items = ipod.rows.iter().find(|r| r.file == "Library.itdb")?.table("item")?;
+    let key = crate::library::Value::Integer(pid);
+    let row = items.find("pid", &key).next()?;
+    Some(items.get(row, column))
+}
+
+/// The image song `pid` shows, if any.
+pub fn image_of(ipod: &crate::add::Ipod, pid: i64) -> Option<u32> {
+    use crate::library::Value;
+    match (
+        item_value(ipod, pid, "artwork_status")?,
+        item_value(ipod, pid, "artwork_cache_id")?,
+    ) {
+        (Value::Integer(1), Value::Integer(id)) if id > 0 => u32::try_from(id).ok(),
+        _ => None,
+    }
+}
+
+/// The image another song of `pid`'s album shows, so that `pid` can share it.
+pub fn album_image(ipod: &crate::add::Ipod, pid: i64) -> Option<u32> {
+    use crate::library::Value;
+    let album = item_value(ipod, pid, "album_pid").filter(|a| *a != Value::Null)?;
+    let items = ipod.rows.iter().find(|r| r.file == "Library.itdb")?.table("item")?;
+    items
+        .find("album_pid", &album)
+        .filter(|r| items.get(r, "pid") != Value::Integer(pid))
+        .find_map(|r| match items.get(r, "pid") {
+            Value::Integer(other) => image_of(ipod, other),
+            _ => None,
+        })
+}
+
+/// A song other than `pid` that shows image `id`.
+pub fn other_song_of(ipod: &crate::add::Ipod, id: u32, pid: i64) -> Option<i64> {
+    use crate::library::Value;
+    let items = ipod.rows.iter().find(|r| r.file == "Library.itdb")?.table("item")?;
+    let key = Value::Integer(i64::from(id));
+    items
+        .find("artwork_cache_id", &key)
+        .find_map(|r| match items.get(r, "pid") {
+            Value::Integer(p) if p != pid => Some(p),
+            _ => None,
+        })
+}
+
+/// Makes song `pid` show image `id`: its `mhit` (`0xA4` = 1, `0x160`), its
+/// `item` row (`artwork_status`, `artwork_cache_id`), and its album's
+/// `artwork_item_pid` when the album has none. False when there is no such song.
+pub fn set_image(ipod: &mut crate::add::Ipod, pid: i64, id: u32) -> bool {
+    use crate::library::Value;
+    let Ok(tracks) = crate::add::list_mut(&mut ipod.tree, crate::add::SECTION_TRACKS, "track list") else {
+        return false;
+    };
+    let Some(mhit) = tracks.iter_mut().find(|t| crate::add::i64_at(&t.header, 0x70) == pid) else {
+        return false;
+    };
+    mhit.header[0xa4] = 1;
+    put(&mut mhit.header, 0x160, &id.to_le_bytes());
+    let Some(library) = ipod.rows.iter_mut().find(|r| r.file == "Library.itdb") else {
+        return false;
+    };
+    let mut album = Value::Null;
+    if let Some(items) = library.table_mut("item")
+        && let (Some(p), Some(status), Some(cache), Some(a)) = (
+            items.column("pid"),
+            items.column("artwork_status"),
+            items.column("artwork_cache_id"),
+            items.column("album_pid"),
+        )
+    {
+        for row in items.rows.iter_mut().filter(|r| r[p] == Value::Integer(pid)) {
+            row[status] = Value::Integer(1);
+            row[cache] = Value::Integer(i64::from(id));
+            album = row[a].clone();
+        }
+    }
+    if album != Value::Null
+        && let Some(albums) = library.table_mut("album")
+        && let (Some(p), Some(art)) = (albums.column("pid"), albums.column("artwork_item_pid"))
+    {
+        for row in albums.rows.iter_mut().filter(|r| r[p] == album) {
+            if matches!(row[art], Value::Null | Value::Integer(0)) {
+                row[art] = Value::Integer(pid);
+            }
+        }
+    }
+    true
+}
+
 /// The RGB pixels (three bytes each, row by row) of a thumbnail's slot.
 pub fn decode(slot: &[u8], width: u16, height: u16, row_bytes: usize) -> Vec<u8> {
     let mut out = Vec::with_capacity(usize::from(width) * usize::from(height) * 3);
@@ -433,31 +557,9 @@ mod tests {
         assert!(album_art_formats("<plist/>").is_empty());
     }
 
-    fn empty_db() -> ArtworkDb {
-        let section = |kind: u16, list: &[u8; 4]| {
-            let mut h = header(b"mhsd", 0x60);
-            put(&mut h, 0x0c, &kind.to_le_bytes());
-            Chunk {
-                header: h,
-                body: Body::Children(vec![Chunk {
-                    header: header(list, 0x5c),
-                    body: Body::List(vec![]),
-                }]),
-            }
-        };
-        let mut h = header(b"mhfd", 0x84);
-        put(&mut h, 0x1c, &100u32.to_le_bytes());
-        ArtworkDb {
-            tree: Chunk {
-                header: h,
-                body: Body::Children(vec![section(1, b"mhli"), section(2, b"mhla"), section(3, b"mhlf")]),
-            },
-        }
-    }
-
     #[test]
     fn add_share_unshare_and_read_back() {
-        let mut db = empty_db();
+        let mut db = ArtworkDb::empty();
         let thumb = Thumb {
             format: 1016,
             file: ":F1016_1.ithmb".into(),
@@ -465,6 +567,8 @@ mod tests {
             size: 6612,
             height: 56,
             width: 57,
+            top: 0,
+            left: 0,
         };
         let id = db.add(42, std::slice::from_ref(&thumb)).unwrap();
         assert_eq!(id, 100);
@@ -490,6 +594,31 @@ mod tests {
         assert_eq!(db.images()[0].song, 43);
         db.unshare(id, 43, None);
         assert!(db.images().is_empty());
+    }
+
+    #[test]
+    fn songs_and_their_images() {
+        use crate::add::tests::{NOW, counter, ipod, song};
+        use crate::library::Value;
+        let mut ipod = ipod();
+        let mut random = counter();
+        let a = crate::add::add(&mut ipod, song("A", "F01/A.mp3"), None, NOW, &mut random).unwrap();
+        let b = crate::add::add(&mut ipod, song("B", "F01/B.mp3"), None, NOW, &mut random).unwrap();
+        assert_eq!(image_of(&ipod, a.pid), None);
+        assert_eq!(album_image(&ipod, b.pid), None);
+        assert!(set_image(&mut ipod, a.pid, 7));
+        assert!(!set_image(&mut ipod, 12345, 7));
+        assert_eq!(image_of(&ipod, a.pid), Some(7));
+        assert_eq!(album_image(&ipod, b.pid), Some(7));
+        assert_eq!(other_song_of(&ipod, 7, b.pid), Some(a.pid));
+        assert_eq!(other_song_of(&ipod, 7, a.pid), None);
+        let library = ipod.rows.iter().find(|r| r.file == "Library.itdb").unwrap();
+        let albums = library.table("album").unwrap();
+        assert_eq!(albums.get(&albums.rows[0], "artwork_item_pid"), Value::Integer(a.pid));
+        let db = ipod.tree.write().unwrap();
+        let at = db.windows(8).position(|w| w == a.pid.to_le_bytes()).unwrap() - 0x70;
+        assert_eq!(db[at + 0xa4], 1);
+        assert_eq!(u32_at(&db, at + 0x160), 7);
     }
 
     #[test]

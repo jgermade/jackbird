@@ -171,6 +171,73 @@ fn run(itunes: &Path, extended: &Path, out: &Path) -> Result<bool, String> {
             "the files differ in their bytes (expected: SQLite lays out pages its own way)"
         }
     );
+
+    // The artwork, when the copy has it (`Artwork/` beside `iTunes/`).
+    if let Some(artwork) = itunes.parent().map(|p| p.join("Artwork")).filter(|a| a.is_dir()) {
+        all &= check_artwork(&artwork, &extended)?;
+    }
+    Ok(all)
+}
+
+/// Reads the `ArtworkDB`, writes it back, rebuilds each image's `mhod`s with
+/// jackbird's code and decodes every thumbnail from its file.
+fn check_artwork(folder: &Path, extended: &str) -> Result<bool, String> {
+    use jackbird_ipod::artwork::{self, ArtworkDb};
+    let raw = read(&folder.join("ArtworkDB"))?;
+    let db = ArtworkDb::parse(&raw).map_err(|e| format!("ArtworkDB: {e}"))?;
+    let mut all = check(
+        db.write().map_err(|e| e.to_string())? == raw,
+        "the ArtworkDB writes back byte for byte",
+    );
+    let formats = artwork::album_art_formats(extended);
+    let images = db.images();
+    // Apple's mhii children, against the ones jackbird would write for the same thumbnails.
+    let mhli: Vec<&chunk::Chunk> = db
+        .tree
+        .children()
+        .iter()
+        .filter(|s| s.header.get(12..14) == Some(&[1, 0][..]))
+        .flat_map(|s| s.children().iter().flat_map(|l| l.children()))
+        .collect();
+    let same = mhli
+        .iter()
+        .zip(&images)
+        .filter(|(m, image)| {
+            let mut ours: Vec<chunk::Chunk> = image.thumbs.iter().map(artwork::thumb_mhod).collect();
+            ours.push(artwork::mhaf_mhod());
+            let bytes = |c: &[chunk::Chunk]| c.iter().map(|x| x.write().unwrap()).collect::<Vec<_>>();
+            bytes(m.children()) == bytes(&ours)
+        })
+        .count();
+    all &= check(
+        same == images.len(),
+        &format!("every image's mhods as jackbird writes them ({same}/{})", images.len()),
+    );
+    // Every thumbnail inside its file, of its format's slot.
+    let mut files: std::collections::HashMap<String, Vec<u8>> = Default::default();
+    let mut fine = 0;
+    let mut total = 0;
+    for t in images.iter().flat_map(|i| &i.thumbs) {
+        total += 1;
+        let name = t.file.trim_start_matches(':').to_string();
+        if !files.contains_key(&name) {
+            files.insert(name.clone(), read(&folder.join(&name))?);
+        }
+        let data = &files[&name];
+        let Some(format) = formats.iter().find(|f| f.id == t.format) else {
+            continue;
+        };
+        let (start, end) = (t.offset as usize, t.offset as usize + t.size as usize);
+        if t.size as usize == format.slot() && end <= data.len() && t.width <= format.width && t.height <= format.height
+        {
+            let rgb = artwork::decode(&data[start..end], t.width, t.height, format.row_bytes(format.width));
+            fine += usize::from(rgb.len() == usize::from(t.width) * usize::from(t.height) * 3);
+        }
+    }
+    all &= check(
+        fine == total,
+        &format!("every thumbnail in its file, in its format's slot ({fine}/{total})"),
+    );
     Ok(all)
 }
 
@@ -339,6 +406,7 @@ fn check_songs(tree: &chunk::Chunk, rows: &[library::Rows]) -> bool {
             artist_pid: None,
             composer_pid: 0,
             genre_id: 0,
+            artwork_id: (h[0xa4] == 1).then(|| u32_at(0x160)),
         };
         // The genre's name is in genre_map; take it from Apple's mhod 5 to
         // check the rest (genres are N4b's).
@@ -358,7 +426,7 @@ fn check_songs(tree: &chunk::Chunk, rows: &[library::Rows]) -> bool {
         let s = Song { genre, ..s };
         songs += 1;
         for (column, value) in s.item_row() {
-            let skip = ["genre_id", "album_pid", "artist_pid", "composer_pid", "artwork_status"];
+            let skip = ["genre_id", "album_pid", "artist_pid", "composer_pid"];
             if !skip.contains(&column) && g(column) != value {
                 *columns.entry(column).or_default() += 1;
             }

@@ -80,7 +80,7 @@ fn run(root: &std::path::Path, files: &[PathBuf], playlist: Option<&str>) -> Res
     for file in files {
         let song = read_mp3(file, &local_offset).map_err(|e| e.to_string())?;
         let added = device
-            .add(file, song, playlist, Stamp { unix: now, offset })
+            .add(file, song, playlist, Stamp { unix: now, offset }, None)
             .map_err(|e| e.to_string())?;
         println!(
             "adding {} as iPod_Control/Music/{} ({} — {}, {} ms, {} kbit/s{})",
