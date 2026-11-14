@@ -243,7 +243,7 @@ pub fn post_process(sysinfo_extended: &str, user_version: i64) -> Result<Vec<Com
 /// The inside of the `<dict>` or `<array>` that follows `<key>key</key>` in
 /// `text`, at the first such key whose value is one. Nested elements are
 /// counted, so the inside ends at its own closing tag.
-fn element_after_key<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn element_after_key<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     let needle = format!("<key>{key}</key>");
     let mut from = 0;
     while let Some(at) = text[from..].find(&needle) {
@@ -287,7 +287,7 @@ fn closing(text: &str, from: usize, tag: &str) -> Option<usize> {
 }
 
 /// The `<string>`s in `text`, in order, with their entities decoded.
-fn strings(text: &str) -> Vec<String> {
+pub(crate) fn strings(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut rest = text;
     while let Some(at) = rest.find("<string>") {

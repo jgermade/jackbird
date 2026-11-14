@@ -14,13 +14,15 @@
 //! - [`song`]: a song as jackbird adds it, and its `mhit` and rows;
 //! - [`collate`]: how the nano's menus sort, and the library's ranks;
 //! - [`add`]: a song added to both databases, in memory;
-//! - [`remove`]: a song taken out of them.
+//! - [`remove`]: a song taken out of them;
+//! - [`artwork`]: album artwork, its database and its pixels.
 //!
 //! No I/O: the caller reads the files (or the USB request) and hands the bytes
 //! in. Malformed input is an [`Error`] that names its offset, never a panic.
 //! See `RECORD/2026-11-14.ipod-sync.WIP.md`.
 
 pub mod add;
+pub mod artwork;
 pub mod cdb;
 pub mod chunk;
 pub mod collate;

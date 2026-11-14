@@ -25,9 +25,13 @@ use crate::Error;
 use crate::bytes::{array, len_at};
 
 /// Chunks whose `0x08` is the count of the children that follow them.
-const LISTS: [&[u8; 4]; 4] = [b"mhlt", b"mhlp", b"mhla", b"mhli"];
+/// (`mhlf`, the artwork database's list of image files.)
+const LISTS: [&[u8; 4]; 5] = [b"mhlt", b"mhlp", b"mhla", b"mhli", b"mhlf"];
 /// Chunks whose children are chunks, inside their total length.
-const CONTAINERS: [&[u8; 4]; 7] = [b"mhbd", b"mhsd", b"mhit", b"mhyp", b"mhip", b"mhia", b"mhii"];
+/// (`mhfd` and `mhni`: the artwork database's root and its thumbnails.)
+const CONTAINERS: [&[u8; 4]; 9] = [
+    b"mhbd", b"mhsd", b"mhit", b"mhyp", b"mhip", b"mhia", b"mhii", b"mhfd", b"mhni",
+];
 
 /// The deepest nesting a database may have: far more than iTunes writes, and a
 /// bound on what a malformed one can make the reader recurse into.
@@ -132,11 +136,17 @@ impl Chunk {
 /// Reads an `iTunesDB` (an `iTunesCDB` must be inflated first,
 /// [`crate::cdb::inflate`]) into its tree, rooted at the `mhbd`.
 pub fn parse(data: &[u8]) -> Result<Chunk, Error> {
+    parse_rooted(data, "mhbd")
+}
+
+/// Reads a database rooted at a chunk named `root` (`mhbd` for an `iTunesDB`,
+/// `mhfd` for an `ArtworkDB`, which shares its layout), or a single chunk.
+pub fn parse_rooted(data: &[u8], root: &'static str) -> Result<Chunk, Error> {
     let name: [u8; 4] = array(data, 0)?;
-    if &name != b"mhbd" {
+    if name != root.as_bytes() {
         return Err(Error::UnexpectedChunk {
             offset: 0,
-            expected: "mhbd",
+            expected: root,
             found: name,
         });
     }
