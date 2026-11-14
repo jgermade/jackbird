@@ -13,6 +13,7 @@
   const Select = await import("../../theme/default/components/select.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
 
+  const { compareText } = await import("../helpers/compare")
   const { newPlaylistPath } = await import("../helpers/playlists")
   const { t, tn } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
@@ -27,7 +28,7 @@
   const folderName = (): string => root()?.label ?? ""
 
   const existing = (): Choice[] =>
-    [...(root()?.playlists ?? [])].sort((left: Choice, right: Choice) => left.name.localeCompare(right.name, preferences.language))
+    [...(root()?.playlists ?? [])].sort((left: Choice, right: Choice) => compareText(left.name, right.name, preferences.language))
 
   // The name: where it will be written, or why it cannot be (once typed); a
   // failure on saving in place of either.

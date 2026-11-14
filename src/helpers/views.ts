@@ -9,6 +9,7 @@
 
 import type { LibraryView, Track, Playlist, WizardTreeRow } from "../types.ts";
 import { isCompilation } from "./metadata.ts";
+import { compareText } from "./compare.ts";
 import { orderDetailPlaylist } from "./tracks.ts";
 
 /** The words and the order a view needs. */
@@ -54,14 +55,16 @@ function grouped(tracks: readonly Track[], keyOf: (track: Track) => string, labe
   const groups = new Map<string, Track[]>();
   for (const track of tracks) {
     const key = keyOf(track);
-    groups.set(key, [...(groups.get(key) ?? []), track]);
+    const members = groups.get(key);
+    if (members) members.push(track);
+    else groups.set(key, [track]);
   }
   return [...groups.entries()]
     .map(([key, members]) => {
       const label = labelOf(members[0]);
       return { key, label: label || "", meta: metaOf(members), tracks: orderDetailPlaylist(members), known: !!label };
     })
-    .sort((left, right) => Number(right.known) - Number(left.known) || left.label.localeCompare(right.label, locale));
+    .sort((left, right) => Number(right.known) - Number(left.known) || compareText(left.label, right.label, locale));
 }
 
 const artistsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] =>
@@ -102,7 +105,12 @@ const albumsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] =>
  */
 const albumArtistsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] => {
   const byAlbum = new Map<string, Track[]>();
-  for (const track of tracks) byAlbum.set(albumKey(track), [...(byAlbum.get(albumKey(track)) ?? []), track]);
+  for (const track of tracks) {
+    const key = albumKey(track);
+    const members = byAlbum.get(key);
+    if (members) members.push(track);
+    else byAlbum.set(key, [track]);
+  }
   const artistOfAlbum = new Map([...byAlbum.entries()].map(([key, members]) => [key, albumArtistOf(members, labels.variousArtists)]));
   const artistOf = (track: Track): string => artistOfAlbum.get(albumKey(track)) ?? "";
   return grouped(tracks, (track) => `@artist:${artistOf(track).toLowerCase()}`, artistOf, () => "", labels.locale).map((group) => ({
@@ -160,7 +168,7 @@ export function buildViewRows(
 
   if (view === "songs") {
     const byTitle = [...tracks].sort(
-      (left, right) => (left.metadata.title || left.name).localeCompare(right.metadata.title || right.name, labels.locale) || left.relativePath.localeCompare(right.relativePath)
+      (left, right) => compareText(left.metadata.title || left.name, right.metadata.title || right.name, labels.locale) || left.relativePath.localeCompare(right.relativePath)
     );
     // "Artist - Album", so two songs of one title tell themselves apart.
     const byWhom = (track: Track): string => [track.metadata.artist.trim(), track.metadata.album.trim()].filter(Boolean).join(" - ");
@@ -190,7 +198,7 @@ export function buildViewRows(
     }
   } else if (view === "playlists") {
     const byPath = new Map(tracks.map((track) => [track.relativePath, track]));
-    const sorted = [...playlists].sort((left, right) => left.name.localeCompare(right.name, labels.locale));
+    const sorted = [...playlists].sort((left, right) => compareText(left.name, right.name, labels.locale));
     for (const playlist of sorted) {
       const key = `@playlist:${playlist.path}`;
       const found = playlist.entries.map((entry) => (entry.path ? byPath.get(entry.path) : undefined));

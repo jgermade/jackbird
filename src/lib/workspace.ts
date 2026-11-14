@@ -78,9 +78,22 @@ function derive(): Derived {
   // Without the songs (a preference), the tree shows and walks the folders only; what Details
   // shows, and its breadcrumb, are still worked out from every row.
   const rows = root && !songs ? withoutSongs(all, root.view ?? "files", root.tracks) : all;
-  const derived = { root, rows, scope: detailScope(root, all), crumbs: scopeCrumbs(root, all) };
+  // The same scope as before (a whole root, kept from one view to another) is the same object, so
+  // the album sheet, which a new one draws again whole, is not drawn again.
+  const scope = sameScope(cache?.derived.scope, detailScope(root, all));
+  const derived = { root, rows, scope, crumbs: scopeCrumbs(root, all) };
   cache = { roots, id, language, songs, derived };
   return derived;
+}
+
+function sameScope(before: Scope | undefined, after: Scope): Scope {
+  return before && before.label === after.label && before.tracks === after.tracks && before.ordered === after.ordered && before.whole === after.whole ? before : after;
+}
+
+/** A box for `data` that is the last one when `data` is the same: a computed that gets it does not wake its views. */
+function boxer<T>(): (data: T) => Opaque<T> {
+  let last: Opaque<T> | null = null;
+  return (data) => (last && last.data === data ? last : (last = new Opaque(data)));
 }
 
 export const activeRoot = $computed((): Opaque<RootWorkspace | null> => new Opaque(derive().root));
@@ -92,7 +105,8 @@ export const treeRows = $computed((): Opaque<WizardTreeRow[]> => new Opaque(deri
 export const treeLevels = $computed((): Opaque<Levels> => new Opaque(levelsOf(derive().rows)));
 
 /** What the album sheet shows. */
-export const detail = $computed((): Opaque<Scope> => new Opaque(derive().scope));
+const detailBox = boxer<Scope>();
+export const detail = $computed((): Opaque<Scope> => detailBox(derive().scope));
 
 /** Where the album sheet's scope comes from, as a breadcrumb (helpers/scope.ts). */
 export const detailCrumbs = $computed((): Opaque<Crumb[]> => new Opaque(derive().crumbs));
@@ -103,9 +117,16 @@ export function showWhole(): void {
 }
 
 /** The sheet's tracks as albums and discs, titled in the current language. */
-export const detailAlbums = $computed(
-  (): Opaque<AlbumGroup[]> => new Opaque(groupAlbums(derive().scope.tracks, t("album.untitled"), preferences.language))
-);
+let albumsOf: { tracks: Track[]; untitled: string; language: string; box: Opaque<AlbumGroup[]> } | null = null;
+export const detailAlbums = $computed((): Opaque<AlbumGroup[]> => {
+  const tracks = derive().scope.tracks;
+  const untitled = t("album.untitled");
+  const language = preferences.language;
+  if (!albumsOf || albumsOf.tracks !== tracks || albumsOf.untitled !== untitled || albumsOf.language !== language) {
+    albumsOf = { tracks, untitled, language, box: new Opaque(groupAlbums(tracks, untitled, language)) };
+  }
+  return albumsOf.box;
+});
 
 export const selectedTracks = $computed((): Opaque<Track[]> => {
   const { root } = derive();

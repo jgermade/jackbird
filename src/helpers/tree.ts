@@ -1,4 +1,5 @@
 import type { Track, WizardTreeRow } from "../types.ts";
+import { compareText } from "./compare.ts";
 
 type FolderNode = {
   folders: Map<string, FolderNode>;
@@ -30,7 +31,7 @@ export function buildWizardRows(tracks: Track[], expandedFolders: readonly strin
   const rows: WizardTreeRow[] = [];
 
   const append = (node: FolderNode, parentPath: string, parentKey: string | null, depth: number): void => {
-    const folders = [...node.folders.entries()].sort(([left], [right]) => left.localeCompare(right, "es"));
+    const folders = [...node.folders.entries()].sort(([left], [right]) => compareText(left, right, "es"));
     for (const [folder, child] of folders) {
       const folderPath = parentPath ? `${parentPath}/${folder}` : folder;
       const folderKey = `folder:${folderPath}`;
@@ -41,7 +42,7 @@ export function buildWizardRows(tracks: Track[], expandedFolders: readonly strin
       }
     }
 
-    const files = [...node.tracks].sort((left, right) => left.relativePath.localeCompare(right.relativePath, "es"));
+    const files = [...node.tracks].sort((left, right) => compareText(left.relativePath, right.relativePath, "es"));
     for (const track of files) {
       rows.push({
         key: `track:${track.id}`,

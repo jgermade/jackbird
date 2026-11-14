@@ -1,5 +1,6 @@
 import type { Track } from "../types.ts";
 import { isCompilation } from "./metadata.ts";
+import { compareText } from "./compare.ts";
 import { inferDiscNumber, trackNumberOrder } from "./tracks.ts";
 
 export type AlbumDisc = {
@@ -54,7 +55,9 @@ export function groupAlbums(tracks: readonly Track[], untitled: string, locale: 
     // An album shows the first cover one of its tracks has: some of its tracks may have none.
     if (!entry.group.coverDataUrl && track.metadata.coverDataUrl) entry.group.coverDataUrl = track.metadata.coverDataUrl;
     const disc = inferDiscNumber(track);
-    entry.discs.set(disc, [...(entry.discs.get(disc) ?? []), track]);
+    const onDisc = entry.discs.get(disc);
+    if (onDisc) onDisc.push(track);
+    else entry.discs.set(disc, [track]);
   }
 
   return [...albums.values()]
@@ -67,9 +70,9 @@ export function groupAlbums(tracks: readonly Track[], untitled: string, locale: 
           // By number; tracks with none (or the same) by file name, as the tree lists them.
           tracks: [...discTracks].sort((left, right) => {
             const difference = trackNumberOrder(left) - trackNumberOrder(right);
-            return (Number.isNaN(difference) ? 0 : difference) || left.name.localeCompare(right.name, locale);
+            return (Number.isNaN(difference) ? 0 : difference) || compareText(left.name, right.name, locale);
           })
         }))
     }))
-    .sort((left, right) => left.title.localeCompare(right.title, locale));
+    .sort((left, right) => compareText(left.title, right.title, locale));
 }

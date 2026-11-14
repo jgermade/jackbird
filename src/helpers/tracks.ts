@@ -1,4 +1,5 @@
 import type { Track } from "../types.ts";
+import { compareText } from "./compare.ts";
 
 /**
  * The disc a track sits on: its disc tag's number (`2` or `2/3`), else a `CD2`,
@@ -27,10 +28,10 @@ function albumKey(track: Track): string {
 export function orderDetailPlaylist(tracks: Track[]): Track[] {
   return [...tracks].sort(
     (left, right) =>
-      albumKey(left).localeCompare(albumKey(right), "es") ||
+      compareText(albumKey(left), albumKey(right), "es") ||
       inferDiscNumber(left) - inferDiscNumber(right) ||
       trackNumberOrder(left) - trackNumberOrder(right) ||
-      left.name.localeCompare(right.name, "es")
+      compareText(left.name, right.name, "es")
   );
 }
 
