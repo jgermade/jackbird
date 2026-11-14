@@ -51,14 +51,25 @@ async function startEmbedded(): Promise<void> {
   const list = await sampleList();
   if (!list) return;
   await openSamples(list);
-  if (await following.then((joined) => joined && embedKind === "phone")) return;
-  // Its tracks come with the folder's walk (the first time, their copies too): queued once read.
+  // Its tracks come with the folder's walk (the first time, their copies too): shown, and queued, once read.
   for (let waited = 0; waited < 120; waited += 1) {
     const root = library.roots.find((one) => one.id === library.activeRootId);
     if (root && root.tracks.length > 0 && !root.loadingMetadata) break;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+  tellLandingDrawn();
+  if (await following.then((joined) => joined && embedKind === "phone")) return;
   queueWhatIsShown();
+}
+
+/**
+ * Tells the landing page the app has drawn its music: until then the page shows its screenshots and
+ * keeps the app hidden over them, so a half-drawn app is not seen over them (landing/landing.js).
+ */
+function tellLandingDrawn(): void {
+  if (window.parent === window) return;
+  // Two frames: the one the tracks' rows are drawn in, and the one after it, painted.
+  requestAnimationFrame(() => requestAnimationFrame(() => window.parent.postMessage({ type: "jackbird:drawn" }, location.origin)));
 }
 
 function startSession(): void {
