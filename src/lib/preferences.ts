@@ -3,13 +3,14 @@
 // once chosen, and is applied to <html> (data-theme, lang). The theme follows
 // the system until one is chosen. And whether the library's tree shows the
 // songs (helpers/folders.ts), on until turned off. And how tall the lists' rows
-// are (helpers/density.ts), applied to <html> as data-density. A jq79 store, so views can
-// bind to it.
+// are (helpers/density.ts), applied to <html> as data-density. And the display spectrum's look
+// and how its peaks fall (helpers/spectrum.ts). A jq79 store, so views can bind to it.
 
 import { $reactive } from "jq79";
 import { densityOf } from "../helpers/density";
 import { pickLanguage } from "../helpers/i18n";
-import type { Density, Language, Theme } from "../types";
+import { peakFallOf, spectrumLookOf } from "../helpers/spectrum";
+import type { Density, Language, PeakFall, SpectrumLook, Theme } from "../types";
 import { isEmbed } from "./platform";
 import { STORAGE_KEYS, readStored, removeStored, writeStored } from "./storage";
 
@@ -52,7 +53,9 @@ export const preferences = $reactive({
   themeChoice: (storedTheme() ?? "auto") as ThemeChoice,
   language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage(),
   songsInTree: readStored(STORAGE_KEYS.songsInTree) !== "off",
-  density: densityOf(readStored(STORAGE_KEYS.density))
+  density: densityOf(readStored(STORAGE_KEYS.density)),
+  spectrumLook: spectrumLookOf(readStored(STORAGE_KEYS.spectrumLook)),
+  peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall))
 });
 
 function apply(): void {
@@ -108,6 +111,18 @@ export function setSongsInTree(on: boolean): void {
 export function setDensity(density: Density): void {
   preferences.density = density;
   writeStored(STORAGE_KEYS.density, density);
+}
+
+/** How the display's spectrum draws its columns. */
+export function setSpectrumLook(look: SpectrumLook): void {
+  preferences.spectrumLook = look;
+  writeStored(STORAGE_KEYS.spectrumLook, look);
+}
+
+/** How the display spectrum's peaks fall, or none. */
+export function setPeakFall(fall: PeakFall): void {
+  preferences.peakFall = fall;
+  writeStored(STORAGE_KEYS.peakFall, fall);
 }
 
 export function setLanguage(language: Language): void {
