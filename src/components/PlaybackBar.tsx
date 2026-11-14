@@ -1,15 +1,15 @@
 import { useEffect, useState, type RefObject } from "react";
-import type { Mp3Track } from "../types";
+import type { Track } from "../types";
 
 type PlaybackBarProps = {
-  track: Mp3Track | null;
+  track: Track | null;
   trackKey: string | null;
   sourceLabel: string;
   position: number;
   total: number;
   canGoPrevious: boolean;
   canGoNext: boolean;
-  onLoadAudioBytes: (track: Mp3Track) => Promise<Uint8Array>;
+  onLoadAudioBytes: (track: Track) => Promise<Uint8Array>;
   onPrevious: () => void;
   onNext: () => void;
   onReturnToList: () => void;

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
-import type { EditableMetadata, Mp3Track } from "../types";
+import type { EditableMetadata, Track } from "../types";
 import { MetadataEditor } from "./MetadataEditor";
 
 type MetadataEditModalProps = {
   open: boolean;
-  tracks: Mp3Track[];
+  tracks: Track[];
   value: EditableMetadata;
   saving: boolean;
   onChange: (next: EditableMetadata) => void;

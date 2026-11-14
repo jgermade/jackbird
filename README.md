@@ -1,4 +1,4 @@
-# MP3 Manager
+# Musikmatch
 
 Aplicacion web cliente para gestionar metadatos ID3 y caratulas de una coleccion MP3 local.
 
@@ -15,23 +15,23 @@ Aplicacion web cliente para gestionar metadatos ID3 y caratulas de una coleccion
 
 - Cliente puro, sin backend.
 - UI desacoplada del acceso a ficheros.
-- Capa VFS por interfaz:
-  - `src/vfs/types.ts`: contrato `VfsAdapter`.
-  - `src/vfs/browserVfs.ts`: implementacion local con File System Access API.
+- Capa VFS sobre `@cloudauthn/vfs-sync`:
+  - `VFSAdapter`: contrato por rutas (`list`/`read`/`write`/`rename`/`stat`, mas streaming opcional)
+    que consume tambien el motor de sincronizacion.
+  - `FSAAdapter`: implementacion local con File System Access API.
 - Motor de metadata sobre bytes:
   - `src/lib/id3.ts` no depende de handles directos.
   - La lectura/escritura se hace sobre `Uint8Array` para facilitar otras VFS.
 
 ## Flujo
 
-1. Montar VFS (`BrowserVfs.mount`).
-2. Listar MP3 (`BrowserVfs.listFiles`).
-3. Leer bytes por archivo (`BrowserVfs.readFile`).
+1. Abrir carpeta (`FSAAdapter.pick`).
+2. Listar MP3 (`walk` de vfs-sync + filtro de extension).
+3. Leer bytes por ruta (`VFSAdapter.read`).
 4. Parsear ID3 (`readTrackMetadataFromBytes`).
 5. Editar en UI.
 6. Serializar ID3 (`writeTrackMetadataToBytes`).
-7. Persistir (`BrowserVfs.writeFile`).
-8. Registrar operacion de escritura (`getWriteOperations`).
+7. Persistir (`VFSAdapter.write`).
 
 ## Requisitos
 
@@ -52,6 +52,9 @@ npm run build
 npm run preview
 ```
 
-## Nota sobre sincronizacion futura
+## Nota sobre sincronizacion
 
-La UI ya consume la abstraccion `VfsAdapter`. Para sincronizar con nube o repositorio remoto, puedes crear otra implementacion (por ejemplo `RemoteSyncVfs`) sin reescribir los componentes de pantalla.
+La UI ya consume la abstraccion `VFSAdapter`, la misma que usa `@cloudauthn/vfs-sync` para
+sincronizar carpetas entre si (motor tipo git: contenido direccionado por SHA-256, renames y
+tombstones). Falta cablear la malla: hoy solo hay una raiz local por pestana y ninguna sesion de
+sincronizacion activa.

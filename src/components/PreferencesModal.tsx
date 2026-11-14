@@ -40,7 +40,7 @@ export function PreferencesModal(props: PreferencesModalProps): JSX.Element {
     >
       <header>
         <div>
-          <span className="detail-eyebrow">MP3 Manager</span>
+          <span className="detail-eyebrow">Musikmatch</span>
           <h2 id="preferences-title">Preferencias</h2>
         </div>
         <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar preferencias" title="Cerrar">

@@ -16,27 +16,19 @@ import {
 } from "../lib/id3";
 import { loadRootSession, saveRootSession } from "../lib/rootSessionStore";
 import { useTheme } from "../services/ThemeService";
-import type { EditableMetadata, Mp3Track, TrackMetadata } from "../types";
+import type { EditableMetadata, Track, TrackMetadata } from "../types";
+import {
+  deleteMetaRecords,
+  isMetaPath,
+  loadMetaSnapshot,
+  newTrackId,
+  saveMetaRecords,
+  type MetaSnapshot
+} from "../lib/metaStore";
 import { FSAAdapter, isFSAAvailable, walk, type VFSAdapter } from "@cloudauthn/vfs-sync";
 
 
 type GroupingMode = "flat" | "wizard";
-
-type MetaRecord = {
-  checksum: string;
-  fullChecksum?: string;
-  audioChecksum?: string;
-  size?: number;
-  lastModified?: number;
-  lastVerifiedAt?: string;
-  metadata: TrackMetadata;
-  updatedAt: string;
-};
-
-type MetaSnapshot = {
-  version: 1;
-  tracks: Record<string, MetaRecord>;
-};
 
 type PlaybackQueue = {
   rootId: string;
@@ -51,7 +43,7 @@ type RootWorkspace = {
   vfs: VFSAdapter;
   /** Kept here rather than on the adapter: it is what the session store persists. */
   rootHandle: FileSystemDirectoryHandle;
-  tracks: Mp3Track[];
+  tracks: Track[];
   selectedTrackId: string | null;
   selectedTrackIds: string[];
   selectionAnchorTrackId: string | null;
@@ -65,8 +57,6 @@ type RootWorkspace = {
   activeRowKey: string | null;
 };
 
-const META_FILE_PATH = ".meta/mp3-manager.json";
-
 function emptyMetadata(): TrackMetadata {
   return {
     title: "",
@@ -79,14 +69,9 @@ function emptyMetadata(): TrackMetadata {
   };
 }
 
-function emptySnapshot(): MetaSnapshot {
-  return {
-    version: 1,
-    tracks: {}
-  };
-}
 
-export function Mp3ManagerView(): JSX.Element {
+
+export function LibraryView(): JSX.Element {
   const [theme, toggleTheme] = useTheme();
   const [roots, setRoots] = useState<RootWorkspace[]>([]);
   const [activeRootId, setActiveRootId] = useState<string | null>(null);
@@ -127,7 +112,7 @@ export function Mp3ManagerView(): JSX.Element {
 
   const detailScope = useMemo(() => {
     if (!activeRoot) {
-      return { label: "", tracks: [] as Mp3Track[] };
+      return { label: "", tracks: [] as Track[] };
     }
 
     const row = activeRoot.activeRowKey ? rowByKey.get(activeRoot.activeRowKey) : undefined;
@@ -167,7 +152,7 @@ export function Mp3ManagerView(): JSX.Element {
   );
   const playbackTracks = useMemo(() => {
     if (!playbackQueue || !playbackRoot) {
-      return [] as Mp3Track[];
+      return [] as Track[];
     }
 
     const tracksById = new Map(playbackRoot.tracks.map((track) => [track.id, track]));
@@ -198,14 +183,23 @@ export function Mp3ManagerView(): JSX.Element {
             continue;
           }
 
-          await hydrateRoot(vfs, {
-            rootHandle: persistedRoot.handle,
-            rootId: persistedRoot.id,
-            rootLabel: persistedRoot.label,
-            groupingMode: persistedRoot.groupingMode,
-            setActive: false
-          });
-          restoredRootIds.push(persistedRoot.id);
+          try {
+            await hydrateRoot(vfs, {
+              rootHandle: persistedRoot.handle,
+              rootId: persistedRoot.id,
+              rootLabel: persistedRoot.label,
+              groupingMode: persistedRoot.groupingMode,
+              setActive: false
+            });
+            restoredRootIds.push(persistedRoot.id);
+          } catch (error) {
+            // A root that refuses to load must say so: silently skipping it looks like the
+            // folder was empty, which is the one conclusion the version gate exists to prevent.
+            const reason = error instanceof Error ? error.message : "error desconocido";
+            if (!cancelled) {
+              setErrorMessage(`No se pudo restaurar ${persistedRoot.label}: ${reason}`);
+            }
+          }
         }
 
         if (!cancelled) {
@@ -283,6 +277,8 @@ export function Mp3ManagerView(): JSX.Element {
 
       let modifiedCount = 0;
       const currentSnapshot = activeRoot.metaSnapshot;
+      // Only the verified sidecars get written; the whole library is never serialised again.
+      const dirty = new Set<string>();
 
       for (const track of candidates) {
         if (cancelled) {
@@ -299,7 +295,9 @@ export function Mp3ManagerView(): JSX.Element {
           const { fullChecksum, audioChecksum } = await calculateDualChecksums(sourceBytes);
           const nowIso = new Date().toISOString();
 
+          const existing = currentSnapshot.tracks[track.relativePath];
           currentSnapshot.tracks[track.relativePath] = {
+            trackId: existing?.trackId ?? newTrackId(),
             checksum: fullChecksum,
             fullChecksum,
             audioChecksum,
@@ -307,8 +305,9 @@ export function Mp3ManagerView(): JSX.Element {
             lastModified: track.lastModified,
             lastVerifiedAt: nowIso,
             metadata: track.metadata,
-            updatedAt: currentSnapshot.tracks[track.relativePath]?.updatedAt ?? nowIso
+            updatedAt: existing?.updatedAt ?? nowIso
           };
+          dirty.add(track.relativePath);
 
           modifiedCount += 1;
 
@@ -334,15 +333,16 @@ export function Mp3ManagerView(): JSX.Element {
           );
 
           if (modifiedCount % 10 === 0) {
-            await writeMetaSnapshot(activeRoot.vfs, currentSnapshot);
+            await saveMetaRecords(activeRoot.vfs, currentSnapshot, [...dirty]);
+            dirty.clear();
           }
         } catch {
           // Ignore individual background read errors
         }
       }
 
-      if (modifiedCount > 0 && !cancelled) {
-        await writeMetaSnapshot(activeRoot.vfs, currentSnapshot);
+      if (dirty.size > 0 && !cancelled) {
+        await saveMetaRecords(activeRoot.vfs, currentSnapshot, [...dirty]);
       }
     }
 
@@ -371,10 +371,10 @@ export function Mp3ManagerView(): JSX.Element {
     const groupingMode = options.groupingMode ?? "wizard";
 
     // ─── Phase 1: Snapshot → instant render ──────────────────────────────────
-    const snapshot = await readMetaSnapshot(vfs);
+    const snapshot = await loadMetaSnapshot(vfs);
 
     const snapshotEntries = Object.entries(snapshot.tracks);
-    const initialTracks: Mp3Track[] = snapshotEntries.map(([relativePath, stored]) => ({
+    const initialTracks: Track[] = snapshotEntries.map(([relativePath, stored]) => ({
       id: relativePath,
       name: relativePath.split("/").at(-1) ?? relativePath,
       relativePath,
@@ -429,7 +429,7 @@ export function Mp3ManagerView(): JSX.Element {
     // ─── Phase 2: Filesystem walk (background) ────────────────────────────────
     void (async () => {
       try {
-        const mp3Files = (await walk(vfs))
+        const mp3Files = (await walk(vfs, { ignore: isMetaPath }))
           .filter((entry) => entry.path.toLowerCase().endsWith(".mp3"))
           .map((entry) => ({
             name: entry.path.split("/").at(-1) ?? entry.path,
@@ -491,6 +491,7 @@ export function Mp3ManagerView(): JSX.Element {
         );
 
         if (removedPaths.length > 0) {
+          await deleteMetaRecords(vfs, snapshot, removedPaths);
           for (const p of removedPaths) {
             delete snapshot.tracks[p];
           }
@@ -507,7 +508,7 @@ export function Mp3ManagerView(): JSX.Element {
 
         // Process stale/new files concurrently
         type TrackUpdate = {
-          trackId: string;
+          trackKey: string;
           metadata: TrackMetadata;
           fullChecksum: string;
           audioChecksum: string;
@@ -518,7 +519,7 @@ export function Mp3ManagerView(): JSX.Element {
 
         const pendingUpdates: TrackUpdate[] = [];
         let loadedCount = initialTracks.length - staleOrNewFiles.length + (removedPaths.length > 0 ? 0 : 0);
-        let snapshotDirty = removedPaths.length > 0;
+        const dirtyPaths = new Set<string>();
         const totalAfterWalk = mp3Files.length;
 
         function flush(): void {
@@ -534,12 +535,12 @@ export function Mp3ManagerView(): JSX.Element {
               const nextTracksById = new Map(root.tracks.map((item) => [item.id, item]));
 
               for (const update of updates) {
-                const currentTrack = nextTracksById.get(update.trackId);
+                const currentTrack = nextTracksById.get(update.trackKey);
                 if (!currentTrack) {
                   continue;
                 }
 
-                nextTracksById.set(update.trackId, {
+                nextTracksById.set(update.trackKey, {
                   ...currentTrack,
                   checksum: update.fullChecksum,
                   fullChecksum: update.fullChecksum,
@@ -584,6 +585,7 @@ export function Mp3ManagerView(): JSX.Element {
 
             const nowIso = new Date().toISOString();
             snapshot.tracks[file.relativePath] = {
+              trackId: stored?.trackId ?? newTrackId(),
               checksum: fullChecksum,
               fullChecksum,
               audioChecksum,
@@ -593,10 +595,10 @@ export function Mp3ManagerView(): JSX.Element {
               metadata,
               updatedAt: nowIso
             };
-            snapshotDirty = true;
+            dirtyPaths.add(file.relativePath);
 
             pendingUpdates.push({
-              trackId: file.relativePath,
+              trackKey: file.relativePath,
               metadata,
               fullChecksum,
               audioChecksum,
@@ -616,8 +618,8 @@ export function Mp3ManagerView(): JSX.Element {
           Array.from({ length: Math.min(READ_CONCURRENCY, staleOrNewFiles.length) }, () => worker())
         );
 
-        if (snapshotDirty) {
-          await writeMetaSnapshot(vfs, snapshot);
+        if (dirtyPaths.size > 0) {
+          await saveMetaRecords(vfs, snapshot, [...dirtyPaths]);
         }
 
         setRoots((currentRoots) =>
@@ -855,7 +857,7 @@ export function Mp3ManagerView(): JSX.Element {
       return;
     }
 
-    const currentFiles = (await walk(root.vfs)).filter((entry) =>
+    const currentFiles = (await walk(root.vfs, { ignore: isMetaPath })).filter((entry) =>
       entry.path.toLowerCase().endsWith(".mp3")
     );
     const currentPaths = new Set(currentFiles.map((file) => file.path));
@@ -1032,7 +1034,7 @@ export function Mp3ManagerView(): JSX.Element {
     );
   }
 
-  async function handleLoadPlaybackAudioBytes(track: Mp3Track): Promise<Uint8Array> {
+  async function handleLoadPlaybackAudioBytes(track: Track): Promise<Uint8Array> {
     if (!playbackRoot) {
       throw new Error("La carpeta de la lista de reproduccion ya no esta disponible.");
     }
@@ -1153,6 +1155,7 @@ export function Mp3ManagerView(): JSX.Element {
         const lastMod = Date.now();
 
         nextSnapshotTracks[track.relativePath] = {
+          trackId: activeRoot.metaSnapshot.tracks[track.relativePath]?.trackId ?? newTrackId(),
           checksum: fullChecksum,
           fullChecksum,
           audioChecksum,
@@ -1180,7 +1183,11 @@ export function Mp3ManagerView(): JSX.Element {
         tracks: nextSnapshotTracks
       };
 
-      await writeMetaSnapshot(activeRoot.vfs, nextSnapshot);
+      await saveMetaRecords(
+        activeRoot.vfs,
+        nextSnapshot,
+        selectedTracks.map((track) => track.relativePath)
+      );
 
       setRoots((currentRoots) =>
         currentRoots.map((root) => {
@@ -1210,7 +1217,7 @@ export function Mp3ManagerView(): JSX.Element {
     <main className="app-shell">
       <header className="app-topbar">
         <div className="header-left">
-          <h1 className="brand">MP3 Manager</h1>
+          <h1 className="brand">Musikmatch</h1>
           <FolderPicker onPickFolder={handlePickFolder} disabled={loading} loading={loading} hasRoots={roots.length > 0} />
         </div>
 
@@ -1396,7 +1403,7 @@ export function Mp3ManagerView(): JSX.Element {
 
 
 
-function computeCommonMetadata(tracks: Mp3Track[]): EditableMetadata {
+function computeCommonMetadata(tracks: Track[]): EditableMetadata {
   if (tracks.length === 0) {
     return emptyMetadata();
   }
@@ -1418,7 +1425,7 @@ function computeCommonMetadata(tracks: Mp3Track[]): EditableMetadata {
   return result;
 }
 
-function getVariedFields(tracks: Mp3Track[]): {
+function getVariedFields(tracks: Track[]): {
   title: boolean;
   artist: boolean;
   album: boolean;
@@ -1453,7 +1460,7 @@ function getVariedFields(tracks: Mp3Track[]): {
 
 
 
-function inferDiscLabel(track: Mp3Track): string {
+function inferDiscLabel(track: Track): string {
   const byPath = track.relativePath.match(/(?:^|\/)(?:cd|disc)[ _-]?(\d+)(?:\/|$)/i);
   if (byPath?.[1]) {
     return `Disco ${byPath[1]}`;
@@ -1462,12 +1469,12 @@ function inferDiscLabel(track: Mp3Track): string {
   return "Disco 1";
 }
 
-function trackNumberOrder(track: Mp3Track): number {
+function trackNumberOrder(track: Track): number {
   const match = track.metadata.trackNumber.match(/\d+/);
   return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
 }
 
-function orderDetailPlaylist(tracks: Mp3Track[]): Mp3Track[] {
+function orderDetailPlaylist(tracks: Track[]): Track[] {
   return [...tracks].sort((left, right) => {
     const albumOrder = (left.metadata.album || left.relativePath.split("/")[0]).localeCompare(
       right.metadata.album || right.relativePath.split("/")[0],
@@ -1491,31 +1498,7 @@ function orderDetailPlaylist(tracks: Mp3Track[]): Mp3Track[] {
   });
 }
 
-async function readMetaSnapshot(vfs: VFSAdapter): Promise<MetaSnapshot> {
-  const exists = await vfs.stat(META_FILE_PATH);
-  if (!exists) {
-    return emptySnapshot();
-  }
-
-  const raw = new TextDecoder().decode(await vfs.read(META_FILE_PATH)).trim();
-  if (!raw) {
-    return emptySnapshot();
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as MetaSnapshot;
-    return parsed?.version === 1 && parsed?.tracks ? parsed : emptySnapshot();
-  } catch {
-    return emptySnapshot();
-  }
-}
-
-async function writeMetaSnapshot(vfs: VFSAdapter, snapshot: MetaSnapshot): Promise<void> {
-  const encoded = new TextEncoder().encode(JSON.stringify(snapshot, null, 2));
-  await vfs.write(META_FILE_PATH, encoded);
-}
-
-function collectFolderPaths(tracks: Mp3Track[]): string[] {
+function collectFolderPaths(tracks: Track[]): string[] {
   const paths = new Set<string>();
 
   for (const track of tracks) {
@@ -1531,10 +1514,10 @@ function collectFolderPaths(tracks: Mp3Track[]): string[] {
   return [...paths];
 }
 
-function buildWizardRows(tracks: Mp3Track[], root: RootWorkspace | null): WizardTreeRow[] {
+function buildWizardRows(tracks: Track[], root: RootWorkspace | null): WizardTreeRow[] {
   type FolderNode = {
     folders: Map<string, FolderNode>;
-    tracks: Mp3Track[];
+    tracks: Track[];
   };
 
   const rootNode: FolderNode = { folders: new Map(), tracks: [] };

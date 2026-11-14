@@ -1,5 +1,5 @@
-import { Mp3ManagerView } from "./views/Mp3ManagerView";
+import { LibraryView } from "./views/LibraryView";
 
 export function App(): JSX.Element {
-  return <Mp3ManagerView />;
+  return <LibraryView />;
 }

@@ -8,7 +8,7 @@ export type TrackMetadata = {
   coverDataUrl: string | null;
 };
 
-export type Mp3Track = {
+export type Track = {
   id: string;
   name: string;
   relativePath: string;

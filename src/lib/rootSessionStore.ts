@@ -10,6 +10,10 @@ type PersistedSession = {
   activeRootId: string | null;
 };
 
+// Deliberately still the old project name: renaming the database orphans every
+// previously opened root (the new name reads as empty, so nothing restores).
+// Changing it needs its own copy-then-delete migration, which is not the `.meta`
+// one — that one is about the user's folder, this one is about this browser.
 const DB_NAME = "mp3-manager";
 const STORE_NAME = "session";
 const SESSION_KEY = "roots-session";

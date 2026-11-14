@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
-import type { Mp3Track } from "../types";
+import type { Track } from "../types";
 
 type TrackInfoModalProps = {
   open: boolean;
-  tracks: Mp3Track[];
+  tracks: Track[];
   onClose: () => void;
 };
 

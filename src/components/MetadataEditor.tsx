@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import type { EditableMetadata, Mp3Track } from "../types";
+import type { EditableMetadata, Track } from "../types";
 import { CoverDropzone } from "./CoverDropzone";
 
 type MetadataEditorProps = {
-  track?: Mp3Track | null;
-  tracks?: Mp3Track[];
+  track?: Track | null;
+  tracks?: Track[];
   value: EditableMetadata;
   saving: boolean;
   onChange: (next: EditableMetadata) => void;
@@ -39,7 +39,7 @@ function MetadataValue(props: { label: string; value: string }): JSX.Element {
   );
 }
 
-function TechnicalDetails(props: { track: Mp3Track }): JSX.Element {
+function TechnicalDetails(props: { track: Track }): JSX.Element {
   const { track } = props;
 
   return (

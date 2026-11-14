@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 
 export type Theme = "light" | "dark";
 
+// Same reasoning as DB_NAME in rootSessionStore: keeping the old key preserves
+// the user's saved theme. Unlike that one the stakes are tiny — the cost is a
+// revert to the OS preference — but it is renamed the same way, by copying and
+// then deleting, not by simply changing the string.
 const STORAGE_KEY = "mp3-manager.theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 

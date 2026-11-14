@@ -1,8 +1,8 @@
-import type { Mp3Track } from "../types";
+import type { Track } from "../types";
 
 type AlbumOverviewProps = {
   rootLabel: string;
-  tracks: Mp3Track[];
+  tracks: Track[];
   selectedTrackIds?: string[];
   onSelectTrack: (trackId: string, options?: { toggle?: boolean; extendRange?: boolean }) => void;
   onPlayTrack: (trackId: string) => void;
@@ -17,10 +17,10 @@ type AlbumGroup = {
   year: string;
   genre: string;
   coverDataUrl: string | null;
-  discs: Map<string, Mp3Track[]>;
+  discs: Map<string, Track[]>;
 };
 
-function discLabel(track: Mp3Track): string {
+function discLabel(track: Track): string {
   const fromPath = track.relativePath.match(/(?:^|\/)(?:cd|disc)[ _-]?(\d+)(?:\/|$)/i);
   if (fromPath?.[1]) {
     return `Disco ${fromPath[1]}`;
@@ -29,12 +29,12 @@ function discLabel(track: Mp3Track): string {
   return "Disco 1";
 }
 
-function trackOrder(track: Mp3Track): number {
+function trackOrder(track: Track): number {
   const match = track.metadata.trackNumber.match(/\d+/);
   return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
 }
 
-function groupAlbums(tracks: Mp3Track[]): AlbumGroup[] {
+function groupAlbums(tracks: Track[]): AlbumGroup[] {
   const groups = new Map<string, AlbumGroup>();
 
   for (const track of tracks) {
@@ -49,7 +49,7 @@ function groupAlbums(tracks: Mp3Track[]): AlbumGroup[] {
       year: track.metadata.year,
       genre: track.metadata.genre,
       coverDataUrl: track.metadata.coverDataUrl,
-      discs: new Map<string, Mp3Track[]>()
+      discs: new Map<string, Track[]>()
     };
 
     const disc = discLabel(track);

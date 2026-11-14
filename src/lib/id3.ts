@@ -165,6 +165,14 @@ export async function sha1Hex(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
+/** SHA-256, the digest vfs-sync content-addresses with (D7). */
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const stable = new Uint8Array(bytes.byteLength);
+  stable.set(bytes);
+  const digest = await crypto.subtle.digest("SHA-256", stable.buffer);
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+}
+
 export async function calculateDualChecksums(
   bytes: Uint8Array
 ): Promise<{ fullChecksum: string; audioChecksum: string }> {
