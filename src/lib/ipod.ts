@@ -50,6 +50,29 @@ export async function lookForIpods(): Promise<void> {
   ipods.found = await listIpods().catch(() => []);
 }
 
+/** How often the plugged-in iPods are looked at. */
+const WATCH_EVERY_MS = 3000;
+
+/**
+ * Watches what is plugged in, for as long as the app runs: an iPod plugged in after the app
+ * started is found (and listed in "Add to the library…"), and an unplugged one's root closes.
+ */
+export function watchIpods(): void {
+  if (!ipodsHere()) return;
+  let seen = "";
+  const look = async (): Promise<void> => {
+    const { ipodMounts } = await import("./sources/ipod");
+    const now = (await ipodMounts().catch(() => [])).sort().join("\n");
+    if (now !== seen) {
+      seen = now;
+      await lookForIpods();
+      closeUnpluggedIpods();
+    }
+  };
+  void look();
+  setInterval(() => void look(), WATCH_EVERY_MS);
+}
+
 /** The open iPods' roots. */
 export function ipodRoots(): RootWorkspace[] {
   return $toRaw(library).roots.filter((root) => !!root.source.ipod);

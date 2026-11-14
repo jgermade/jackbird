@@ -9,9 +9,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { t } = await import("../lib/i18n")
-  const { ipods, ipodsHere, lookForIpods, openIpodRoot } = await import("../lib/ipod")
-  // The iPods plugged in (the panel, RECORD/2026-11-14.ipod-sync.WIP.md): looked for each time the panel shows.
-  void lookForIpods()
+  const { ipods, openIpodRoot } = await import("../lib/ipod")
   const openIpod = (ipod: (typeof ipods.found)[number]) => {
     adding.open = false
     void openIpodRoot(ipod)
@@ -52,20 +50,6 @@
         </li>
       </ul>
     </div>
-    <!-- The iPods plugged in, each opening as a root of its songs (the desktop app). -->
-    <div :if="ipodsHere() && ipods.found.length > 0" class="recent">
-      <h3 class="mm-legend">{{ t("sources.ipods") }}</h3>
-      <p class="hint">{{ t("sources.ipodHint") }}</p>
-      <ul class="list">
-        <li :each="ipod in ipods.found" :key="ipod.path">
-          <button type="button" class="choice" :aria-label="t('sources.openIpod', { name: ipod.name })" @click="openIpod(ipod)">
-            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M4.75 1.75h6.5v12.5h-6.5z" /><circle cx="8" cy="10" r="2" /></svg>
-            <span class="name">{{ ipod.name }}</span>
-          </button>
-          <p :if="!ipod.writable && !ipod.needsSysinfo" class="hint below">{{ t("sources.ipodReadOnly") }}</p>
-        </li>
-      </ul>
-    </div>
     <!-- The music others share with one (SH-D6), each opening as a tab of its own. -->
     <div :if="adding.shared.length > 0" class="recent">
       <h3 class="mm-legend">{{ t("sources.sharedWithMe") }}</h3>
@@ -87,6 +71,23 @@
     <div :if="adding.samples" class="source">
       <p class="hint">{{ t("sources.samplesHint") }}</p>
       <Key @click="addSamples()">{{ t("sources.samples") }}</Key>
+    </div>
+  </section>
+
+  <!-- The iPods plugged in (the desktop app), each opening as a root of its songs. -->
+  <section :if="shownTab() === 'ipod'" class="tab">
+    <p class="hint">{{ t("sources.ipodHint") }}</p>
+    <p :if="ipods.found.length === 0" class="hint">{{ t("sources.noIpod") }}</p>
+    <div :if="ipods.found.length > 0" class="recent">
+      <ul class="list">
+        <li :each="ipod in ipods.found" :key="ipod.path">
+          <button type="button" class="choice" :aria-label="t('sources.openIpod', { name: ipod.name })" @click="openIpod(ipod)">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M4.75 1.75h6.5v12.5h-6.5z" /><circle cx="8" cy="10" r="2" /></svg>
+            <span class="name">{{ ipod.name }}</span>
+          </button>
+          <p :if="!ipod.writable && !ipod.needsSysinfo" class="hint below">{{ t("sources.ipodReadOnly") }}</p>
+        </li>
+      </ul>
     </div>
   </section>
 

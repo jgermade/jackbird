@@ -80,6 +80,8 @@ function startSession(): void {
 // The desktop app's unattended check (desktop.yml), only when the app is started for it.
 if (isDesktop && !isPhone) {
   void import("./lib/sources/check").then((check) => check.runCheckIfAsked());
+  // The iPods plugged in, found whenever they come and go (the panel, RECORD/2026-11-14.ipod-sync.WIP.md).
+  void import("./lib/ipod").then((ipod) => ipod.watchIpods());
 }
 // An Android phone draws the app under its bars and camera: the page keeps clear of them.
 // Its keyboard too; in a browser (and the iPhone app), the page follows it from the visual viewport.

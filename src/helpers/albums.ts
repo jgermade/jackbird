@@ -51,6 +51,8 @@ export function groupAlbums(tracks: readonly Track[], untitled: string, locale: 
       };
       albums.set(key, entry);
     }
+    // An album shows the first cover one of its tracks has: some of its tracks may have none.
+    if (!entry.group.coverDataUrl && track.metadata.coverDataUrl) entry.group.coverDataUrl = track.metadata.coverDataUrl;
     const disc = inferDiscNumber(track);
     entry.discs.set(disc, [...(entry.discs.get(disc) ?? []), track]);
   }

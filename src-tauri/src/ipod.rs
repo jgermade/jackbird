@@ -65,6 +65,19 @@ pub async fn ipods() -> Answer<Vec<IpodJson>> {
     blocking(|| Ok(listing::find_ipods().into_iter().map(json).collect())).await
 }
 
+/// The mount points that hold an iPod, looked at cheaply: the interface asks every few seconds,
+/// and reads the iPods again (`ipods`) when they change.
+#[tauri::command]
+pub async fn ipod_mounts() -> Answer<Vec<String>> {
+    blocking(|| {
+        Ok(listing::ipod_mounts()
+            .into_iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect())
+    })
+    .await
+}
+
 /// Opens an iPod as a root (its files reachable for playing, as a folder's).
 #[tauri::command]
 pub fn ipod_open(app: AppHandle, path: String) -> Answer<Opened> {

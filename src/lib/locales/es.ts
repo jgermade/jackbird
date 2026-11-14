@@ -607,6 +607,8 @@ export const es: Record<MessageKey, string> = {
   "ipod.removed.other": "{count} canciones quitadas del iPod.",
   "ipod.opened": "Las canciones del iPod tal como las lista su base de datos: se escuchan aquí, y solo cambian enviándole canciones o quitándoselas.",
   "sources.ipods": "iPods",
+  "sources.ipodTab": "iPod",
+  "sources.noIpod": "No hay ningún iPod conectado. Conecta uno y saldrá aquí en unos segundos.",
   "sources.ipodHint": "Abre un iPod conectado para ver y escuchar sus canciones, y para enviarle canciones.",
   "sources.ipodReadOnly": "jackbird puede mostrar este iPod pero no enviarle canciones: escribe en un iPod nano de 6.ª o 7.ª generación.",
   "sources.openIpod": "Abrir {name}",

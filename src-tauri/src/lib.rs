@@ -428,6 +428,7 @@ pub fn run() {
         audio::audio_status,
         audio::audio_spectrum,
         ipod::ipods,
+        ipod::ipod_mounts,
         ipod::ipod_open,
         ipod::ipod_tracks,
         ipod::ipod_send,

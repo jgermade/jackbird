@@ -32,6 +32,9 @@ type MediaUrl = { kind: "asset"; path: string } | { kind: "http"; url: string };
 /** The iPods mounted on this machine. */
 export const listIpods = (): Promise<IpodInfo[]> => call<IpodInfo[]>("ipods");
 
+/** The mount points that hold an iPod: cheap, for watching what is plugged in. */
+export const ipodMounts = (): Promise<string[]> => call<string[]>("ipod_mounts");
+
 /** Reads an iPod's SysInfoExtended over USB and keeps it on its disk (the one plugged in). */
 export const saveSysinfo = (path: string): Promise<void> => call<void>("ipod_save_sysinfo", { path });
 

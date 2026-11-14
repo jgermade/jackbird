@@ -10,13 +10,13 @@
   const SourcesPanel = await import("./sources-panel.html")
 
   const { t } = await import("../lib/i18n")
-  const { adding, chooseTab, closeAdding, shownTab, tabsHere } = await import("../lib/adding")
+  const { adding, chooseTab, closeAdding, shownTab, tabLabel, tabsHere } = await import("../lib/adding")
 
-  const tabs = () => tabsHere().map((tab) => ({ id: tab, label: tab === "folder" ? t("sources.folderTab") : t("sources.serverTab") }))
+  const tabs = () => tabsHere().map((tab) => ({ id: tab, label: tabLabel(tab) }))
 </script>
 
 <div class="sources-dialog">
-  <Modal :open="adding.open" :eyebrow="t('sources.eyebrow')" :title="shownTab() === 'server' ? t('sources.server') : t('sources.folderTab')" size="sm" :close-label="t('sources.close')" @close="closeAdding()">
+  <Modal :open="adding.open" :eyebrow="t('sources.eyebrow')" :title="shownTab() === 'server' ? t('sources.server') : tabLabel(shownTab())" size="sm" :close-label="t('sources.close')" @close="closeAdding()">
     <template :slot.nav>
       <Tabs :if="tabs().length > 1" plain :label="t('sources.tabs')" :items="tabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
     </template>

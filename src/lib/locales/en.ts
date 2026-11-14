@@ -606,6 +606,8 @@ export const en = {
   "ipod.removed.other": "{count} songs taken off the iPod.",
   "ipod.opened": "The iPod’s songs as its database lists them: they play here, and change only by sending songs to it or taking them off.",
   "sources.ipods": "iPods",
+  "sources.ipodTab": "iPod",
+  "sources.noIpod": "No iPod plugged in. Plug one in and it shows here in a few seconds.",
   "sources.ipodHint": "Open a plugged-in iPod to see and play its songs, and to send songs to it.",
   "sources.ipodReadOnly": "jackbird can show this iPod but not send songs to it: it writes to an iPod nano 6th or 7th generation.",
   "sources.openIpod": "Open {name}",

@@ -50,6 +50,15 @@ fn candidates() -> Vec<PathBuf> {
     out
 }
 
+/// The mount points that hold an iPod (an `iPod_Control/iTunes` folder), looked at cheaply: for
+/// watching what is plugged in. [`find_ipods`] reads them.
+pub fn ipod_mounts() -> Vec<PathBuf> {
+    candidates()
+        .into_iter()
+        .filter(|p| p.join("iPod_Control").join("iTunes").is_dir())
+        .collect()
+}
+
 /// The iPods mounted on this machine.
 pub fn find_ipods() -> Vec<Found> {
     find_in(candidates())
@@ -176,7 +185,10 @@ impl Covers {
         if rows == 0 || thumb.width == 0 {
             return None;
         }
-        let row_bytes = thumb.size as usize / rows;
+        // The slot is a square of the larger side, its rows padded to 4 bytes: a 240×239 cover's
+        // rows are 480 bytes apart, not its bytes over its height.
+        let side = usize::from(thumb.width.max(thumb.height));
+        let row_bytes = (side * 2).div_ceil(4) * 4;
         let name = thumb.file.trim_start_matches(':').to_string();
         let dir = artwork_dir(&self.root);
         let file = self

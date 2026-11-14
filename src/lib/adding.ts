@@ -11,6 +11,7 @@ import type { SampleList } from "../helpers/samples";
 import { account, can, followServer, whenSignedIn } from "./account";
 import { t } from "./i18n";
 import { importing } from "./importing";
+import { ipodsHere } from "./ipod";
 import { library } from "./library";
 import { isDesktop, isEmbed, isPhone, isService } from "./platform";
 import { recent, forgetRecent, type RecentRoot } from "./recent";
@@ -21,10 +22,13 @@ import { currentServer, homeServer, librarySource, serviceAt, serviceRoots, shar
 
 export type SourceKind = "device" | "serverFolder" | "server";
 
+/** The tabs of "Add to the library…": a folder, a server, an iPod (the desktop app). */
+export type SourceTab = "folder" | "server" | "ipod";
+
 export const adding = $reactive({
   open: false,
   /** The dialog's tab: a folder (of this device, or of the server in front), or a server by its address. */
-  tab: "folder" as "folder" | "server",
+  tab: "folder" as SourceTab,
   address: "",
   busy: false,
   error: "",
@@ -106,11 +110,17 @@ export const folderSources = (): SourceKind[] => sourcesHere().filter((kind) => 
 export const deviceAccess = (): FolderAccess => (isDesktop ? "full" : folderAccessHere());
 
 /** The dialog's tabs: "Folder" wherever folders are offered; "Server" in the apps. */
-export function tabsHere(): ("folder" | "server")[] {
-  const tabs: ("folder" | "server")[] = [];
+export function tabsHere(): SourceTab[] {
+  const tabs: SourceTab[] = [];
   if (folderSources().length > 0 || recent.list.length > 0 || adding.shared.length > 0) tabs.push("folder");
   if (sourcesHere().includes("server")) tabs.push("server");
+  if (ipodsHere()) tabs.push("ipod");
   return tabs;
+}
+
+/** A tab's name. */
+export function tabLabel(tab: SourceTab): string {
+  return tab === "folder" ? t("sources.folderTab") : tab === "server" ? t("sources.serverTab") : t("sources.ipodTab");
 }
 
 /**
@@ -138,13 +148,13 @@ export function openAdding(): void {
 }
 
 /** The tab shown: the one chosen, if this runtime has it, else its first. */
-export function shownTab(): "folder" | "server" {
+export function shownTab(): SourceTab {
   const tabs = tabsHere();
   return tabs.includes(adding.tab) ? adding.tab : (tabs[0] ?? "folder");
 }
 
 /** Shows a tab of the dialog. */
-export function chooseTab(tab: "folder" | "server"): void {
+export function chooseTab(tab: SourceTab): void {
   adding.tab = tab;
   adding.error = "";
 }
