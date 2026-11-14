@@ -8,6 +8,8 @@
 
 #[cfg(desktop)]
 mod audio;
+#[cfg(desktop)]
+mod ipod;
 mod media;
 mod scan;
 mod service;
@@ -56,7 +58,7 @@ async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, Error> + S
 }
 
 /// Registers a folder as an open root, and lets the asset protocol reach it where it is used.
-fn register(app: &AppHandle, path: &str) -> Answer<Opened> {
+pub(crate) fn register(app: &AppHandle, path: &str) -> Answer<Opened> {
     let root = Root::open(path).map_err(Failure::from)?;
     let opened = Opened {
         path: path.to_owned(),
@@ -424,7 +426,13 @@ pub fn run() {
         audio::audio_seek,
         audio::audio_stop,
         audio::audio_status,
-        audio::audio_spectrum
+        audio::audio_spectrum,
+        ipod::ipods,
+        ipod::ipod_open,
+        ipod::ipod_tracks,
+        ipod::ipod_send,
+        ipod::ipod_remove,
+        ipod::ipod_save_sysinfo
     ]);
     // The phone's native player and folders (E6b): the page drives the plugin directly
     // (src/lib/phone-audio.ts, src/lib/sources/phone.ts); Rust reads the folders' tags.

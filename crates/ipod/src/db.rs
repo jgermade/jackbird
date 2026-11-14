@@ -81,6 +81,10 @@ pub struct Track {
     pub play_count: u32,
     /// Rating, 0 to 100 in steps of 20 (`0x1F`).
     pub rating: u8,
+    /// Whether it belongs to a compilation (`0x1E`).
+    pub compilation: bool,
+    /// Its cover's image in the `ArtworkDB` (`0x160`), when `0xA4` says it has one.
+    pub artwork_id: Option<u32>,
 }
 
 impl Track {
@@ -213,6 +217,12 @@ fn track(data: &[u8], at: usize, end: usize) -> Result<(Track, usize), Error> {
         id: f(0x10)?,
         database_id: if header >= 0x78 { u64_at(data, at + 0x70)? } else { 0 },
         rating: if header > 0x1f { u8_at(data, at + 0x1f)? } else { 0 },
+        compilation: header > 0x1e && u8_at(data, at + 0x1e)? == 1,
+        artwork_id: if header >= 0x164 && u8_at(data, at + 0xa4)? == 1 {
+            Some(u32_at(data, at + 0x160)?).filter(|id| *id != 0)
+        } else {
+            None
+        },
         size: f(0x24)?,
         length_ms: f(0x28)?,
         track_number: f(0x2c)?,

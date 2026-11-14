@@ -13,36 +13,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use jackbird_ipod::song::Stamp;
-use jackbird_ipod_sync::{open, read_cover, read_mp3};
-
-/// This machine's offset from UTC at the moment `unix`, in seconds, from
-/// `date` (`+0100`): BSD's and macOS's `-r`, else GNU's `-d @`; 0 when it
-/// cannot say.
-fn local_offset(unix: i64) -> i32 {
-    let ask = |args: &[String]| {
-        std::process::Command::new("date")
-            .args(args)
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-    };
-    let text = ask(&["-r".into(), unix.to_string(), "+%z".into()])
-        .or_else(|| ask(&["-d".into(), format!("@{unix}"), "+%z".into()]))
-        .unwrap_or_default();
-    let (sign, digits) = match text.split_at_checked(1) {
-        Some(("+", d)) => (1, d),
-        Some(("-", d)) => (-1, d),
-        _ => return 0,
-    };
-    match (
-        digits.get(..2).and_then(|h| h.parse::<i32>().ok()),
-        digits.get(2..4).and_then(|m| m.parse::<i32>().ok()),
-    ) {
-        (Some(h), Some(m)) => sign * (h * 3600 + m * 60),
-        _ => 0,
-    }
-}
+use jackbird_ipod_sync::{local_offset, open, read_cover, read_mp3};
 
 fn main() -> ExitCode {
     let mut args = std::env::args_os().skip(1);
