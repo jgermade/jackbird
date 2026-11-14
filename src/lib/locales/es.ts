@@ -366,7 +366,6 @@ export const es: Record<MessageKey, string> = {
   "output.fidelity.converted": "convertida",
   "output.fidelity.volume": "bit-perfect salvo el volumen del teléfono",
   "output.badge.bit-perfect": "bit-perfect",
-  "output.badge.mixer": "nativa",
   "output.badge.converted": "convertida",
   "output.badge.volume": "directa",
   "output.badge.dac": "DAC",

@@ -120,13 +120,16 @@ export function soundingParts(
   const quality = info ? streamQuality(info) : sounding.format.bits > 0 ? `${sounding.format.bits} bit · ${rate}` : rate;
   // On a phone (E6b-D10): bit-perfect to a DAC (or so but for the phone's volume), through
   // Android's mixer to a USB DAC ("DAC"), or nothing to say of the phone's own output.
+  // On the desktop, the native (mixer) way says nothing: only bit-perfect or converted are told.
   const route = output.phone
     ? sounding.route.fidelity === "bit-perfect" || sounding.route.fidelity === "volume"
       ? t(`output.badge.${sounding.route.fidelity}`)
       : sounding.route.device !== "Android"
         ? t("output.badge.dac")
         : ""
-    : t(`output.badge.${sounding.route.fidelity}`);
+    : sounding.route.fidelity === "mixer"
+      ? ""
+      : t(`output.badge.${sounding.route.fidelity}`);
   // With a DAC, how the music reaches it is the DAC's own view (soundingDevice).
   return { format: sounding.codec, quality, route: soundingDac() ? "" : route, vbr };
 }

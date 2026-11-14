@@ -365,7 +365,6 @@ export const en = {
   "output.fidelity.converted": "converted",
   "output.fidelity.volume": "bit-perfect but for the phone's volume",
   "output.badge.bit-perfect": "bit-perfect",
-  "output.badge.mixer": "native",
   "output.badge.converted": "converted",
   "output.badge.volume": "direct",
   "output.badge.dac": "DAC",
