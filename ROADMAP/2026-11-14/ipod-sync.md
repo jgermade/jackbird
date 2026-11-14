@@ -38,7 +38,7 @@ gantt
 | Step | Scope | Done when |
 | --- | --- | --- |
 | N0 The nano 7G | Capacity, format (HFS+ or FAT32), synced with iTunes or not, can it be restored. | it is in the record |
-| N1 Read it (coded; the device check is pending) | `crates/ipod` reads `SysInfo` and the `iTunesCDB` (zlib); the desktop app reads `SysInfoExtended` (`sg_inq`, or its copy on the device) and the GUID; web and desktop list the nano's tracks. | the tracks and playlists are listed as the nano shows them, and the GUID is known |
+| N1 Read it (coded; the device check is pending) | `crates/ipod` reads `SysInfo` and the `iTunesCDB` (zlib); the desktop app reads `SysInfoExtended` (USB vendor request through `nusb`, or its copy on the device) and the GUID; web and desktop list the nano's tracks. | the tracks and playlists are listed as the nano shows them, and the GUID is known |
 | N2 `hashAB` (coded; the device check is pending) | Ported from dstaley/hashab (public domain), its 100 vectors; checked on the nano's own `iTunesCDB` and `Locations.itdb.cbk`. | the signature iTunes wrote validates |
 | N3 Write the databases | The `iTunesCDB` writer and its signature, the SQLite library with the nano's post-process SQL, `Locations.itdb.cbk`. | for an unchanged library, the files match iTunes' in all but the random bytes |
 | N4 Copy and write | MP3s under `iPod_Control/Music/Fnn/`, both databases, a playlist, backups and the order of replacing; the iPod panel in the desktop app, then in the web (approved 2026-11-14). | a copy of the nano's files with one track added keeps its tracks, playlists and play counts |
