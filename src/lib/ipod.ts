@@ -10,7 +10,7 @@ import type { RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
 import { isDesktop, isPhone } from "./platform";
-import { closeRoot, hydrateRoot } from "./roots";
+import { closeRoot, hydrateRoot, updateRoots } from "./roots";
 import type { IpodInfo } from "./sources/ipod";
 
 /** What the iPod dialog asks. */
@@ -209,7 +209,21 @@ export async function confirmRemove(): Promise<void> {
     ipods.done = tn("ipod.removed", removed);
     library.infoMessage = ipods.done;
     ipods.dialog = null;
-    await reloadIpod(ipod.path);
+    // The songs leave the root's list as they left the iPod: no need to read it all again.
+    const gone = new Set(dialog.paths);
+    updateRoots((roots) =>
+      roots.map((one) =>
+        one.id === root.id
+          ? {
+              ...one,
+              tracks: one.tracks.filter((track) => !gone.has(track.id)),
+              selectedTrackIds: one.selectedTrackIds.filter((id) => !gone.has(id)),
+              selectedTrackId: one.selectedTrackId && gone.has(one.selectedTrackId) ? null : one.selectedTrackId,
+              loadedCount: one.tracks.filter((track) => !gone.has(track.id)).length
+            }
+          : one
+      )
+    );
   } catch (error) {
     ipods.error = error instanceof Error ? error.message : String(error);
   } finally {

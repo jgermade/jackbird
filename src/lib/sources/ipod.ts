@@ -42,10 +42,20 @@ export const sendFiles = (path: string, files: { root: string; path: string }[],
 /** Takes songs off an iPod, by their pids. */
 export const removePids = (path: string, pids: string[]): Promise<number> => call<number>("ipod_remove", { path, pids });
 
+/**
+ * The covers the app has had from an iPod this session (lib/covers.ts keeps them): not asked for
+ * again when its root is read again after a send.
+ */
+const coversHad = new Set<string>();
+
 /** An iPod's root: a desktop root over its mount point, with the songs its database lists. */
 function ipodSource(root: string, name: string): RootSource {
   let listing: Promise<IpodTracks> | null = null;
-  const load = (): Promise<IpodTracks> => (listing ??= call<IpodTracks>("ipod_tracks", { path: root, knownCovers: [] }));
+  const load = (): Promise<IpodTracks> =>
+    (listing ??= call<IpodTracks>("ipod_tracks", { path: root, knownCovers: [...coversHad] }).then((found) => {
+      for (const cover of found.covers) coversHad.add(cover.name);
+      return found;
+    }));
   const pids = async (): Promise<Map<string, string>> => new Map((await load()).pids);
   const readOnly = (path: string): Error => new DOMException(`Read-only: ${path}`, "NoModificationAllowedError");
   return {
