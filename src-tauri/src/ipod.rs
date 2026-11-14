@@ -114,7 +114,13 @@ fn cover_name(root: &Path, id: u32) -> String {
 #[tauri::command]
 pub async fn ipod_tracks(path: String, known_covers: Vec<String>) -> Answer<IpodTracks> {
     let root = ipod_at(&path)?;
-    blocking(move || {
+    blocking(move || tracks_of(&root, &known_covers)).await
+}
+
+/// [`ipod_tracks`]'s work: the songs of the iPod at `root`, and the covers not in `known_covers`.
+fn tracks_of(root: &Path, known_covers: &[String]) -> Answer<IpodTracks> {
+    {
+        let root = root.to_path_buf();
         let listing = listing::list(&root).map_err(sync_failure)?;
         let mut images = listing::Covers::open(&root);
         let mut covers = Vec::new();
@@ -157,8 +163,7 @@ pub async fn ipod_tracks(path: String, known_covers: Vec<String>) -> Answer<Ipod
             });
         }
         Ok(IpodTracks { tracks, covers, pids })
-    })
-    .await
+    }
 }
 
 fn base64(bytes: &[u8]) -> String {
@@ -333,6 +338,39 @@ pub async fn ipod_save_sysinfo(path: String) -> Answer<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// On a copy of a real iPod (`JACKBIRD_IPOD_COPY`, its root), skipped otherwise: every cover a
+    /// song names comes in the answer, as a PNG, under a name the interface takes.
+    #[test]
+    fn every_cover_named_is_sent() {
+        let Some(root) = std::env::var_os("JACKBIRD_IPOD_COPY").map(PathBuf::from) else {
+            return;
+        };
+        let Ok(answer) = tracks_of(&root, &[]) else {
+            panic!("{} could not be read", root.display())
+        };
+        let sent: std::collections::HashMap<&str, &str> = answer
+            .covers
+            .iter()
+            .map(|c| (c.name.as_str(), c.data.as_str()))
+            .collect();
+        let mut named = std::collections::BTreeSet::new();
+        for track in &answer.tracks {
+            if let Some(reference) = &track.metadata.cover_data_url {
+                let name = reference.trim_start_matches("jackbird-cover:");
+                named.insert(name.to_string());
+                let data = sent
+                    .get(name)
+                    .unwrap_or_else(|| panic!("{name} ({}) not sent", track.metadata.album));
+                assert!(data.starts_with("iVBORw0KGgo"), "{name} is not a PNG");
+            }
+        }
+        eprintln!(
+            "{} covers named, every one sent ({} in all)",
+            named.len(),
+            answer.covers.len()
+        );
+    }
 
     #[test]
     fn numbers_and_names() {
