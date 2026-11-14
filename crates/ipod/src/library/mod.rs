@@ -36,6 +36,64 @@ pub fn file(name: &str) -> Option<&'static File> {
     schema::FILES.iter().find(|f| f.name == name)
 }
 
+/// The columns of `table` (in any file of the schema) and the value each
+/// takes when a row leaves it out: its `DEFAULT`, or `NULL`. Read from the
+/// `CREATE TABLE` itself.
+pub fn columns(table: &str) -> Option<Vec<(String, Value)>> {
+    let create = schema::FILES
+        .iter()
+        .flat_map(|f| f.tables.iter())
+        .find(|(name, _)| *name == table)?
+        .1;
+    let body = &create[create.find('(')? + 1..create.rfind(')')?];
+    let mut out = Vec::new();
+    for definition in split_top_level(body) {
+        let definition = definition.trim();
+        let first = definition.split_whitespace().next().unwrap_or("");
+        if ["PRIMARY", "UNIQUE", "CHECK", "FOREIGN", "CONSTRAINT"].contains(&first) {
+            continue;
+        }
+        let words: Vec<&str> = definition.split_whitespace().collect();
+        let default = words
+            .iter()
+            .position(|w| w.eq_ignore_ascii_case("DEFAULT"))
+            .and_then(|i| words.get(i + 1))
+            .map_or(Value::Null, |literal| parse_literal(literal));
+        out.push((first.to_string(), default));
+    }
+    Some(out)
+}
+
+/// `text` split at the commas that are not inside parentheses.
+fn split_top_level(text: &str) -> Vec<&str> {
+    let (mut out, mut depth, mut start) = (Vec::new(), 0usize, 0);
+    for (i, c) in text.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                out.push(&text[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(&text[start..]);
+    out
+}
+
+fn parse_literal(literal: &str) -> Value {
+    if let Ok(i) = literal.parse::<i64>() {
+        Value::Integer(i)
+    } else if let Ok(r) = literal.parse::<f64>() {
+        Value::Real(r)
+    } else if let Some(t) = literal.strip_prefix('\'').and_then(|t| t.strip_suffix('\'')) {
+        Value::Text(t.replace("''", "'"))
+    } else {
+        Value::Null
+    }
+}
+
 /// A value in a row, as SQLite stores it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -66,6 +124,41 @@ impl Table {
     /// Where `column` is in a row.
     pub fn column(&self, column: &str) -> Option<usize> {
         self.columns.iter().position(|c| c == column)
+    }
+
+    /// Adds a row with these values; the table's other columns take their
+    /// default ([`columns`]), or `NULL` for a table the schema does not have.
+    /// A value for a column the table lacks is an error, naming it.
+    pub fn push(&mut self, values: &[(&str, Value)]) -> Result<(), String> {
+        if let Some((name, _)) = values.iter().find(|(c, _)| self.column(c).is_none()) {
+            return Err(format!("{} has no column {name}", self.name));
+        }
+        let defaults = columns(&self.name).unwrap_or_default();
+        let row = self
+            .columns
+            .iter()
+            .map(|c| {
+                values
+                    .iter()
+                    .find(|(name, _)| name == c)
+                    .map(|(_, v)| v.clone())
+                    .or_else(|| defaults.iter().find(|(name, _)| name == c).map(|(_, v)| v.clone()))
+                    .unwrap_or(Value::Null)
+            })
+            .collect();
+        self.rows.push(row);
+        Ok(())
+    }
+
+    /// The rows whose `column` is `value`.
+    pub fn find<'a>(&'a self, column: &str, value: &'a Value) -> impl Iterator<Item = &'a Vec<Value>> + 'a {
+        let c = self.column(column);
+        self.rows.iter().filter(move |r| c.is_some_and(|c| &r[c] == value))
+    }
+
+    /// The value of `column` in `row`, `NULL` when the table lacks it.
+    pub fn get(&self, row: &[Value], column: &str) -> Value {
+        self.column(column).map_or(Value::Null, |c| row[c].clone())
     }
 }
 
@@ -336,6 +429,36 @@ mod tests {
         for cut in (0..EXTENDED.len()).step_by(7) {
             let _ = post_process(&EXTENDED[..cut], 26);
         }
+    }
+
+    #[test]
+    fn columns_and_their_defaults() {
+        let item = columns("item").unwrap();
+        assert_eq!(item[0], ("pid".to_string(), Value::Null));
+        assert!(item.contains(&("is_song".to_string(), Value::Integer(0))));
+        assert!(!item.iter().any(|(c, _)| c == "PRIMARY"));
+        let stats = columns("item_stats").unwrap();
+        assert!(stats.contains(&("bookmark_time_ms".to_string(), Value::Null)));
+        assert_eq!(columns("nothing"), None);
+        assert_eq!(parse_literal("'it''s'"), Value::Text("it's".into()));
+        assert_eq!(parse_literal("1.5"), Value::Real(1.5));
+        assert_eq!(parse_literal("x"), Value::Null);
+
+        let mut t = Table {
+            name: "genre_map".into(),
+            columns: vec!["id".into(), "genre".into(), "has_music".into()],
+            rows: vec![],
+        };
+        t.push(&[("id", Value::Integer(5)), ("genre", Value::Text("Rock".into()))])
+            .unwrap();
+        assert_eq!(
+            t.rows[0],
+            [Value::Integer(5), Value::Text("Rock".into()), Value::Integer(0)]
+        );
+        assert!(t.push(&[("nope", Value::Null)]).is_err());
+        assert_eq!(t.find("id", &Value::Integer(5)).count(), 1);
+        assert_eq!(t.get(&t.rows[0], "genre"), Value::Text("Rock".into()));
+        assert_eq!(t.get(&t.rows[0], "nope"), Value::Null);
     }
 
     #[test]

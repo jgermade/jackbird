@@ -2075,6 +2075,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jackbird-ipod-sync"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "jackbird-ipod",
+ "jackbird-ipod-sqlite",
+ "jackbird-tags",
+]
+
+[[package]]
 name = "jackbird-ipod-usb"
 version = "0.1.0"
 dependencies = [

@@ -12,12 +12,14 @@
 //! - [`library`]: the SQLite library of the nano 6G and 7G, as data: its
 //!   schema, its post-process and its rows;
 //! - [`song`]: a song as jackbird adds it, and its `mhit` and rows;
-//! - [`collate`]: how the nano's menus sort, and the library's ranks.
+//! - [`collate`]: how the nano's menus sort, and the library's ranks;
+//! - [`add`]: a song added to both databases, in memory.
 //!
 //! No I/O: the caller reads the files (or the USB request) and hands the bytes
 //! in. Malformed input is an [`Error`] that names its offset, never a panic.
 //! See `RECORD/2026-11-14.ipod-sync.WIP.md`.
 
+pub mod add;
 pub mod cdb;
 pub mod chunk;
 pub mod collate;
