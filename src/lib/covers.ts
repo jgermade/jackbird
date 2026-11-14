@@ -227,6 +227,9 @@ export function withCovers(source: RootSource): RootSource {
               const data = fromBase64(cover.data);
               if (data) keepCover(cover.name, data);
             }
+            // A view that drew before these came in (an album in the details while the folder
+            // loads) found none and drew the placeholder: told once to draw again.
+            if (batch.covers.length > 0) covers.version += 1;
             for (const track of batch.tracks) {
               const name = refName(track.metadata.coverDataUrl);
               if (name && !kept.has(name)) coverAt(name, source.vfs);

@@ -9,6 +9,11 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { t } = await import("../lib/i18n")
+  const { ipods, openIpodRoot } = await import("../lib/ipod")
+  const openIpod = (ipod: (typeof ipods.found)[number]) => {
+    adding.open = false
+    void openIpodRoot(ipod)
+  }
   const { addFrom, addSamples, addServer, adding, deviceAccess, folderSources, openShared, recentFolders, reopenRecent, serverName, sharedLabel, shownTab } = await import("../lib/adding")
 
   // Each folder source is a key that opens its dialog: the device's own (the system's, Android's
@@ -69,6 +74,23 @@
     </div>
   </section>
 
+  <!-- The iPods plugged in (the desktop app), each opening as a root of its songs. -->
+  <section :if="shownTab() === 'ipod'" class="tab">
+    <p class="hint">{{ t("sources.ipodHint") }}</p>
+    <p :if="ipods.found.length === 0" class="hint">{{ t("sources.noIpod") }}</p>
+    <div :if="ipods.found.length > 0" class="recent">
+      <ul class="list">
+        <li :each="ipod in ipods.found" :key="ipod.path">
+          <button type="button" class="choice" :aria-label="t('sources.openIpod', { name: ipod.name })" @click="openIpod(ipod)">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M4.75 1.75h6.5v12.5h-6.5z" /><circle cx="8" cy="10" r="2" /></svg>
+            <span class="name">{{ ipod.name }}</span>
+          </button>
+          <p :if="!ipod.writable && !ipod.needsSysinfo" class="hint below">{{ t("sources.ipodReadOnly") }}</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
   <form :if="shownTab() === 'server'" class="tab form" @submit="submit($event)">
     <p class="hint">{{ t("sources.serverHint") }}</p>
     <Field :label="t('instance.address')" control="server-address" :hint="t('instance.addressHint')">
@@ -118,6 +140,7 @@
   .source { display: grid; justify-items: start; gap: var(--mm-space-2); }
   .source + .source, .recent + .source { padding-top: var(--mm-space-3); border-top: var(--mm-border-width) solid var(--mm-border); }
   .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .hint.below { padding: 0 var(--mm-space-3) var(--mm-space-2); }
   .warning { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-warn-led); border-radius: var(--mm-radius-key); background: var(--mm-warn-soft); color: var(--mm-warn); font-size: var(--mm-text-sm); }
   .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
   .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }

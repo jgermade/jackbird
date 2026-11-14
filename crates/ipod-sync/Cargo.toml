@@ -1,0 +1,35 @@
+[package]
+name = "jackbird-ipod-sync"
+description = "jackbird's iPod sync (nano 6G and 7G): MP3s read into songs, copied onto a mounted iPod and added to both of its databases, with the old ones kept and put back on any failure; and ipod-add, the tool that does it"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+jackbird-ipod = { path = "../ipod" }
+jackbird-ipod-sqlite = { path = "../ipod-sqlite" }
+jackbird-tags = { path = "../tags" }
+# The pids, the file names and the signatures' random bytes. The version is
+# one Cargo.lock already holds (RECORD/2026-11-14.ipod-sync.WIP.md, N4).
+getrandom = "=0.3.4"
+# The covers in MP3s' tags, decoded to scale them for the iPod (artwork, A3,
+# approved by the owner on 2026-11-15): png is the version Cargo.lock already
+# holds through Tauri; zune-jpeg is pure Rust and builds for WebAssembly.
+png = "=0.18.1"
+zune-jpeg = { version = "=0.5.15", default-features = false, features = ["std"] }
+
+[[bin]]
+name = "ipod-add"
+path = "src/main.rs"
+
+[[bin]]
+name = "ipod-remove"
+path = "src/remove_main.rs"
+
+[[bin]]
+name = "ipod-check-mp3"
+path = "src/check_mp3.rs"
+
+[lints]
+workspace = true

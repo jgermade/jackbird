@@ -216,14 +216,22 @@ function tellTone() {
   for (const live of lives) live.contentWindow?.postMessage({ type: "jackbird:tone", tone: root.dataset.theme === "dark" ? "dark" : "light" }, location.origin);
 }
 
-/** The app itself in `place`, over its screenshots, which stay shown until it has loaded (`live-on`). */
+/**
+ * The app itself in `place`, over its screenshots: hidden, and they shown, until it says it has drawn
+ * its music (`jackbird:drawn`, src/main.ts); a page loaded but drawing slowly shows itself anyway
+ * after a while. Shown on the frame's load alone, the half-drawn app let the screenshots through it.
+ */
 function embedApp(place, kind, title) {
   const live = document.createElement("iframe");
   live.className = "live";
   live.title = title;
   live.allow = "autoplay";
   live.src = `./demo/?embed${kind ? `=${kind}` : ""}&lang=en&tone=${root.dataset.theme === "dark" ? "dark" : "light"}`;
-  live.addEventListener("load", () => place.classList.add("live-on"), { once: true });
+  const show = () => place.classList.add("live-on");
+  window.addEventListener("message", (event) => {
+    if (event.origin === location.origin && event.source === live.contentWindow && event.data?.type === "jackbird:drawn") show();
+  });
+  live.addEventListener("load", () => setTimeout(show, 15000), { once: true });
   place.append(live);
   lives.push(live);
 }

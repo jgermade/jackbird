@@ -238,6 +238,9 @@ h1 em {
    kept under it for its size, and shown until it has loaded. */
 .stage .live { position: absolute; inset: -1.5rem -1.5rem 0; width: calc(100% + 3rem); height: calc(100% + 1.5rem); border: 0; background: transparent; }
 .stage.live-on .window, .stage.live-on .mini { visibility: hidden; }
+/* Hidden until it has drawn its music (landing.js), then in place of the screenshots at once. */
+.stage .live, .handset .live { opacity: 0; }
+.stage.live-on .live, .handset.live-on .live { opacity: 1; }
 /* The invitation to the demo, when the embedded app is asked for a folder. */
 .invite {
   position: absolute;

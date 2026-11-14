@@ -123,8 +123,9 @@ export async function hydrateRoot(
       void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
         console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
       );
+      const isTrack = source.isTrack ?? isAudioFile;
       const audioFiles = walked
-        .filter((entry) => isAudioFile(entry.path))
+        .filter((entry) => isTrack(entry.path))
         .map((entry) => ({
           name: entry.path.split("/").at(-1) ?? entry.path,
           relativePath: entry.path,

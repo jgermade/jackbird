@@ -39,6 +39,19 @@ describe("groupAlbums", () => {
     assert.deepEqual(album.discs.map((disc) => [disc.number, disc.tracks.map((one) => one.id)]), [[1, ["t1", "t2"]]]);
   });
 
+  it("shows the first cover one of its tracks has, when the first track has none", () => {
+    const albums = groupAlbums(
+      [
+        track("a/01.mp3", { ...kob, coverDataUrl: null, title: "So What" }, "t1"),
+        track("a/02.mp3", { ...kob, title: "Freddie" }, "t2"),
+        track("a/03.mp3", { ...kob, coverDataUrl: "data:other", title: "Blue" }, "t3")
+      ],
+      "No album",
+      "en"
+    );
+    assert.equal(albums[0].coverDataUrl, "data:kob");
+  });
+
   it("keeps two artists' albums of the same name apart", () => {
     const albums = groupAlbums([track("a.mp3", { artist: "A", album: "Greatest Hits" }), track("b.mp3", { artist: "B", album: "Greatest Hits" })], "No album", "en");
     assert.equal(albums.length, 2);

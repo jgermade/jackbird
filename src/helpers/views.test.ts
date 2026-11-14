@@ -24,6 +24,9 @@ describe("keys", () => {
     assert.equal(albumFolder(tracks[2]), "Coltrane/Giant Steps");
     assert.equal(albumFolder({ relativePath: "A/CD2/x.mp3" }), "A");
     assert.equal(albumFolder({ relativePath: "x.mp3" }), "");
+    // An iPod's songs, spread over its music folders at random: grouped by their tags alone.
+    assert.equal(albumFolder({ relativePath: "iPod_Control/Music/F24/STSM.mp3" }), "");
+    assert.equal(albumFolder({ relativePath: "Rock/iPod_Control/Music/F24/STSM.mp3" }), "Rock/iPod_Control/Music/F24");
     assert.equal(albumKey(tracks[2]), albumKey(tracks[3]));
     assert.equal(albumKey(tracks[4]), albumKey(tracks[5]));
     assert.equal(artistKey(tracks[0]), "@artist:miles davis");

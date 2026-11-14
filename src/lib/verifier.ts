@@ -159,7 +159,8 @@ export function startVerifier(): () => void {
     const roots = library.roots;
     const activeRootId = library.activeRootId;
     const root = $toRaw(roots).find((item) => item.id === activeRootId) ?? null;
-    const ready = root && !root.loadingMetadata && root.tracks.length > 0 ? root : null;
+    // An iPod's files are not hashed (lib/sources/ipod.ts): reading them all would take long over USB.
+    const ready = root && !root.loadingMetadata && root.tracks.length > 0 && !root.source.ipod ? root : null;
     if ((ready?.id ?? null) === readyId) {
       return;
     }

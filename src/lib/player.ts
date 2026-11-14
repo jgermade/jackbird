@@ -219,8 +219,8 @@ function resumeOnFirstInteraction(element: HTMLAudioElement): void {
 }
 
 // The spectrum: the element routed through an analyser on its way to the
-// speakers, built on the first play (a context needs the person to have
-// interacted with the page) and resumed on each one. Once routed, the
+// speakers, built on the first play that finds the context running (made on
+// the person's gestures: see wakeAudioOnGestures) and resumed on each one. Once routed, the
 // element sounds only through the context, so a context that cannot be made
 // leaves the element as it was. The context runs at the device's own rate
 // (one resampling, as the element alone; forcing one would add another) and
@@ -229,30 +229,57 @@ let context: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let bins: Uint8Array<ArrayBuffer> | null = null;
 
-function routeThroughAnalyser(element: HTMLAudioElement): void {
-  if (!context) {
-    if (typeof AudioContext !== "function") {
-      return;
-    }
+/** The context, made on the first call (none where the browser has no Web Audio). */
+function audioContext(): AudioContext | null {
+  if (!context && typeof AudioContext === "function") {
     try {
-      const made = new AudioContext({ latencyHint: "playback" });
-      const node = made.createAnalyser();
-      node.fftSize = SPECTRUM_FFT;
-      node.smoothingTimeConstant = SPECTRUM_SMOOTHING;
-      // Headroom for the bass (see SPECTRUM_DECIBELS); crates/audio's spectrum spans the same.
-      node.minDecibels = SPECTRUM_DECIBELS.min;
-      node.maxDecibels = SPECTRUM_DECIBELS.max;
-      made.createMediaElementSource(element).connect(node);
-      node.connect(made.destination);
-      context = made;
-      analyser = node;
-      bins = new Uint8Array(node.frequencyBinCount);
+      context = new AudioContext({ latencyHint: "playback" });
     } catch {
-      return;
+      return null;
     }
   }
-  if (context.state === "suspended") {
-    void context.resume().catch(() => undefined);
+  return context;
+}
+
+/**
+ * Safari lets a context start only inside a click or a key, not in the `play` event that comes after
+ * the file has loaded: made then, it stays suspended, and the element routed through it is silent.
+ * So it is made, and woken again (Safari also suspends it when another app takes the sound), on each
+ * of the person's gestures. Chrome and Firefox allow it later as well.
+ */
+function wakeAudioOnGestures(): void {
+  if (typeof document === "undefined") return;
+  const wake = () => {
+    const made = audioContext();
+    if (made && made.state !== "running") void made.resume().catch(() => undefined);
+  };
+  for (const type of ["pointerdown", "keydown", "touchend"] as const) document.addEventListener(type, wake, true);
+}
+wakeAudioOnGestures();
+
+function routeThroughAnalyser(element: HTMLAudioElement): void {
+  const made = audioContext();
+  if (!made) return;
+  if (made.state === "suspended") {
+    void made.resume().catch(() => undefined);
+  }
+  if (analyser) return;
+  // Routed through a context that is not running, the element would play in silence: it is left as
+  // it is (no spectrum) until a play finds the context running.
+  if (made.state !== "running") return;
+  try {
+    const node = made.createAnalyser();
+    node.fftSize = SPECTRUM_FFT;
+    node.smoothingTimeConstant = SPECTRUM_SMOOTHING;
+    // Headroom for the bass (see SPECTRUM_DECIBELS); crates/audio's spectrum spans the same.
+    node.minDecibels = SPECTRUM_DECIBELS.min;
+    node.maxDecibels = SPECTRUM_DECIBELS.max;
+    made.createMediaElementSource(element).connect(node);
+    node.connect(made.destination);
+    analyser = node;
+    bins = new Uint8Array(node.frequencyBinCount);
+  } catch {
+    return;
   }
 }
 
