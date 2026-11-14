@@ -4,6 +4,7 @@
 
 use crate::Error;
 use crate::bytes::{len_at, u16_at};
+use miniz_oxide::deflate::compress_to_vec_zlib;
 use miniz_oxide::inflate::decompress_to_vec_zlib_with_limit;
 
 /// Where the header flags compression.
@@ -40,20 +41,36 @@ pub fn inflate(data: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(out)
 }
 
+/// The zlib level jackbird compresses with. Apple's own `iTunesCDB` on the
+/// owner's nano 7G starts its stream with `78 01`, the fastest levels; the
+/// firmware reads any level, and 6 makes a smaller file.
+pub const LEVEL: u8 = 6;
+
+/// The `iTunesCDB` for an `iTunesDB`: [`inflate`]'s inverse. The header is kept,
+/// with the total length set to the compressed file's (as Apple's is) and the
+/// compression flag set, and the children follow as one zlib stream. The
+/// signature is not touched: sign the result with
+/// [`crate::hashab::sign_database`].
+pub fn compress(db: &[u8], level: u8) -> Result<Vec<u8>, Error> {
+    let header = len_at(db, 4, 0)?;
+    if !db.starts_with(b"mhbd") || header <= COMPRESSED_FLAG + 1 || header > db.len() {
+        return Err(Error::BadLength { offset: 0 });
+    }
+    let mut out = db[..header].to_vec();
+    out.extend(compress_to_vec_zlib(&db[header..], level));
+    let total = u32::try_from(out.len()).map_err(|_| Error::BadLength { offset: 0 })?;
+    out[8..12].copy_from_slice(&total.to_le_bytes());
+    out[COMPRESSED_FLAG..COMPRESSED_FLAG + 2].copy_from_slice(&1u16.to_le_bytes());
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::tests::sample_database;
-    use miniz_oxide::deflate::compress_to_vec_zlib;
 
     pub(crate) fn compress(db: &[u8]) -> Vec<u8> {
-        let header = u32::from_le_bytes(db[4..8].try_into().unwrap()) as usize;
-        let mut out = db[..header].to_vec();
-        out.extend(compress_to_vec_zlib(&db[header..], 6));
-        let total = out.len() as u32;
-        out[8..12].copy_from_slice(&total.to_le_bytes());
-        out[COMPRESSED_FLAG..COMPRESSED_FLAG + 2].copy_from_slice(&1u16.to_le_bytes());
-        out
+        super::compress(db, LEVEL).unwrap()
     }
 
     #[test]
@@ -72,6 +89,14 @@ mod tests {
         let header = u32::from_le_bytes(cdb[4..8].try_into().unwrap()) as usize;
         cdb.truncate(header + 6);
         assert_eq!(inflate(&cdb), Err(Error::Inflate { offset: header }));
+    }
+
+    #[test]
+    fn compress_refuses_what_is_not_a_database() {
+        assert!(super::compress(b"mhbd", LEVEL).is_err());
+        assert!(super::compress(b"anything at all, long enough", LEVEL).is_err());
+        let db = sample_database();
+        assert!(super::compress(&db[..0x40], LEVEL).is_err());
     }
 
     #[test]

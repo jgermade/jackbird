@@ -1,0 +1,16 @@
+[package]
+name = "jackbird-ipod-sqlite"
+description = "jackbird's iPod SQLite library (nano 6G and 7G): its files read into rows, and written anew from rows and the device's post-process"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+jackbird-ipod = { path = "../ipod" }
+# The same crate and version as jackbird-store's, with SQLite built in, so the
+# library is written by jackbird's SQLite and not the system's.
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
+
+[lints]
+workspace = true

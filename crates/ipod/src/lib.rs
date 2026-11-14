@@ -1,4 +1,4 @@
-//! jackbird's iPod databases, read from bytes.
+//! jackbird's iPod databases, read from bytes and written back.
 //!
 //! - [`sysinfo`]: the device's `SysInfo` file and the scalar values of its
 //!   `SysInfoExtended` (which the iPod sends over USB, or a copy on its disk);
@@ -7,16 +7,21 @@
 //! - [`cdb`]: an `iTunesCDB` (nano 5G to 7G) turned into the `iTunesDB` it
 //!   compresses;
 //! - [`db`]: the tracks and playlists of an `iTunesDB`;
-//! - [`hashab`]: the signature the nano 6G and 7G check on their databases.
+//! - [`chunk`]: an `iTunesDB` as a tree of chunks, written back byte for byte;
+//! - [`hashab`]: the signature the nano 6G and 7G check on their databases;
+//! - [`library`]: the SQLite library of the nano 6G and 7G, as data: its
+//!   schema, its post-process and its rows.
 //!
 //! No I/O: the caller reads the files (or the USB request) and hands the bytes
 //! in. Malformed input is an [`Error`] that names its offset, never a panic.
 //! See `RECORD/2026-11-14.ipod-sync.WIP.md`.
 
 pub mod cdb;
+pub mod chunk;
 pub mod db;
 pub mod device;
 pub mod hashab;
+pub mod library;
 pub mod sysinfo;
 
 mod bytes;

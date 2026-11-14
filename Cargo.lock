@@ -2067,10 +2067,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "jackbird-ipod-sqlite"
+version = "0.1.0"
+dependencies = [
+ "jackbird-ipod",
+ "rusqlite",
+]
+
+[[package]]
 name = "jackbird-ipod-usb"
 version = "0.1.0"
 dependencies = [
  "jackbird-ipod",
+ "jackbird-ipod-sqlite",
  "nusb",
 ]
 

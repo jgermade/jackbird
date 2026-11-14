@@ -67,7 +67,7 @@ impl Profile {
         debug_assert!(!input.is_empty() && input.len().is_multiple_of(BLOCK));
         let mut chaining = chain;
         let mut out = Vec::with_capacity(input.len());
-        for block in input.chunks_exact(BLOCK) {
+        for block in input.as_chunks::<BLOCK>().0 {
             let mut state = [0; BLOCK];
             for (i, s) in state.iter_mut().enumerate() {
                 *s = self.input_map[usize::from(block[i])] ^ chaining[i] ^ self.schedule[i];

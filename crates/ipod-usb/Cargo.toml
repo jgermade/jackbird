@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 jackbird-ipod = { path = "../ipod" }
+jackbird-ipod-sqlite = { path = "../ipod-sqlite" }
 # USB control transfers in pure Rust, with no system library and no unsafe
 # code in jackbird (RECORD/2026-11-14.ipod-sync.WIP.md, N1).
 nusb = "=0.2.9"
@@ -15,6 +16,10 @@ nusb = "=0.2.9"
 [[bin]]
 name = "ipod-info"
 path = "src/main.rs"
+
+[[bin]]
+name = "ipod-roundtrip"
+path = "src/roundtrip.rs"
 
 [lints]
 workspace = true

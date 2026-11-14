@@ -73,7 +73,7 @@ fn scalar(text: &str) -> Option<String> {
 
 /// The text with XML's five predefined entities and numeric references
 /// decoded. An unknown or malformed entity is kept as it is.
-fn decode_entities(text: &str) -> String {
+pub(crate) fn decode_entities(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(amp) = rest.find('&') {

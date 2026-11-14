@@ -116,6 +116,22 @@ pub fn database_signature(database: &[u8]) -> Option<[u8; SIGNATURE_LEN]> {
     database.get(DATABASE_SIGNATURE)?.try_into().ok()
 }
 
+/// Signs a database (an `iTunesCDB` as it will be on the iPod, compressed)
+/// for `guid`, in place: the scheme at `0x30` is set to `hashAB`'s (3) and the
+/// signature written at `0xAB`. `false`, and nothing changed, when the file is
+/// too short to hold a signature.
+pub fn sign_database(database: &mut [u8], guid: &[u8; 8], random: &[u8; RANDOM_LEN]) -> bool {
+    if database.len() < DATABASE_SIGNATURE.end {
+        return false;
+    }
+    database[DATABASE_SCHEME_AT..DATABASE_SCHEME_AT + 2].copy_from_slice(&3u16.to_le_bytes());
+    let Some(digest) = database_digest(database) else {
+        return false;
+    };
+    database[DATABASE_SIGNATURE].copy_from_slice(&signature(&digest, guid, random));
+    true
+}
+
 /// Whether a database (an `iTunesCDB` as it is on the iPod, compressed) is
 /// signed for `guid`.
 pub fn verify_database(database: &[u8], guid: &[u8; 8]) -> bool {
@@ -241,6 +257,26 @@ mod tests {
         assert!(!verify_database(&db, &guid));
         assert!(!verify_database(&db[..0x80], &guid));
         assert_eq!(database_digest(&db[..0x80]), None);
+    }
+
+    #[test]
+    fn sign_database_in_place() {
+        let guid = [0x00, 0x0a, 0x27, 0x00, 0x13, 0x8b, 0x4e, 0x3e];
+        let mut db = vec![0u8; 0x200];
+        db[..4].copy_from_slice(b"mhbd");
+        db[0x100..].iter_mut().enumerate().for_each(|(i, b)| *b = i as u8);
+        assert!(sign_database(&mut db, &guid, &LIBGPOD_RANDOM));
+        assert_eq!(db[DATABASE_SCHEME_AT..DATABASE_SCHEME_AT + 2], 3u16.to_le_bytes());
+        assert!(verify_database(&db, &guid));
+        assert_eq!(random_of(&database_signature(&db).unwrap()), LIBGPOD_RANDOM);
+        // Signing again after a change gives a valid signature again.
+        db[0x150] ^= 1;
+        assert!(!verify_database(&db, &guid));
+        assert!(sign_database(&mut db, &guid, &LIBGPOD_RANDOM));
+        assert!(verify_database(&db, &guid));
+        let mut short = vec![0u8; 0x80];
+        assert!(!sign_database(&mut short, &guid, &LIBGPOD_RANDOM));
+        assert_eq!(short, vec![0u8; 0x80]);
     }
 
     #[test]
