@@ -11,7 +11,8 @@
 //! - [`hashab`]: the signature the nano 6G and 7G check on their databases;
 //! - [`library`]: the SQLite library of the nano 6G and 7G, as data: its
 //!   schema, its post-process and its rows;
-//! - [`song`]: a song as jackbird adds it, and its `mhit` and rows.
+//! - [`song`]: a song as jackbird adds it, and its `mhit` and rows;
+//! - [`collate`]: how the nano's menus sort, and the library's ranks.
 //!
 //! No I/O: the caller reads the files (or the USB request) and hands the bytes
 //! in. Malformed input is an [`Error`] that names its offset, never a panic.
@@ -19,6 +20,7 @@
 
 pub mod cdb;
 pub mod chunk;
+pub mod collate;
 pub mod db;
 pub mod device;
 pub mod hashab;

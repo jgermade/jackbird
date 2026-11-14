@@ -17,7 +17,7 @@ use jackbird_ipod::device::find_guid;
 use jackbird_ipod::library::Value;
 use jackbird_ipod::library::{self, schema::FILES};
 use jackbird_ipod::song::{self, MHIT_NOT_KNOWN, Song, Stamp};
-use jackbird_ipod::{cdb, chunk, db, hashab, sysinfo};
+use jackbird_ipod::{cdb, chunk, collate, db, hashab, sysinfo};
 use jackbird_ipod_sqlite as sqlite;
 
 fn main() -> ExitCode {
@@ -101,6 +101,7 @@ fn run(itunes: &Path, extended: &Path, out: &Path) -> Result<bool, String> {
     for r in &mut rows {
         if r.file == "Library.itdb" {
             library::strip_post_processed(r);
+            all &= check_ranks(r);
         }
     }
     let library_version = FILES[0].user_version;
@@ -412,4 +413,38 @@ fn check_songs(tree: &chunk::Chunk, rows: &[library::Rows]) -> bool {
     );
     let rows_ok = check(columns.is_empty(), "every MP3's item row, in the columns a song sets");
     header_ok && mhods_ok && rows_ok
+}
+
+/// Recomputes every rank of the library with [`collate::rank_library`] and
+/// compares each with Apple's.
+fn check_ranks(library: &library::Rows) -> bool {
+    let mut ours = library.clone();
+    collate::rank_library(&mut ours);
+    let mut all = true;
+    for (table, column) in [
+        ("item", "title_order"),
+        ("item", "artist_order"),
+        ("item", "album_order"),
+        ("item", "album_artist_order"),
+        ("item", "composer_order"),
+        ("item", "genre_order"),
+        ("item", "series_name_order"),
+        ("artist", "name_order"),
+        ("album", "name_order"),
+        ("composer", "name_order"),
+        ("genre_map", "genre_order"),
+    ] {
+        let values = |rows: &library::Rows| -> Vec<Value> {
+            let t = rows.table(table).cloned().unwrap_or_default();
+            let c = t.column(column);
+            t.rows.iter().map(|r| c.map_or(Value::Null, |c| r[c].clone())).collect()
+        };
+        let (a, b) = (values(library), values(&ours));
+        let same = a.iter().zip(&b).filter(|(x, y)| x == y).count();
+        all &= check(
+            same == a.len(),
+            &format!("{table}.{column}: every rank as Apple's ({same}/{})", a.len()),
+        );
+    }
+    all
 }
