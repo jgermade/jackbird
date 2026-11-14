@@ -17,7 +17,8 @@
   // manual popover), under the key, or above it when there is no room below;
   // at 720px and below it is a sheet at the bottom of the screen over a
   // dimmed page. A click outside it, Escape or Tab close it, and the key gets
-  // the focus back. Up, Down, Home and End move through the items; Enter and
+  // the focus back. A tap on the dimmed page only closes the sheet: what is
+  // behind it does not get the click. Up, Down, Home and End move through the items; Enter and
   // Space choose one. Its clicks, presses and keys stop at the menu, so a row
   // or a tree around it never hears them.
   //
@@ -71,10 +72,41 @@
     element.style.top = `${top}px`
   }
 
-  // A press anywhere but the menu and its key closes it.
+  // The click that follows a press on the sheet's veil, taken before anything hears it. The veil
+  // is the popover's backdrop, which takes no pointer events: the press lands on the page behind.
+  // If no click follows (the press became a scroll, or was held), nothing is left listening.
+  const swallow = (() => {
+    let timer = 0
+    const off = () => {
+      clearTimeout(timer)
+      removeEventListener("click", stop, true)
+      removeEventListener("pointerup", settle, true)
+      removeEventListener("pointercancel", off, true)
+    }
+    const stop = (event: Event) => {
+      event.stopPropagation()
+      event.preventDefault()
+      off()
+    }
+    const settle = () => (timer = window.setTimeout(off, 400))
+    const on = () => {
+      off()
+      addEventListener("click", stop, true)
+      addEventListener("pointerup", settle, true)
+      addEventListener("pointercancel", off, true)
+    }
+    return { on, off }
+  })()
+
+  // A press anywhere but the menu and its key closes it. As a sheet, over a dimmed page, that
+  // press is the veil's: it closes the menu and nothing else, so what is behind never hears it.
   const outside = (event: PointerEvent) => {
     const target = event.target as Node
     if (list()?.contains(target) || key()?.contains(target)) return
+    if (matchMedia(PHONE).matches) {
+      event.stopPropagation()
+      swallow.on()
+    }
     close(false)
   }
 
@@ -100,7 +132,10 @@
     if (element?.matches(":popover-open")) element.hidePopover()
     if (giveFocusBack) key()?.focus()
   }
-  $destroyed(() => close(false))
+  $destroyed(() => {
+    close(false)
+    swallow.off()
+  })
 
   const toggle = () => (open ? close() : show())
 

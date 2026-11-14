@@ -1,3 +1,5 @@
+import type { PeakFall, SpectrumLook } from "../types.ts";
+
 /** The frequencies a spectrum display shows, in Hz: where music has something to show. */
 export const SPECTRUM_RANGE = { low: 40, high: 16000 } as const;
 
@@ -86,4 +88,37 @@ export function foldBands(levels: readonly number[], groups: number): number[] {
     for (let band = from; band < Math.min(to, levels.length); band += 1) highest = Math.max(highest, levels[band]);
     return highest;
   });
+}
+
+/** The display spectrum's looks, the default first: stacked segments, or fine horizontal lines. */
+export const SPECTRUM_LOOKS: readonly SpectrumLook[] = ["segments", "lines"];
+
+/** The look a saved value names, else segments. */
+export function spectrumLookOf(value: unknown): SpectrumLook {
+  return SPECTRUM_LOOKS.find((look) => look === value) ?? "segments";
+}
+
+/** How the display spectrum's peaks may fall, none first; fast is the default. */
+export const PEAK_FALLS: readonly PeakFall[] = ["none", "fast", "slow", "very-slow"];
+
+export const DEFAULT_PEAK_FALL: PeakFall = "fast";
+
+/** The fall a saved value names, else the default. */
+export function peakFallOf(value: unknown): PeakFall {
+  return PEAK_FALLS.find((fall) => fall === value) ?? DEFAULT_PEAK_FALL;
+}
+
+/** A peak's motion: held `hold` ms at the highest its column reached, then falling `speed` of the height a second. */
+export type PeakMotion = { hold: number; speed: number };
+
+const PEAK_MOTIONS: Record<PeakFall, PeakMotion | null> = {
+  none: null,
+  fast: { hold: 600, speed: 0.4 },
+  slow: { hold: 1000, speed: 0.15 },
+  "very-slow": { hold: 1600, speed: 0.06 }
+};
+
+/** How a fall moves the peaks; `null` for none (no peaks drawn). */
+export function peakMotion(fall: PeakFall): PeakMotion | null {
+  return Object.hasOwn(PEAK_MOTIONS, fall) ? PEAK_MOTIONS[fall] : PEAK_MOTIONS[DEFAULT_PEAK_FALL];
 }

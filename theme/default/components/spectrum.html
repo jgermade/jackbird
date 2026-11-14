@@ -1,4 +1,4 @@
-<script :setup="{ source = null, bands = 16, active = false }: Props" lang="ts">
+<script :setup="{ source = null, bands = 16, active = false, look = 'segments', peaks = undefined }: Props" lang="ts">
   // A spectrum analyser for the display: columns of fine segments (about
   // 2px each, as many as its height holds), lit in the display's ink over
   // unlit ones, like the meter's; over each, its peak, a lit segment held a
@@ -6,6 +6,13 @@
   // music is what it shows.
   //
   //   <Spectrum :source="readSpectrum" :bands="16" :active="playing" />
+  //
+  // `look`: "segments" (the default) stacks the fine segments above; "lines"
+  // draws the columns in finer horizontal lines, thinner and closer, the
+  // peak one of them. `peaks`: `{ hold, speed }`, held `hold` ms, then
+  // falling `speed` of the height a second (600 ms and 0.4 by default), or
+  // `null` for none drawn. Both are read on every frame, so a change shows
+  // at once.
   //
   // `source(bands)` returns the levels, from 0 to 1, low frequencies first
   // (or `null` when there are none yet). While `active`, it is read and drawn
@@ -18,9 +25,15 @@
   // `tokens.css`. See `RECORD/2026-11-04.github-actions-workflows.WIP.md`
   // (12:00).
 
-  type Props = { source?: ((bands: number) => number[] | null) | null; bands?: number; active?: boolean | "" }
+  type Peaks = { hold: number; speed: number }
+  // The peaks' motion unless told otherwise: held 600 ms, then falling 0.4 of the height a second.
+  const DEFAULT_PEAKS: Peaks = { hold: 600, speed: 0.4 }
+  type Props = { source?: ((bands: number) => number[] | null) | null; bands?: number; active?: boolean | ""; look?: "segments" | "lines"; peaks?: Peaks | null }
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  // A peak's motion: as given, none for `null`, the default for anything else.
+  const peakMotion = (): Peaks | null =>
+    peaks === null ? null : peaks && typeof peaks === "object" && Number.isFinite(peaks.hold) && Number.isFinite(peaks.speed) ? peaks : DEFAULT_PEAKS
 
   // The drawing's state lives in this closure, not in the component's store:
   // a top-level `let` would be a reactive field, written on every frame.
@@ -28,13 +41,13 @@
     // A segment about this tall (CSS px), with a device pixel between two; never fewer than 8.
     const STEP = 2
     const MIN_SEGMENTS = 8
+    // A line, in device pixels: a CSS pixel tall, with a CSS pixel between two (half a segment's
+    // height; thinner ones grey out under the display's dots).
+    const lineOf = (ratio: number) => ({ size: Math.max(1, Math.round(ratio)), gap: Math.max(1, Math.round(ratio)) })
     // The bars: up at once, down by this much a frame, as a meter's needle falls.
     const FALL = 0.06
-    // The peaks: held this long (ms), then falling by this much of the height a second.
-    const HOLD = 600
-    const PEAK_FALL = 0.4
     let shown: number[] = []
-    let peaks: { level: number; held: number }[] = []
+    let tops: { level: number; held: number }[] = []
     let last = 0
     let frame = 0
     let timer = 0
@@ -70,33 +83,40 @@
       last = now
       const read = flag(active) && typeof source === "function" ? source(count) : null
       shown = Array.from({ length: count }, (_, band) => Math.max(read?.[band] ?? 0, (shown[band] ?? 0) - FALL))
-      // A peak rises with its column and is held; then it falls, never below the column.
-      peaks = shown.map((level, band) => {
-        const peak = peaks[band] ?? { level: 0, held: 0 }
+      // A peak rises with its column and is held; then it falls, never below the column. None
+      // drawn, none kept.
+      const motion = peakMotion()
+      tops = !motion ? [] : shown.map((level, band) => {
+        const peak = tops[band] ?? { level: 0, held: 0 }
         if (level >= peak.level) return { level, held: now }
-        const falling = now - peak.held > HOLD ? peak.level - (PEAK_FALL * elapsed) / 1000 : peak.level
+        const falling = now - peak.held > motion.hold ? peak.level - (motion.speed * elapsed) / 1000 : peak.level
         return { level: Math.max(level, falling), held: peak.held }
       })
       const context = element.getContext("2d")
       if (!context) return false
       const { lit, unlit } = ink(element)
-      const gap = Math.max(1, Math.round(ratio))
-      const segments = Math.max(MIN_SEGMENTS, Math.floor((height + gap) / (STEP * ratio + gap)))
+      const lines = look === "lines"
+      const line = lineOf(ratio)
+      const gap = lines ? line.gap : Math.max(1, Math.round(ratio))
+      const unit = lines ? line.size : STEP * ratio
+      const segments = Math.max(MIN_SEGMENTS, Math.floor((height + gap) / (unit + gap)))
       const columnGap = Math.max(1, Math.round(ratio))
       const columnWidth = (width - columnGap * (count - 1)) / count
-      const segmentHeight = (height - gap * (segments - 1)) / segments
+      // Segments share the height out; lines keep whole device pixels, so each is sharp (the
+      // little left over stays at the top).
+      const segmentHeight = lines ? unit : (height - gap * (segments - 1)) / segments
       const top = (segment: number) => height - (segment + 1) * segmentHeight - segment * gap
       context.clearRect(0, 0, width, height)
       shown.forEach((level, band) => {
         const litSegments = Math.round(level * segments)
-        const peakSegment = Math.min(segments, Math.round(peaks[band].level * segments)) - 1
+        const peakSegment = tops[band] ? Math.min(segments, Math.round(tops[band].level * segments)) - 1 : -1
         const x = band * (columnWidth + columnGap)
         for (let segment = 0; segment < segments; segment += 1) {
           context.fillStyle = segment < litSegments || (segment === peakSegment && peakSegment >= litSegments) ? lit : unlit
           context.fillRect(x, top(segment), columnWidth, segmentHeight)
         }
       })
-      return shown.some((level) => level > 0) || peaks.some((peak) => peak.level > 0)
+      return shown.some((level) => level > 0) || tops.some((peak) => peak.level > 0)
     }
 
     const stop = () => {

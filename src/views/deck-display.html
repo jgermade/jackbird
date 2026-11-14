@@ -24,6 +24,8 @@
   const { library } = await import("../lib/library")
   const { activeRoot } = await import("../lib/workspace")
   const { t } = await import("../lib/i18n")
+  const { preferences } = await import("../lib/preferences")
+  const { peakMotion } = await import("../helpers/spectrum")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   const mp3Url: string = (await import("../assets/formats/mp3.svg?url")).default
   const oggUrl: string = (await import("../assets/formats/ogg.svg?url")).default
@@ -209,7 +211,7 @@
           <span class="icons"><DisplayIcon filled>DAC</DisplayIcon></span>
           <span :if="soundingDevice()?.quality" class="quality"><span :each="part in soundingDevice()?.quality.split(' · ') ?? []">{{ part }}</span></span>
         </span>
-        <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="bands" :active="playback.playing" /></span>
+        <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="bands" :active="playback.playing" :look="preferences.spectrumLook" :peaks="peakMotion(preferences.peakFall)" /></span>
       </button>
       <span :else class="lcd-mark" aria-hidden="true">
         <span class="lcd-logo" :style="logoStyle"></span>

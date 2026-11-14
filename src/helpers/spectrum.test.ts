@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DISPLAY_BANDS, SPECTRUM_DECIBELS, SPECTRUM_RANGE, SPECTRUM_TILT, foldBands, spectrumBands } from "./spectrum.ts";
+import type { PeakFall } from "../types.ts";
+import {
+  DEFAULT_PEAK_FALL,
+  DISPLAY_BANDS,
+  PEAK_FALLS,
+  SPECTRUM_DECIBELS,
+  SPECTRUM_LOOKS,
+  SPECTRUM_RANGE,
+  SPECTRUM_TILT,
+  foldBands,
+  peakFallOf,
+  peakMotion,
+  spectrumBands,
+  spectrumLookOf
+} from "./spectrum.ts";
 
 // An analyser's 512 bins (fftSize 1024) at the two usual rates.
 const BINS = 512;
@@ -116,5 +130,48 @@ describe("foldBands", () => {
   it("gives nothing for no levels or no groups", () => {
     assert.deepEqual(foldBands([], 3), []);
     assert.deepEqual(foldBands([0.5], 0), []);
+  });
+});
+
+describe("spectrumLookOf", () => {
+  it("takes a look it knows", () => {
+    for (const look of SPECTRUM_LOOKS) assert.equal(spectrumLookOf(look), look);
+  });
+
+  it("gives segments for anything else", () => {
+    assert.equal(spectrumLookOf(null), "segments");
+    assert.equal(spectrumLookOf("bars"), "segments");
+  });
+});
+
+describe("peakFallOf", () => {
+  it("takes a fall it knows", () => {
+    for (const fall of PEAK_FALLS) assert.equal(peakFallOf(fall), fall);
+  });
+
+  it("gives the default, fast, for anything else", () => {
+    assert.equal(DEFAULT_PEAK_FALL, "fast");
+    assert.equal(peakFallOf(undefined), "fast");
+    assert.equal(peakFallOf("slowest"), "fast");
+  });
+});
+
+describe("peakMotion", () => {
+  it("draws no peaks for none", () => {
+    assert.equal(peakMotion("none"), null);
+  });
+
+  it("keeps the fast fall as it was: held 600 ms, then 0.4 of the height a second", () => {
+    assert.deepEqual(peakMotion("fast"), { hold: 600, speed: 0.4 });
+  });
+
+  it("holds longer and falls slower, the slower the choice", () => {
+    const [fast, slow, verySlow] = (["fast", "slow", "very-slow"] as const).map((fall) => peakMotion(fall)!);
+    assert.ok(slow.hold > fast.hold && verySlow.hold > slow.hold);
+    assert.ok(slow.speed < fast.speed && verySlow.speed < slow.speed);
+  });
+
+  it("gives the default's motion for a fall it does not know", () => {
+    assert.deepEqual(peakMotion("huge" as PeakFall), peakMotion("fast"));
   });
 });
