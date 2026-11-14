@@ -110,6 +110,12 @@ export type Density = "compact" | "comfortable" | "spacious";
 /** The interface languages; English is the source and the fallback. */
 export type Language = "en" | "es";
 
+/** How the display's spectrum draws its columns (helpers/spectrum.ts): stacked segments, or fine horizontal lines. */
+export type SpectrumLook = "segments" | "lines";
+
+/** How the display's spectrum's peaks fall (helpers/spectrum.ts), or none drawn. */
+export type PeakFall = "none" | "fast" | "slow" | "very-slow";
+
 export type GroupingMode = "flat" | "wizard";
 
 /** One open folder ("root") and everything the library shows of it. */

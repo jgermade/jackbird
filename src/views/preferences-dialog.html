@@ -7,7 +7,7 @@
   // is in, their name, their passkeys and sessions (with sign-in on), signing
   // out or switching profile, and, for admins and owners, "People and
   // sign-in". In sections, a bar of them at the top: General (the tone, the
-  // rows' density, the language), Library, Sound, Account, Sharing, Service,
+  // rows' density, the display spectrum's look and peaks, the language), Library, Sound, Account, Sharing, Service,
   // each only where it applies (2026-11-14). See
   // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7)
   // and RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S2, S3).
@@ -23,8 +23,9 @@
   const Tabs = await import("../../theme/default/components/tabs.html")
 
   const { languageName, t } = await import("../lib/i18n")
-  const { LANGUAGES, preferences, setDensity, setLanguage, setSongsInTree, setThemeChoice } = await import("../lib/preferences")
+  const { LANGUAGES, preferences, setDensity, setLanguage, setPeakFall, setSongsInTree, setSpectrumLook, setThemeChoice } = await import("../lib/preferences")
   const { DENSITIES, densityOf } = await import("../helpers/density")
+  const { PEAK_FALLS, SPECTRUM_LOOKS, peakFallOf, spectrumLookOf } = await import("../helpers/spectrum")
   const { ui } = await import("../lib/ui")
   const { isDesktop, isPhone } = await import("../lib/platform")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
@@ -118,6 +119,8 @@
   }
   const sections = () => shown().map((id) => ({ id, label: t(`preferences.section.${id}` as "preferences.section.general"), icon: ICONS[id] }))
   const densities = () => DENSITIES.map((density) => ({ value: density, label: t(`preferences.density.${density}` as "preferences.density.compact") }))
+  const looks = () => SPECTRUM_LOOKS.map((look) => ({ value: look, label: t(`preferences.spectrumLook.${look}` as "preferences.spectrumLook.segments") }))
+  const peakFalls = () => PEAK_FALLS.map((fall) => ({ value: fall, label: t(`preferences.peakFall.${fall}` as "preferences.peakFall.fast") }))
   const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
 </script>
 
@@ -141,6 +144,21 @@
           <p>{{ t("preferences.densityHint") }}</p>
         </div>
         <Choice :label="t('preferences.density')" :model="preferences.density" :options="densities()" @change="setDensity(densityOf($event.detail))" />
+      </section>
+      <!-- The display spectrum's look and how its peaks fall (helpers/spectrum.ts). -->
+      <section class="pref density">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("preferences.spectrum") }}</h3>
+          <p>{{ t("preferences.spectrumHint") }}</p>
+        </div>
+        <div class="choice">
+          <span class="caption" aria-hidden="true">{{ t("preferences.spectrumLook") }}</span>
+          <Choice :label="t('preferences.spectrumLook')" :model="preferences.spectrumLook" :options="looks()" @change="setSpectrumLook(spectrumLookOf($event.detail))" />
+        </div>
+        <div class="choice">
+          <span class="caption" aria-hidden="true">{{ t("preferences.peakFall") }}</span>
+          <Choice :label="t('preferences.peakFall')" :model="preferences.peakFall" :options="peakFalls()" @change="setPeakFall(peakFallOf($event.detail))" />
+        </div>
       </section>
       <section class="pref">
         <Field :label="t('preferences.language')" control="preferences-language" :hint="t('preferences.languageHint')">
@@ -312,6 +330,9 @@
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
   .density { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); justify-items: start; }
+  /* A choice under its own caption (the spectrum's look, its peaks' fall). */
+  .choice { display: grid; gap: var(--mm-space-1); justify-items: start; }
+  .caption { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
   .service, .output { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
   .output .state { color: var(--mm-fg); }
   .service .state { color: var(--mm-fg); }
