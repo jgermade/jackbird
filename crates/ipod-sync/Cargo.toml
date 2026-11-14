@@ -13,6 +13,11 @@ jackbird-tags = { path = "../tags" }
 # The pids, the file names and the signatures' random bytes. The version is
 # one Cargo.lock already holds (RECORD/2026-11-14.ipod-sync.WIP.md, N4).
 getrandom = "=0.3.4"
+# The covers in MP3s' tags, decoded to scale them for the iPod (artwork, A3,
+# approved by the owner on 2026-11-15): png is the version Cargo.lock already
+# holds through Tauri; zune-jpeg is pure Rust and builds for WebAssembly.
+png = "=0.18.1"
+zune-jpeg = { version = "=0.5.15", default-features = false, features = ["std"] }
 
 [[bin]]
 name = "ipod-add"

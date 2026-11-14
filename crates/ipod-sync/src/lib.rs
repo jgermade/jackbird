@@ -15,6 +15,7 @@
 //!   any step puts the old files back and removes the copied MP3s. The old
 //!   files are kept in `iPod_Control/iTunes/.jackbird-backups/<when>/`.
 
+pub mod cover;
 pub mod genres;
 pub mod mpeg;
 
@@ -175,6 +176,14 @@ fn total(text: &str) -> u32 {
 fn some(text: &str) -> Option<String> {
     let t = text.trim();
     (!t.is_empty()).then(|| t.to_string())
+}
+
+/// The cover an audio file's tags show (`jackbird-tags`: the front cover, else
+/// the first picture), decoded; `None` when it has none or it cannot be read.
+pub fn read_cover(path: &Path) -> Option<Cover> {
+    let bytes = std::fs::read(path).ok()?;
+    let cover = jackbird_tags::read(&bytes).ok()?.cover?;
+    cover::decode(&cover.data)
 }
 
 /// A song of an MP3 file: its tags, its audio, its size, and when it was last
@@ -588,6 +597,24 @@ fn write_synced(path: &Path, bytes: &[u8]) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn covers_of_files() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tags");
+        for (name, side) in [
+            ("cover1.jpg", 16),
+            ("cover2.jpg", 24),
+            ("cover9.jpg", 32),
+            ("cover3.png", 16),
+        ] {
+            let bytes = std::fs::read(fixtures.join("covers").join(name)).unwrap();
+            let c = cover::decode(&bytes).unwrap_or_else(|| panic!("{name}"));
+            assert_eq!((c.width, c.height), (side, side), "{name}");
+            assert_eq!(c.rgb.len(), (side * side * 3) as usize, "{name}");
+        }
+        assert_eq!(read_cover(&fixtures.join("mp3-no-tag.mp3")), None);
+        assert_eq!(read_cover(Path::new("/nonexistent.mp3")), None);
+    }
 
     #[test]
     fn numbers_of_tags() {

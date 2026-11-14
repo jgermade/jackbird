@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use jackbird_ipod::song::Stamp;
-use jackbird_ipod_sync::{open, read_mp3};
+use jackbird_ipod_sync::{open, read_cover, read_mp3};
 
 /// This machine's offset from UTC at the moment `unix`, in seconds, from
 /// `date` (`+0100`): BSD's and macOS's `-r`, else GNU's `-d @`; 0 when it
@@ -80,7 +80,13 @@ fn run(root: &std::path::Path, files: &[PathBuf], playlist: Option<&str>) -> Res
     for file in files {
         let song = read_mp3(file, &local_offset).map_err(|e| e.to_string())?;
         let added = device
-            .add(file, song, playlist, Stamp { unix: now, offset }, None)
+            .add(
+                file,
+                song,
+                playlist,
+                Stamp { unix: now, offset },
+                read_cover(file).as_ref(),
+            )
             .map_err(|e| e.to_string())?;
         println!(
             "adding {} as iPod_Control/Music/{} ({} — {}, {} ms, {} kbit/s{})",
@@ -92,6 +98,9 @@ fn run(root: &std::path::Path, files: &[PathBuf], playlist: Option<&str>) -> Res
             added.bitrate,
             if added.vbr { ", VBR" } else { "" }
         );
+        if let Some(id) = added.artwork_id {
+            println!("  with its cover (image {id})");
+        }
     }
     let backups = device.commit().map_err(|e| e.to_string())?;
     println!("written; the old databases are kept as:");
