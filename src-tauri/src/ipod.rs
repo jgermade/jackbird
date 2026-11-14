@@ -93,13 +93,21 @@ fn numbered(n: u32, total: u32) -> String {
     }
 }
 
-/// The name a cover of image `id` on the iPod at `root` goes by: unique to that iPod.
+/// The name a cover of image `id` on the iPod at `root` goes by: unique to that iPod, and shaped
+/// as the interface's cover names are (`helpers/cover.ts`: sixteen hex digits, a dash, hex digits
+/// and the type's extension), which it checks before it takes a reference: the iPod's path hashed
+/// twice (FNV-1a, two seeds), then the image's ID.
 fn cover_name(root: &Path, id: u32) -> String {
-    let hash = root
-        .to_string_lossy()
-        .bytes()
-        .fold(0x811c_9dc5_u32, |h, b| (h ^ u32::from(b)).wrapping_mul(0x0100_0193));
-    format!("ipod-{hash:08x}-{id}.png")
+    let path = root.to_string_lossy();
+    let hash = |seed: u32| {
+        path.bytes()
+            .fold(seed, |h, b| (h ^ u32::from(b)).wrapping_mul(0x0100_0193))
+    };
+    format!(
+        "{:08x}{:08x}-{id:x}.png",
+        hash(0x811c_9dc5),
+        hash(0x0100_0193 ^ 0x6970_6f64)
+    )
 }
 
 /// The songs of the iPod at `path`, from its database.
@@ -334,8 +342,12 @@ mod tests {
         assert_eq!(base64(b"Man"), "TWFu");
         assert_eq!(base64(b"Ma"), "TWE=");
         assert_eq!(base64(b"M"), "TQ==");
-        let a = cover_name(Path::new("/Volumes/iPod"), 7);
-        assert!(a.starts_with("ipod-") && a.ends_with("-7.png"));
-        assert_ne!(a, cover_name(Path::new("/Volumes/Other"), 7));
+        let a = cover_name(Path::new("/Volumes/iPod"), 0x1c7);
+        // The interface's `refName` takes only `^[0-9a-f]{16}-[0-9a-f]+\.[a-z]+$`.
+        let (hashes, rest) = a.split_once('-').unwrap();
+        assert_eq!(hashes.len(), 16);
+        assert!(hashes.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert_eq!(rest, "1c7.png");
+        assert_ne!(a, cover_name(Path::new("/Volumes/Other"), 0x1c7));
     }
 }
