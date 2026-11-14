@@ -1,0 +1,20 @@
+[package]
+name = "jackbird-ipod-usb"
+description = "jackbird's iPod on USB: the Apple devices connected, their serial numbers, and SysInfoExtended read with the iPod's vendor request; and ipod-info, a tool that describes a mounted iPod"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+jackbird-ipod = { path = "../ipod" }
+# USB control transfers in pure Rust, with no system library and no unsafe
+# code in jackbird (RECORD/2026-11-14.ipod-sync.WIP.md, N1).
+nusb = "=0.2.9"
+
+[[bin]]
+name = "ipod-info"
+path = "src/main.rs"
+
+[lints]
+workspace = true

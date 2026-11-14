@@ -1,0 +1,14 @@
+[package]
+name = "jackbird-ipod"
+description = "jackbird's iPod databases: the device's identity (SysInfo, SysInfoExtended, model, GUID) and its iTunesDB or iTunesCDB, read from bytes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+# The iTunesCDB of the nano 5G to 7G: a zlib stream after the header.
+miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
+
+[lints]
+workspace = true
