@@ -2063,6 +2063,7 @@ name = "jackbird-ipod"
 version = "0.1.0"
 dependencies = [
  "miniz_oxide 0.9.1",
+ "sha1",
 ]
 
 [[package]]

@@ -6,7 +6,8 @@
 //!   database file it reads, and its FireWire GUID;
 //! - [`cdb`]: an `iTunesCDB` (nano 5G to 7G) turned into the `iTunesDB` it
 //!   compresses;
-//! - [`db`]: the tracks and playlists of an `iTunesDB`.
+//! - [`db`]: the tracks and playlists of an `iTunesDB`;
+//! - [`hashab`]: the signature the nano 6G and 7G check on their databases.
 //!
 //! No I/O: the caller reads the files (or the USB request) and hands the bytes
 //! in. Malformed input is an [`Error`] that names its offset, never a panic.
@@ -15,9 +16,18 @@
 pub mod cdb;
 pub mod db;
 pub mod device;
+pub mod hashab;
 pub mod sysinfo;
 
 mod bytes;
+mod sha1 {
+    //! SHA-1, as one call.
+    use sha1::{Digest, Sha1};
+
+    pub(crate) fn sha1(data: &[u8]) -> [u8; 20] {
+        Sha1::digest(data).into()
+    }
+}
 
 use std::fmt;
 

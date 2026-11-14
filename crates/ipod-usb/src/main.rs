@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use jackbird_ipod::device::{Checksum, Generation, GuidSource, find_guid};
-use jackbird_ipod::{cdb, db, sysinfo};
+use jackbird_ipod::{cdb, db, hashab, sysinfo};
 use jackbird_ipod_usb::{UsbIpod, list_apple_devices, read_sysinfo_extended};
 
 struct Args {
@@ -153,7 +153,8 @@ fn run(args: &Args) -> Result<(), String> {
 
     // Which iPod, its GUID.
     let generation = ipod.and_then(|d| d.generation);
-    match find_guid(&extended, &sysinfo, ipod.and_then(|d| d.serial.as_deref())) {
+    let found_guid = find_guid(&extended, &sysinfo, ipod.and_then(|d| d.serial.as_deref()));
+    match found_guid {
         Some((guid, source)) => println!(
             "GUID: {} (from {})",
             guid.to_hex(),
@@ -223,6 +224,14 @@ fn run(args: &Args) -> Result<(), String> {
         );
     }
 
+    // The signatures (N2): checked, never written.
+    if scheme == Some(Checksum::HashAb) || generation.is_some_and(|g| g.checksum() == Checksum::HashAb) {
+        match found_guid {
+            None => println!("hashAB: no GUID to check the signatures with"),
+            Some((guid, _)) => check_hashab(&itunes, &raw, &data, &guid.0),
+        }
+    }
+
     // Tracks.
     let missing = database
         .tracks
@@ -270,6 +279,35 @@ fn run(args: &Args) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+/// Whether the `iTunesCDB` and `Locations.itdb.cbk` iTunes wrote are signed
+/// for this GUID: the proof that `hashAB` and the GUID are right, without
+/// writing anything.
+fn check_hashab(itunes: &Path, raw: &[u8], inflated: &[u8], guid: &[u8; 8]) {
+    let yes = |b: bool| if b { "valid" } else { "NOT valid" };
+    let on_file = hashab::verify_database(raw, guid);
+    print!("hashAB: the database's signature is {} for this GUID", yes(on_file));
+    if !on_file && inflated != raw {
+        print!(
+            " (over the inflated database: {})",
+            yes(hashab::verify_database(inflated, guid))
+        );
+    }
+    println!();
+    let itlp = itunes.join("iTunes Library.itlp");
+    match (
+        std::fs::read(itlp.join("Locations.itdb.cbk")),
+        std::fs::read(itlp.join("Locations.itdb")),
+    ) {
+        (Ok(book), Ok(locations)) => println!(
+            "hashAB: Locations.itdb.cbk ({} bytes) is {} for Locations.itdb ({} bytes)",
+            book.len(),
+            yes(hashab::verify_checksum_book(&book, &locations, guid)),
+            locations.len()
+        ),
+        _ => println!("hashAB: no Locations.itdb.cbk and Locations.itdb to check"),
+    }
 }
 
 fn describe_file(text: Option<&str>, values: usize) -> String {

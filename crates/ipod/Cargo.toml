@@ -9,6 +9,8 @@ publish.workspace = true
 [dependencies]
 # The iTunesCDB of the nano 5G to 7G: a zlib stream after the header.
 miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
+# hashAB signs SHA-1s; the same crate and version as jackbird-core's.
+sha1 = { version = "=0.10.6", default-features = false }
 
 [lints]
 workspace = true
