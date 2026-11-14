@@ -1,0 +1,105 @@
+<script :setup lang="ts">
+  // The iPod dialog (the panel, RECORD/2026-11-14.ipod-sync.WIP.md): sending songs of the app's
+  // folders to an iPod (which one, when several are plugged in; the Mac's settings to keep them;
+  // the songs it seems to have already, left out unless kept; the tracks that cannot go), and
+  // asking before taking songs off one. A view over lib/ipod.ts.
+
+  const Modal = await import("../../theme/default/components/modal.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Checkbox = await import("../../theme/default/components/checkbox.html")
+
+  const { t, tn } = await import("../lib/i18n")
+  const { chooseTarget, closeIpodDialog, confirmRemove, confirmSend, filesToSend, ipodDialogTitle, ipods } = await import("../lib/ipod")
+
+  type Send = Extract<NonNullable<typeof ipods.dialog>, { mode: "send" }>
+  const send = (): Send | null => (ipods.dialog?.mode === "send" ? ipods.dialog : null)
+  const duplicateTitles = (): string[] => send()?.duplicates.map((index) => send()?.files[index]?.title ?? "") ?? []
+  const toSend = (): number => {
+    const dialog = send()
+    return dialog ? filesToSend(dialog).length : 0
+  }
+  const keep = (value: boolean) => {
+    const dialog = send()
+    if (dialog) ipods.dialog = { ...dialog, keepDuplicates: value }
+  }
+</script>
+
+<div class="ipod-dialog">
+  <Modal :open="!!ipods.dialog" :eyebrow="t('ipod.eyebrow')" :title="ipodDialogTitle()" size="sm" :close-label="t('ipod.close')" @close="closeIpodDialog()">
+    <div :if="send()" class="body">
+      <div :if="(send()?.targets.length ?? 0) > 1" class="targets">
+        <h3 class="mm-legend">{{ t("ipod.to") }}</h3>
+        <ul class="list">
+          <li :each="ipod in send()?.targets ?? []" :key="ipod.path">
+            <button type="button" class="choice" :class.chosen="ipod.path === send()?.target" :aria-pressed="ipod.path === send()?.target ? 'true' : 'false'" @click="chooseTarget(ipod.path)">{{ ipod.name }}</button>
+          </li>
+        </ul>
+      </div>
+      <p class="warning">{{ t("ipod.macWarning") }}</p>
+      <div :if="duplicateTitles().length > 0" class="duplicates">
+        <p class="hint">{{ tn("ipod.duplicates", duplicateTitles().length) }}</p>
+        <ul class="names">
+          <li :each="(title, index) in duplicateTitles()" :key="index">{{ title }}</li>
+        </ul>
+        <Checkbox :model="send()?.keepDuplicates ?? false" @change="keep($event.detail)">{{ t("ipod.keepDuplicates") }}</Checkbox>
+      </div>
+      <p :if="(send()?.skipped ?? 0) > 0" class="hint">{{ tn("ipod.skipped", send()?.skipped ?? 0) }}</p>
+      <p :if="toSend() === 0" class="hint">{{ t("ipod.nothing") }}</p>
+    </div>
+    <div :if="ipods.dialog?.mode === 'remove'" class="body">
+      <p class="hint">{{ t("ipod.removeHint") }}</p>
+    </div>
+    <p :if="ipods.error" class="failure">{{ ipods.error }}</p>
+    <template :slot.foot>
+      <span class="keys">
+        <Key variant="ghost" :disabled="ipods.busy" @click="closeIpodDialog()">{{ t("editor.cancel") }}</Key>
+        <Key :if="send()" variant="primary" :disabled="ipods.busy || toSend() === 0" @click="confirmSend()">{{ t("ipod.send") }}</Key>
+        <Key :if="ipods.dialog?.mode === 'remove'" variant="danger" :disabled="ipods.busy" @click="confirmRemove()">{{ t("ipod.remove") }}</Key>
+      </span>
+    </template>
+  </Modal>
+</div>
+
+<style scoped>
+  .ipod-dialog { display: contents; }
+  .body { display: grid; gap: var(--mm-space-3); }
+  .targets { display: grid; gap: var(--mm-space-2); }
+  .targets .mm-legend { margin: 0; }
+  .list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    list-style: none;
+  }
+  .list li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .choice {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: 0;
+    background: transparent;
+    color: var(--mm-fg);
+    font: inherit;
+    font-size: var(--mm-text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  .choice.chosen { background: var(--mm-sunken); font-weight: 600; }
+  @media (hover: hover) { .choice:hover { background: var(--mm-hover); } }
+  .choice:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .duplicates { display: grid; gap: var(--mm-space-2); }
+  .names {
+    margin: 0;
+    padding-left: var(--mm-space-4);
+    max-height: 8rem;
+    overflow-y: auto;
+    color: var(--mm-fg);
+    font-size: var(--mm-text-sm);
+  }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .warning { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-warn-led); border-radius: var(--mm-radius-key); background: var(--mm-warn-soft); color: var(--mm-warn); font-size: var(--mm-text-sm); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+  .keys { display: flex; justify-content: flex-end; gap: var(--mm-space-2); width: 100%; }
+</style>

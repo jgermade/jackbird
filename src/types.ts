@@ -232,4 +232,8 @@ export type RootSource = {
   openMedia(path: string): Promise<MediaHandle>;
   /** The root was closed: on the desktop, nothing under it can be reached any more. */
   close(): void;
+  /** Which of its walked files are tracks; by extension (`isAudioFile`) when absent. An iPod's are all (its AAC songs too). */
+  isTrack?(path: string): boolean;
+  /** An iPod's root (lib/sources/ipod.ts): its mount point, and each song's pid in its database. Its files are not hashed. */
+  readonly ipod?: { path: string; pidOf(path: string): Promise<string | undefined> };
 };

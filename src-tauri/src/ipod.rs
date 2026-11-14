@@ -79,8 +79,9 @@ pub fn ipod_open(app: AppHandle, path: String) -> Answer<Opened> {
 pub struct IpodTracks {
     tracks: Vec<ScannedJson>,
     covers: Vec<CoverJson>,
-    /// Each song's pid, by its path, to take it off.
-    pids: Vec<(String, i64)>,
+    /// Each song's pid, by its path, to take it off: as text, since a 64-bit integer does not
+    /// survive JavaScript's numbers.
+    pids: Vec<(String, String)>,
 }
 
 /// A number as the interface's fields hold it: `n`, `n/total`, or nothing for 0.
@@ -127,7 +128,7 @@ pub async fn ipod_tracks(path: String, known_covers: Vec<String>) -> Answer<Ipod
                 cover_ref(&name)
             });
             let text = |s: &Option<String>| s.clone().unwrap_or_default();
-            pids.push((song.path.clone(), t.database_id as i64));
+            pids.push((song.path.clone(), (t.database_id as i64).to_string()));
             tracks.push(ScannedJson {
                 path: song.path,
                 size: u64::from(t.size),
@@ -239,8 +240,15 @@ pub async fn ipod_send(
 
 /// Takes songs off the iPod at `path`, by their pids (as `ipod_tracks` gave them). All or nothing.
 #[tauri::command]
-pub async fn ipod_remove(path: String, pids: Vec<i64>) -> Answer<usize> {
+pub async fn ipod_remove(path: String, pids: Vec<String>) -> Answer<usize> {
     let root = ipod_at(&path)?;
+    let pids = pids
+        .iter()
+        .map(|p| {
+            p.parse::<i64>()
+                .map_err(|_| failure("ipod", format!("{p:?} is not a pid")))
+        })
+        .collect::<Answer<Vec<i64>>>()?;
     blocking(move || {
         let mut device = jackbird_ipod_sync::open(&root).map_err(sync_failure)?;
         for pid in &pids {

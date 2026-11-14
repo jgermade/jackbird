@@ -6,6 +6,7 @@
 
 import type { WizardTreeRow } from "../types";
 import { canChange, openSelectionFor } from "./editor";
+import { askRemove, askSend, canSendFrom } from "./ipod";
 import { isFavourite, toggleFavourite } from "./mine";
 import { t, tn } from "./i18n";
 import { moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
@@ -34,7 +35,9 @@ const ICONS: Record<string, string> = {
   delete: "M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.75 9h6.5l.75-9",
   up: "M8 13V3M4 7l4-4 4 4",
   down: "M8 3v10M4 9l4 4 4-4",
-  out: "M2.5 4h11M2.5 8h11M2.5 12h5M10 12.25h4.5"
+  out: "M2.5 4h11M2.5 8h11M2.5 12h5M10 12.25h4.5",
+  sendToIpod: "M5 1.75h6v12.5H5zM8 4.5v4.5M6.25 7.25 8 9l1.75-1.75M7 12h2",
+  removeFromIpod: "M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.75 9h6.5l.75-9"
 };
 
 /** Pairs that share a row, side by side. */
@@ -76,8 +79,10 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
   if (place === "sheet") {
     items.push({ id: "show", label: t("menu.showInLibrary") });
   }
-  // The family library: one's favourites (F3).
   const root = activeRoot.value.data;
+  // The iPod (the panel): songs of this machine's folders go to it; an iPod's songs leave it.
+  if (canSendFrom(root)) items.push({ id: "sendToIpod", label: tn("menu.sendToIpod", count), rule: true });
+  // The family library: one's favourites (F3).
   const track = root?.source.kind === "library" ? root.tracks.find((one) => one.id === trackId) : undefined;
   if (track) {
     items.push({ id: "favourite", label: isFavourite(track.relativePath) ? t("menu.unfavourite") : t("menu.favourite") });
@@ -88,6 +93,11 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
     { id: "rename", label: tn("menu.rename", count) },
     { id: "remove", label: tn("menu.remove", count), danger: true, rule: true }
   );
+  if (root?.source.ipod) {
+    // Its songs are its database's: never edited, renamed or removed as a folder's files are.
+    const kept = items.filter((item) => !["edit", "rename", "remove", "playlist"].includes(item.id));
+    return styled([...kept, { id: "removeFromIpod", label: tn("menu.removeFromIpod", count), danger: true, rule: true }]);
+  }
   return allowed(items);
 }
 
@@ -128,6 +138,12 @@ export function onTrackMenu(trackId: string, choice: string): void {
         showInLibrary(root.id, trackId);
         ui.pane = "library";
       }
+      break;
+    }
+    case "sendToIpod":
+    case "removeFromIpod": {
+      const root = activeRoot.value.data;
+      if (root) void (choice === "sendToIpod" ? askSend(root.id, menuTargets(trackId)) : askRemove(root.id, menuTargets(trackId)));
       break;
     }
     case "edit":
