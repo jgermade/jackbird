@@ -175,20 +175,7 @@ impl Covers {
     /// Image `id` as a PNG: its largest size, decoded from its image file (read the first time
     /// an image needs it). `None` when there is no such image or it cannot be read.
     pub fn png(&mut self, id: u32) -> Option<Vec<u8>> {
-        let image = self.images.get(&id)?;
-        let thumb = image
-            .thumbs
-            .iter()
-            .max_by_key(|t| u32::from(t.width) * u32::from(t.height))?
-            .clone();
-        let rows = usize::from(thumb.height);
-        if rows == 0 || thumb.width == 0 {
-            return None;
-        }
-        // The slot is a square of the larger side, its rows padded to 4 bytes: a 240×239 cover's
-        // rows are 480 bytes apart, not its bytes over its height.
-        let side = usize::from(thumb.width.max(thumb.height));
-        let row_bytes = (side * 2).div_ceil(4) * 4;
+        let thumb = self.images.get(&id)?.largest()?;
         let name = thumb.file.trim_start_matches(':').to_string();
         let dir = artwork_dir(&self.root);
         let file = self
@@ -197,21 +184,7 @@ impl Covers {
             .or_insert_with(|| std::fs::read(dir.join(&name)).ok())
             .as_ref()?;
         let slot = file.get(thumb.offset as usize..thumb.offset as usize + thumb.size as usize)?;
-        // A cover Apple centres keeps blank rows above it: they are left out.
-        let top = usize::try_from(thumb.top.max(0)).unwrap_or(0).min(rows);
-        let height = thumb.height - top as u16;
-        let rgb = artwork::decode(&slot[top * row_bytes..], thumb.width, height, row_bytes);
-        let mut out = Vec::new();
-        {
-            let mut encoder = png::Encoder::new(&mut out, u32::from(thumb.width), u32::from(height));
-            encoder.set_color(png::ColorType::Rgb);
-            encoder.set_depth(png::BitDepth::Eight);
-            // `fdeflate`'s fast mode: a cover a little larger, made many times faster.
-            encoder.set_compression(png::Compression::Fast);
-            let mut writer = encoder.write_header().ok()?;
-            writer.write_image_data(&rgb).ok()?;
-        }
-        Some(out)
+        artwork::cover_png(slot, thumb)
     }
 }
 

@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-jackbird-ipod = { path = "../ipod" }
+jackbird-ipod = { path = "../ipod", features = ["png"] }
 jackbird-ipod-sqlite = { path = "../ipod-sqlite" }
 jackbird-tags = { path = "../tags" }
 # The pids, the file names and the signatures' random bytes. The version is

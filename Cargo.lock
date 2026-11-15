@@ -2066,6 +2066,7 @@ name = "jackbird-ipod"
 version = "0.1.0"
 dependencies = [
  "miniz_oxide 0.9.1",
+ "png",
  "sha1",
 ]
 
@@ -2096,6 +2097,13 @@ dependencies = [
  "jackbird-ipod",
  "jackbird-ipod-sqlite",
  "nusb",
+]
+
+[[package]]
+name = "jackbird-ipod-wasm"
+version = "0.1.0"
+dependencies = [
+ "jackbird-ipod",
 ]
 
 [[package]]

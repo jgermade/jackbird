@@ -11,6 +11,8 @@ dist/
 
 # The tag engine's WebAssembly module, built by scripts/build-wasm.mjs.
 src/lib/tags/engine.wasm
+# The iPod's WebAssembly module, built by scripts/build-wasm.mjs.
+src/lib/ipod-db/ipod.wasm
 
 # The service's binary the desktop app carries, built by scripts/sidecar.mjs.
 src-tauri/binaries/
