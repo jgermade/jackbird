@@ -105,7 +105,9 @@ const COVERS_DIR: &str = ".meta/covers";
 
 /// The tags of `paths` under `root`, in batches over `channel`; each cover met for the first time
 /// written into `.meta/covers/`, or sent when it cannot be; `known_covers` are the covers' names
-/// the interface has already, neither written nor sent.
+/// the interface has already, neither written nor sent. The tests' way in; the command takes
+/// [`scan_tags_with`].
+#[cfg(test)]
 pub fn scan_tags(root: &Root, paths: Vec<String>, known_covers: Vec<String>, channel: &Channel<TagsBatch>) {
     scan_tags_with(root, paths, known_covers, channel, true);
 }
