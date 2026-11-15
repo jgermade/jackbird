@@ -50,27 +50,59 @@ export async function lookForIpods(): Promise<void> {
   ipods.found = await listIpods().catch(() => []);
 }
 
-/** How often the plugged-in iPods are looked at. */
+/** How often the plugged-in iPods are looked at, while the panel that lists them shows. */
 const WATCH_EVERY_MS = 3000;
 
+/** The watches held (the dialog's panel and the welcome's can both hold one), and the running one. */
+let watchers = 0;
+let watching: { timer: ReturnType<typeof setInterval>; seen: string } | null = null;
+
+/** Looks at what is plugged in; reads the iPods again, and closes an unplugged one's root, when that changed. */
+async function lookAtMounts(): Promise<void> {
+  const { ipodMounts } = await import("./sources/ipod");
+  const now = (await ipodMounts().catch(() => [])).sort().join("\n");
+  if (!watching || now === watching.seen) return;
+  watching.seen = now;
+  await lookForIpods();
+  closeUnpluggedIpods();
+}
+
 /**
- * Watches what is plugged in, for as long as the app runs: an iPod plugged in after the app
- * started is found (and listed in "Add to the library…"), and an unplugged one's root closes.
+ * Watches what is plugged in while the sources panel (views/sources-panel.html) shows: an iPod
+ * plugged in is listed within seconds, and an unplugged one's root closes. Gives the function that
+ * lets the watch go; the last one let go stops it. The first looks at once.
  */
-export function watchIpods(): void {
-  if (!ipodsHere()) return;
-  let seen = "";
-  const look = async (): Promise<void> => {
-    const { ipodMounts } = await import("./sources/ipod");
-    const now = (await ipodMounts().catch(() => [])).sort().join("\n");
-    if (now !== seen) {
-      seen = now;
-      await lookForIpods();
-      closeUnpluggedIpods();
+export function watchIpods(): () => void {
+  if (!ipodsHere()) return () => undefined;
+  watchers += 1;
+  if (!watching) {
+    watching = { timer: setInterval(() => void lookAtMounts(), WATCH_EVERY_MS), seen: "\0" };
+    void lookAtMounts();
+  }
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    watchers -= 1;
+    if (watchers === 0 && watching) {
+      clearInterval(watching.timer);
+      watching = null;
     }
   };
-  void look();
-  setInterval(() => void look(), WATCH_EVERY_MS);
+}
+
+/** A view's hold on the watch: `follow(true)` while it shows, `follow(false)` once it does not. */
+export function ipodWatcher(): { follow(on: boolean): void } {
+  let release: (() => void) | null = null;
+  return {
+    follow(on) {
+      if (on && !release) release = watchIpods();
+      else if (!on && release) {
+        release();
+        release = null;
+      }
+    }
+  };
 }
 
 /** The open iPods' roots. */
