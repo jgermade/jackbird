@@ -185,7 +185,8 @@ export type Unread = { path: string; message: string };
 export type TagsBatch = {
   done: boolean;
   tracks: { path: string; size: number; lastModified: number; metadata: TrackMetadata }[];
-  covers: { name: string; data: string }[];
+  /** Each cover's bytes come as base64 (`data`), or as they are (`bytes`, the web's iPod: no round trip through text). */
+  covers: { name: string; data: string; bytes?: Uint8Array }[];
   unread: Unread[];
 };
 
@@ -234,6 +235,10 @@ export type RootSource = {
   close(): void;
   /** Which of its walked files are tracks; by extension (`isAudioFile`) when absent. An iPod's are all (its AAC songs too). */
   isTrack?(path: string): boolean;
-  /** An iPod's root (lib/sources/ipod.ts): its mount point, and each song's pid in its database. Its files are not hashed. */
-  readonly ipod?: { path: string; pidOf(path: string): Promise<string | undefined> };
+  /**
+   * An iPod's root (lib/sources/ipod.ts): its mount point, and each song's pid in its database. Its
+   * files are not hashed. `web`: opened in a browser (lib/sources/ipod-web.ts), only read; its
+   * `path` is its drive's name.
+   */
+  readonly ipod?: { path: string; pidOf(path: string): Promise<string | undefined>; web?: boolean };
 };

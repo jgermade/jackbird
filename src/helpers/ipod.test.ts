@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { folded, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
+import { IPOD_DATABASES, folded, inGroups, ipodCoverName, ipodSongMetadata, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
 
 describe("sending to an iPod", () => {
   it("folds names: case, accents, spaces and punctuation aside", () => {
@@ -42,5 +42,53 @@ describe("sending to an iPod", () => {
     assert.equal(isSendable("Rock/Song.MP3"), true);
     assert.equal(isSendable("Rock/Song.flac"), false);
     assert.equal(isSendable("Rock/mp3"), false);
+  });
+});
+
+describe("an iPod in a browser", () => {
+  it("looks for the compressed database first", () => {
+    assert.deepEqual(IPOD_DATABASES, ["iPod_Control/iTunes/iTunesCDB", "iPod_Control/iTunes/iTunesDB"]);
+  });
+
+  it("names covers as the desktop app does", () => {
+    // The names src-tauri/src/ipod.rs's cover_name gives (FNV-1a over the UTF-8, two seeds).
+    assert.equal(ipodCoverName("/Volumes/NANO", 215), "d924c6d434529eaa-d7.png");
+    assert.equal(ipodCoverName("NANO ñ", 215), "5882b531507a5007-d7.png");
+    assert.notEqual(ipodCoverName("NANO", 1), ipodCoverName("NANO", 2));
+  });
+
+  it("gives a listed song's fields, its cover by reference", () => {
+    const song = {
+      title: "First song",
+      artist: "The Fixtures",
+      album: "Fixtures",
+      albumArtist: "The Fixtures",
+      genre: "Rock",
+      year: "2024",
+      trackNumber: "1/2",
+      discNumber: "1/1",
+      compilation: false
+    };
+    assert.deepEqual(ipodSongMetadata(song, "d924c6d434529eaa-64.png"), {
+      title: "First song",
+      artist: "The Fixtures",
+      album: "Fixtures",
+      year: "2024",
+      genre: "Rock",
+      trackNumber: "1/2",
+      discNumber: "1/1",
+      albumArtist: "The Fixtures",
+      compilation: "",
+      coverDataUrl: "jackbird-cover:d924c6d434529eaa-64.png"
+    });
+    const other = ipodSongMetadata({ ...song, compilation: true }, null);
+    assert.equal(other.compilation, "1");
+    assert.equal(other.coverDataUrl, null);
+  });
+
+  it("splits a list into groups", () => {
+    assert.deepEqual(inGroups([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
+    assert.deepEqual(inGroups([], 10), []);
+    assert.deepEqual(inGroups([1, 2], 0), [[1], [2]]);
   });
 });

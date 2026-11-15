@@ -105,9 +105,9 @@ export function ipodWatcher(): { follow(on: boolean): void } {
   };
 }
 
-/** The open iPods' roots. */
+/** The open iPods' roots, as the desktop app opened them (not an iPod opened in a browser, which is only read). */
 export function ipodRoots(): RootWorkspace[] {
-  return $toRaw(library).roots.filter((root) => !!root.source.ipod);
+  return $toRaw(library).roots.filter((root) => !!root.source.ipod && !root.source.ipod.web);
 }
 
 /** Opens an iPod as a root, or shows it if it is open; reads its SysInfoExtended over USB first when it lacks it. */

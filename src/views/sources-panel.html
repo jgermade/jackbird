@@ -21,7 +21,7 @@
     adding.open = false
     void openIpodRoot(ipod)
   }
-  const { addFrom, addSamples, addServer, adding, deviceAccess, folderSources, openShared, recentFolders, reopenRecent, serverName, sharedLabel, shownTab } = await import("../lib/adding")
+  const { addFrom, addIpodDrive, addSamples, addServer, adding, ipodPickedHere, deviceAccess, folderSources, openShared, recentFolders, reopenRecent, serverName, sharedLabel, shownTab } = await import("../lib/adding")
 
   // Each folder source is a key that opens its dialog: the device's own (the system's, Android's
   // folder picker, the browser's), or the server's folder chooser. In a browser that can only read
@@ -81,8 +81,17 @@
     </div>
   </section>
 
+  <!-- In a browser: the iPod's drive, picked, opening as a root of its songs, only read (W4). -->
+  <section :if="shownTab() === 'ipod' && ipodPickedHere()" class="tab">
+    <p class="hint">{{ t("sources.ipodWebHint") }}</p>
+    <p :if="deviceAccess() === 'read'" class="hint">{{ t("sources.ipodWebSafari") }}</p>
+    <div class="keys">
+      <Key variant="primary" @click="addIpodDrive()">{{ t("sources.openIpodWeb") }}</Key>
+    </div>
+  </section>
+
   <!-- The iPods plugged in (the desktop app), each opening as a root of its songs. -->
-  <section :if="shownTab() === 'ipod'" class="tab">
+  <section :if="shownTab() === 'ipod' && !ipodPickedHere()" class="tab">
     <p class="hint">{{ t("sources.ipodHint") }}</p>
     <p :if="ipods.found.length === 0" class="hint">{{ t("sources.noIpod") }}</p>
     <div :if="ipods.found.length > 0" class="recent">
