@@ -48,6 +48,19 @@ async function fetchInto(folder: FileSystemDirectoryHandle, name: string): Promi
   await response.body.pipeTo(await file.createWritable());
 }
 
+/**
+ * Copies one track into the folder with no other frame of this origin copying it meanwhile: the
+ * landing page's two demos (the windows and the phone) open the sample music at once, into the same
+ * private folder, and one read a track while the other rewrote it ("could not be read"). Under a Web
+ * Lock per track, the second waits, then finds it there and keeps it. A browser without Web Locks
+ * copies as before.
+ */
+async function fetchIntoAlone(folder: FileSystemDirectoryHandle, label: string, name: string): Promise<void> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (!locks) return fetchInto(folder, name);
+  await locks.request(`jackbird-sample:${label}/${name}`, () => fetchInto(folder, name));
+}
+
 /** The sample music as a folder: opened at once, its tracks copied into the page's private storage meanwhile. */
 export async function openSampleSource(list: SampleList): Promise<RootSource> {
   const storage = await navigator.storage.getDirectory();
@@ -60,7 +73,7 @@ export async function openSampleSource(list: SampleList): Promise<RootSource> {
   let queue: Promise<unknown> = Promise.resolve();
   const downloads = new Map(
     list.files.map((name) => {
-      const done = queue.then(() => fetchInto(folder, name)).then(() => {
+      const done = queue.then(() => fetchIntoAlone(folder, list.label, name)).then(() => {
         ready.add(name);
       });
       queue = done.catch(() => undefined);

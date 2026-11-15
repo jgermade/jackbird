@@ -12,6 +12,11 @@
 // Among them, the faceplate's deck and the compact player's card (in the page, the floating
 // window's API removed), in both tones, for the landing page's hero.
 //
+// And the demo as the landing page embeds it (`?embed`, `?embed=phone`), in both tones, at the
+// iframes' own size, see-through round the windows: the landing page shows it until the demo
+// itself has drawn over it, so the two match (embed-*.png). The sample music is served from
+// `samples/`, which a build does not hold. `JACKBIRD_SHOTS=embed` takes these alone (no ffmpeg).
+//
 // It builds the library in a temporary folder: five invented albums (artists, titles and genres
 // made up; covers drawn on a canvas, abstract shapes; tones and noise from ffmpeg, so the spectrum
 // has something to show), tagged by ffmpeg. Chromium (Playwright) copies it into the page's
@@ -197,6 +202,72 @@ async function openApp(browser, { tone, ...options }) {
   return page;
 }
 
+// ---- the demo as the landing page embeds it ---------------------------------------------------
+
+const samples = path.resolve(__dirname, "../samples");
+
+/**
+ * The embedded demo's iframes, as the landing page sizes them where its content is 1024px wide
+ * (landing/landing.css): the stage's frame, 1.5rem (27px, the root being 18px) wider each side,
+ * and the phone's column, 18rem.
+ */
+const EMBEDS = [
+  { kind: "", name: "embed", width: 1078, height: 724 },
+  { kind: "phone", name: "embed-phone", width: 324, height: 551 }
+];
+
+/**
+ * The demo in an iframe of `embed`'s size, in a page of the app's origin (the demo tells its parent
+ * it has drawn, `jackbird:drawn`, to that origin alone), captured see-through round its windows, as
+ * the landing page shows it. The windows are captured the moment they have drawn, as the landing
+ * page shows them, their marquees at their start. The phone follows the windows' player on the
+ * landing page (src/lib/mirror.ts), so its page holds the windows too, and it is captured once it
+ * shows their track. The phone's clock is fixed at 9:41.
+ */
+async function captureEmbed(browser, embed, tone) {
+  const windows = EMBEDS[0];
+  const phone = embed.kind === "phone";
+  const page = await browser.newPage({
+    viewport: { width: Math.max(windows.width, embed.width), height: windows.height + (phone ? embed.height : 0) },
+    deviceScaleFactor: 2,
+    locale: "en-US"
+  });
+  page.on("pageerror", (error) => console.error("page error:", error.message));
+  await page.clock.setFixedTime(new Date("2026-01-05T09:41:00"));
+  await page.route("**/samples/**", (route) => {
+    const name = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^.*\/samples\//, ""));
+    const file = path.join(samples, name);
+    if (!file.startsWith(samples + path.sep) || !fs.existsSync(file)) return route.fulfill({ status: 404 });
+    route.fulfill({ body: fs.readFileSync(file), contentType: name.endsWith(".json") ? "application/json" : "audio/mpeg" });
+  });
+  const host = new URL("__embed-host.html", app).href;
+  const frame = ({ kind, width, height }) =>
+    `<iframe id="${kind || "windows"}" src="./?embed${kind ? `=${kind}` : ""}&lang=en&tone=${tone === "graphite" ? "dark" : "light"}" style="display:block;width:${width}px;height:${height}px;border:0;background:transparent"></iframe>`;
+  await page.route(host, (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      // Each demo says it has drawn to its parent: this page counts them on its body.
+      body: `<!doctype html><html><body style="margin:0;background:transparent" data-drawn="0"><script>addEventListener("message", (event) => { if (event.data?.type === "jackbird:drawn") document.body.dataset.drawn = String(Number(document.body.dataset.drawn) + 1); });</script>${frame(windows)}${phone ? frame(embed) : ""}</body></html>`
+    })
+  );
+  await page.goto(host);
+  await page.waitForSelector(`body[data-drawn="${phone ? 2 : 1}"]`, { state: "attached", timeout: 60000 });
+  if (phone) {
+    // Its rows show the track queued (playing or paused) once it follows the windows.
+    await page.frameLocator("#phone").locator(".row.playing").first().waitFor({ timeout: 30000 });
+    await page.waitForTimeout(300);
+  }
+  await page.locator(`#${embed.kind || "windows"}`).screenshot({ path: path.join(out, `${embed.name}-${tone}.png`), omitBackground: true });
+  console.log(`${embed.name} in ${tone}`);
+  await page.close();
+}
+
+async function captureEmbeds(browser) {
+  for (const embed of EMBEDS) {
+    for (const tone of ["silver", "graphite"]) await captureEmbed(browser, embed, tone);
+  }
+}
+
 /** Plays a track by its title (a click on its row plays it) and lets the music run a little. */
 async function play(page, title, seconds = 4) {
   await page.getByText(title, { exact: true }).last().click();
@@ -206,6 +277,14 @@ async function play(page, title, seconds = 4) {
 
 async function main() {
   const browser = await chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });
+  fs.mkdirSync(out, { recursive: true });
+  await captureEmbeds(browser);
+  if (process.env.JACKBIRD_SHOTS === "embed") {
+    await browser.close();
+    fs.rmSync(work, { recursive: true, force: true });
+    console.log("screenshots in", out);
+    return;
+  }
   console.log("drawing covers and making the tracks in", work);
   makeLibrary(await drawCovers(browser));
   fs.mkdirSync(out, { recursive: true });

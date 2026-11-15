@@ -71,25 +71,17 @@
 
     <!-- The app itself, in the tone the page is in. -->
     <section class="shot">
-      <!-- The window and the compact player, as screenshots; on a computer the app itself takes
-           their place as the page loads (./demo/?embed: both windows over one player, the sample
-           music). The tilt follows the pointer (landing.js, and the embedded app). The iframe takes
-           the stage's size, which the screenshots give it: their width and height are written, so
-           it holds before they load (Safari leaves a lazy image of no size unloaded, and the app
-           was squashed into a strip). -->
-      <div class="stage" data-rest-x="1" data-rest-y="-2">
-      <figure class="window">
-        <div class="window-bar"><span></span><span></span><span></span></div>
-        <img class="only-light" src="./screenshots/library-silver.png" alt="jackbird's library in Silver, with a track playing" width="2880" height="1800" loading="lazy">
-        <img class="only-dark" src="./screenshots/library-graphite.png" alt="A two-disc album in jackbird's Graphite tone, with a track playing" width="2880" height="1800" loading="lazy">
-      </figure>
-      <!-- The compact player, captured from the app too (scripts/screenshots.cjs), playing: a small
-           window in front of the big one, over its bottom left corner. A release from before it
-           has no such capture: then it is left out (landing.js). -->
-      <figure class="mini">
-        <img class="only-light" src="./screenshots/compact-silver.png" alt="jackbird's compact player in Silver: the display playing a track and the transport keys under it" width="880" height="440">
-        <img class="only-dark" src="./screenshots/compact-graphite.png" alt="jackbird's compact player in Graphite: the display glowing, a track playing, and the transport keys under it" width="880" height="440">
-      </figure>
+      <!-- The demo (./demo/?embed: both windows over one player, the sample music) in a frame of
+           its size: first a capture of it, taken by the release on its own build
+           (scripts/screenshots.cjs), then, on a computer, the demo itself over it once it has drawn
+           (landing.js). The frame's size comes from the stylesheet, not from the capture, so it
+           holds before the capture loads, or without it. The demo's window tilts to face the
+           pointer itself. -->
+      <div class="stage">
+      <div class="frame">
+        <img class="only-light" src="./screenshots/embed-silver.png" alt="jackbird's library in Silver, with the sample music" width="2156" height="1448">
+        <img class="only-dark" src="./screenshots/embed-graphite.png" alt="jackbird's library in Graphite, with the sample music" width="2156" height="1448">
+      </div>
       <div class="invite" role="dialog" aria-labelledby="invite-title" hidden>
         <p id="invite-title"><strong>Your own music?</strong> The demo opens a folder of yours, and nothing leaves your computer.</p>
         <a class="key primary" href="./demo/">Open the demo</a>
@@ -136,9 +128,12 @@
     </section>
 
     <section class="phone">
-      <!-- The phone's screenshot; on a computer the app itself in its place, as a phone draws it
-           (./demo/?embed=phone, landing.js). -->
-      <figure class="handset"><img src="./screenshots/phone.png" alt="jackbird on a phone, playing a track" width="780" height="1328" loading="lazy"></figure>
+      <!-- A capture of the demo as a phone draws it (./demo/?embed=phone), in each tone; on a
+           computer the demo itself over it once it has drawn (landing.js). -->
+      <figure class="handset">
+        <img class="only-light" src="./screenshots/embed-phone-silver.png" alt="jackbird on a phone, with the sample music" width="648" height="1102" loading="lazy">
+        <img class="only-dark" src="./screenshots/embed-phone-graphite.png" alt="jackbird on a phone, with the sample music" width="648" height="1102" loading="lazy">
+      </figure>
       <div>
         <h2 class="section-label">In your pocket</h2>
         <p class="statement">The same deck on a phone, with the queue playing in the background, screen off.</p>
