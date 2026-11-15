@@ -203,6 +203,23 @@ export type SumsBatch = {
  * wasm) or the desktop app's (a path, the engine natively, no file bytes over
  * the IPC). See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4-D1, E4-D2).
  */
+/**
+ * What an iPod says of itself and of its drive (W5, RECORD/2026-11-14.ipod-sync.WIP.md): from its
+ * `SysInfo`, its copy of `SysInfoExtended` and Rockbox's `rockbox-info.txt`, its database's
+ * checksum scheme, and its drive's size and free space (none in a browser, which cannot know them).
+ */
+export type IpodDeviceInfo = {
+  modelNumber: string | null;
+  familyId: string | null;
+  firmware: string | null;
+  serial: string | null;
+  /** Rockbox's version when it is installed ("" when its file names none); null without Rockbox. */
+  rockbox: string | null;
+  checksum: number | null;
+  total: number | null;
+  free: number | null;
+};
+
 export type RootSource = {
   readonly kind: "browser" | "desktop" | "service" | "library";
   /** The small-file adapter: `.meta/`, playlists, renames, deletes. */
@@ -240,5 +257,5 @@ export type RootSource = {
    * files are not hashed. `web`: opened in a browser (lib/sources/ipod-web.ts), only read; its
    * `path` is its drive's name.
    */
-  readonly ipod?: { path: string; pidOf(path: string): Promise<string | undefined>; web?: boolean };
+  readonly ipod?: { path: string; pidOf(path: string): Promise<string | undefined>; web?: boolean; info(): Promise<IpodDeviceInfo> };
 };

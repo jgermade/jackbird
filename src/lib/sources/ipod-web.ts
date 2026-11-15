@@ -11,7 +11,7 @@
 import { FSAAdapter, MemoryAdapter, type WalkedFile } from "@cloudauthn/vfs-sync";
 import { audioMimeType } from "../../helpers/formats";
 import { IPOD_ARTWORK, IPOD_DATABASES, inGroups, ipodCoverName, ipodSongMetadata } from "../../helpers/ipod";
-import type { Inspection, MediaHandle, RootSource, TagsBatch } from "../../types";
+import type { Inspection, IpodDeviceInfo, MediaHandle, RootSource, TagsBatch } from "../../types";
 import type { IpodDb, IpodImage, IpodListing, IpodSong } from "../ipod-db/wasm";
 import { fileOf } from "./browser";
 import { PickedFolder } from "./picked";
@@ -123,7 +123,21 @@ export async function webIpodSource(drive: DriveFiles, database: File): Promise<
   return {
     kind: "browser",
     readOnly: true,
-    ipod: { path: drive.name, web: true, pidOf: async (path) => songs.get(path)?.pid },
+    ipod: {
+      path: drive.name,
+      web: true,
+      pidOf: async (path) => songs.get(path)?.pid,
+      // What it says of itself; a browser cannot know a drive's size or free space.
+      async info(): Promise<IpodDeviceInfo> {
+        const text = async (path: string): Promise<string | null> => (await drive.file(path))?.text() ?? null;
+        const [sysinfo, extended, rockbox] = await Promise.all([
+          text("iPod_Control/Device/SysInfo"),
+          text("iPod_Control/Device/SysInfoExtended"),
+          text(".rockbox/rockbox-info.txt")
+        ]);
+        return { ...db.device(sysinfo, extended, rockbox), checksum: listing.checksum, total: null, free: null };
+      }
+    },
     vfs: new MemoryAdapter(label),
     // Not kept between sessions (session.ts and recent.ts skip a read-only root), as the desktop
     // app's iPod and a folder Safari can only read: only told apart.

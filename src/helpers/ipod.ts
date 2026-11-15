@@ -111,3 +111,69 @@ export function inGroups<T>(items: readonly T[], size: number): T[][] {
   for (let at = 0; at < items.length; at += step) out.push(items.slice(at, at + step));
   return out;
 }
+
+/** The row key that shows the iPod's own sheet in Details (W5): no row of the tree has it. */
+export const IPOD_ROW = "@ipod";
+
+/** What the model is known by: the locale key of its name (`ipod.model.*`). */
+export type IpodModelKey = "nano7" | "nano67" | "nano5" | "hash58" | "older" | "unknown";
+
+/** What an iPod's device facts and database tell of its model. */
+export type ModelClues = { familyId: string | null; checksum: number | null };
+
+/**
+ * The iPod's model, as far as its files tell: `SysInfoExtended`'s `FamilyID` where it is known (18,
+ * the owner's nano 7G), else the family its database's checksum scheme points to (hashAB: the nano
+ * 6G or 7G; hash72: the nano 5G; hash58: the classic, the nano 3G or 4G; none: the video, the nano
+ * 1G or 2G).
+ */
+export function ipodModel(clues: ModelClues): IpodModelKey {
+  if (clues.familyId?.trim() === "18") return "nano7";
+  switch (clues.checksum) {
+    case 3:
+      return "nano67";
+    case 2:
+      return "nano5";
+    case 1:
+      return "hash58";
+    case 0:
+      return "older";
+    default:
+      return "unknown";
+  }
+}
+
+/** What a drive's space is: known where the system said (the desktop app), else only the music's. */
+export type IpodUsage = { total: number | null; free: number | null; used: number | null; fraction: number | null; music: number };
+
+/** The space of an iPod's drive (`total` and `free`, null where unknown) and its music's bytes. */
+export function ipodUsage(total: number | null, free: number | null, music: number): IpodUsage {
+  if (total === null || free === null || total <= 0) return { total: null, free: null, used: null, fraction: null, music };
+  const used = Math.max(0, total - free);
+  return { total, free, used, fraction: Math.min(1, used / total), music };
+}
+
+/** A library's songs, albums, artists and bytes. An album is told by its artist and title. */
+export function libraryCounts(tracks: readonly { size: number; metadata: { album: string; artist: string; albumArtist: string } }[]): {
+  songs: number;
+  albums: number;
+  artists: number;
+  bytes: number;
+} {
+  const albums = new Set<string>();
+  const artists = new Set<string>();
+  let bytes = 0;
+  for (const { size, metadata } of tracks) {
+    bytes += size;
+    const artist = (metadata.albumArtist || metadata.artist).trim();
+    if (metadata.artist.trim()) artists.add(folded(metadata.artist));
+    if (metadata.album.trim()) albums.add(`${folded(artist)}\u0000${folded(metadata.album)}`);
+  }
+  return { songs: tracks.length, albums: albums.size, artists: artists.size, bytes };
+}
+
+/** A drive's size as its system shows it: decimal units, one decimal ("15.8 GB", "980 MB"), in `language`. */
+export function formatDriveSize(bytes: number, language: string): string {
+  const [value, unit] = bytes >= 1e9 ? [bytes / 1e9, "GB"] : bytes >= 1e6 ? [bytes / 1e6, "MB"] : [bytes / 1e3, "KB"];
+  return `${new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(value)} ${unit}`;
+}

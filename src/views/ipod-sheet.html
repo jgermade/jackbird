@@ -1,0 +1,110 @@
+<script :setup lang="ts">
+  // The iPod's sheet in Details (W5, RECORD/2026-11-14.ipod-sync.WIP.md),
+  // opened from its foot in the library: its model, its drive's space (the
+  // desktop app; a browser knows only its music's), what it holds, what it
+  // says of itself (firmware, serial number, model number), Rockbox when it
+  // is installed, and whether jackbird can send songs to it. A view over
+  // lib/ipod-info.ts.
+
+  const Key = await import("../../theme/default/components/key.html")
+  const Meter = await import("../../theme/default/components/meter.html")
+
+  const { formatDriveSize, ipodModel, ipodUsage, libraryCounts } = await import("../helpers/ipod")
+  const { t } = await import("../lib/i18n")
+  const { ipods } = await import("../lib/ipod")
+  const { infoOf, leaveIpodSheet } = await import("../lib/ipod-info")
+  const { preferences } = await import("../lib/preferences")
+  const { activeRoot } = await import("../lib/workspace")
+
+  type Fact = { label: string; text: string }
+
+  const root = () => activeRoot.value.data
+  const info = () => infoOf(root())
+  const counts = () => libraryCounts(root()?.tracks ?? [])
+  const usage = () => ipodUsage(info()?.total ?? null, info()?.free ?? null, counts().bytes)
+  const size = (bytes: number): string => formatDriveSize(bytes, preferences.language)
+  const number = (n: number): string => new Intl.NumberFormat(preferences.language).format(n)
+  const isWeb = (): boolean => !!root()?.source.ipod?.web
+  const model = (): string => t(`ipod.model.${ipodModel({ familyId: info()?.familyId ?? null, checksum: info()?.checksum ?? null })}`)
+
+  const space = (): Fact[] => {
+    const u = usage()
+    const out: Fact[] = []
+    if (u.total !== null && u.used !== null && u.free !== null) {
+      out.push({ label: t("ipod.sheet.capacity"), text: size(u.total) }, { label: t("ipod.sheet.used"), text: size(u.used) }, { label: t("ipod.sheet.free"), text: size(u.free) })
+    }
+    out.push({ label: t("ipod.sheet.music"), text: size(u.music) })
+    return out
+  }
+  const holds = (): Fact[] => [
+    { label: t("ipod.sheet.songs"), text: number(counts().songs) },
+    { label: t("ipod.sheet.albums"), text: number(counts().albums) },
+    { label: t("ipod.sheet.artists"), text: number(counts().artists) }
+  ]
+  const device = (): Fact[] => {
+    const i = info()
+    const out: Fact[] = []
+    if (i?.firmware) out.push({ label: t("ipod.sheet.firmware"), text: i.firmware })
+    if (i?.serial) out.push({ label: t("ipod.sheet.serial"), text: i.serial })
+    if (i?.modelNumber) out.push({ label: t("ipod.sheet.modelNumber"), text: i.modelNumber })
+    if (i && i.rockbox !== null) out.push({ label: t("ipod.sheet.rockbox"), text: i.rockbox || t("ipod.sheet.rockboxInstalled") })
+    return out
+  }
+  // Whether jackbird can send songs to it: the browser only reads; the desktop app as it found it.
+  const writing = (): string => {
+    if (isWeb()) return t("ipod.sheet.webReadOnly")
+    const found = ipods.found.find((one) => one.path === root()?.source.ipod?.path)
+    if (!found) return ""
+    if (found.writable) return t("ipod.sheet.writable")
+    return found.needsSysinfo ? t("ipod.sheet.needsSysinfo") : t("sources.ipodReadOnly")
+  }
+</script>
+
+<article class="ipod">
+  <header class="top">
+    <Key size="sm" variant="ghost" @click="leaveIpodSheet()">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+      {{ t("ipod.sheet.back") }}
+    </Key>
+  </header>
+
+  <div class="card">
+    <p class="eyebrow">{{ model() }}</p>
+    <h2 class="title">{{ root()?.label }}</h2>
+    <Meter :if="usage().fraction !== null" :level="usage().used" :max="usage().total" :pitch=".5" :label="t('ipod.foot.meter')" :level-text="t('ipod.foot.space', { used: size(usage().used ?? 0), total: size(usage().total ?? 0) })" />
+    <p :if="!info()" class="hint">{{ t("ipod.sheet.reading") }}</p>
+    <p :if="usage().fraction === null && isWeb()" class="hint">{{ t("ipod.sheet.spaceUnknown") }}</p>
+
+    <dl class="facts">
+      <div :each="fact in space()" :key="fact.label" class="fact"><dt>{{ fact.label }}</dt><dd>{{ fact.text }}</dd></div>
+    </dl>
+    <dl class="facts">
+      <div :each="fact in holds()" :key="fact.label" class="fact"><dt>{{ fact.label }}</dt><dd>{{ fact.text }}</dd></div>
+    </dl>
+    <dl :if="device().length > 0" class="facts">
+      <div :each="fact in device()" :key="fact.label" class="fact"><dt>{{ fact.label }}</dt><dd>{{ fact.text }}</dd></div>
+    </dl>
+    <p :if="writing()" class="hint">{{ writing() }}</p>
+  </div>
+</article>
+
+<style scoped>
+  .ipod { display: grid; gap: var(--mm-space-4); padding: var(--mm-space-4) var(--mm-space-6) var(--mm-space-6); }
+  .top { display: flex; }
+  .icon { width: .75rem; height: .75rem; }
+  .card {
+    display: grid;
+    gap: var(--mm-space-4);
+    padding: var(--mm-space-5) var(--mm-space-6);
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-lg);
+    background: var(--mm-surface);
+  }
+  .eyebrow { margin: 0; color: var(--mm-fg-muted); font-family: var(--mm-font-label); font-size: var(--mm-text-label); letter-spacing: var(--mm-tracking-label); text-transform: uppercase; }
+  .title { margin: 0; font-size: var(--mm-text-xl); font-weight: var(--mm-weight-bold); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: var(--mm-space-3) var(--mm-space-5); margin: 0; padding-top: var(--mm-space-4); border-top: var(--mm-border-width) solid var(--mm-border); }
+  .fact { display: grid; gap: .125rem; min-width: 0; }
+  dt { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
+  dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mm-font-mono); font-size: var(--mm-text-sm); }
+</style>

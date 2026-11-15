@@ -22,7 +22,7 @@ mod fixture;
 use std::cell::RefCell;
 
 use jackbird_ipod::artwork::{self, ArtworkDb, Thumb};
-use jackbird_ipod::{cdb, db};
+use jackbird_ipod::{cdb, db, device};
 use json::Json;
 
 thread_local! {
@@ -160,6 +160,54 @@ pub fn cover(request: &[u8]) -> Result<Vec<u8>, String> {
     artwork::cover_png(slot, &thumb).ok_or_else(|| "the cover has no pixels".to_string())
 }
 
+/// What an iPod says of itself (`device::facts`), as JSON. The request: three texts, `SysInfo`,
+/// `SysInfoExtended` and `.rockbox/rockbox-info.txt`, each its length (four bytes, little-endian;
+/// `0xFFFFFFFF` for a file the drive does not have) then its UTF-8.
+pub fn device_facts(request: &[u8]) -> Result<String, String> {
+    let mut texts: Vec<Option<String>> = Vec::new();
+    let mut at = 0;
+    for _ in 0..3 {
+        let len = request
+            .get(at..at + 4)
+            .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+            .ok_or_else(|| "the request: too short".to_string())?;
+        at += 4;
+        if len == u32::MAX {
+            texts.push(None);
+            continue;
+        }
+        let bytes = request
+            .get(at..at + len as usize)
+            .ok_or_else(|| "the request: too short".to_string())?;
+        texts.push(Some(String::from_utf8_lossy(bytes).into_owned()));
+        at += len as usize;
+    }
+    let facts = device::facts(texts[0].as_deref(), texts[1].as_deref(), texts[2].as_deref());
+    let mut json = Json::default();
+    json.open(None);
+    for (key, value) in [
+        ("modelNumber", &facts.model_number),
+        ("familyId", &facts.family_id),
+        ("firmware", &facts.firmware),
+        ("serial", &facts.serial),
+        ("rockbox", &facts.rockbox),
+    ] {
+        match value {
+            Some(v) => json.text(key, v),
+            None => json.null(key),
+        };
+    }
+    json.close();
+    Ok(json.finish())
+}
+
+/// [`device_facts`] on the request in the input.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn ipod_device() -> u32 {
+    answer(device_facts(&take_input()).map(String::into_bytes))
+}
+
 /// Makes the input buffer `len` bytes long (zeroed), and gives where it
 /// starts, for the caller to copy the request into. The output is dropped.
 #[allow(unsafe_code)]
@@ -265,6 +313,24 @@ mod tests {
         assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
         // 12 × 9: the blank row above the image is left out.
         assert_eq!(&png[16..24], &[0, 0, 0, 12, 0, 0, 0, 9]);
+    }
+
+    #[test]
+    fn gives_what_the_ipod_says_of_itself() {
+        let text = |t: &str| [&(t.len() as u32).to_le_bytes()[..], t.as_bytes()].concat();
+        let mut request = text("ModelNumStr: xA623\n");
+        request.extend(u32::MAX.to_le_bytes());
+        request.extend(text("Version: 3.15\n"));
+        let (status, out) = call(&request, ipod_device);
+        assert_eq!(status, 0);
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            r#"{"modelNumber":"xA623","familyId":null,"firmware":null,"serial":null,"rockbox":"3.15"}"#
+        );
+        let (status, _) = call(&[1, 0, 0], ipod_device);
+        assert_eq!(status, 1);
+        let (status, _) = call(&[9, 0, 0, 0, b'x'], ipod_device);
+        assert_eq!(status, 1);
     }
 
     #[test]

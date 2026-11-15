@@ -1,0 +1,74 @@
+<script :setup lang="ts">
+  // The foot of the library while an iPod's root is the active tab (W5,
+  // RECORD/2026-11-14.ipod-sync.WIP.md): its name, how full it is (the
+  // desktop app; a browser knows only its music's size) and its songs. The
+  // whole foot is a key that shows the iPod's sheet in Details. A view over
+  // lib/ipod-info.ts.
+
+  const Meter = await import("../../theme/default/components/meter.html")
+
+  const { formatDriveSize, ipodUsage, libraryCounts } = await import("../helpers/ipod")
+  const { t, tn } = await import("../lib/i18n")
+  const { preferences } = await import("../lib/preferences")
+  const { infoOf, loadIpodInfo, showIpodSheet, showsIpodSheet } = await import("../lib/ipod-info")
+  const { activeRoot } = await import("../lib/workspace")
+
+  // Read through functions, not `$:` copies: the derived values are boxed (lib/workspace.ts).
+  const root = () => activeRoot.value.data
+  const isIpod = (): boolean => !!root()?.source.ipod
+  // Asked once per root, when its foot first shows.
+  const askFor = (id: string | undefined): void => {
+    if (id && isIpod()) void loadIpodInfo(id)
+  }
+  $: askFor(root()?.id)
+
+  const size = (bytes: number): string => formatDriveSize(bytes, preferences.language)
+  const counts = () => libraryCounts(root()?.tracks ?? [])
+  const usage = () => {
+    const info = infoOf(root())
+    return ipodUsage(info?.total ?? null, info?.free ?? null, counts().bytes)
+  }
+  const spaceText = (): string => {
+    const u = usage()
+    return u.total !== null && u.used !== null ? t("ipod.foot.space", { used: size(u.used), total: size(u.total) }) : t("ipod.foot.music", { size: size(u.music) })
+  }
+  const songsText = (): string => tn("tracks.count", counts().songs)
+</script>
+
+<button :if="isIpod()" type="button" class="ipod-foot" :class.is-open="showsIpodSheet(root())" :aria-label="t('ipod.foot.open', { name: root().label })" :title="t('ipod.foot.open', { name: root().label })" @click="showIpodSheet()">
+  <span class="line">
+    <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M4.75 1.75h6.5v12.5h-6.5z" /><circle cx="8" cy="10" r="2" /></svg>
+    <span class="name">{{ root().label }}</span>
+    <span class="figures">{{ spaceText() }} · {{ songsText() }}</span>
+  </span>
+  <Meter :if="usage().fraction !== null" :level="usage().used" :max="usage().total" :pitch=".5" :label="t('ipod.foot.meter')" :level-text="spaceText()" />
+</button>
+
+<style scoped>
+  .ipod-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: grid;
+    gap: var(--mm-space-2);
+    width: 100%;
+    margin-top: auto;
+    padding: var(--mm-space-2) var(--mm-space-4) var(--mm-space-3);
+    border: 0;
+    border-top: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-surface);
+    color: var(--mm-fg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ipod-foot:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  .ipod-foot.is-open .name { color: var(--mm-accent); }
+  @media (hover: hover) {
+    .ipod-foot:hover { background: var(--mm-sunken); }
+  }
+  .line { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
+  .icon { flex: none; align-self: center; width: .875rem; height: .875rem; color: var(--mm-fg-muted); }
+  .name { overflow: hidden; font-weight: var(--mm-weight-medium); font-size: var(--mm-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+  .figures { margin-left: auto; flex: none; color: var(--mm-fg-muted); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); white-space: nowrap; }
+</style>

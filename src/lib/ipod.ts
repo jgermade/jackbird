@@ -11,6 +11,7 @@ import { t, tn } from "./i18n";
 import { library } from "./library";
 import { isDesktop, isPhone } from "./platform";
 import { closeRoot, hydrateRoot, updateRoots } from "./roots";
+import { loadIpodInfo } from "./ipod-info";
 import type { IpodInfo } from "./sources/ipod";
 
 /** What the iPod dialog asks. */
@@ -139,6 +140,8 @@ async function reloadIpod(path: string): Promise<void> {
   if (!open || !info) return;
   const { openIpod } = await import("./sources/ipod");
   await hydrateRoot(await openIpod(info), { rootId: open.id, rootLabel: open.label, setActive: false });
+  // Its space changed: its foot and sheet asked again.
+  void loadIpodInfo(open.id, true);
 }
 
 /**
@@ -264,6 +267,7 @@ export async function confirmRemove(): Promise<void> {
     ipods.done = tn("ipod.removed", removed);
     library.infoMessage = ipods.done;
     ipods.dialog = null;
+    void loadIpodInfo(root.id, true);
     // The songs leave the root's list as they left the iPod: no need to read it all again.
     const gone = new Set(dialog.paths);
     updateRoots((roots) =>

@@ -198,6 +198,41 @@ pub fn find_guid(
         })
 }
 
+/// What an iPod says of itself on its disk, for the app to show (`RECORD/2026-11-14.ipod-sync.WIP.md`,
+/// W5): from `SysInfo`, the copy of `SysInfoExtended`, and Rockbox's `.rockbox/rockbox-info.txt`.
+/// A value none of them has is `None`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Facts {
+    /// `SysInfo`'s `ModelNumStr` ("xA623"), which older firmware writes.
+    pub model_number: Option<String>,
+    /// `SysInfoExtended`'s `FamilyID` (18 on the owner's nano 7G).
+    pub family_id: Option<String>,
+    /// The firmware's version: `SysInfoExtended`'s `VisibleBuildID`, else `SysInfo`'s `visibleBuildID`.
+    pub firmware: Option<String>,
+    /// The serial number: `SysInfoExtended`'s `SerialNumber`, else `SysInfo`'s `pszSerialNumber`.
+    pub serial: Option<String>,
+    /// Rockbox's version, when Rockbox is installed (its `Version:` line).
+    pub rockbox: Option<String>,
+}
+
+/// [`Facts`] from the three files' texts, any of them missing.
+pub fn facts(sysinfo: Option<&str>, extended: Option<&str>, rockbox_info: Option<&str>) -> Facts {
+    let plain = sysinfo.map(crate::sysinfo::parse_sysinfo).unwrap_or_default();
+    let ext = extended.map(crate::sysinfo::extended_values).unwrap_or_default();
+    let rockbox = rockbox_info.map(crate::sysinfo::parse_sysinfo).unwrap_or_default();
+    let pick = |map: &BTreeMap<String, String>, key: &str| {
+        map.get(key).map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
+    };
+    Facts {
+        model_number: pick(&plain, "ModelNumStr"),
+        family_id: pick(&ext, "FamilyID"),
+        firmware: pick(&ext, "VisibleBuildID").or_else(|| pick(&plain, "visibleBuildID")),
+        serial: pick(&ext, "SerialNumber").or_else(|| pick(&plain, "pszSerialNumber")),
+        // An empty or unreadable file still says Rockbox is there.
+        rockbox: rockbox_info.map(|_| pick(&rockbox, "Version").unwrap_or_default()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,5 +293,27 @@ mod tests {
         let (guid, source) = find_guid(&extended, &sysinfo, serial).unwrap();
         assert_eq!((guid.0[7], source), (1, GuidSource::SysInfoExtended));
         assert_eq!(find_guid(&BTreeMap::new(), &BTreeMap::new(), None), None);
+    }
+
+    #[test]
+    fn facts_from_the_three_files() {
+        let sysinfo = "ModelNumStr: xA623\nvisibleBuildID: 0x01118000 (1.1.1)\npszSerialNumber: OLDSERIAL\n";
+        let extended = "<plist><dict><key>FamilyID</key><integer>18</integer><key>VisibleBuildID</key><string>1.0.4</string><key>SerialNumber</key><string>CCQ123</string></dict></plist>";
+        let rockbox = "Target: ipodvideo\nVersion: 3.15\nMemory: 32\n";
+        assert_eq!(
+            facts(Some(sysinfo), Some(extended), Some(rockbox)),
+            Facts {
+                model_number: Some("xA623".into()),
+                family_id: Some("18".into()),
+                firmware: Some("1.0.4".into()),
+                serial: Some("CCQ123".into()),
+                rockbox: Some("3.15".into()),
+            }
+        );
+        let old = facts(Some(sysinfo), None, Some(""));
+        assert_eq!(old.firmware.as_deref(), Some("0x01118000 (1.1.1)"));
+        assert_eq!(old.serial.as_deref(), Some("OLDSERIAL"));
+        assert_eq!(old.rockbox.as_deref(), Some(""));
+        assert_eq!(facts(None, None, None), Facts::default());
     }
 }

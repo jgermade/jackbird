@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use jackbird_ipod::artwork::{self, ArtworkDb};
-use jackbird_ipod::device::Checksum;
+use jackbird_ipod::device::{self, Checksum, Facts};
 use jackbird_ipod::{cdb, db, sysinfo};
 
 use crate::{Error, artwork_dir, err, io, itunes};
@@ -103,6 +103,95 @@ pub fn writable(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// What the app shows of a mounted iPod beside its songs (`RECORD/2026-11-14.ipod-sync.WIP.md`, W5).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Info {
+    /// What it says of itself on its disk.
+    pub facts: Facts,
+    /// The checksum scheme its database's header names (`mhbd` `0x30`).
+    pub checksum: Option<u16>,
+    /// Its drive's size and free space, in bytes, as the system reports them.
+    pub space: Option<Space>,
+}
+
+/// A drive's size and free space, in bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Space {
+    /// Its size.
+    pub total: u64,
+    /// What is free on it.
+    pub free: u64,
+}
+
+/// [`Info`] of the iPod at `root`.
+pub fn info(root: &Path) -> Info {
+    let text = |path: PathBuf| {
+        std::fs::read(path)
+            .ok()
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+    };
+    let device = root.join("iPod_Control").join("Device");
+    let facts = device::facts(
+        text(device.join("SysInfo")).as_deref(),
+        text(device.join("SysInfoExtended")).as_deref(),
+        text(root.join(".rockbox").join("rockbox-info.txt")).as_deref(),
+    );
+    // The scheme is in the header, which an iTunesCDB keeps uncompressed: its first bytes do.
+    let checksum = ["iTunesCDB", "iTunesDB"].iter().find_map(|name| {
+        use std::io::Read;
+        let mut head = [0u8; 0x32];
+        let mut file = std::fs::File::open(itunes(root).join(name)).ok()?;
+        file.read_exact(&mut head).ok()?;
+        (head.starts_with(b"mhbd")).then(|| u16::from_le_bytes([head[0x30], head[0x31]]))
+    });
+    Info {
+        facts,
+        checksum,
+        space: space(root),
+    }
+}
+
+/// The size and free space of the drive `root` is on, from the system's own tools: `df` on macOS
+/// and Linux, PowerShell's `Get-PSDrive` on Windows. `None` when they do not answer.
+pub fn space(root: &Path) -> Option<Space> {
+    if cfg!(windows) {
+        let letter = root
+            .to_string_lossy()
+            .chars()
+            .next()
+            .filter(char::is_ascii_alphabetic)?;
+        let script = format!("$d = Get-PSDrive -Name {letter}; \"$($d.Used) $($d.Free)\"");
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let mut numbers = text.split_whitespace().map(|n| n.parse::<u64>().ok());
+        let (used, free) = (numbers.next()??, numbers.next()??);
+        return Some(Space {
+            total: used + free,
+            free,
+        });
+    }
+    let out = std::process::Command::new("df").arg("-kP").arg(root).output().ok()?;
+    out.status.success().then_some(())?;
+    parse_df(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// The size and free space in `df -kP`'s answer: its second line's blocks and available (in KiB),
+/// the two numbers before the capacity's percentage (a device's name may hold spaces).
+pub fn parse_df(text: &str) -> Option<Space> {
+    let line = text.lines().nth(1)?;
+    let fields: Vec<&str> = line.split_whitespace().collect();
+    let at = fields.iter().position(|f| f.ends_with('%'))?;
+    let number = |i: usize| fields.get(i)?.parse::<u64>().ok();
+    let (blocks, available) = (number(at.checked_sub(3)?)?, number(at - 1)?);
+    Some(Space {
+        total: blocks * 1024,
+        free: available * 1024,
+    })
+}
+
 /// A song as the iPod's database lists it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Listed {
@@ -196,6 +285,27 @@ pub fn cover_png(root: &Path, id: u32) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_df_and_the_drive_here() {
+        let text = "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk4s2 My Disk 15433728 12822528 2611200 84% /Volumes/NANO\n";
+        assert_eq!(
+            parse_df(text),
+            Some(Space {
+                total: 15_433_728 * 1024,
+                free: 2_611_200 * 1024
+            })
+        );
+        assert_eq!(parse_df("Filesystem\n"), None);
+        assert_eq!(parse_df("header\nno numbers 12%\n"), None);
+        // The drive this crate is on: some size, less free than that.
+        if !cfg!(windows) {
+            let here = space(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
+            assert!(here.total > 0 && here.free <= here.total);
+        }
+        let none = info(Path::new(env!("CARGO_MANIFEST_DIR")));
+        assert_eq!((none.facts, none.checksum), (Facts::default(), None));
+    }
 
     #[test]
     fn nothing_mounted_where_there_is_no_ipod() {

@@ -6,7 +6,7 @@
 
 import { MemoryAdapter, type WalkedFile } from "@cloudauthn/vfs-sync";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Inspection, MediaHandle, RootSource, TagsBatch } from "../../types";
+import type { Inspection, IpodDeviceInfo, MediaHandle, RootSource, TagsBatch } from "../../types";
 import { TagError } from "../tags";
 
 type Failure = { code: string; message: string };
@@ -64,7 +64,7 @@ function ipodSource(root: string, name: string): RootSource {
   return {
     kind: "desktop",
     readOnly: true,
-    ipod: { path: root, pidOf: async (path) => (await pids()).get(path) },
+    ipod: { path: root, pidOf: async (path) => (await pids()).get(path), info: () => call<IpodDeviceInfo>("ipod_info", { path: root }) },
     vfs: new MemoryAdapter(name),
     saved: `ipod:${root}`,
     isTrack: () => true,

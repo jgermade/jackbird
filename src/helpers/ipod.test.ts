@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { IPOD_DATABASES, folded, inGroups, ipodCoverName, ipodSongMetadata, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
+import { IPOD_DATABASES, folded, formatDriveSize, inGroups, ipodModel, ipodUsage, libraryCounts, ipodCoverName, ipodSongMetadata, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
 
 describe("sending to an iPod", () => {
   it("folds names: case, accents, spaces and punctuation aside", () => {
@@ -90,5 +90,39 @@ describe("an iPod in a browser", () => {
     assert.deepEqual(inGroups([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
     assert.deepEqual(inGroups([], 10), []);
     assert.deepEqual(inGroups([1, 2], 0), [[1], [2]]);
+  });
+});
+
+describe("an iPod's foot and sheet", () => {
+  it("tells the model from the family or the checksum", () => {
+    assert.equal(ipodModel({ familyId: "18", checksum: 3 }), "nano7");
+    assert.equal(ipodModel({ familyId: null, checksum: 3 }), "nano67");
+    assert.equal(ipodModel({ familyId: "99", checksum: 2 }), "nano5");
+    assert.equal(ipodModel({ familyId: null, checksum: 1 }), "hash58");
+    assert.equal(ipodModel({ familyId: null, checksum: 0 }), "older");
+    assert.equal(ipodModel({ familyId: null, checksum: null }), "unknown");
+  });
+
+  it("works out the space used", () => {
+    assert.deepEqual(ipodUsage(1000, 250, 600), { total: 1000, free: 250, used: 750, fraction: 0.75, music: 600 });
+    assert.deepEqual(ipodUsage(null, null, 600), { total: null, free: null, used: null, fraction: null, music: 600 });
+    assert.deepEqual(ipodUsage(0, 0, 1), { total: null, free: null, used: null, fraction: null, music: 1 });
+    assert.equal(ipodUsage(100, 200, 0).used, 0);
+  });
+
+  it("counts songs, albums and artists", () => {
+    const song = (album: string, artist: string, albumArtist = "", size = 10) => ({ size, metadata: { album, artist, albumArtist } });
+    assert.deepEqual(
+      libraryCounts([song("Fixtures", "The Fixtures"), song("fixtures", "The Fixtures"), song("Other", "Guest", "The Fixtures"), song("", ""), song("Fixtures", "Someone else")]),
+      { songs: 5, albums: 3, artists: 3, bytes: 50 }
+    );
+    assert.deepEqual(libraryCounts([]), { songs: 0, albums: 0, artists: 0, bytes: 0 });
+  });
+
+  it("formats a drive's sizes as its system does", () => {
+    assert.equal(formatDriveSize(15_803_000_000, "en"), "15.8 GB");
+    assert.equal(formatDriveSize(15_803_000_000, "es"), "15,8 GB");
+    assert.equal(formatDriveSize(980_000_000, "en"), "980 MB");
+    assert.equal(formatDriveSize(1_500, "en"), "1.5 KB");
   });
 });

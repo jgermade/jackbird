@@ -55,6 +55,23 @@ describe("the iPod module as wasm, on the fixture", () => {
     assert.deepEqual([view.getUint32(16), view.getUint32(20)], [12, 9]);
   });
 
+  it("gives what the iPod says of itself", () => {
+    assert.deepEqual(db.device("ModelNumStr: xA623\n", null, "Version: 3.15\n"), {
+      modelNumber: "xA623",
+      familyId: null,
+      firmware: null,
+      serial: null,
+      rockbox: "3.15"
+    });
+    assert.deepEqual(db.device(null, "<key>FamilyID</key><integer>18</integer><key>VisibleBuildID</key><string>1.0.4</string>", null), {
+      modelNumber: null,
+      familyId: "18",
+      firmware: "1.0.4",
+      serial: null,
+      rockbox: null
+    });
+  });
+
   it("throws the module's message, and keeps working after it", () => {
     assert.throws(() => db.list(new TextEncoder().encode("not a database")), IpodDbError);
     assert.throws(() => db.cover({ id: 1, file: "", offset: 0, size: 0, width: 0, height: 0, top: 0 }, new Uint8Array()), /no pixels/);

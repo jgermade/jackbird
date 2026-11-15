@@ -12,6 +12,7 @@ type Exports = {
   ipod_list(): number;
   ipod_artwork(): number;
   ipod_cover(): number;
+  ipod_device(): number;
   ipod_output_ptr(): number;
   ipod_output_len(): number;
   ipod_release(): void;
@@ -61,6 +62,15 @@ export type IpodImage = {
   top: number;
 };
 
+/** What an iPod says of itself in its files (`device::facts`). */
+export type IpodFacts = {
+  modelNumber: string | null;
+  familyId: string | null;
+  firmware: string | null;
+  serial: string | null;
+  rockbox: string | null;
+};
+
 /** An error of the module: its message, or a trap (`broken`). */
 export class IpodDbError extends Error {
   constructor(message: string) {
@@ -77,6 +87,8 @@ export type IpodDb = {
   images(artworkDb: Uint8Array): IpodImage[];
   /** An image's cover as a PNG, from its slot (`image.size` bytes at `image.offset` in its file). */
   cover(image: IpodImage, slot: Uint8Array): Uint8Array;
+  /** What the iPod says of itself, from `SysInfo`, `SysInfoExtended` and `rockbox-info.txt` (null for one it lacks). */
+  device(sysinfo: string | null, extended: string | null, rockboxInfo: string | null): IpodFacts;
   readonly broken: boolean;
 };
 
@@ -118,6 +130,21 @@ export function ipodDbOf(instance: WebAssembly.Instance): IpodDb {
       view.setInt16(4, image.top, true);
       request.set(slot, 8);
       return call(request, exports.ipod_cover);
+    },
+    device(...texts) {
+      const encoded = texts.map((text) => (text === null ? null : new TextEncoder().encode(text)));
+      const request = new Uint8Array(encoded.reduce((sum, bytes) => sum + 4 + (bytes?.length ?? 0), 0));
+      const view = new DataView(request.buffer);
+      let at = 0;
+      for (const bytes of encoded) {
+        view.setUint32(at, bytes ? bytes.length : 0xffffffff, true);
+        at += 4;
+        if (bytes) {
+          request.set(bytes, at);
+          at += bytes.length;
+        }
+      }
+      return json<IpodFacts>(call(request, exports.ipod_device));
     },
     get broken() {
       return broken;
