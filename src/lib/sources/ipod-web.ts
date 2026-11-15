@@ -135,7 +135,7 @@ export async function webIpodSource(drive: DriveFiles, database: File): Promise<
           text("iPod_Control/Device/SysInfoExtended"),
           text(".rockbox/rockbox-info.txt")
         ]);
-        return { ...db.device(sysinfo, extended, rockbox), checksum: listing.checksum, total: null, free: null };
+        return { ...db.device(sysinfo, extended, rockbox), checksum: listing.checksum, total: null, free: null, artworkBytes: null, photoBytes: null, rockboxBytes: null };
       }
     },
     vfs: new MemoryAdapter(label),

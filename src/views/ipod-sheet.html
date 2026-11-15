@@ -7,12 +7,12 @@
   // lib/ipod-info.ts.
 
   const Key = await import("../../theme/default/components/key.html")
-  const Meter = await import("../../theme/default/components/meter.html")
+  const UsageBar = await import("../../theme/default/components/usage-bar.html")
 
   const { formatDriveSize, ipodModel, ipodUsage, libraryCounts } = await import("../helpers/ipod")
   const { t } = await import("../lib/i18n")
   const { ipods } = await import("../lib/ipod")
-  const { infoOf, leaveIpodSheet } = await import("../lib/ipod-info")
+  const { driveSize, infoOf, leaveIpodSheet, spaceBar } = await import("../lib/ipod-info")
   const { preferences } = await import("../lib/preferences")
   const { activeRoot } = await import("../lib/workspace")
 
@@ -30,9 +30,8 @@
   const space = (): Fact[] => {
     const u = usage()
     const out: Fact[] = []
-    if (u.total !== null && u.used !== null && u.free !== null) {
-      out.push({ label: t("ipod.sheet.capacity"), text: size(u.total) }, { label: t("ipod.sheet.used"), text: size(u.used) }, { label: t("ipod.sheet.free"), text: size(u.free) })
-    }
+    // With the bar, its legend gives each kind and the free space: the figures add the whole.
+    if (u.total !== null && u.used !== null) return [{ label: t("ipod.sheet.capacity"), text: size(u.total) }, { label: t("ipod.sheet.used"), text: size(u.used) }]
     out.push({ label: t("ipod.sheet.music"), text: size(u.music) })
     return out
   }
@@ -71,7 +70,7 @@
   <div class="card">
     <p class="eyebrow">{{ model() }}</p>
     <h2 class="title">{{ root()?.label }}</h2>
-    <Meter :if="usage().fraction !== null" :level="usage().used" :max="usage().total" :pitch=".5" :label="t('ipod.foot.meter')" :level-text="t('ipod.foot.space', { used: size(usage().used ?? 0), total: size(usage().total ?? 0) })" />
+    <UsageBar :if="spaceBar(root())" size="md" legend :parts="spaceBar(root()).parts" :max="spaceBar(root()).max" :label="t('ipod.foot.space', { used: driveSize(spaceBar(root()).used), total: driveSize(spaceBar(root()).max) })" :free-label="t('ipod.content.free')" :free-text="driveSize(spaceBar(root()).free)" />
     <p :if="!info()" class="hint">{{ t("ipod.sheet.reading") }}</p>
     <p :if="usage().fraction === null && isWeb()" class="hint">{{ t("ipod.sheet.spaceUnknown") }}</p>
 

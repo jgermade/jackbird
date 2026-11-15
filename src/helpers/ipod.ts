@@ -177,3 +177,26 @@ export function formatDriveSize(bytes: number, language: string): string {
   const [value, unit] = bytes >= 1e9 ? [bytes / 1e9, "GB"] : bytes >= 1e6 ? [bytes / 1e6, "MB"] : [bytes / 1e3, "KB"];
   return `${new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(value)} ${unit}`;
 }
+
+/** The kinds of content an iPod's space bar tells apart (W5b), in its order. */
+export type ContentKind = "music" | "covers" | "photos" | "rockbox" | "other";
+
+/** A part of the space bar: a kind and its bytes. */
+export type UsagePart = { kind: ContentKind; bytes: number };
+
+/**
+ * The parts of an iPod's used space, in the bar's order: its music, covers, photos and Rockbox
+ * (each as known, unknown ones as 0), then "other", what is used and is none of them (never below
+ * 0). Parts of 0 bytes are left out. None when the drive's use is unknown.
+ */
+export function usageParts(usage: IpodUsage, content: { artwork: number | null; photos: number | null; rockbox: number | null }): UsagePart[] {
+  if (usage.used === null) return [];
+  const known: UsagePart[] = [
+    { kind: "music", bytes: usage.music },
+    { kind: "covers", bytes: content.artwork ?? 0 },
+    { kind: "photos", bytes: content.photos ?? 0 },
+    { kind: "rockbox", bytes: content.rockbox ?? 0 }
+  ];
+  const told = known.reduce((sum, part) => sum + part.bytes, 0);
+  return [...known, { kind: "other" as const, bytes: Math.max(0, usage.used - told) }].filter((part) => part.bytes > 0);
+}

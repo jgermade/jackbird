@@ -91,6 +91,9 @@ pub struct IpodInfoJson {
     checksum: Option<u16>,
     total: Option<u64>,
     free: Option<u64>,
+    artwork_bytes: Option<u64>,
+    photo_bytes: Option<u64>,
+    rockbox_bytes: Option<u64>,
 }
 
 /// [`IpodInfoJson`] of the iPod at `path`.
@@ -108,6 +111,9 @@ pub async fn ipod_info(path: String) -> Answer<IpodInfoJson> {
             checksum: info.checksum,
             total: info.space.map(|s| s.total),
             free: info.space.map(|s| s.free),
+            artwork_bytes: Some(info.content.artwork),
+            photo_bytes: Some(info.content.photos),
+            rockbox_bytes: Some(info.content.rockbox),
         })
     })
     .await

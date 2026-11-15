@@ -1,16 +1,17 @@
 <script :setup lang="ts">
   // The foot of the library while an iPod's root is the active tab (W5,
   // RECORD/2026-11-14.ipod-sync.WIP.md): its name, how full it is (the
-  // desktop app; a browser knows only its music's size) and its songs. The
+  // desktop app, a continuous bar split by content; a browser knows only its
+  // music's size) and its songs. The
   // whole foot is a key that shows the iPod's sheet in Details. A view over
   // lib/ipod-info.ts.
 
-  const Meter = await import("../../theme/default/components/meter.html")
+  const UsageBar = await import("../../theme/default/components/usage-bar.html")
 
   const { formatDriveSize, ipodUsage, libraryCounts } = await import("../helpers/ipod")
   const { t, tn } = await import("../lib/i18n")
   const { preferences } = await import("../lib/preferences")
-  const { infoOf, loadIpodInfo, showIpodSheet, showsIpodSheet } = await import("../lib/ipod-info")
+  const { infoOf, loadIpodInfo, showIpodSheet, showsIpodSheet, spaceBar } = await import("../lib/ipod-info")
   const { activeRoot } = await import("../lib/workspace")
 
   // Read through functions, not `$:` copies: the derived values are boxed (lib/workspace.ts).
@@ -41,7 +42,7 @@
     <span class="name">{{ root().label }}</span>
     <span class="figures">{{ spaceText() }} · {{ songsText() }}</span>
   </span>
-  <Meter :if="usage().fraction !== null" :level="usage().used" :max="usage().total" :pitch=".5" :label="t('ipod.foot.meter')" :level-text="spaceText()" />
+  <UsageBar :if="spaceBar(root())" :parts="spaceBar(root()).parts" :max="spaceBar(root()).max" :label="t('ipod.foot.meter')" />
 </button>
 
 <style scoped>

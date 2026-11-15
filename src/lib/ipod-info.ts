@@ -4,9 +4,11 @@
 // off; and Details showing the iPod's sheet, by a row key no tree row has (IPOD_ROW).
 
 import { $reactive, $toRaw } from "jq79";
-import { IPOD_ROW } from "../helpers/ipod";
+import { IPOD_ROW, formatDriveSize, ipodUsage, libraryCounts, usageParts, type ContentKind } from "../helpers/ipod";
 import type { IpodDeviceInfo, RootWorkspace } from "../types";
+import { t } from "./i18n";
 import { library } from "./library";
+import { preferences } from "./preferences";
 import { ui } from "./ui";
 import { setCurrentRow, showWhole } from "./workspace";
 
@@ -46,4 +48,38 @@ export function showIpodSheet(): void {
 /** Back from the iPod's sheet to its songs. */
 export function leaveIpodSheet(): void {
   showWhole();
+}
+
+/** Each kind of content's colour in the space bar (W5b): the theme's tones. */
+const TONES: Record<ContentKind, "accent" | "stripe-1" | "stripe-2" | "info" | "muted"> = {
+  music: "accent",
+  covers: "stripe-2",
+  photos: "info",
+  rockbox: "stripe-1",
+  other: "muted"
+};
+
+/** A size as the iPod's foot and sheet show it, in the app's language. */
+export const driveSize = (bytes: number): string => formatDriveSize(bytes, preferences.language);
+
+/** What an iPod's root shows of its space: the space bar's parts, its whole and its free space; null where the drive's size is unknown (a browser). */
+export type SpaceBar = {
+  parts: { label: string; amount: number; caption: string; tone: (typeof TONES)[ContentKind] }[];
+  max: number;
+  used: number;
+  free: number;
+};
+
+/** The space bar of an iPod's root, from what it said and its songs (the music). */
+export function spaceBar(root: RootWorkspace | null): SpaceBar | null {
+  const info = infoOf(root);
+  const usage = ipodUsage(info?.total ?? null, info?.free ?? null, libraryCounts(root?.tracks ?? []).bytes);
+  if (usage.total === null || usage.used === null || usage.free === null) return null;
+  const parts = usageParts(usage, { artwork: info?.artworkBytes ?? null, photos: info?.photoBytes ?? null, rockbox: info?.rockboxBytes ?? null });
+  return {
+    parts: parts.map((part) => ({ label: t(`ipod.content.${part.kind}`), amount: part.bytes, caption: driveSize(part.bytes), tone: TONES[part.kind] })),
+    max: usage.total,
+    used: usage.used,
+    free: usage.free
+  };
 }

@@ -112,6 +112,34 @@ pub struct Info {
     pub checksum: Option<u16>,
     /// Its drive's size and free space, in bytes, as the system reports them.
     pub space: Option<Space>,
+    /// The bytes of the kinds of content told apart on its drive.
+    pub content: Content,
+}
+
+/// The bytes of the kinds of content that can be told apart on an iPod's drive without walking
+/// all of it (W5b): its covers (`iPod_Control/Artwork`), its photos (`Photos`) and Rockbox
+/// (`.rockbox`). Its music is its database's.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Content {
+    /// `iPod_Control/Artwork`.
+    pub artwork: u64,
+    /// `Photos`.
+    pub photos: u64,
+    /// `.rockbox`.
+    pub rockbox: u64,
+}
+
+/// The bytes of the files under `dir`, its links not followed; 0 when it is not there.
+pub fn folder_bytes(dir: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
+    entries
+        .filter_map(Result::ok)
+        .map(|entry| match entry.file_type() {
+            Ok(kind) if kind.is_dir() => folder_bytes(&entry.path()),
+            Ok(kind) if kind.is_file() => entry.metadata().map_or(0, |m| m.len()),
+            _ => 0,
+        })
+        .sum()
 }
 
 /// A drive's size and free space, in bytes.
@@ -148,6 +176,11 @@ pub fn info(root: &Path) -> Info {
         facts,
         checksum,
         space: space(root),
+        content: Content {
+            artwork: folder_bytes(&artwork_dir(root)),
+            photos: folder_bytes(&root.join("Photos")),
+            rockbox: folder_bytes(&root.join(".rockbox")),
+        },
     }
 }
 
@@ -303,7 +336,16 @@ mod tests {
             let here = space(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
             assert!(here.total > 0 && here.free <= here.total);
         }
+        // A folder's bytes: this crate's sources, counted again by hand.
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let by_hand: u64 = std::fs::read_dir(&src)
+            .unwrap()
+            .map(|e| e.unwrap().metadata().unwrap().len())
+            .sum();
+        assert_eq!(folder_bytes(&src), by_hand);
+        assert_eq!(folder_bytes(&src.join("missing")), 0);
         let none = info(Path::new(env!("CARGO_MANIFEST_DIR")));
+        assert_eq!(none.content, Content::default());
         assert_eq!((none.facts, none.checksum), (Facts::default(), None));
     }
 

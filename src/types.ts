@@ -218,6 +218,10 @@ export type IpodDeviceInfo = {
   checksum: number | null;
   total: number | null;
   free: number | null;
+  /** The bytes of its covers (`iPod_Control/Artwork`), photos (`Photos`) and Rockbox (`.rockbox`): the desktop app's (W5b). */
+  artworkBytes: number | null;
+  photoBytes: number | null;
+  rockboxBytes: number | null;
 };
 
 export type RootSource = {

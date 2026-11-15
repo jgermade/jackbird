@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { IPOD_DATABASES, folded, formatDriveSize, inGroups, ipodModel, ipodUsage, libraryCounts, ipodCoverName, ipodSongMetadata, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
+import { IPOD_DATABASES, folded, formatDriveSize, inGroups, ipodModel, ipodUsage, libraryCounts, usageParts, ipodCoverName, ipodSongMetadata, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
 
 describe("sending to an iPod", () => {
   it("folds names: case, accents, spaces and punctuation aside", () => {
@@ -108,6 +108,19 @@ describe("an iPod's foot and sheet", () => {
     assert.deepEqual(ipodUsage(null, null, 600), { total: null, free: null, used: null, fraction: null, music: 600 });
     assert.deepEqual(ipodUsage(0, 0, 1), { total: null, free: null, used: null, fraction: null, music: 1 });
     assert.equal(ipodUsage(100, 200, 0).used, 0);
+  });
+
+  it("splits the used space by content", () => {
+    const used = ipodUsage(1000, 200, 500);
+    assert.deepEqual(usageParts(used, { artwork: 50, photos: 0, rockbox: 100 }), [
+      { kind: "music", bytes: 500 },
+      { kind: "covers", bytes: 50 },
+      { kind: "rockbox", bytes: 100 },
+      { kind: "other", bytes: 150 }
+    ]);
+    // What is known can be more than the system counts as used: no negative "other".
+    assert.deepEqual(usageParts(ipodUsage(1000, 600, 500), { artwork: null, photos: null, rockbox: null }), [{ kind: "music", bytes: 500 }]);
+    assert.deepEqual(usageParts(ipodUsage(null, null, 500), { artwork: 1, photos: 1, rockbox: 1 }), []);
   });
 
   it("counts songs, albums and artists", () => {

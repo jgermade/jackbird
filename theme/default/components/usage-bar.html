@@ -1,0 +1,59 @@
+<script :setup="{ parts = [], max = 1, label = '', legend = false, size = 'sm', freeLabel = '', freeText = '' }: Props" lang="ts">
+  // A continuous bar of how a whole is used, split into parts: a drive's
+  // space by its content, each part a colour, the rest of the track free.
+  //
+  //   <UsageBar :parts="[{ label: 'Music', amount: 12, caption: '12 GB', tone: 'accent' }]" :max="16" label="Space used" />
+  //
+  // A part's `tone` is one of the theme's colours: `accent`, `stripe-1`,
+  // `stripe-2`, `info` or `muted`. `size` is the bar's height (`sm`, a line;
+  // `md`, a band). With `legend`, each part follows under the bar, its swatch,
+  // its label and its caption, then the free part (`freeLabel`, `freeText`)
+  // when given. The bar reads as one image, its label naming every part.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`.
+
+  type Part = { label: string; amount: number; caption: string; tone: "accent" | "stripe-1" | "stripe-2" | "info" | "muted" }
+  type Props = { parts?: Part[]; max?: number; label?: string; legend?: boolean | ""; size?: "sm" | "md"; freeLabel?: string; freeText?: string }
+
+  const share = (amount: number): string => `${Math.max(0, Math.min(100, (amount / (max || 1)) * 100))}%`
+  const spoken = (): string => [label, ...parts.map((part: Part) => `${part.label}: ${part.caption}`), freeLabel && freeText ? `${freeLabel}: ${freeText}` : ""].filter(Boolean).join(", ")
+  const showsLegend = (): boolean => legend === "" || legend === true
+</script>
+
+<div class="usage">
+  <div class="track" :class.md="size === 'md'" role="img" :aria-label="spoken()">
+    <span :each="part in parts" :key="part.label" class="part" :class="`tone-${part.tone}`" :style="`width: ${share(part.amount)}`"></span>
+  </div>
+  <ul :if="showsLegend()" class="legend">
+    <li :each="part in parts" :key="part.label"><i class="swatch" :class="`tone-${part.tone}`"></i><span class="name">{{ part.label }}</span><span class="caption">{{ part.caption }}</span></li>
+    <li :if="freeLabel"><i class="swatch free"></i><span class="name">{{ freeLabel }}</span><span class="caption">{{ freeText }}</span></li>
+  </ul>
+</div>
+
+<style scoped>
+  .usage { display: grid; gap: var(--mm-space-3); min-width: 0; }
+  .track {
+    display: flex;
+    overflow: hidden;
+    height: .375rem;
+    border-radius: var(--mm-radius-full);
+    background: var(--mm-sunken);
+    box-shadow: inset 0 0 0 var(--mm-border-width) var(--mm-border);
+  }
+  .track.md { height: .75rem; }
+  /* A hairline between parts, so two parts of near colours still read apart. */
+  .part { flex: none; height: 100%; }
+  .part + .part { box-shadow: inset 1px 0 0 var(--mm-surface); }
+  .tone-accent { background: var(--mm-accent); }
+  .tone-stripe-1 { background: var(--mm-stripe-1); }
+  .tone-stripe-2 { background: var(--mm-stripe-2); }
+  .tone-info { background: var(--mm-info-led); }
+  .tone-muted { background: var(--mm-fg-muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--mm-space-2) var(--mm-space-4); margin: 0; padding: 0; list-style: none; font-size: var(--mm-text-xs); }
+  .legend li { display: flex; align-items: center; gap: var(--mm-space-1); }
+  .swatch { flex: none; width: .625rem; height: .625rem; border-radius: var(--mm-radius-full); }
+  .swatch.free { background: var(--mm-sunken); box-shadow: inset 0 0 0 var(--mm-border-width) var(--mm-border); }
+  .name { color: var(--mm-fg-muted); }
+  .caption { font-family: var(--mm-font-mono); }
+</style>
