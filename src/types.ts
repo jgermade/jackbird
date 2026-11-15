@@ -270,5 +270,7 @@ export type RootSource = {
     library: "apple" | "rockbox";
     /** The same iPod's other library, as a source over the same drive (made once, then the same). */
     counterpart(): Promise<RootSource>;
+    /** Drops what it read of the iPod, so it is read again the next time it is shown (its database changed). */
+    forget?(): void;
   };
 };

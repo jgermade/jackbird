@@ -140,7 +140,10 @@ async function reloadIpod(path: string): Promise<void> {
   const info = ipods.found.find((one) => one.path === path);
   if (!open || !info) return;
   // Showing its Rockbox library: songs sent went into Apple's database, not into Rockbox's files.
-  if (open.source.ipod?.library !== "apple") {
+  // Its Apple library forgets what it read, so switching back reads the database again.
+  if (open.source.ipod && open.source.ipod.library !== "apple") {
+    const apple = await open.source.ipod.counterpart();
+    apple.ipod?.forget?.();
     void loadIpodInfo(open.id, true);
     return;
   }

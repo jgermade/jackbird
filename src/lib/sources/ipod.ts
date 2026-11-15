@@ -75,7 +75,10 @@ function ipodSource(root: string, name: string): RootSource {
       pidOf: async (path) => (await pids()).get(path),
       info: () => call<IpodDeviceInfo>("ipod_info", { path: root }),
       library: "apple",
-      counterpart: () => (rockbox ??= rockboxSource(root, name, self))
+      counterpart: () => (rockbox ??= rockboxSource(root, name, self)),
+      forget: () => {
+        listing = null;
+      }
     },
     vfs: new MemoryAdapter(name),
     saved: `ipod:${root}`,

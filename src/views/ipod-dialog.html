@@ -18,6 +18,9 @@
     const dialog = send()
     return dialog ? filesToSend(dialog).length : 0
   }
+  // Read through a function: `:model` binds both ways, and `a?.b ?? c` is no assignment target
+  // (jq79 warned at build time); the choice comes back through `change`.
+  const keeping = (): boolean => send()?.keepDuplicates ?? false
   const keep = (value: boolean) => {
     const dialog = send()
     if (dialog) ipods.dialog = { ...dialog, keepDuplicates: value }
@@ -41,7 +44,7 @@
         <ul class="names">
           <li :each="(title, index) in duplicateTitles()" :key="index">{{ title }}</li>
         </ul>
-        <Checkbox :model="send()?.keepDuplicates ?? false" @change="keep($event.detail)">{{ t("ipod.keepDuplicates") }}</Checkbox>
+        <Checkbox :model="keeping()" @change="keep($event.detail)">{{ t("ipod.keepDuplicates") }}</Checkbox>
       </div>
       <p :if="(send()?.skipped ?? 0) > 0" class="hint">{{ tn("ipod.skipped", send()?.skipped ?? 0) }}</p>
       <p :if="toSend() === 0" class="hint">{{ t("ipod.nothing") }}</p>

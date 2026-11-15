@@ -149,6 +149,9 @@
   $: settingsLoaded(people.settings)
   let ownEmail: string = ""
   let setupCode: string = ""
+  // Read through a function: `:model` binds both ways and `a?.b ?? c` is no assignment target;
+  // the choice comes back through `change`.
+  const onNetwork = (): boolean => people.settings?.network ?? false
 </script>
 
 <div class="people-dialog">
@@ -231,7 +234,7 @@
           <TextInput id="instance-address" type="url" placeholder="https://music.example.com" :model="address" @input="address = $event.detail" />
         </Field>
         <div :if="account.signin" class="network">
-          <SlideSwitch :label="t('signin.network')" :off-legend="t('signin.networkOff')" :on-legend="t('signin.networkOn')" :model="people.settings?.network ?? false" @change="saveSettings({ network: $event.detail }, t('signin.saved'))" />
+          <SlideSwitch :label="t('signin.network')" :off-legend="t('signin.networkOff')" :on-legend="t('signin.networkOn')" :model="onNetwork()" @change="saveSettings({ network: $event.detail }, t('signin.saved'))" />
           <p class="hint">{{ t("signin.networkHint") }}</p>
         </div>
         <div class="keys">
