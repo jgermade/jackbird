@@ -8,7 +8,7 @@ import { emptyMetadata, readsEveryField, withEveryField } from "../helpers/metad
 import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
-import { collectFolderPaths } from "../helpers/tracks";
+import { collectFolderPaths, sameTrackFiles } from "../helpers/tracks";
 import type { GroupingMode, LibraryView, RootSource, RootWorkspace, Track } from "../types";
 import { coversIn, internSnapshot, namesIn, withCovers } from "./covers";
 import { refName } from "../helpers/cover";
@@ -468,10 +468,9 @@ async function resyncRootIfNeeded(rootId: string): Promise<void> {
   if (playlistPaths.length !== knownPlaylists.size || playlistPaths.some((path) => !knownPlaylists.has(path))) {
     void loadPlaylists(root.id, walked.map((entry) => entry.path));
   }
-  const currentFiles = walked.filter((entry) => isAudioFile(entry.path));
-  const currentPaths = new Set(currentFiles.map((file) => file.path));
-  const knownPaths = new Set(root.tracks.map((track) => track.relativePath));
-  if (currentFiles.length === root.tracks.length && [...currentPaths].every((path) => knownPaths.has(path))) {
+  // The root's own test of a track, as when it was opened (an iPod's AAC songs too): with
+  // isAudioFile alone, an iPod with AAC songs was loaded again on every selection of its tab.
+  if (sameTrackFiles(walked.map((entry) => entry.path), root.source.isTrack ?? isAudioFile, root.tracks)) {
     return;
   }
 

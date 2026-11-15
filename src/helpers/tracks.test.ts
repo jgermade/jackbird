@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
-import { collectFolderPaths, inferDiscNumber, orderDetailPlaylist, trackNumberOrder, tracksToVerify, VERIFICATION_TTL_MS } from "./tracks.ts";
+import { collectFolderPaths, inferDiscNumber, orderDetailPlaylist, sameTrackFiles, trackNumberOrder, tracksToVerify, VERIFICATION_TTL_MS } from "./tracks.ts";
 
 describe("inferDiscNumber", () => {
   it("reads the disc from a CD or Disc folder, in any case and separator", () => {
@@ -129,5 +129,27 @@ describe("tracksToVerify", () => {
     const list = [verified("b.mp3", "a", undefined), verified("a.mp3", undefined, undefined)];
     tracksToVerify(list, now);
     assert.deepEqual(list.map((one) => one.id), ["b.mp3", "a.mp3"]);
+  });
+});
+
+describe("sameTrackFiles", () => {
+  const isMp3 = (path: string): boolean => path.endsWith(".mp3");
+  const all = (): boolean => true;
+
+  it("is true for the same tracks, whatever else the folder holds", () => {
+    assert.equal(sameTrackFiles(["a.mp3", "b.mp3", "cover.jpg"], isMp3, [track("b.mp3"), track("a.mp3")]), true);
+  });
+
+  it("is false when a track was added, removed or renamed", () => {
+    assert.equal(sameTrackFiles(["a.mp3", "b.mp3"], isMp3, [track("a.mp3")]), false);
+    assert.equal(sameTrackFiles(["a.mp3"], isMp3, [track("a.mp3"), track("b.mp3")]), false);
+    assert.equal(sameTrackFiles(["a.mp3", "c.mp3"], isMp3, [track("a.mp3"), track("b.mp3")]), false);
+  });
+
+  it("counts by the root's own test: an iPod's AAC songs are tracks", () => {
+    const paths = ["iPod_Control/Music/F00/A.mp3", "iPod_Control/Music/F01/B.m4a"];
+    const tracks = paths.map((path) => track(path));
+    assert.equal(sameTrackFiles(paths, all, tracks), true);
+    assert.equal(sameTrackFiles(paths, isMp3, tracks), false);
   });
 });

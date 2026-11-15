@@ -64,3 +64,12 @@ export function tracksToVerify(tracks: readonly Track[], now: number): Track[] {
     .filter((track) => !track.audioChecksum || !track.lastVerifiedAt || now - verifiedAt(track) > VERIFICATION_TTL_MS)
     .sort((a, b) => Number(!!a.audioChecksum) - Number(!!b.audioChecksum) || verifiedAt(a) - verifiedAt(b));
 }
+
+/**
+ * Whether a root's files still hold the tracks it shows: the same paths, no more and no fewer.
+ * `isTrack` is the root's own test (an iPod's lists its AAC songs too), as when it was opened.
+ */
+export function sameTrackFiles(paths: readonly string[], isTrack: (path: string) => boolean, tracks: readonly Pick<Track, "relativePath">[]): boolean {
+  const current = new Set(paths.filter(isTrack));
+  return current.size === tracks.length && tracks.every((track) => current.has(track.relativePath));
+}
