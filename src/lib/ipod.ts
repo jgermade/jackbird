@@ -302,6 +302,30 @@ export function ipodDialogTitle(): string {
   return dialog.mode === "send" ? tn("ipod.sendTitle", dialog.files.length) : t("ipod.removeTitle", { name: dialog.label });
 }
 
+/**
+ * Ejects the iPod at `path` (W6): its roots closed first (the queue lets go of its songs), then
+ * the system asked to eject its drive. Said once done, or why not. Not while a send or a removal
+ * writes to it.
+ */
+export async function ejectIpod(path: string): Promise<void> {
+  if (!ipodsHere() || ipods.busy) return;
+  const roots = ipodRoots().filter((root) => root.source.ipod?.path === path);
+  const name = ipods.found.find((one) => one.path === path)?.name ?? roots[0]?.label ?? path;
+  ipods.busy = true;
+  library.errorMessage = null;
+  try {
+    for (const root of roots) closeRoot(root.id);
+    const { ejectDrive } = await import("./sources/ipod");
+    await ejectDrive(path);
+    ipods.found = ipods.found.filter((one) => one.path !== path);
+    library.infoMessage = t("ipod.ejected", { name });
+  } catch (error) {
+    library.errorMessage = t("ipod.ejectFailed", { name, reason: error instanceof Error ? error.message : String(error) });
+  } finally {
+    ipods.busy = false;
+  }
+}
+
 /** Closes an iPod's root when it is unplugged (it is gone from the iPods found). */
 export function closeUnpluggedIpods(): void {
   for (const root of ipodRoots()) {

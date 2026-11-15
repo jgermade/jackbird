@@ -430,6 +430,7 @@ pub fn run() {
         ipod::ipods,
         ipod::ipod_mounts,
         ipod::ipod_info,
+        ipod::ipod_eject,
         ipod::ipod_open,
         ipod::ipod_tracks,
         ipod::ipod_send,

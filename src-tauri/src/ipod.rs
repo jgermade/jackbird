@@ -119,6 +119,14 @@ pub async fn ipod_info(path: String) -> Answer<IpodInfoJson> {
     .await
 }
 
+/// Ejects an iPod (W6, `RECORD/2026-11-14.ipod-sync.WIP.md`): the interface closes its root
+/// first, then the system is asked to eject its drive; the error is what the system said.
+#[tauri::command]
+pub async fn ipod_eject(path: String) -> Answer<()> {
+    let root = ipod_at(&path)?;
+    blocking(move || listing::eject(&root).map_err(|why| failure("eject", why))).await
+}
+
 /// Opens an iPod as a root (its files reachable for playing, as a folder's).
 #[tauri::command]
 pub fn ipod_open(app: AppHandle, path: String) -> Answer<Opened> {

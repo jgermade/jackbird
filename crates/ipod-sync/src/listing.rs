@@ -225,6 +225,82 @@ pub fn parse_df(text: &str) -> Option<Space> {
     })
 }
 
+/// A program's answer: its output when it succeeds, else what it said (its error output, else its
+/// output, else that it failed).
+fn run(program: &str, args: &[&std::ffi::OsStr]) -> Result<String, String> {
+    let out = std::process::Command::new(program)
+        .args(args)
+        .output()
+        .map_err(|e| format!("{program}: {e}"))?;
+    let said = |bytes: &[u8]| String::from_utf8_lossy(bytes).trim().to_string();
+    if out.status.success() {
+        return Ok(said(&out.stdout));
+    }
+    let why = [said(&out.stderr), said(&out.stdout)]
+        .into_iter()
+        .find(|s| !s.is_empty());
+    Err(why.unwrap_or_else(|| format!("{program} failed")))
+}
+
+/// Ejects the iPod mounted at `root`, with the system's own tools (W6,
+/// `RECORD/2026-11-14.ipod-sync.WIP.md`): `diskutil eject` on macOS; on Linux `udisksctl unmount`
+/// of the device `findmnt` names, then `udisksctl power-off` of its disk (as the file manager's
+/// "Eject" does; a refusal to power off still leaves it safe to unplug); on Windows the shell's
+/// "Eject" verb. A program that still holds a file (the player letting go of a song) makes the
+/// system refuse: it is tried three times, 700 ms apart. The error is what the system said.
+pub fn eject(root: &Path) -> Result<(), String> {
+    let mut last = String::new();
+    for attempt in 0..3 {
+        if attempt > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(700));
+        }
+        match eject_once(root) {
+            Ok(()) => return Ok(()),
+            Err(why) => last = why,
+        }
+    }
+    Err(last)
+}
+
+fn eject_once(root: &Path) -> Result<(), String> {
+    let path = root.as_os_str();
+    if cfg!(target_os = "macos") {
+        return run("diskutil", &["eject".as_ref(), path]).map(drop);
+    }
+    if cfg!(windows) {
+        let letter = root
+            .to_string_lossy()
+            .chars()
+            .next()
+            .filter(char::is_ascii_alphabetic)
+            .ok_or_else(|| format!("{} is not a drive", root.display()))?;
+        let script = format!(
+            "(New-Object -ComObject Shell.Application).Namespace(17).ParseName('{letter}:').InvokeVerb('Eject')"
+        );
+        return run(
+            "powershell",
+            &[
+                "-NoProfile".as_ref(),
+                "-NonInteractive".as_ref(),
+                "-Command".as_ref(),
+                script.as_ref(),
+            ],
+        )
+        .map(drop);
+    }
+    let device = run("findmnt", &["-no".as_ref(), "SOURCE".as_ref(), path])?;
+    if device.is_empty() {
+        return Err(format!("{} is not mounted", root.display()));
+    }
+    run("udisksctl", &["unmount".as_ref(), "-b".as_ref(), device.as_ref()])?;
+    let disk = run("lsblk", &["-no".as_ref(), "PKNAME".as_ref(), device.as_ref()])
+        .ok()
+        .filter(|name| !name.is_empty())
+        .map_or(device.clone(), |name| format!("/dev/{name}"));
+    let _ = run("udisksctl", &["power-off".as_ref(), "-b".as_ref(), disk.as_ref()]);
+    Ok(())
+}
+
 /// A song as the iPod's database lists it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Listed {
@@ -347,6 +423,31 @@ mod tests {
         let none = info(Path::new(env!("CARGO_MANIFEST_DIR")));
         assert_eq!(none.content, Content::default());
         assert_eq!((none.facts, none.checksum), (Facts::default(), None));
+    }
+
+    #[test]
+    fn runs_programs_and_says_why_they_failed() {
+        if cfg!(windows) {
+            return;
+        }
+        assert_eq!(run("echo", &["hi".as_ref()]), Ok("hi".into()));
+        assert_eq!(
+            run("sh", &["-c".as_ref(), "echo no >&2; exit 1".as_ref()]),
+            Err("no".into())
+        );
+        assert_eq!(run("false", &[]), Err("false failed".into()));
+        assert!(run("jackbird-no-such-program", &[]).is_err());
+    }
+
+    /// Not an iPod's mount point: nothing to eject, and the system says so (Linux, where the tests
+    /// run; `findmnt` finds no mount there).
+    #[test]
+    fn ejects_nothing_that_is_not_mounted() {
+        if !cfg!(target_os = "linux") {
+            return;
+        }
+        let missing = std::env::temp_dir().join("jackbird-no-such-mount");
+        assert!(eject_once(&missing).is_err());
     }
 
     #[test]

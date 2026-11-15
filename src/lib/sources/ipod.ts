@@ -42,6 +42,9 @@ export const saveSysinfo = (path: string): Promise<void> => call<void>("ipod_sav
 export const sendFiles = (path: string, files: { root: string; path: string }[], playlist?: string): Promise<Sent[]> =>
   call<Sent[]>("ipod_send", { path, files, playlist: playlist ?? null });
 
+/** Ejects an iPod: the system asked to let its drive go (W6). */
+export const ejectDrive = (path: string): Promise<void> => call<void>("ipod_eject", { path });
+
 /** Takes songs off an iPod, by their pids. */
 export const removePids = (path: string, pids: string[]): Promise<number> => call<number>("ipod_remove", { path, pids });
 
