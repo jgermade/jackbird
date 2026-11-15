@@ -224,7 +224,7 @@ export function withCovers(source: RootSource): RootSource {
       ? (paths, knownCovers, take) =>
           source.scanTags!(paths, [...new Set([...knownCovers, ...kept.keys()])], (batch) => {
             for (const cover of batch.covers) {
-              const data = fromBase64(cover.data);
+              const data = cover.bytes ?? fromBase64(cover.data);
               if (data) keepCover(cover.name, data);
             }
             // A view that drew before these came in (an album in the details while the folder

@@ -122,6 +122,9 @@
   const looks = () => SPECTRUM_LOOKS.map((look) => ({ value: look, label: t(`preferences.spectrumLook.${look}` as "preferences.spectrumLook.segments") }))
   const peakFalls = () => PEAK_FALLS.map((fall) => ({ value: fall, label: t(`preferences.peakFall.${fall}` as "preferences.peakFall.fast") }))
   const languages = () => LANGUAGES.map((language) => ({ value: language, label: languageName(language) }))
+  // Read through a function: `:model` binds both ways and `a ?? b` is no assignment target; the
+  // choice comes back through `change`.
+  const chosenDevice = (): string => output.device ?? ""
 </script>
 
 <div class="preferences-dialog">
@@ -187,7 +190,7 @@
           <Select id="output-kind" :model="output.kind" :options="kinds()" @change="pickKind($event.detail)" />
         </Field>
         <Field :if="output.kind !== 'embedded'" :label="t('output.device')" control="output-device">
-          <Select id="output-device" :model="output.device ?? ''" :options="deviceOptions()" @change="setOutputDevice($event.detail || null)" />
+          <Select id="output-device" :model="chosenDevice()" :options="deviceOptions()" @change="setOutputDevice($event.detail || null)" />
         </Field>
         <p :if="output.fallback" class="hint">{{ t("output.fallback", { reason: output.fallback }) }}</p>
       </section>

@@ -1,54 +1,97 @@
 # iPod sync: the iPod nano and the iPod classic
 
-Sending music from jackbird to an iPod that mounts as a disk, on the owner's own devices, starting
-with the nano 7G at the owner's ask (2026-11-14), then the nano 6G, the iPod video 5G, the classic
-7G and the nano 5G. The nano 1G–4G share the classic's format and work in the code, but no device
-here tests them. Asked by the owner on 2026-11-04, started as a spike on
-2026-11-14 with the owner's focus on the nano and the classic. The reasoning, the models and the
-catches are in [RECORD/2026-11-14.ipod-sync.WIP.md](../../RECORD/2026-11-14.ipod-sync.WIP.md).
+This roadmap covers sending music from jackbird to an iPod that mounts as a disk, on the owner's
+own devices.
 
-**Progress (2026-11-14):** N0 done, except the disk's format (which does not matter on macOS). N1
-and N2 are coded and tested without the device (`crates/ipod`, `crates/ipod-usb`, `ipod-info`;
-`hashAB` checked against dstaley's vectors and C). Both now wait for the check on the owner's nano,
-which continues in a Claude Code session on the owner's Mac (see the record's handoff entry). The
-web writing too was approved on 2026-11-14.
+- **Order.** The nano 7G comes first, at the owner's ask (2026-11-14). Then come the nano 6G, the
+  iPod video 5G, the classic 7G and the nano 5G.
+- **Untested models.** The nano 1G–4G share the classic's format and work in the code, but no
+  device here tests them.
+- **History.** The owner asked for it on 2026-11-04, and it started as a spike on 2026-11-14 with
+  the owner's focus on the nano and the classic.
+- **The record.** The reasoning, the models, the catches and every step's walkthrough are in
+  [RECORD/2026-11-14.ipod-sync.WIP.md](../../RECORD/2026-11-14.ipod-sync.WIP.md).
 
-Each step ends with its "done when" met and a walkthrough in the record. The dates are estimates,
-and the steps from N1 on need the owner's nano at hand.
+**Progress (2026-11-15, end of the cloud session).**
+
+- **The desktop app on the nano 7G** (N0–N5, artwork, removal, the panel). Done and checked on
+  the owner's nano: jackbird's songs play with their covers, Music opens the nano without a
+  restore, and songs can be taken off again.
+- **The web and the desktop app** (W0–W7). Coded and checked in Chromium (Playwright) on a
+  fixture iPod:
+  - the iPod opened and listed in a browser;
+  - its foot and sheet;
+  - a space bar split by content;
+  - ejecting;
+  - Apple's and Rockbox's libraries.
+- **What waits for the owner's Mac (V1).** This session could not compile the desktop app (no
+  WebKitGTK), so the desktop app's new commands, and every check that needs a real iPod, wait
+  for it.
+
+**Branch.** The work of 2026-11-15 (W0–W7 and the fixes after) is on
+`ccr-89c94572-kxlm56`, not merged. The next session continues on a new branch, on the owner's
+Mac with Claude Code's CLI. See the record's handoff entry of 2026-11-15 19:00 UTC.
 
 ```mermaid
 gantt
-  title iPod sync, the nano 7G first
+  title iPod sync
   dateFormat YYYY-MM-DD
   axisFormat %d %b
-  section nano 7G
+  section nano 7G, desktop app
     N0 The nano 7G                     :done, n0, 2026-11-14, 1d
-    N1 Read it (iTunesCDB, GUID)       :active, n1, 2026-11-14, 3d
-    N2 hashAB, checked on the nano     :active, n2, 2026-11-14, 3d
-    N3 Write the databases             :n3, after n2, 5d
-    N4 Copy tracks, write              :n4, after n3, 3d
-    N5 On the nano 7G                  :n5, after n4, 1d
-  section Then
-    nano 6G                            :b1, after n5, 2d
+    N1 Read it (iTunesCDB, GUID)       :done, n1, 2026-11-14, 1d
+    N2 hashAB, checked on the nano     :done, n2, 2026-11-14, 1d
+    N3 Write the databases             :done, n3, 2026-11-14, 1d
+    N4 Copy tracks, write              :done, n4, 2026-11-14, 1d
+    N5 On the nano 7G                  :done, n5, 2026-11-15, 1d
+    R Take songs off (ipod-remove)     :done, r, 2026-11-15, 1d
+    M1 Music leaves them alone         :done, m1, 2026-11-15, 1d
+    A Artwork (A1-A4)                  :done, a, 2026-11-15, 1d
+    P The iPod panel (P1-P4)           :done, p, 2026-11-15, 1d
+  section The web, the foot, Rockbox
+    W0 Watch only while shown          :done, w0, 2026-11-15, 1d
+    W1 ipod.wasm (songs, covers)       :done, w1, 2026-11-15, 1d
+    W3-W4 Open and list it in the web  :done, w3, 2026-11-15, 1d
+    W5 Foot, sheet, space by content   :done, w5, 2026-11-15, 1d
+    W6 Eject (desktop)                 :done, w6, 2026-11-15, 1d
+    W7 Apple and Rockbox libraries     :done, w7, 2026-11-15, 1d
+  section On the owner's Mac
+    V1 Check W0-W7 in the desktop app  :active, v1, 2026-11-16, 1d
+  section Next
+    Web writing (SysInfoExtended, SQLite in wasm) :x1, after v1, 5d
+    classic 7G (hash58)                :x2, after v1, 3d
+    Sending to Rockbox's library       :x3, after x2, 2d
+    nano 6G                            :b1, after x2, 2d
     iPod video 5G                      :b2, after b1, 2d
-    classic 7G (hash58)                :b3, after b2, 3d
-    nano 5G (hash72)                   :b4, after b3, 5d
+    nano 5G (hash72)                   :b4, after b2, 5d
 ```
 
 | Step | Scope | Done when |
 | --- | --- | --- |
-| N0 The nano 7G | Capacity, format (HFS+ or FAT32), synced with iTunes or not, can it be restored. | it is in the record |
-| N1 Read it (coded; the device check is pending) | `crates/ipod` reads `SysInfo` and the `iTunesCDB` (zlib); the desktop app reads `SysInfoExtended` (USB vendor request through `nusb`, or its copy on the device) and the GUID; web and desktop list the nano's tracks. | the tracks and playlists are listed as the nano shows them, and the GUID is known |
-| N2 `hashAB` (coded; the device check is pending) | Ported from dstaley/hashab (public domain), its 100 vectors; checked on the nano's own `iTunesCDB` and `Locations.itdb.cbk`. | the signature iTunes wrote validates |
-| N3 Write the databases | The `iTunesCDB` writer and its signature, the SQLite library with the nano's post-process SQL, `Locations.itdb.cbk`. | for an unchanged library, the files match iTunes' in all but the random bytes |
-| N4 Copy and write | MP3s under `iPod_Control/Music/Fnn/`, both databases, a playlist, backups and the order of replacing; the iPod panel in the desktop app, then in the web (approved 2026-11-14). | a copy of the nano's files with one track added keeps its tracks, playlists and play counts |
-| N5 On the nano 7G | The owner's test on the device. | the tracks play, and iTunes still opens the nano without a restore |
-| Then | The nano 6G (same `hashAB` and SQLite), the iPod video 5G (no checksum), the classic 7G (`hash58`), the nano 5G (`hash72`). | each plays on the owner's device |
+| N0–N5 (done) | The nano 7G read (`iTunesCDB`, `SysInfoExtended`, GUID); `hashAB`; both databases written; MP3s copied; checked on the device. | the songs play, and Music opens the nano without a restore |
+| R, M1, A (done) | `ipod-remove`; Music with manual management leaves jackbird's songs alone; covers written to the `ArtworkDB`. | each checked on the owner's nano |
+| P (done) | The iPod as a source in the desktop app: listed, opened, played, songs sent and taken off. | checked on the owner's nano |
+| W0 (done) | The iPods looked for only while the sources panel shows. | coded; the desktop check is V1 |
+| W1 (done) | `crates/ipod-wasm`: the songs, the images, a cover as a PNG (`png` in the module, its speed profile: 2.75 ms a cover). | its Rust and Node tests pass on the fixture |
+| W3–W4 (done) | An iPod's drive opened in the browser (Chrome's picker, or Safari's and Firefox's folder input), listed from its database, covers in batches, played from the drive; only read. | checked in Chromium |
+| W5 (done) | The iPod's foot in the library (name, space, songs) and its sheet in Details (model, space, counts, firmware, serial, Rockbox, writing); a continuous bar split by content (music, covers, photos, Rockbox, other, free). | checked in Chromium; the desktop's real sizes are V1 |
+| W6 (done) | Eject from the desktop app (`diskutil`, `udisksctl`, the shell's verb), from the foot and the sheet; the web says to eject from the system. | coded; the eject itself is V1 |
+| W7 (done) | Apple's library or Rockbox's (the drive as Rockbox's database lists it), switched from the foot, remembered per iPod; nothing written to the drive. | checked in Chromium; the desktop and a real classic are V1 |
+| V1 | The owner's checks on the Mac, listed in the record's handoff entry (2026-11-15 19:00 UTC). | each passes, or is fixed |
+| Web writing | Sending from the web: `SysInfoExtended` from its copy on the iPod (or WebUSB, an experiment), the SQL run with SQLite compiled to WebAssembly. | a song sent from Chrome plays on the nano |
+| classic 7G | `hash58` (keyed on the FireWire GUID), the classic's `iTunesDB`, written from the desktop app. | a song sent plays on the owner's classic in Apple's firmware |
+| Rockbox sending | With Rockbox's library shown, songs copied into a folder (`Music/<artist>/<album>/`), no database. | Rockbox lists them after its database update |
+| Then | The nano 6G (same `hashAB` and SQLite), the iPod video 5G (no checksum), the nano 5G (`hash72`). | each plays on the owner's device |
 
-Writing to a nano 6G or 7G needs `SysInfoExtended` and SQLite. The desktop app reads
-`SysInfoExtended` with a USB vendor request (`nusb`), and runs the SQL with `rusqlite`. The web
-reads the copy that the desktop app or `ipod-info --save-sysinfo` leaves on the iPod (WebUSB is an
-experiment), and runs the same SQL with SQLite compiled to WebAssembly.
+**How it writes.** Writing to a nano 6G or 7G needs `SysInfoExtended` and SQLite:
 
-Not in it: artwork, play counts shown in jackbird, podcasts, AAC and ALAC, FLAC conversion,
-deleting from the iPod, the shuffle, the iPod touch and the iPhone.
+- **The desktop app** reads `SysInfoExtended` with a USB vendor request (`nusb`) and runs the SQL
+  with `rusqlite`.
+- **The web** will read the copy that the desktop app or `ipod-info --save-sysinfo` leaves on the
+  iPod (WebUSB is an experiment), and run the same SQL with SQLite compiled to WebAssembly.
+- **Rockbox.** It answers no vendor request, so `SysInfoExtended` is read with the iPod in Apple's
+  firmware, once.
+
+**Not in it.** Play counts shown in jackbird, podcasts, writing AAC and ALAC, FLAC conversion,
+the shuffle, the iPod touch and the iPhone. Reading AAC works: Apple's library lists them, and
+the app's tag engine does not read them, so Rockbox's library leaves them out.

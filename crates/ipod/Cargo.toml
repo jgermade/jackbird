@@ -11,6 +11,13 @@ publish.workspace = true
 miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
 # hashAB signs SHA-1s; the same crate and version as jackbird-core's.
 sha1 = { version = "=0.10.6", default-features = false }
+# A cover as a PNG (`artwork::cover_png`), for the apps that show the iPod's
+# covers: the desktop app (through jackbird-ipod-sync) and the web
+# (jackbird-ipod-wasm). The version the workspace already holds.
+png = { version = "=0.18.1", optional = true }
+
+[features]
+png = ["dep:png"]
 
 [lints]
 workspace = true

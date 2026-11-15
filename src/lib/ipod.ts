@@ -11,6 +11,7 @@ import { t, tn } from "./i18n";
 import { library } from "./library";
 import { isDesktop, isPhone } from "./platform";
 import { closeRoot, hydrateRoot, updateRoots } from "./roots";
+import { loadIpodInfo, preferredLibrary } from "./ipod-info";
 import type { IpodInfo } from "./sources/ipod";
 
 /** What the iPod dialog asks. */
@@ -50,32 +51,64 @@ export async function lookForIpods(): Promise<void> {
   ipods.found = await listIpods().catch(() => []);
 }
 
-/** How often the plugged-in iPods are looked at. */
+/** How often the plugged-in iPods are looked at, while the panel that lists them shows. */
 const WATCH_EVERY_MS = 3000;
 
-/**
- * Watches what is plugged in, for as long as the app runs: an iPod plugged in after the app
- * started is found (and listed in "Add to the library…"), and an unplugged one's root closes.
- */
-export function watchIpods(): void {
-  if (!ipodsHere()) return;
-  let seen = "";
-  const look = async (): Promise<void> => {
-    const { ipodMounts } = await import("./sources/ipod");
-    const now = (await ipodMounts().catch(() => [])).sort().join("\n");
-    if (now !== seen) {
-      seen = now;
-      await lookForIpods();
-      closeUnpluggedIpods();
-    }
-  };
-  void look();
-  setInterval(() => void look(), WATCH_EVERY_MS);
+/** The watches held (the dialog's panel and the welcome's can both hold one), and the running one. */
+let watchers = 0;
+let watching: { timer: ReturnType<typeof setInterval>; seen: string } | null = null;
+
+/** Looks at what is plugged in; reads the iPods again, and closes an unplugged one's root, when that changed. */
+async function lookAtMounts(): Promise<void> {
+  const { ipodMounts } = await import("./sources/ipod");
+  const now = (await ipodMounts().catch(() => [])).sort().join("\n");
+  if (!watching || now === watching.seen) return;
+  watching.seen = now;
+  await lookForIpods();
+  closeUnpluggedIpods();
 }
 
-/** The open iPods' roots. */
+/**
+ * Watches what is plugged in while the sources panel (views/sources-panel.html) shows: an iPod
+ * plugged in is listed within seconds, and an unplugged one's root closes. Gives the function that
+ * lets the watch go; the last one let go stops it. The first looks at once.
+ */
+export function watchIpods(): () => void {
+  if (!ipodsHere()) return () => undefined;
+  watchers += 1;
+  if (!watching) {
+    watching = { timer: setInterval(() => void lookAtMounts(), WATCH_EVERY_MS), seen: "\0" };
+    void lookAtMounts();
+  }
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    watchers -= 1;
+    if (watchers === 0 && watching) {
+      clearInterval(watching.timer);
+      watching = null;
+    }
+  };
+}
+
+/** A view's hold on the watch: `follow(true)` while it shows, `follow(false)` once it does not. */
+export function ipodWatcher(): { follow(on: boolean): void } {
+  let release: (() => void) | null = null;
+  return {
+    follow(on) {
+      if (on && !release) release = watchIpods();
+      else if (!on && release) {
+        release();
+        release = null;
+      }
+    }
+  };
+}
+
+/** The open iPods' roots, as the desktop app opened them (not an iPod opened in a browser, which is only read). */
 export function ipodRoots(): RootWorkspace[] {
-  return $toRaw(library).roots.filter((root) => !!root.source.ipod);
+  return $toRaw(library).roots.filter((root) => !!root.source.ipod && !root.source.ipod.web);
 }
 
 /** Opens an iPod as a root, or shows it if it is open; reads its SysInfoExtended over USB first when it lacks it. */
@@ -93,7 +126,8 @@ export async function openIpodRoot(info: IpodInfo): Promise<void> {
       await lookForIpods();
     }
     const fresh = ipods.found.find((one) => one.path === info.path) ?? info;
-    await hydrateRoot(await openIpod(fresh), { rootLabel: fresh.name, groupingMode: "wizard" });
+    // On the library last shown for it: Apple's, or Rockbox's when it has Rockbox (W7).
+    await hydrateRoot(await preferredLibrary(await openIpod(fresh)), { rootLabel: fresh.name, groupingMode: "wizard" });
     library.infoMessage = t("ipod.opened");
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : String(error);
@@ -105,8 +139,18 @@ async function reloadIpod(path: string): Promise<void> {
   const open = ipodRoots().find((root) => root.source.ipod?.path === path);
   const info = ipods.found.find((one) => one.path === path);
   if (!open || !info) return;
+  // Showing its Rockbox library: songs sent went into Apple's database, not into Rockbox's files.
+  // Its Apple library forgets what it read, so switching back reads the database again.
+  if (open.source.ipod && open.source.ipod.library !== "apple") {
+    const apple = await open.source.ipod.counterpart();
+    apple.ipod?.forget?.();
+    void loadIpodInfo(open.id, true);
+    return;
+  }
   const { openIpod } = await import("./sources/ipod");
   await hydrateRoot(await openIpod(info), { rootId: open.id, rootLabel: open.label, setActive: false });
+  // Its space changed: its foot and sheet asked again.
+  void loadIpodInfo(open.id, true);
 }
 
 /**
@@ -232,6 +276,7 @@ export async function confirmRemove(): Promise<void> {
     ipods.done = tn("ipod.removed", removed);
     library.infoMessage = ipods.done;
     ipods.dialog = null;
+    void loadIpodInfo(root.id, true);
     // The songs leave the root's list as they left the iPod: no need to read it all again.
     const gone = new Set(dialog.paths);
     updateRoots((roots) =>
@@ -264,6 +309,30 @@ export function ipodDialogTitle(): string {
   const dialog = ipods.dialog;
   if (!dialog) return "";
   return dialog.mode === "send" ? tn("ipod.sendTitle", dialog.files.length) : t("ipod.removeTitle", { name: dialog.label });
+}
+
+/**
+ * Ejects the iPod at `path` (W6): its roots closed first (the queue lets go of its songs), then
+ * the system asked to eject its drive. Said once done, or why not. Not while a send or a removal
+ * writes to it.
+ */
+export async function ejectIpod(path: string): Promise<void> {
+  if (!ipodsHere() || ipods.busy) return;
+  const roots = ipodRoots().filter((root) => root.source.ipod?.path === path);
+  const name = ipods.found.find((one) => one.path === path)?.name ?? roots[0]?.label ?? path;
+  ipods.busy = true;
+  library.errorMessage = null;
+  try {
+    for (const root of roots) closeRoot(root.id);
+    const { ejectDrive } = await import("./sources/ipod");
+    await ejectDrive(path);
+    ipods.found = ipods.found.filter((one) => one.path !== path);
+    library.infoMessage = t("ipod.ejected", { name });
+  } catch (error) {
+    library.errorMessage = t("ipod.ejectFailed", { name, reason: error instanceof Error ? error.message : String(error) });
+  } finally {
+    ipods.busy = false;
+  }
 }
 
 /** Closes an iPod's root when it is unplugged (it is gone from the iPods found). */

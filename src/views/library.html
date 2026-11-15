@@ -11,6 +11,7 @@
   const ListRow = await import("../../theme/default/components/list-row.html")
   const Menu = await import("../../theme/default/components/menu.html")
   const Reel = await import("../../theme/default/components/reel.html")
+  const IpodFoot = await import("./ipod-foot.html")
 
   const { formatTrackNumber, trackLead } = await import("../helpers/format")
   const { rowHeights } = await import("../helpers/density")
@@ -249,10 +250,14 @@
       </template>
     </ListRow>
   </div>
+
+  <!-- An iPod's root: how full it is, a key to its sheet in Details (W5). -->
+  <IpodFoot />
 </section>
 
 <style scoped>
-  .library { display: flex; flex-direction: column; color: var(--mm-fg); }
+  /* As tall as its pane at least, so an iPod's foot keeps to the bottom. */
+  .library { display: flex; flex-direction: column; min-height: 100%; color: var(--mm-fg); }
   /* The view keys from the left, flat on the head, the open one down. */
   .head {
     position: sticky;

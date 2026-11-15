@@ -105,8 +105,22 @@ const COVERS_DIR: &str = ".meta/covers";
 
 /// The tags of `paths` under `root`, in batches over `channel`; each cover met for the first time
 /// written into `.meta/covers/`, or sent when it cannot be; `known_covers` are the covers' names
-/// the interface has already, neither written nor sent.
+/// the interface has already, neither written nor sent. The tests' way in; the command takes
+/// [`scan_tags_with`].
+#[cfg(test)]
 pub fn scan_tags(root: &Root, paths: Vec<String>, known_covers: Vec<String>, channel: &Channel<TagsBatch>) {
+    scan_tags_with(root, paths, known_covers, channel, true);
+}
+
+/// [`scan_tags`], each new cover written into `.meta/covers/` only with `write_covers`: without it
+/// (an iPod's Rockbox library, W7: nothing is written to an iPod's drive) every cover is sent.
+pub fn scan_tags_with(
+    root: &Root,
+    paths: Vec<String>,
+    known_covers: Vec<String>,
+    channel: &Channel<TagsBatch>,
+    write_covers: bool,
+) {
     let mut sent: HashSet<String> = known_covers.into_iter().collect();
     let mut batch = TagsBatch::default();
     in_parallel(
@@ -121,7 +135,8 @@ pub fn scan_tags(root: &Root, paths: Vec<String>, known_covers: Vec<String>, cha
                     && sent.insert(name.clone())
                 {
                     let at = format!("{COVERS_DIR}/{name}");
-                    let kept = matches!(root.stat(&at), Ok(Some(_))) || root.write(&at, &cover.data).is_ok();
+                    let kept =
+                        write_covers && (matches!(root.stat(&at), Ok(Some(_))) || root.write(&at, &cover.data).is_ok());
                     if !kept {
                         batch.covers.push(CoverJson {
                             name,
@@ -173,10 +188,12 @@ pub async fn scan(
     root: String,
     paths: Vec<String>,
     known_covers: Vec<String>,
+    write_covers: Option<bool>,
     channel: Channel<TagsBatch>,
 ) -> Answer<()> {
     let root = root_of(&roots, &root)?;
-    tauri::async_runtime::spawn_blocking(move || scan_tags(&root, paths, known_covers, &channel))
+    let write_covers = write_covers.unwrap_or(true);
+    tauri::async_runtime::spawn_blocking(move || scan_tags_with(&root, paths, known_covers, &channel, write_covers))
         .await
         .map_err(|error| jackbird_api::failure("io", error.to_string()))
 }

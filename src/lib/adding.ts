@@ -114,8 +114,25 @@ export function tabsHere(): SourceTab[] {
   const tabs: SourceTab[] = [];
   if (folderSources().length > 0 || recent.list.length > 0 || adding.shared.length > 0) tabs.push("folder");
   if (sourcesHere().includes("server")) tabs.push("server");
-  if (ipodsHere()) tabs.push("ipod");
+  if (ipodTabHere()) tabs.push("ipod");
   return tabs;
+}
+
+/**
+ * Whether "Add to the library…" has an iPod tab: the desktop app on a computer (the iPods plugged
+ * in), or a browser on a computer that can open a folder (the iPod's drive, picked: W4).
+ */
+export function ipodTabHere(): boolean {
+  return ipodsHere() || (!isDesktop && !isEmbed && deviceAccess() !== "none");
+}
+
+/** Whether the iPod tab picks the drive in the browser, instead of listing the iPods plugged in. */
+export const ipodPickedHere = (): boolean => !isDesktop;
+
+/** Opens an iPod in the browser: its drive, picked (W4). Straight from the click, as Safari asks. */
+export function addIpodDrive(): void {
+  adding.open = false;
+  void openFolder(undefined, { ipod: true });
 }
 
 /** A tab's name. */

@@ -6,7 +6,8 @@
 
 import { MemoryAdapter, type WalkedFile } from "@cloudauthn/vfs-sync";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import type { Inspection, MediaHandle, RootSource, TagsBatch } from "../../types";
+import { rockboxLibraryPaths } from "../../helpers/ipod";
+import type { Inspection, IpodDeviceInfo, MediaHandle, RootSource, TagsBatch } from "../../types";
 import { TagError } from "../tags";
 
 type Failure = { code: string; message: string };
@@ -42,6 +43,9 @@ export const saveSysinfo = (path: string): Promise<void> => call<void>("ipod_sav
 export const sendFiles = (path: string, files: { root: string; path: string }[], playlist?: string): Promise<Sent[]> =>
   call<Sent[]>("ipod_send", { path, files, playlist: playlist ?? null });
 
+/** Ejects an iPod: the system asked to let its drive go (W6). */
+export const ejectDrive = (path: string): Promise<void> => call<void>("ipod_eject", { path });
+
 /** Takes songs off an iPod, by their pids. */
 export const removePids = (path: string, pids: string[]): Promise<number> => call<number>("ipod_remove", { path, pids });
 
@@ -54,6 +58,8 @@ const coversHad = new Set<string>();
 /** An iPod's root: a desktop root over its mount point, with the songs its database lists. */
 function ipodSource(root: string, name: string): RootSource {
   let listing: Promise<IpodTracks> | null = null;
+  // Its Rockbox library, made the first time it is asked for (W7).
+  let rockbox: Promise<RootSource> | null = null;
   const load = (): Promise<IpodTracks> =>
     (listing ??= call<IpodTracks>("ipod_tracks", { path: root, knownCovers: [...coversHad] }).then((found) => {
       for (const cover of found.covers) coversHad.add(cover.name);
@@ -61,10 +67,19 @@ function ipodSource(root: string, name: string): RootSource {
     }));
   const pids = async (): Promise<Map<string, string>> => new Map((await load()).pids);
   const readOnly = (path: string): Error => new DOMException(`Read-only: ${path}`, "NoModificationAllowedError");
-  return {
+  const self: RootSource = {
     kind: "desktop",
     readOnly: true,
-    ipod: { path: root, pidOf: async (path) => (await pids()).get(path) },
+    ipod: {
+      path: root,
+      pidOf: async (path) => (await pids()).get(path),
+      info: () => call<IpodDeviceInfo>("ipod_info", { path: root }),
+      library: "apple",
+      counterpart: () => (rockbox ??= rockboxSource(root, name, self)),
+      forget: () => {
+        listing = null;
+      }
+    },
     vfs: new MemoryAdapter(name),
     saved: `ipod:${root}`,
     isTrack: () => true,
@@ -100,6 +115,47 @@ function ipodSource(root: string, name: string): RootSource {
     },
     close: () => void invoke("close_root", { root }).catch(() => undefined)
   };
+  return self;
+}
+
+/** Plays a file of the iPod at `root` from its disk, as a folder's. */
+async function mediaOf(root: string, path: string): Promise<MediaHandle> {
+  const found = await call<MediaUrl>("media_url", { root, path });
+  return {
+    url: found.kind === "asset" ? convertFileSrc(found.path) : found.url,
+    changed: async () => false,
+    release: () => undefined,
+    native: { root, path }
+  };
+}
+
+/**
+ * The Rockbox library of the iPod at `root` (W7): its drive as Rockbox's database lists it
+ * (helpers/ipod.ts's `rockboxLibraryPaths`), read with the app's tag engine as a folder is, in
+ * bulk. Only read, as its Apple library: nothing is written to the drive, not even the covers the
+ * scan meets (`writeCovers: false`: they come in the batches, kept in memory).
+ */
+async function rockboxSource(root: string, name: string, apple: RootSource): Promise<RootSource> {
+  const readOnly = (path: string): Error => new DOMException(`Read-only: ${path}`, "NoModificationAllowedError");
+  const { streamed } = await import("./desktop");
+  const self: RootSource = {
+    kind: "desktop",
+    readOnly: true,
+    ipod: { path: root, pidOf: async () => undefined, info: apple.ipod!.info, library: "rockbox", counterpart: async () => apple },
+    vfs: new MemoryAdapter(name),
+    saved: `ipod-rockbox:${root}`,
+    async walk(): Promise<WalkedFile[]> {
+      const all = await call<WalkedFile[]>("walk", { root });
+      const kept = new Set(rockboxLibraryPaths(all.map((file) => file.path)));
+      return all.filter((file) => kept.has(file.path));
+    },
+    scanTags: (paths, knownCovers, take) => streamed<TagsBatch>("scan", { root, paths, knownCovers, writeCovers: false }, take),
+    inspect: (path, known) => call<Inspection>("inspect", { root, path, known: known ?? null }),
+    save: (path) => Promise.reject(readOnly(path)),
+    openMedia: (path) => mediaOf(root, path),
+    close: () => void invoke("close_root", { root }).catch(() => undefined)
+  };
+  return self;
 }
 
 /** Opens an iPod as a root. */

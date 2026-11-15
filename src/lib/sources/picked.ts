@@ -25,7 +25,7 @@ export function folderAccessHere(): FolderAccess {
  * be neither changed nor moved: the app does not offer to (its menus and dialogs ask `readOnly`),
  * and if it did, the write would fail here, not reach the disk.
  */
-class PickedFolder implements VFSAdapter {
+export class PickedFolder implements VFSAdapter {
   private readonly kept: MemoryAdapter;
 
   constructor(

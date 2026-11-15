@@ -20,7 +20,7 @@
     <template :slot.nav>
       <Tabs :if="tabs().length > 1" plain :label="t('sources.tabs')" :items="tabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
     </template>
-    <SourcesPanel />
+    <SourcesPanel :live="adding.open" />
   </Modal>
 </div>
 

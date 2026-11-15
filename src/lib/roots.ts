@@ -382,14 +382,20 @@ export async function hydrateRoot(
 }
 
 /** Asks for a folder and opens it: one of this device, or of `server`'s machine (E6b-D11). */
-export async function openFolder(server?: ServiceClient): Promise<void> {
+export async function openFolder(server?: ServiceClient, options: { ipod?: boolean } = {}): Promise<void> {
   library.loading = true;
   library.errorMessage = null;
   library.infoMessage = null;
 
   try {
-    const source = await pickSource(server);
-    if (source) {
+    const source = await pickSource(server, options);
+    if (source?.ipod) {
+      // An iPod in a browser (lib/sources/ipod-web.ts): by album, as the desktop app opens one.
+      // On the library last shown for it (W7).
+      const { preferredLibrary } = await import("./ipod-info");
+      await hydrateRoot(await preferredLibrary(source), { groupingMode: "wizard" });
+      library.infoMessage = t("ipod.openedWeb");
+    } else if (source) {
       await hydrateRoot(source, {});
       // A folder the browser can only read (lib/sources/picked.ts): said once it is open.
       if (source.readOnly) library.infoMessage = t("message.readOnlyOpened");

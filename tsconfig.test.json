@@ -8,6 +8,7 @@
   "include": [
     "src/helpers",
     "src/lib/tags",
+    "src/lib/ipod-db",
     "src/lib/locales",
     "src/types.ts"
   ],

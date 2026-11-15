@@ -31,7 +31,7 @@ type MediaUrl = { kind: "asset"; path: string } | { kind: "http"; url: string };
  * Calls a command that sends its results in batches over a channel; resolves once the last batch
  * (`done`) is taken, which can come after the command's own answer.
  */
-async function streamed<B extends { done: boolean }>(command: string, args: Record<string, unknown>, take: (batch: B) => void): Promise<void> {
+export async function streamed<B extends { done: boolean }>(command: string, args: Record<string, unknown>, take: (batch: B) => void): Promise<void> {
   let finished = (): void => undefined;
   const last = new Promise<void>((resolve) => (finished = resolve));
   const channel = new Channel<B>();

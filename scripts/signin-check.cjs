@@ -115,6 +115,10 @@ async function openPreferences(page) {
     page.on("pageerror", (error) => console.log("pageerror:", error.message));
     await page.goto(base);
     await page.getByRole("button", { name: /^(Open library|Add a folder|Add to the library|Choose a folder( of .+)?…)$/ }).first().click();
+    // With more than one tab (Folder, and iPod in a browser: RECORD/2026-11-14.ipod-sync.WIP.md, W4)
+    // "Add to the library…" opens its dialog first: its Folder tab's key goes on to the chooser.
+    const chooser = page.getByRole("button", { name: /^Choose a folder( of .+)?…$/ });
+    if (await chooser.first().isVisible({ timeout: 2000 }).catch(() => false)) await chooser.first().click();
     await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
     await page.getByText("Before").first().waitFor({ timeout: 30000 });

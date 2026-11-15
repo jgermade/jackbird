@@ -15,7 +15,8 @@ import { audioMimeType } from "../../helpers/formats";
 import type { Inspection, MediaHandle, RootSource, TrackMetadata } from "../../types";
 import { checksums, readTags, writeTags } from "../tags";
 
-async function fileOf(root: FileSystemDirectoryHandle, relativePath: string): Promise<File> {
+/** A file under a folder's handle, by its path. */
+export async function fileOf(root: FileSystemDirectoryHandle, relativePath: string): Promise<File> {
   const parts = relativePath.split("/").filter(Boolean);
   const name = parts.pop();
   if (!name) {

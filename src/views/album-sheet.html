@@ -9,6 +9,8 @@
   const Menu = await import("../../theme/default/components/menu.html")
   const SelectBox = await import("../../theme/default/components/select-box.html")
   const Stripes = await import("../../theme/default/components/stripes.html")
+  const IpodSheet = await import("./ipod-sheet.html")
+  const { showsIpodSheet } = await import("../lib/ipod-info")
 
   const { t, tn } = await import("../lib/i18n")
   const { coverSrc } = await import("../lib/covers")
@@ -113,6 +115,9 @@
     </Key>
     <small class="mm-legend">{{ t("landing.note") }}</small>
   </div>
+
+  <!-- An iPod's sheet, from its foot in the library (W5). -->
+  <IpodSheet :elseif="showsIpodSheet(root())" />
 
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">

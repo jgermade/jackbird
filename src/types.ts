@@ -185,7 +185,8 @@ export type Unread = { path: string; message: string };
 export type TagsBatch = {
   done: boolean;
   tracks: { path: string; size: number; lastModified: number; metadata: TrackMetadata }[];
-  covers: { name: string; data: string }[];
+  /** Each cover's bytes come as base64 (`data`), or as they are (`bytes`, the web's iPod: no round trip through text). */
+  covers: { name: string; data: string; bytes?: Uint8Array }[];
   unread: Unread[];
 };
 
@@ -202,6 +203,27 @@ export type SumsBatch = {
  * wasm) or the desktop app's (a path, the engine natively, no file bytes over
  * the IPC). See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (E4-D1, E4-D2).
  */
+/**
+ * What an iPod says of itself and of its drive (W5, RECORD/2026-11-14.ipod-sync.WIP.md): from its
+ * `SysInfo`, its copy of `SysInfoExtended` and Rockbox's `rockbox-info.txt`, its database's
+ * checksum scheme, and its drive's size and free space (none in a browser, which cannot know them).
+ */
+export type IpodDeviceInfo = {
+  modelNumber: string | null;
+  familyId: string | null;
+  firmware: string | null;
+  serial: string | null;
+  /** Rockbox's version when it is installed ("" when its file names none); null without Rockbox. */
+  rockbox: string | null;
+  checksum: number | null;
+  total: number | null;
+  free: number | null;
+  /** The bytes of its covers (`iPod_Control/Artwork`), photos (`Photos`) and Rockbox (`.rockbox`): the desktop app's (W5b). */
+  artworkBytes: number | null;
+  photoBytes: number | null;
+  rockboxBytes: number | null;
+};
+
 export type RootSource = {
   readonly kind: "browser" | "desktop" | "service" | "library";
   /** The small-file adapter: `.meta/`, playlists, renames, deletes. */
@@ -234,6 +256,21 @@ export type RootSource = {
   close(): void;
   /** Which of its walked files are tracks; by extension (`isAudioFile`) when absent. An iPod's are all (its AAC songs too). */
   isTrack?(path: string): boolean;
-  /** An iPod's root (lib/sources/ipod.ts): its mount point, and each song's pid in its database. Its files are not hashed. */
-  readonly ipod?: { path: string; pidOf(path: string): Promise<string | undefined> };
+  /**
+   * An iPod's root (lib/sources/ipod.ts): its mount point, and each song's pid in its database. Its
+   * files are not hashed. `web`: opened in a browser (lib/sources/ipod-web.ts), only read; its
+   * `path` is its drive's name.
+   */
+  readonly ipod?: {
+    path: string;
+    pidOf(path: string): Promise<string | undefined>;
+    web?: boolean;
+    info(): Promise<IpodDeviceInfo>;
+    /** Which of its libraries this root lists (W7): Apple's database, or the drive as Rockbox lists it. */
+    library: "apple" | "rockbox";
+    /** The same iPod's other library, as a source over the same drive (made once, then the same). */
+    counterpart(): Promise<RootSource>;
+    /** Drops what it read of the iPod, so it is read again the next time it is shown (its database changed). */
+    forget?(): void;
+  };
 };

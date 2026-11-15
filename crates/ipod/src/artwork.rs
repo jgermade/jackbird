@@ -536,6 +536,52 @@ pub fn scale(rgb: &[u8], w: u32, h: u32, tw: u16, th: u16) -> Vec<u8> {
     out
 }
 
+impl Image {
+    /// Its largest size, the one a cover is shown from.
+    pub fn largest(&self) -> Option<&Thumb> {
+        self.thumbs
+            .iter()
+            .max_by_key(|t| u32::from(t.width) * u32::from(t.height))
+    }
+}
+
+/// A cover's pixels from its size's slot (the `size` bytes at `offset` in its file): its width,
+/// the height shown and the RGB rows. The slot is a square of the larger side, its rows padded to
+/// 4 bytes, so a 240×239 cover's rows are 480 bytes apart, not its bytes over its height. A cover
+/// Apple centres keeps blank rows above it (`top`): they are left out. `None` for an empty size.
+pub fn cover_rgb(slot: &[u8], thumb: &Thumb) -> Option<(u16, u16, Vec<u8>)> {
+    let rows = usize::from(thumb.height);
+    if rows == 0 || thumb.width == 0 {
+        return None;
+    }
+    let side = usize::from(thumb.width.max(thumb.height));
+    let row_bytes = (side * 2).div_ceil(4) * 4;
+    let top = usize::try_from(thumb.top.max(0)).unwrap_or(0).min(rows);
+    let height = thumb.height - top as u16;
+    if height == 0 {
+        return None;
+    }
+    let rest = slot.get(top * row_bytes..).unwrap_or(&[]);
+    Some((thumb.width, height, decode(rest, thumb.width, height, row_bytes)))
+}
+
+/// A cover as a PNG, from its size's slot ([`cover_rgb`]): 8-bit RGB, written with `fdeflate`'s
+/// fast mode (a cover a little larger, made many times faster).
+#[cfg(feature = "png")]
+pub fn cover_png(slot: &[u8], thumb: &Thumb) -> Option<Vec<u8>> {
+    let (width, height, rgb) = cover_rgb(slot, thumb)?;
+    let mut out = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut out, u32::from(width), u32::from(height));
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Fast);
+        let mut writer = encoder.write_header().ok()?;
+        writer.write_image_data(&rgb).ok()?;
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

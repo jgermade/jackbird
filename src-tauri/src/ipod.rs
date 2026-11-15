@@ -78,6 +78,55 @@ pub async fn ipod_mounts() -> Answer<Vec<String>> {
     .await
 }
 
+/// What the iPod's foot and sheet show beside its songs (W5, `RECORD/2026-11-14.ipod-sync.WIP.md`):
+/// what it says of itself, its database's checksum scheme, and its drive's size and free space.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IpodInfoJson {
+    model_number: Option<String>,
+    family_id: Option<String>,
+    firmware: Option<String>,
+    serial: Option<String>,
+    rockbox: Option<String>,
+    checksum: Option<u16>,
+    total: Option<u64>,
+    free: Option<u64>,
+    artwork_bytes: Option<u64>,
+    photo_bytes: Option<u64>,
+    rockbox_bytes: Option<u64>,
+}
+
+/// [`IpodInfoJson`] of the iPod at `path`.
+#[tauri::command]
+pub async fn ipod_info(path: String) -> Answer<IpodInfoJson> {
+    let root = ipod_at(&path)?;
+    blocking(move || {
+        let info = listing::info(&root);
+        Ok(IpodInfoJson {
+            model_number: info.facts.model_number,
+            family_id: info.facts.family_id,
+            firmware: info.facts.firmware,
+            serial: info.facts.serial,
+            rockbox: info.facts.rockbox,
+            checksum: info.checksum,
+            total: info.space.map(|s| s.total),
+            free: info.space.map(|s| s.free),
+            artwork_bytes: Some(info.content.artwork),
+            photo_bytes: Some(info.content.photos),
+            rockbox_bytes: Some(info.content.rockbox),
+        })
+    })
+    .await
+}
+
+/// Ejects an iPod (W6, `RECORD/2026-11-14.ipod-sync.WIP.md`): the interface closes its root
+/// first, then the system is asked to eject its drive; the error is what the system said.
+#[tauri::command]
+pub async fn ipod_eject(path: String) -> Answer<()> {
+    let root = ipod_at(&path)?;
+    blocking(move || listing::eject(&root).map_err(|why| failure("eject", why))).await
+}
+
 /// Opens an iPod as a root (its files reachable for playing, as a folder's).
 #[tauri::command]
 pub fn ipod_open(app: AppHandle, path: String) -> Answer<Opened> {

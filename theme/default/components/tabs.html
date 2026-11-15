@@ -16,8 +16,10 @@
   // drop-down; there the chosen one has its × when `closable` (Delete closes
   // it from the keyboard), and `addLabel` adds a last option that emits `add`
   // (disabled with `addDisabled`). That tab is a customizable `<select>`
-  // (`appearance: base-select`): its `<button>` shows the chosen `<option>`
-  // through `<selectedcontent>`, and where the browser has no base-select it
+  // (`appearance: base-select`): its `<button>` shows the chosen item, drawn
+  // here from it (not `<selectedcontent>`: the browser's copy of an option
+  // reached jq79 outside the option's `:each`, and it had to be copied again
+  // whenever a count changed), and where the browser has no base-select it
   // is a plain native select that still works.
   // `plain` drops the bar's own chassis, for a bar inside another one (a
   // modal's header). An item's `tone` (`go`, `edit` or `danger`) gives its
@@ -55,8 +57,6 @@
   $: chosen = items.find((item: Item) => item.id === model) ?? null
   const hasMeta = (item: Item): boolean => item.meta !== undefined && item.meta !== null && item.meta !== ""
 
-  // `<selectedcontent>` copies the chosen option when the choice changes, not
-  // when the option's text does (a count while a folder loads): copy it again.
   // The drop-down: an item is chosen, or "add" asks for one (and the choice
   // goes back to what it was, since nothing was chosen).
   const picked = (event: Event) => {
@@ -81,17 +81,6 @@
       $emit("close", chosen.id)
     }
   }
-
-  const refresh = () => {
-    const select = $self("select.pick") as HTMLSelectElement | null
-    if (!select || select.selectedIndex < 0) return
-    const index = select.selectedIndex
-    select.selectedIndex = -1
-    select.selectedIndex = index
-  }
-  // The `$:` reads what is shown, so it runs again whenever any of it changes.
-  const refreshSoon = (_shown: string) => requestAnimationFrame(refresh)
-  $: refreshSoon(items.map((item: Item) => `${item.id} ${item.label} ${item.meta ?? ""}`).join("|") + model)
 
   const choose = (id: string) => {
     if (id === model) return
@@ -144,7 +133,7 @@
     <div class="tab on picked">
       <select class="pick" :aria-label="label || null" @change="picked($event)" @keydown="pickKey($event)">
         <button type="button" class="pick-button">
-          <selectedcontent></selectedcontent>
+          <span class="shown"><span class="pick-label">{{ chosen?.label ?? "" }}</span><span :if="chosen && hasMeta(chosen)" class="meta">{{ chosen?.meta }}</span></span>
           <svg class="pick-caret" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         <option :each="item in items" :key="item.id" class="pick-option" :value="item.id" :selected="item.id === model">
@@ -231,7 +220,7 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .pick-button selectedcontent { display: flex; align-items: center; gap: var(--mm-space-2); min-width: 0; overflow: hidden; }
+  .pick-button .shown { display: flex; align-items: center; gap: var(--mm-space-2); min-width: 0; overflow: hidden; }
   .pick-caret { flex: none; width: .625rem; height: .625rem; margin-left: auto; color: var(--mm-fg-muted); transition: transform var(--mm-duration) var(--mm-ease); }
   .pick:open .pick-caret { transform: rotate(180deg); }
   .pick::picker(select) {
@@ -271,7 +260,6 @@
   }
   @media (hover: hover) { .pick-close:hover { background: var(--mm-sunken); color: var(--mm-fg); } }
   .pick-close svg { width: .625rem; height: .625rem; }
-  .pick-button selectedcontent .pick-close { display: none; }
   .pick-rule { margin: var(--mm-space-1) 0; border: 0; border-top: var(--mm-border-width) solid var(--mm-border); }
   .pick-add svg { width: .75rem; height: .75rem; color: var(--mm-accent-ink); }
   .pick-add:disabled { opacity: .45; cursor: default; }

@@ -15,7 +15,10 @@ import type { ServiceClient } from "./service";
  * Asks for a folder to open: the browser's picker, the system's dialog, or the service's; with
  * `server`, a folder of that server's machine (E6b-D11). Null when the person cancels.
  */
-export async function pickSource(server?: ServiceClient): Promise<RootSource | null> {
+export async function pickSource(server?: ServiceClient, options: { ipod?: boolean } = {}): Promise<RootSource | null> {
+  // An iPod in a browser (W4, RECORD/2026-11-14.ipod-sync.WIP.md): the drive is this computer's,
+  // even where a service serves the page, so the browser's own picker.
+  if (options.ipod && !isDesktop) return pickInBrowser(true);
   // A folder of the phone (E6b-D9): Android's own folder picker, which grants that folder alone.
   if (isPhone && !server) return (await import("./phone")).pickPhoneFolder();
   if (server) {
@@ -40,11 +43,23 @@ export async function pickSource(server?: ServiceClient): Promise<RootSource | n
     const path = await (await import("../folders")).chooseMachineFolder();
     return path === null ? null : (await import("./service")).openServiceFolder(path);
   }
+  return pickInBrowser(false);
+}
+
+/**
+ * A folder through the browser's picker. A folder holding an iPod's database opens as the iPod
+ * (lib/sources/ipod-web.ts); with `ipodOnly`, any other folder is refused.
+ */
+async function pickInBrowser(ipodOnly: boolean): Promise<RootSource | null> {
   // A browser with no File System Access (Safari, Firefox): the folder, to read only.
   // Imported up front, not on the click: Safari opens the input's dialog only straight from it.
   const access = folderAccessHere();
-  if (access === "read") return pickReadOnlySource();
-  return pickBrowserSource(t(access === "none" ? "sources.noFolders" : "message.noFsa"));
+  const picked = access === "read" ? await pickReadOnlySource() : await pickBrowserSource(t(access === "none" ? "sources.noFolders" : "message.noFsa"));
+  if (!picked) return null;
+  const ipod = await (await import("./ipod-web")).asWebIpod(picked);
+  if (ipod) return ipod;
+  if (ipodOnly) throw new Error(t("sources.notAnIpod"));
+  return picked;
 }
 
 /** Reopens what the session kept of a root; null when it cannot be (no permission, a path gone, the other runtime's). */
