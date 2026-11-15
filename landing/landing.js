@@ -174,38 +174,14 @@ fetch("https://api.github.com/repos/jgermade/jackbird/releases/latest", { header
   })
   .catch(() => {});
 
-// ---- the compact player over the window ------------------------------------------------------
-
-// A release from before the compact player's capture: no such picture; it is left out.
-for (const img of document.querySelectorAll(".mini img")) {
-  img.addEventListener("error", () => img.closest(".mini")?.remove(), { once: true });
-}
-
-// ---- the stage: the window's tilt, and the app itself -------------------------------------------
+// ---- the demo: its captures, then the demo itself ---------------------------------------------
 
 const stage = document.querySelector(".stage");
 
-/** The tilt for a pointer at (x, y), each 0 to 1 across the stage: the window turns to face it. */
-function tiltFor(x, y) {
-  return { x: `${((0.5 - y) * 2).toFixed(2)}deg`, y: `${((x - 0.5) * 3 - 1.5).toFixed(2)}deg` };
-}
-
-/** The window turns to face the pointer over the stage, and back to rest (the stylesheet's) when it leaves. */
-function followPointer(area) {
-  area.addEventListener("pointermove", (event) => {
-    const box = area.getBoundingClientRect();
-    const tilt = tiltFor((event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
-    area.style.setProperty("--tilt-x", tilt.x);
-    area.style.setProperty("--tilt-y", tilt.y);
-  });
-  area.addEventListener("pointerleave", () => {
-    area.style.removeProperty("--tilt-x");
-    area.style.removeProperty("--tilt-y");
-  });
-}
-
-if (matchMedia("(hover: hover)").matches && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-  if (stage) followPointer(stage);
+// A capture that does not load (a release from before it, or a local build without the release's
+// captures) is left out: its frame keeps its size, empty, until the demo draws in it.
+for (const img of document.querySelectorAll(".stage .frame img, .handset img")) {
+  img.addEventListener("error", () => img.remove(), { once: true });
 }
 
 /** The embedded apps: the windows on the stage, and the phone's. */
@@ -217,11 +193,12 @@ function tellTone() {
 }
 
 /**
- * The app itself in `place`, over its screenshots: hidden, and they shown, until it says it has drawn
- * its music (`jackbird:drawn`, src/main.ts); a page loaded but drawing slowly shows itself anyway
- * after a while. Shown on the frame's load alone, the half-drawn app let the screenshots through it.
+ * The app itself in `into` (within `place`), over its captures: hidden, and they shown, until it says
+ * it has drawn its music (`jackbird:drawn`, src/main.ts); a page loaded but drawing slowly shows
+ * itself anyway after a while. Shown on the frame's load alone, the half-drawn app let the captures
+ * through it.
  */
-function embedApp(place, kind, title) {
+function embedApp(place, into, kind, title) {
   const live = document.createElement("iframe");
   live.className = "live";
   live.title = title;
@@ -232,16 +209,17 @@ function embedApp(place, kind, title) {
     if (event.origin === location.origin && event.source === live.contentWindow && event.data?.type === "jackbird:drawn") show();
   });
   live.addEventListener("load", () => setTimeout(show, 15000), { once: true });
-  place.append(live);
+  into.append(live);
   lives.push(live);
 }
 
-// On a computer the app itself takes the screenshots' place as the page loads: the windows on the
-// stage, and the app as a phone draws it in the phone's picture. A phone keeps the screenshots.
+// On a computer the app itself takes its captures' place as the page loads: the windows in the
+// stage's frame, and the app as a phone draws it in the phone's picture. A phone keeps the captures.
 if (matchMedia("(min-width: 901px)").matches) {
-  if (stage) embedApp(stage, "", "jackbird, with the sample music");
+  const frame = stage?.querySelector(".frame");
+  if (stage && frame) embedApp(stage, frame, "", "jackbird, with the sample music");
   const handset = document.querySelector(".handset");
-  if (handset) embedApp(handset, "phone", "jackbird on a phone, with the sample music");
+  if (handset) embedApp(handset, handset, "phone", "jackbird on a phone, with the sample music");
 }
 
 // The two are one player: the phone follows the windows' (src/lib/mirror.ts), so nothing here

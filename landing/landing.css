@@ -215,30 +215,18 @@ h1 em {
 /* ---- the app's window --------------------------------------------------------------------- */
 
 .shot { display: grid; justify-items: center; gap: var(--mm-space-4); }
-/* The desktop app in a very slight perspective, turned towards the page's middle, and the compact
-   player in front of it over its bottom left corner, as two windows on a desk. */
-.stage { position: relative; width: 100%; padding: 0 0 1.5rem 0; perspective: 160rem; }
-.stage .window { transform: rotateY(var(--tilt-y, -2deg)) rotateX(var(--tilt-x, 1deg)); transform-origin: 70% 50%; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
-.mini {
-  position: absolute;
-  left: 4.5rem;
-  bottom: 0;
-  width: min(32%, 26rem);
-  margin: 0;
-  overflow: hidden;
-  border: var(--mm-border-width) solid var(--mm-border-strong);
-  border-radius: var(--mm-radius-lg);
-  /* As the embedded app draws it, where a longer shadow would be cut by the iframe. */
-  box-shadow: 0 .5rem .875rem rgba(0, 0, 0, .3), 0 .125rem .375rem rgba(0, 0, 0, .2);
-  transform: rotateY(-1deg) translateZ(4rem);
-  transition: transform .8s cubic-bezier(.2, .7, .2, 1);
-}
-.mini img { display: block; width: 100%; height: auto; }
-/* The app itself, loaded with the page on a computer: an iframe over the stage, the screenshots
-   kept under it for its size, and shown until it has loaded. */
-.stage .live { position: absolute; inset: -1.5rem -1.5rem 0; width: calc(100% + 3rem); height: calc(100% + 1.5rem); border: 0; background: transparent; }
-.stage.live-on .window, .stage.live-on .mini { visibility: hidden; }
-/* Hidden until it has drawn its music (landing.js), then in place of the screenshots at once. */
+/* The demo's stage. Its frame is the embedded demo's size: 1.5rem wider than the stage each side
+   and above it, room for the demo's shadows, and 1078 by 724 in shape, as the release captures it
+   (scripts/screenshots.cjs; 1078px wide where the stage is 1024px, which it is on most computers).
+   The capture fills it, then the demo, over it. */
+.stage { position: relative; width: 100%; }
+.stage .frame { position: relative; margin: -1.5rem -1.5rem 0; aspect-ratio: 1078 / 724; }
+.stage .frame img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage .live { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+.stage.live-on .frame img { visibility: hidden; }
+/* A phone's page has 1rem each side, and no demo over the capture: the frame no wider than it. */
+@media (max-width: 640px) { .stage .frame { margin: -1rem -1rem 0; } }
+/* Hidden until it has drawn its music (landing.js), then in place of the capture at once. */
 .stage .live, .handset .live { opacity: 0; }
 .stage.live-on .live, .handset.live-on .live { opacity: 1; }
 /* The invitation to the demo, when the embedded app is asked for a folder. */
@@ -263,27 +251,6 @@ h1 em {
 .invite p { grid-column: 1 / -1; margin: 0; color: var(--mm-fg-muted); }
 .invite strong { color: var(--mm-fg); }
 
-/* Narrow screens: flat, the compact player under the window's corner, smaller. */
-@media (max-width: 640px) {
-  .stage { padding-bottom: 2.5rem; }
-  .stage .window { transform: none; }
-  .mini { left: .5rem; width: 55%; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) { .stage .window, .mini { transition: none; } }
-.window {
-  width: 100%;
-  margin: 0;
-  overflow: hidden;
-  border: var(--mm-border-width) solid var(--mm-border-strong);
-  border-radius: var(--mm-radius-lg);
-  background: var(--mm-chassis);
-  box-shadow: var(--mm-shadow-lg);
-}
-.window-bar { display: flex; gap: .4rem; padding: .6rem .9rem; border-bottom: var(--mm-border-width) solid var(--mm-border); }
-.window-bar span { width: .65rem; height: .65rem; border-radius: 50%; background: var(--mm-led-off); box-shadow: var(--mm-led-inset); }
-.window-bar span:nth-child(1) { background: var(--mm-stripe-3); }
-.window-bar span:nth-child(2) { background: var(--mm-stripe-2); }
-.window-bar span:nth-child(3) { background: var(--mm-stripe-1); }
 :root[data-theme="dark"] .only-light, :root:not([data-theme="dark"]) .only-dark { display: none; }
 .caption { margin: var(--mm-space-5) 0 0; font-size: var(--mm-text-sm); color: var(--mm-fg-muted); text-align: center; }
 .caption span { display: block; font-size: var(--mm-text-xs); color: var(--mm-fg-subtle); }
@@ -349,7 +316,9 @@ h1 em {
   box-shadow: var(--mm-shadow-lg), 0 0 0 1px var(--mm-border-strong);
   transform: rotate(-4deg);
 }
-.handset img { display: block; width: 100%; height: auto; }
+/* The demo as a phone draws it, 324 by 551 in shape (18rem wide, as the release captures it). */
+.handset { aspect-ratio: 324 / 551; }
+.handset img { display: block; width: 100%; height: 100%; }
 .handset .live { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 .handset.live-on img { visibility: hidden; }
 .phone .statement {
