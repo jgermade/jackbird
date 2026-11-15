@@ -261,5 +261,14 @@ export type RootSource = {
    * files are not hashed. `web`: opened in a browser (lib/sources/ipod-web.ts), only read; its
    * `path` is its drive's name.
    */
-  readonly ipod?: { path: string; pidOf(path: string): Promise<string | undefined>; web?: boolean; info(): Promise<IpodDeviceInfo> };
+  readonly ipod?: {
+    path: string;
+    pidOf(path: string): Promise<string | undefined>;
+    web?: boolean;
+    info(): Promise<IpodDeviceInfo>;
+    /** Which of its libraries this root lists (W7): Apple's database, or the drive as Rockbox lists it. */
+    library: "apple" | "rockbox";
+    /** The same iPod's other library, as a source over the same drive (made once, then the same). */
+    counterpart(): Promise<RootSource>;
+  };
 };

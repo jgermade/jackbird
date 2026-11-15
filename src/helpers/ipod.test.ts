@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { IPOD_DATABASES, folded, formatDriveSize, inGroups, ipodModel, ipodUsage, libraryCounts, usageParts, ipodCoverName, ipodSongMetadata, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
+import { IPOD_DATABASES, folded, formatDriveSize, inGroups, ipodModel, ipodUsage, libraryCounts, rockboxLibraryPaths, usageParts, ipodCoverName, ipodSongMetadata, isSendable, likelyDuplicates, songKey } from "./ipod.ts";
 
 describe("sending to an iPod", () => {
   it("folds names: case, accents, spaces and punctuation aside", () => {
@@ -137,5 +137,37 @@ describe("an iPod's foot and sheet", () => {
     assert.equal(formatDriveSize(15_803_000_000, "es"), "15,8 GB");
     assert.equal(formatDriveSize(980_000_000, "en"), "980 MB");
     assert.equal(formatDriveSize(1_500, "en"), "1.5 KB");
+  });
+});
+
+describe("an iPod's Rockbox library", () => {
+  it("holds the drive's files as Rockbox's database does", () => {
+    const drive = [
+      "Music/A/01.mp3",
+      "Music/A/._01.mp3",
+      ".rockbox/rocks/viewers/x.rock",
+      ".Trashes/501/old.mp3",
+      "iPod_Control/Music/F00/ABCD.mp3",
+      "Podcasts/database.ignore",
+      "Podcasts/show/1.mp3",
+      "Podcasts/keep/database.unignore",
+      "Podcasts/keep/2.mp3",
+      "Podcasts/keep/deeper/3.mp3",
+      "database.ignore.txt",
+      "song.mp3"
+    ];
+    assert.deepEqual(rockboxLibraryPaths(drive), [
+      "Music/A/01.mp3",
+      "iPod_Control/Music/F00/ABCD.mp3",
+      "Podcasts/keep/database.unignore",
+      "Podcasts/keep/2.mp3",
+      "Podcasts/keep/deeper/3.mp3",
+      "database.ignore.txt",
+      "song.mp3"
+    ]);
+  });
+
+  it("leaves out the whole drive when its root says so", () => {
+    assert.deepEqual(rockboxLibraryPaths(["database.ignore", "Music/a.mp3"]), []);
   });
 });

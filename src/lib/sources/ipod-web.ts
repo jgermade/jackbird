@@ -8,9 +8,9 @@
 // time, each made from its slot of the image files (read with `File.slice`: an `.ithmb` is tens of
 // MB, and only the slots shown are read).
 
-import { FSAAdapter, MemoryAdapter, type WalkedFile } from "@cloudauthn/vfs-sync";
+import { FSAAdapter, MemoryAdapter, walk, type WalkedFile } from "@cloudauthn/vfs-sync";
 import { audioMimeType } from "../../helpers/formats";
-import { IPOD_ARTWORK, IPOD_DATABASES, inGroups, ipodCoverName, ipodSongMetadata } from "../../helpers/ipod";
+import { IPOD_ARTWORK, IPOD_DATABASES, inGroups, ipodCoverName, ipodSongMetadata, rockboxLibraryPaths } from "../../helpers/ipod";
 import type { Inspection, IpodDeviceInfo, MediaHandle, RootSource, TagsBatch } from "../../types";
 import type { IpodDb, IpodImage, IpodListing, IpodSong } from "../ipod-db/wasm";
 import { fileOf } from "./browser";
@@ -22,16 +22,22 @@ export type DriveFiles = {
   readonly name: string;
   /** A file by its path under the drive; null when it has none. */
   file(path: string): Promise<File | null>;
+  /** Every file on the drive, with its size and date (W7: the Rockbox library). */
+  list(): Promise<WalkedFile[]>;
 };
 
 /** A drive through a folder's handle (Chrome, Edge). */
 export function handleDrive(handle: FileSystemDirectoryHandle): DriveFiles {
-  return { name: handle.name, file: (path) => fileOf(handle, path).catch(() => null) };
+  return { name: handle.name, file: (path) => fileOf(handle, path).catch(() => null), list: () => walk(FSAAdapter.fromHandle(handle)) };
 }
 
 /** A drive through a folder input's files, by their path under it (Safari, Firefox). */
 export function filesDrive(name: string, files: ReadonlyMap<string, File>): DriveFiles {
-  return { name, file: async (path) => files.get(path) ?? null };
+  return {
+    name,
+    file: async (path) => files.get(path) ?? null,
+    list: async () => [...files].map(([path, file]) => ({ path, stat: { kind: "file", size: file.size, mtime: file.lastModified } }))
+  };
 }
 
 /** The drive's database, the first of IPOD_DATABASES it has; null when it is not an iPod. */
@@ -74,6 +80,83 @@ const bytesOf = async (file: Blob): Promise<Uint8Array> => new Uint8Array(await 
 
 /** Lets the page draw between batches. */
 const breathe = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** Plays a file of the drive from the drive itself: a slice of its `File`, typed by extension. */
+async function driveMedia(drive: DriveFiles, path: string): Promise<MediaHandle> {
+  const file = await drive.file(path);
+  if (!file) throw new DOMException(`Not found: ${path}`, "NotFoundError");
+  // An iPod's AAC songs (`.m4a`, which the app's formats do not list) as MPEG-4 audio.
+  const type = audioMimeType(path) || (/\.m4[ab]$/i.test(path) ? "audio/mp4" : file.type);
+  const url = URL.createObjectURL(file.slice(0, file.size, type));
+  return {
+    url,
+    changed: async () => {
+      const now = await drive.file(path);
+      return !now || now.size !== file.size || now.lastModified !== file.lastModified;
+    },
+    release: () => URL.revokeObjectURL(url)
+  };
+}
+
+/** How many of the Rockbox library's files are read at once, and handed over in one batch. */
+const ROCKBOX_READERS = 4;
+const ROCKBOX_PER_BATCH = 24;
+
+/**
+ * The Rockbox library of an iPod in a browser (W7): its drive as Rockbox's database lists it
+ * (helpers/ipod.ts's `rockboxLibraryPaths`), each file's tags read from its head and tail only
+ * (lib/tags's `readBlobTags`: the files are read over USB), with no checksum. Only read, as its
+ * Apple library.
+ */
+export function rockboxWebSource(drive: DriveFiles, apple: RootSource): RootSource {
+  const readOnly = (path: string): Error => new DOMException(`Read-only: ${path}`, "NoModificationAllowedError");
+  const tagsOf = async (path: string): Promise<TagsBatch["tracks"][number]> => {
+    const file = await drive.file(path);
+    if (!file) throw new DOMException(`Not found: ${path}`, "NotFoundError");
+    const { readBlobTags } = await import("../tags");
+    return { path, size: file.size, lastModified: file.lastModified, metadata: await readBlobTags(file) };
+  };
+  return {
+    kind: "browser",
+    readOnly: true,
+    ipod: { path: drive.name, web: true, pidOf: async () => undefined, info: apple.ipod!.info, library: "rockbox", counterpart: async () => apple },
+    // Named as its Apple library is (its master playlist's name): the same tab, whichever it shows.
+    vfs: new MemoryAdapter(apple.vfs.name || drive.name),
+    saved: `ipod-web-rockbox:${drive.name}:${Date.now()}`,
+    async walk(): Promise<WalkedFile[]> {
+      const all = await drive.list();
+      const kept = new Set(rockboxLibraryPaths(all.map((file) => file.path)));
+      return all.filter((file) => kept.has(file.path));
+    },
+    async scanTags(paths, _knownCovers, take) {
+      const groups = inGroups(paths, ROCKBOX_PER_BATCH);
+      if (groups.length === 0) take({ done: true, tracks: [], covers: [], unread: [] });
+      for (const [index, group] of groups.entries()) {
+        const tracks: TagsBatch["tracks"] = [];
+        const unread: TagsBatch["unread"] = [];
+        let next = 0;
+        const reader = async (): Promise<void> => {
+          while (next < group.length) {
+            const path = group[next++];
+            await tagsOf(path).then(
+              (track) => void tracks.push(track),
+              (error: unknown) => void unread.push({ path, message: error instanceof Error ? error.message : String(error) })
+            );
+          }
+        };
+        await Promise.all(Array.from({ length: ROCKBOX_READERS }, reader));
+        take({ done: index === groups.length - 1, tracks, covers: [], unread });
+      }
+    },
+    async inspect(path): Promise<Inspection> {
+      const track = await tagsOf(path);
+      return { size: track.size, lastModified: track.lastModified, fullChecksum: "", audioChecksum: "", metadata: track.metadata };
+    },
+    save: (path) => Promise.reject(readOnly(path)),
+    openMedia: (path) => driveMedia(drive, path),
+    close: () => undefined
+  };
+}
 
 /** An iPod's root over a drive that holds a database (`database`, found by ipodDatabase). */
 export async function webIpodSource(drive: DriveFiles, database: File): Promise<RootSource> {
@@ -120,12 +203,15 @@ export async function webIpodSource(drive: DriveFiles, database: File): Promise<
   const readOnly = (path: string): Error => new DOMException(`Read-only: ${path}`, "NoModificationAllowedError");
   const label = listing.name || drive.name;
 
-  return {
+  let rockbox: RootSource | null = null;
+  const self: RootSource = {
     kind: "browser",
     readOnly: true,
     ipod: {
       path: drive.name,
       web: true,
+      library: "apple",
+      counterpart: async () => (rockbox ??= rockboxWebSource(drive, self)),
       pidOf: async (path) => songs.get(path)?.pid,
       // What it says of itself; a browser cannot know a drive's size or free space.
       async info(): Promise<IpodDeviceInfo> {
@@ -182,21 +268,9 @@ export async function webIpodSource(drive: DriveFiles, database: File): Promise<
     save: (path) => Promise.reject(readOnly(path)),
     async openMedia(path): Promise<MediaHandle> {
       listed(path);
-      const file = await drive.file(path);
-      if (!file) throw new DOMException(`Not found: ${path}`, "NotFoundError");
-      // Typed by extension: a slice is still the file on the drive, not read into memory.
-      // An iPod's AAC songs (`.m4a`, which the app's formats do not list) as MPEG-4 audio.
-      const type = audioMimeType(path) || (/\.m4[ab]$/i.test(path) ? "audio/mp4" : file.type);
-      const url = URL.createObjectURL(file.slice(0, file.size, type));
-      return {
-        url,
-        changed: async () => {
-          const now = await drive.file(path);
-          return !now || now.size !== file.size || now.lastModified !== file.lastModified;
-        },
-        release: () => URL.revokeObjectURL(url)
-      };
+      return driveMedia(drive, path);
     },
     close: () => undefined
   };
+  return self;
 }

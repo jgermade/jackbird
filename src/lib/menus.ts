@@ -96,8 +96,9 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
   if (root?.source.ipod) {
     // Its songs are its database's: never edited, renamed or removed as a folder's files are.
     const kept = items.filter((item) => !["edit", "rename", "remove", "playlist"].includes(item.id));
-    // In a browser it is only read: nothing is taken off it there (RECORD/2026-11-14.ipod-sync.WIP.md, W3).
-    if (root.source.ipod.web) return styled(kept);
+    // In a browser it is only read, and its Rockbox library is files, not Apple's database: nothing
+    // is taken off it there (RECORD/2026-11-14.ipod-sync.WIP.md, W3 and W7).
+    if (root.source.ipod.web || root.source.ipod.library !== "apple") return styled(kept);
     return styled([...kept, { id: "removeFromIpod", label: tn("menu.removeFromIpod", count), danger: true, rule: true }]);
   }
   return allowed(items);

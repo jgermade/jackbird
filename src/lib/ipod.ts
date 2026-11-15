@@ -11,7 +11,7 @@ import { t, tn } from "./i18n";
 import { library } from "./library";
 import { isDesktop, isPhone } from "./platform";
 import { closeRoot, hydrateRoot, updateRoots } from "./roots";
-import { loadIpodInfo } from "./ipod-info";
+import { loadIpodInfo, preferredLibrary } from "./ipod-info";
 import type { IpodInfo } from "./sources/ipod";
 
 /** What the iPod dialog asks. */
@@ -126,7 +126,8 @@ export async function openIpodRoot(info: IpodInfo): Promise<void> {
       await lookForIpods();
     }
     const fresh = ipods.found.find((one) => one.path === info.path) ?? info;
-    await hydrateRoot(await openIpod(fresh), { rootLabel: fresh.name, groupingMode: "wizard" });
+    // On the library last shown for it: Apple's, or Rockbox's when it has Rockbox (W7).
+    await hydrateRoot(await preferredLibrary(await openIpod(fresh)), { rootLabel: fresh.name, groupingMode: "wizard" });
     library.infoMessage = t("ipod.opened");
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : String(error);
@@ -138,6 +139,11 @@ async function reloadIpod(path: string): Promise<void> {
   const open = ipodRoots().find((root) => root.source.ipod?.path === path);
   const info = ipods.found.find((one) => one.path === path);
   if (!open || !info) return;
+  // Showing its Rockbox library: songs sent went into Apple's database, not into Rockbox's files.
+  if (open.source.ipod?.library !== "apple") {
+    void loadIpodInfo(open.id, true);
+    return;
+  }
   const { openIpod } = await import("./sources/ipod");
   await hydrateRoot(await openIpod(info), { rootId: open.id, rootLabel: open.label, setActive: false });
   // Its space changed: its foot and sheet asked again.

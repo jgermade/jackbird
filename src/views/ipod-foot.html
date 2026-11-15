@@ -7,12 +7,13 @@
   // lib/ipod-info.ts.
 
   const Key = await import("../../theme/default/components/key.html")
+  const KeySelect = await import("../../theme/default/components/key-select.html")
   const UsageBar = await import("../../theme/default/components/usage-bar.html")
 
   const { formatDriveSize, ipodUsage, libraryCounts } = await import("../helpers/ipod")
   const { t, tn } = await import("../lib/i18n")
   const { preferences } = await import("../lib/preferences")
-  const { infoOf, loadIpodInfo, showIpodSheet, showsIpodSheet, spaceBar } = await import("../lib/ipod-info")
+  const { hasRockbox, infoOf, libraryOf, loadIpodInfo, showIpodLibrary, showIpodSheet, showsIpodSheet, spaceBar } = await import("../lib/ipod-info")
   const { activeRoot } = await import("../lib/workspace")
   const { ejectIpod, ipods, ipodsHere } = await import("../lib/ipod")
   // Ejecting from the foot: the desktop app's iPods (a browser cannot eject a drive).
@@ -38,6 +39,13 @@
     return u.total !== null && u.used !== null ? t("ipod.foot.space", { used: size(u.used), total: size(u.total) }) : t("ipod.foot.music", { size: size(u.music) })
   }
   const songsText = (): string => tn("tracks.count", counts().songs)
+  // Which library the root shows, where Rockbox is on the drive (W7): its own key, beside the one
+  // that opens the sheet.
+  const libraries = () => [
+    { value: "apple", label: t("ipod.library.apple"), title: t("ipod.library.appleTitle") },
+    { value: "rockbox", label: t("ipod.library.rockbox"), title: t("ipod.library.rockboxTitle") }
+  ]
+  const choose = (which: string): void => void showIpodLibrary(root()!.id, which === "rockbox" ? "rockbox" : "apple")
 </script>
 
 <div :if="isIpod()" class="ipod-foot" :class.is-open="showsIpodSheet(root())">
@@ -49,27 +57,34 @@
     </span>
     <UsageBar :if="spaceBar(root())" :parts="spaceBar(root()).parts" :max="spaceBar(root()).max" :label="t('ipod.foot.meter')" />
   </button>
+  <span :if="hasRockbox(root())" class="libraries"><KeySelect size="sm" :label="t('ipod.library.label')" :options="libraries()" :model="libraryOf(root())" @change="choose($event.detail)" /></span>
   <span :if="canEject()" class="eject"><Key square size="sm" variant="ghost" :disabled="ipods.busy" :label="t('ipod.ejectLabel', { name: root().label })" :title="t('ipod.ejectLabel', { name: root().label })" @click="ejectIpod(root().source.ipod.path)">
     <svg class="icon eject-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 2.75 13.25 9H2.75z" /><rect x="2.75" y="11" width="10.5" height="1.75" rx=".4" /></svg>
   </Key></span>
 </div>
 
 <style scoped>
-  /* The bar at the pane's bottom: the key to the sheet across it, the eject key at its right. */
+  /* The bar at the pane's bottom: the key to the sheet across it, then the library's switch and the
+     eject key at its right. */
   .ipod-foot {
     position: sticky;
     bottom: 0;
     z-index: 1;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     margin-top: auto;
     border-top: var(--mm-border-width) solid var(--mm-border);
     background: var(--mm-surface);
   }
-  .eject { flex: none; padding-right: var(--mm-space-2); }
+  .eject { flex: none; padding: 0 var(--mm-space-2) var(--mm-space-1) 0; }
+  .libraries { flex: none; padding: 0 var(--mm-space-2) var(--mm-space-1); }
   .eject-icon { color: var(--mm-fg); }
+  /* It keeps room for its name and figures: where the switch and the eject key would squeeze it,
+     they go under it, at the right. */
   .open {
-    flex: 1;
+    flex: 1 1 17rem;
     min-width: 0;
     display: grid;
     gap: var(--mm-space-2);

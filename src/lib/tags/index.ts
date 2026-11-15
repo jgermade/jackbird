@@ -10,8 +10,8 @@ import { editFor } from "../../helpers/cover.ts";
 import { internCoverBytes } from "../covers.ts";
 import { emptyMetadata } from "../../helpers/metadata.ts";
 import type { TrackMetadata } from "../../types.ts";
-import type { WireLayout } from "../../helpers/tagwire.ts";
-import { layoutOf, readOf, writeOf } from "./engine.ts";
+import type { WireLayout, WireTags } from "../../helpers/tagwire.ts";
+import { layoutOf, readBlob, readOf, writeOf } from "./engine.ts";
 import { TagError } from "./error.ts";
 import type { Engine } from "./wasm.ts";
 
@@ -43,6 +43,19 @@ function layoutFor(one: Engine, bytes: Uint8Array): WireLayout {
   return layout;
 }
 
+/** A file's tags as the library holds them, read from a `Blob`'s head and tail only (lib/tags/engine.ts's `readBlob`). */
+export async function readBlobTags(blob: Blob): Promise<TrackMetadata> {
+  const one = await engine();
+  let tags;
+  try {
+    tags = await readBlob(one, blob);
+  } catch (error) {
+    if (!(error instanceof TagError) || error.code === "engine-failed") throw error;
+    tags = null;
+  }
+  return tags ? metadataOf(tags) : emptyMetadata();
+}
+
 /** A file's tags as the library holds them. A file the engine cannot read reads as untagged. */
 export async function readTags(bytes: Uint8Array): Promise<TrackMetadata> {
   const one = await engine();
@@ -59,6 +72,11 @@ export async function readTags(bytes: Uint8Array): Promise<TrackMetadata> {
   if (!tags) {
     return emptyMetadata();
   }
+  return metadataOf(tags);
+}
+
+/** The engine's tags as the library holds them. */
+function metadataOf(tags: WireTags): TrackMetadata {
   return {
     title: tags.fields.title,
     artist: tags.fields.artist,

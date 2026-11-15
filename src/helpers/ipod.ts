@@ -200,3 +200,31 @@ export function usageParts(usage: IpodUsage, content: { artwork: number | null; 
   const told = known.reduce((sum, part) => sum + part.bytes, 0);
   return [...known, { kind: "other" as const, bytes: Math.max(0, usage.used - told) }].filter((part) => part.bytes > 0);
 }
+
+/** Which library of an iPod a root shows (W7): Apple's database, or the drive as Rockbox lists it. */
+export type IpodLibrary = "apple" | "rockbox";
+
+/**
+ * The files of an iPod's drive that Rockbox's library holds (W7), as its database lists them: every
+ * file, but none under a folder that holds a `database.ignore` (a folder below it that holds a
+ * `database.unignore` counts again), and none whose path has a part starting with "." (Rockbox's
+ * own `.rockbox/`, the system's `.Trashes` and `.Spotlight-V100`, macOS's `._` files beside each
+ * file on a FAT drive). Which of them are tracks is the app's own rule (by extension).
+ */
+export function rockboxLibraryPaths(paths: readonly string[]): string[] {
+  const marked = (name: string): Set<string> =>
+    new Set(paths.filter((path) => path === name || path.endsWith(`/${name}`)).map((path) => path.slice(0, Math.max(0, path.length - name.length - 1))));
+  const ignore = marked("database.ignore");
+  const unignore = marked("database.unignore");
+  const ignored = (path: string): boolean => {
+    const parts = path.split("/").slice(0, -1);
+    let out = false;
+    for (let depth = 0; depth <= parts.length; depth += 1) {
+      const folder = parts.slice(0, depth).join("/");
+      if (ignore.has(folder)) out = true;
+      if (unignore.has(folder)) out = false;
+    }
+    return out;
+  };
+  return paths.filter((path) => !path.split("/").some((part) => part.startsWith(".")) && !ignored(path));
+}

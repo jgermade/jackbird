@@ -4,11 +4,13 @@
 // off; and Details showing the iPod's sheet, by a row key no tree row has (IPOD_ROW).
 
 import { $reactive, $toRaw } from "jq79";
-import { IPOD_ROW, formatDriveSize, ipodUsage, libraryCounts, usageParts, type ContentKind } from "../helpers/ipod";
-import type { IpodDeviceInfo, RootWorkspace } from "../types";
+import { IPOD_ROW, formatDriveSize, ipodUsage, libraryCounts, usageParts, type ContentKind, type IpodLibrary } from "../helpers/ipod";
+import type { IpodDeviceInfo, RootSource, RootWorkspace } from "../types";
 import { t } from "./i18n";
 import { library } from "./library";
 import { preferences } from "./preferences";
+import { hydrateRoot } from "./roots";
+import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 import { ui } from "./ui";
 import { setCurrentRow, showWhole } from "./workspace";
 
@@ -82,4 +84,57 @@ export function spaceBar(root: RootWorkspace | null): SpaceBar | null {
     used: usage.used,
     free: usage.free
   };
+}
+
+/** Each iPod's library last shown, by its name: the last part of its mount point or its drive's name (W7). */
+function remembered(): Record<string, IpodLibrary> {
+  try {
+    const parsed: unknown = JSON.parse(readStored(STORAGE_KEYS.ipodLibraries) ?? "{}");
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, IpodLibrary>) : {};
+  } catch {
+    return {};
+  }
+}
+
+const driveName = (path: string): string => path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+
+function remember(path: string, library: IpodLibrary): void {
+  writeStored(STORAGE_KEYS.ipodLibraries, JSON.stringify({ ...remembered(), [driveName(path)]: library }));
+}
+
+/** Whether an iPod's root can show its Rockbox library: Rockbox is on its drive (W7). */
+export const hasRockbox = (root: RootWorkspace | null): boolean => {
+  const info = infoOf(root);
+  return !!info && info.rockbox !== null;
+};
+
+/** The library an iPod's root shows. */
+export const libraryOf = (root: RootWorkspace | null): IpodLibrary => root?.source.ipod?.library ?? "apple";
+
+/**
+ * The source an iPod opens with: the library last shown for it, when that is Rockbox's and Rockbox
+ * is on its drive; else its Apple library, as given.
+ */
+export async function preferredLibrary(apple: RootSource): Promise<RootSource> {
+  const ipod = apple.ipod;
+  if (!ipod || remembered()[driveName(ipod.path)] !== "rockbox") return apple;
+  const info = await ipod.info().catch(() => null);
+  return info && info.rockbox !== null ? ipod.counterpart() : apple;
+}
+
+/**
+ * Shows the active iPod's other library in its root (W7, the foot's switch): the same tab, label
+ * and place, its selection cleared, read again from that library (instant after the first time:
+ * each library keeps what it read). What plays goes on playing. Remembered for the next time.
+ */
+export async function showIpodLibrary(rootId: string, which: IpodLibrary): Promise<void> {
+  const root = $toRaw(library).roots.find((one) => one.id === rootId);
+  const ipod = root?.source.ipod;
+  if (!root || !ipod || ipod.library === which) return;
+  remember(ipod.path, which);
+  try {
+    await hydrateRoot(await ipod.counterpart(), { rootId, rootLabel: root.label, groupingMode: root.groupingMode });
+  } catch (error) {
+    library.errorMessage = error instanceof Error ? error.message : String(error);
+  }
 }

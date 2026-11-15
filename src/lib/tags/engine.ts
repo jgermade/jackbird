@@ -33,6 +33,33 @@ export function layoutOf(engine: Engine, bytes: Uint8Array): WireLayout {
   throw new TagError("unreadable", "where its tags end cannot be found");
 }
 
+/**
+ * A file's tags from a `Blob` (a `File` on a drive), reading only its last bytes and a head that
+ * grows as `layout` asks, never the rest: the web's iPod in its Rockbox library (W7,
+ * RECORD/2026-11-14.ipod-sync.WIP.md), whose files are read over USB. Null for a file the engine
+ * gives no format to.
+ */
+export async function readBlob(engine: Engine, blob: Blob): Promise<WireTags | null> {
+  const length = blob.size;
+  const bytesOf = async (start: number, end: number): Promise<Uint8Array> => new Uint8Array(await blob.slice(start, end).arrayBuffer());
+  const tail = await bytesOf(Math.max(0, length - TAIL_LEN), length);
+  let given = Math.min(FIRST_HEAD, length);
+  let head = await bytesOf(0, given);
+  for (let step = 0; step < MAX_STEPS; step += 1) {
+    const answer = engine.layout(head, tail, length);
+    if ("known" in answer) {
+      const layout = answer.known;
+      if (!layout.format) return null;
+      if (head.length < layout.tagsEnd) head = await bytesOf(0, layout.tagsEnd);
+      return engine.read(head.subarray(0, layout.tagsEnd), layout);
+    }
+    if (answer.needHead <= given || answer.needHead > length) break;
+    given = Math.min(length, Math.max(answer.needHead, given * 2));
+    head = await bytesOf(0, given);
+  }
+  throw new TagError("unreadable", "where its tags end cannot be found");
+}
+
 /** A file's tags, the module given only them. */
 export function readOf(engine: Engine, bytes: Uint8Array, layout: WireLayout): WireTags {
   return engine.read(bytes.subarray(0, layout.tagsEnd), layout);

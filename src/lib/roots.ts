@@ -391,7 +391,9 @@ export async function openFolder(server?: ServiceClient, options: { ipod?: boole
     const source = await pickSource(server, options);
     if (source?.ipod) {
       // An iPod in a browser (lib/sources/ipod-web.ts): by album, as the desktop app opens one.
-      await hydrateRoot(source, { groupingMode: "wizard" });
+      // On the library last shown for it (W7).
+      const { preferredLibrary } = await import("./ipod-info");
+      await hydrateRoot(await preferredLibrary(source), { groupingMode: "wizard" });
       library.infoMessage = t("ipod.openedWeb");
     } else if (source) {
       await hydrateRoot(source, {});

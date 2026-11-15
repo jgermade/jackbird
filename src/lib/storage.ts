@@ -21,7 +21,9 @@ export const STORAGE_KEYS = {
   /** The display spectrum's look: segments or lines (src/helpers/spectrum.ts). */
   spectrumLook: "jackbird.spectrumLook",
   /** How the display spectrum's peaks fall: none, fast, slow or very-slow (src/helpers/spectrum.ts). */
-  peakFall: "jackbird.peakFall"
+  peakFall: "jackbird.peakFall",
+  /** Each iPod's library last shown, Apple's or Rockbox's, by its name (W7, RECORD/2026-11-14.ipod-sync.WIP.md): a JSON object. */
+  ipodLibraries: "jackbird.ipodLibraries"
 } as const;
 
 /**

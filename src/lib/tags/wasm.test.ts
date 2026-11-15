@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { WireEdit } from "../../helpers/tagwire.ts";
-import { layoutOf, readOf, writeOf } from "./engine.ts";
+import { layoutOf, readBlob, readOf, writeOf } from "./engine.ts";
 import { TagError } from "./error.ts";
 import { instantiate, type Engine } from "./wasm.ts";
 
@@ -60,6 +60,13 @@ describe("the tag engine as wasm, on the fixtures", () => {
         }
       });
 
+      it("reads the same from a Blob, its head and tail only", async () => {
+        const tags = await readBlob(engine, new Blob([bytes]));
+        assert.equal(tags?.format, fixture.format);
+        assert.deepEqual(tags?.fields, fixture.fields);
+        assert.equal(tags?.cover ? sha1(tags.cover.data) : null, fixture.cover?.sha1 ?? null);
+      });
+
       it("has its audio region", () => {
         const { start, end } = region(bytes);
         assert.deepEqual({ start, end }, { start: fixture.region.start, end: fixture.region.end });
@@ -105,6 +112,10 @@ describe("the tag engine as wasm", () => {
       () => write(mp3, { fields: { year: "c. 1959" }, cover: keep }),
       (error: unknown) => error instanceof TagError && error.code === "invalid-year" && /c\. 1959/.test(error.message)
     );
+  });
+
+  it("reads nothing from a Blob that is not MP3 or FLAC", async () => {
+    assert.equal(await readBlob(engine, new Blob([new TextEncoder().encode("not audio at all")])), null);
   });
 
   it("gives no format for what is not MP3 or FLAC, and refuses to read it", () => {
