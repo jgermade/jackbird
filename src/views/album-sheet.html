@@ -4,6 +4,7 @@
   // tab bar (faceplate). A view over lib/workspace.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
 
+  const DisplayIcon = await import("../../theme/default/components/display-icon.html")
   const EqBars = await import("../../theme/default/components/eq-bars.html")
   const Key = await import("../../theme/default/components/key.html")
   const Menu = await import("../../theme/default/components/menu.html")
@@ -213,7 +214,7 @@
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-box" :class.numbered="discNumbered(disc)"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span></td>
-                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="formatLabel(track.relativePath)" class="format">{{ formatLabel(track.relativePath) }}</span></span></td>
+                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="formatLabel(track.relativePath)" class="format"><DisplayIcon>{{ formatLabel(track.relativePath) }}</DisplayIcon></span></span></td>
                     <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
@@ -342,23 +343,10 @@
     .pick-box:not(.numbered) { visibility: hidden; }
     .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-visible .pick-box, .mm-table tr:has(:focus-visible) .pick-box { visibility: visible; }
   }
-  /* The track's format after its title, small and in the subtle ink (the owner, 2026-11-16),
-     framed as the library's rows print it (list-row.html). */
   .title-line { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
-  .format {
-    flex: none;
-    padding: .18em .35em .14em;
-    border: 1px solid currentColor;
-    border-radius: .22em;
-    font-family: var(--mm-font-label);
-    font-stretch: var(--mm-stretch-label);
-    font-size: .5625rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: var(--mm-fg-subtle);
-  }
+  /* The track's format, with the display's own icon (display-icon.html), small and in a light
+     grey (the owner, 2026-11-16); never its glow, which is the display's. */
+  .format { flex: none; font-size: .5625rem; line-height: 1; color: color-mix(in srgb, var(--mm-fg-subtle) 70%, transparent); --mm-display-glow: none; }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   /* Room after the length, before the menu's key. */
   /* The length and the menu's key up to the row's end (the owner, 2026-11-16). */

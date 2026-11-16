@@ -99,6 +99,7 @@
     round?: boolean | ""
   }
 
+  const DisplayIcon = await import("./display-icon.html")
   const EqBars = await import("./eq-bars.html")
   const SelectBox = await import("./select-box.html")
 
@@ -156,7 +157,7 @@
     <span :elseif="roomy && !isFolder" class="track-frame" aria-hidden="true"></span>
   </span>
   <span class="label" :class.led="hasLead"><span :if="hasLead" class="lead">{{ lead }}</span><span class="title">{{ label }}</span><span :if="sub" class="sub">{{ sub }}</span></span>
-  <span class="end"><span :if="format" class="format">{{ format }}</span><span class="meta">{{ meta }}</span></span>
+  <span class="end"><span :if="format" class="format"><DisplayIcon>{{ format }}</DisplayIcon></span><span class="meta">{{ meta }}</span></span>
   <span :if="$slots.action" class="action"><slot.action /></span>
   <span :if="isCued" class="cue" aria-hidden="true">
     <EqBars :if="flag(playing)" :active="flag(playingActive)" :source="playingSource" />
@@ -287,24 +288,10 @@
   /* A folder (an artist, an album) that holds the track playing: its name in the accent too. */
   .holds .title { color: var(--mm-accent-ink); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--mm-space-2); }
-  /* A track's format, framed as the display prints one (display-icon.html), in the row's subtle
-     ink; one width for all, so the lengths after it stay in a column. */
-  .format {
-    box-sizing: border-box;
-    min-width: 3.4em;
-    padding: .18em .35em .14em;
-    border: 1px solid currentColor;
-    border-radius: .22em;
-    font-family: var(--mm-font-label);
-    font-stretch: var(--mm-stretch-label);
-    font-size: .625rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: .06em;
-    text-align: center;
-    text-transform: uppercase;
-    color: var(--mm-fg-subtle);
-  }
+  /* A track's format, with the display's own icon (display-icon.html), small and in a light grey
+     (the owner, 2026-11-16); never its glow, which is the display's. */
+  /* One width for all, the icon at its end, so the lengths after it stay in a column. */
+  .format { display: inline-flex; justify-content: flex-end; min-width: 4.6em; font-size: .5625rem; line-height: 1; color: color-mix(in srgb, var(--mm-fg-subtle) 70%, transparent); --mm-display-glow: none; }
   .cue { display: grid; place-items: center; width: 1.5rem; }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; }
   @media (hover: hover) { .row:hover .cue-play { opacity: 1; } }
