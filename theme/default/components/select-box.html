@@ -103,15 +103,15 @@
   .number { display: none; }
   @media (hover: none), (max-width: 720px) {
     .numbered {
-      min-width: 2rem;
-      height: 2rem;
+      min-width: 1.25rem;
+      height: 1.25rem;
       padding: 0 .25rem;
       border-color: var(--mm-border);
       border-radius: var(--mm-radius-key);
       box-sizing: border-box;
     }
-    /* The hit area widens it only sideways: a 2rem box is already as tall as a row, and a margin
-       under it would stick out of a disc's last row, which scrolls its `mm-table-wrap`. */
+    /* The hit area widens it only sideways: a margin under it would stick out of a disc's last
+       row in the compact density, which scrolls its `mm-table-wrap`. */
     .numbered::before { inset: 0 -.375rem; }
     .numbered::after { display: none; }
     .numbered .number {

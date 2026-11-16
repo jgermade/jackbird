@@ -377,6 +377,10 @@
      column of its own. */
   @media (hover: none), (max-width: 720px) {
     .num-cell { display: none; }
+    /* The owner's adjustments (2026-11-16): the box flush with the disc's heading, and the
+       length and the menu's key up to the row's end. */
+    .mm-table .pick-cell { padding-left: 0; }
+    .mm-table .cue-cell, .mm-table .menu-cell { padding-right: 0; }
   }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
