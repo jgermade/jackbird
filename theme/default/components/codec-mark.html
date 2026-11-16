@@ -49,6 +49,9 @@
   .tinted[data-codec="mp3"] { color: var(--mm-codec-mp3); }
   .tinted[data-codec="ogg"] { color: var(--mm-codec-ogg); }
   .tinted[data-codec="other"] { color: var(--mm-codec-other); }
+  /* In a list its lettering a little smaller than the marks (the owner, 2026-11-16): at the same
+     height it weighed more than MP3's. */
+  .tinted .flac { font-size: calc(var(--codec-size, 1.9em) * .85); }
   /* A codec's mark, its shape in the ink around it. */
   .mark {
     display: block;
