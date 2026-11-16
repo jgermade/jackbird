@@ -313,7 +313,8 @@
   /* A scrollbar that takes room (the desktop app on macOS draws its own, base.css) takes as much on
      the left too: the rows keep even sides. Overlay scrollbars take none either way. */
   .tree-pane { border-right: var(--mm-border-width) solid var(--mm-border); background: var(--mm-surface); scrollbar-gutter: stable both-edges; }
-  .sheet-pane { background: var(--mm-sheet); }
+  /* The details are laid out by their own width (album-sheet.html), not the window's. */
+  .sheet-pane { container: sheet / inline-size; background: var(--mm-sheet); }
 
   /* Phones: one pane per screen width, in a row that snaps as it is swiped. */
   @media (max-width: 720px) {

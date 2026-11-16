@@ -14,6 +14,7 @@
   const IpodFoot = await import("./ipod-foot.html")
 
   const { formatTrackNumber, trackLead } = await import("../helpers/format")
+  const { formatLabel } = await import("../helpers/formats")
   const { rowHeights, rowPixels } = await import("../helpers/density")
   const { coverSrc } = await import("../lib/covers")
   // Whether the stylesheet rounds the rows' heights to whole pixels (tokens.css).
@@ -277,6 +278,7 @@
              :label="rowLabel(row)"
              :lead="rowLead(row)"
              :meta="rowMeta(row)"
+             :format="row.kind === 'track' && row.relativePath ? formatLabel(row.relativePath) : ''"
              :sub="rowSub(row)"
              :cover="rowCover(row)"
              :framed="!!row.framed"
@@ -292,6 +294,7 @@
              :selectable="row.kind === 'track' && !!row.trackId"
              :playable="row.kind === 'track' && !!row.trackId"
              :muted="!!row.missing"
+             :loading="!!row.pending"
              :no-toggle="phone || !!row.leaf"
              @select="open(row, $event.detail)"
              @pick="pick(row, $event.detail)"
