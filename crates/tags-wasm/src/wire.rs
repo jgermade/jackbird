@@ -383,7 +383,14 @@ mod tests {
         assert_eq!(tags(&read, None), expected);
         with_audio.push(1);
         with_audio.extend_from_slice(&[0xe8, 3, 0, 0, 128, 0, 0, 0, 0x44, 0xac, 0, 0, 2, 16, 1]);
-        let audio = Audio { duration_ms: 1000, bitrate: 128, sample_rate: 44_100, channels: 2, bits: 16, vbr: true };
+        let audio = Audio {
+            duration_ms: 1000,
+            bitrate: 128,
+            sample_rate: 44_100,
+            channels: 2,
+            bits: 16,
+            vbr: true,
+        };
         assert_eq!(tags(&read, Some(audio)), with_audio);
         let untagged = Tags {
             format: Format::Mp3,

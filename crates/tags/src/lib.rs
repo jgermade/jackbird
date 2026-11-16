@@ -16,9 +16,9 @@
 //! (21:45 to 22:20).
 
 mod audio;
-pub mod mpeg;
 mod flac;
 mod mp3;
+pub mod mpeg;
 mod region;
 mod year;
 

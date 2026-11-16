@@ -603,7 +603,6 @@ fn the_head_and_splice_path_gives_the_whole_files_bytes() {
     }
 }
 
-
 #[test]
 fn every_case_with_audio_gives_its_length_and_rates() {
     // As make.mjs makes their audio with ffmpeg: MP3 at 22,050 Hz, mono, 32 kbit/s, about half a
@@ -616,9 +615,24 @@ fn every_case_with_audio_gives_its_length_and_rates() {
         let Some(format) = layout.format else { continue };
         let found = jackbird_tags::audio(&case.bytes, &layout).unwrap_or_else(|| panic!("{}: no audio", case.name));
         match format {
-            Format::Mp3 => assert_eq!((found.sample_rate, found.channels, found.bitrate, found.bits), (22_050, 1, 32, 0), "{}", case.name),
-            Format::Flac => assert_eq!((found.duration_ms, found.sample_rate, found.channels, found.bits), (500, 8_000, 1, 16), "{}", case.name),
+            Format::Mp3 => assert_eq!(
+                (found.sample_rate, found.channels, found.bitrate, found.bits),
+                (22_050, 1, 32, 0),
+                "{}",
+                case.name
+            ),
+            Format::Flac => assert_eq!(
+                (found.duration_ms, found.sample_rate, found.channels, found.bits),
+                (500, 8_000, 1, 16),
+                "{}",
+                case.name
+            ),
         }
-        assert!((450..700).contains(&found.duration_ms), "{}: {} ms", case.name, found.duration_ms);
+        assert!(
+            (450..700).contains(&found.duration_ms),
+            "{}: {} ms",
+            case.name,
+            found.duration_ms
+        );
     }
 }

@@ -37,7 +37,11 @@ pub fn decode_comment(content: &[u8]) -> Result<Comment, Error> {
 /// everything fits in it, else UTF-8 (v2.4) or UTF-16 with its byte order mark (v2.3). A language
 /// that is not three letters is written `eng`.
 pub fn encode_comment(comment: &Comment, version: Version) -> Vec<u8> {
-    let latin = comment.description.chars().chain(comment.text.chars()).all(|c| u32::from(c) <= 0xff);
+    let latin = comment
+        .description
+        .chars()
+        .chain(comment.text.chars())
+        .all(|c| u32::from(c) <= 0xff);
     let encoding: u8 = if latin {
         0
     } else if version == Version::V24 {
@@ -45,7 +49,11 @@ pub fn encode_comment(comment: &Comment, version: Version) -> Vec<u8> {
     } else {
         1
     };
-    let language = if comment.language.len() == 3 && comment.language.is_ascii() { comment.language.as_str() } else { "eng" };
+    let language = if comment.language.len() == 3 && comment.language.is_ascii() {
+        comment.language.as_str()
+    } else {
+        "eng"
+    };
     let mut out = Vec::with_capacity(comment.text.len() * 2 + comment.description.len() * 2 + 10);
     out.push(encoding);
     out.extend_from_slice(language.as_bytes());

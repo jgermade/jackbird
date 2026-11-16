@@ -113,7 +113,11 @@ mod tests {
     }
 
     fn layout(format: Format, start: u64, end: u64) -> FileLayout {
-        FileLayout { format: Some(format), tags_end: start, audio: start..end }
+        FileLayout {
+            format: Some(format),
+            tags_end: start,
+            audio: start..end,
+        }
     }
 
     #[test]
@@ -121,7 +125,16 @@ mod tests {
         let bytes = cbr(100);
         let found = audio(&bytes, &layout(Format::Mp3, 0, bytes.len() as u64)).unwrap();
         // 41,700 bytes at 128 kbit/s: 2,606 ms.
-        assert_eq!((found.duration_ms, found.bitrate, found.sample_rate, found.channels, found.vbr), (2606, 128, 44_100, 2, false));
+        assert_eq!(
+            (
+                found.duration_ms,
+                found.bitrate,
+                found.sample_rate,
+                found.channels,
+                found.vbr
+            ),
+            (2606, 128, 44_100, 2, false)
+        );
     }
 
     #[test]
@@ -150,13 +163,32 @@ mod tests {
         info[10..18].copy_from_slice(&packed.to_be_bytes());
         bytes.extend(info);
         let found = audio(&bytes, &layout(Format::Flac, 42, 42 + 1_000_000)).unwrap();
-        assert_eq!((found.duration_ms, found.sample_rate, found.channels, found.bits, found.bitrate), (10_000, 44_100, 2, 16, 800));
+        assert_eq!(
+            (
+                found.duration_ms,
+                found.sample_rate,
+                found.channels,
+                found.bits,
+                found.bitrate
+            ),
+            (10_000, 44_100, 2, 16, 800)
+        );
     }
 
     #[test]
     fn nothing_without_the_first_frame_or_a_streaminfo() {
         assert_eq!(audio(&[0; 64], &layout(Format::Mp3, 0, 64)), None);
         assert_eq!(audio(b"fLaC\x01\x00\x00\x00", &layout(Format::Flac, 8, 100)), None);
-        assert_eq!(audio(&cbr(2), &FileLayout { format: None, tags_end: 0, audio: 0..834 }), None);
+        assert_eq!(
+            audio(
+                &cbr(2),
+                &FileLayout {
+                    format: None,
+                    tags_end: 0,
+                    audio: 0..834
+                }
+            ),
+            None
+        );
     }
 }

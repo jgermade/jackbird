@@ -460,9 +460,7 @@ pub fn run() {
                 // keys sit on the faceplate, whose bare metal drags the window
                 // (src/views/faceplate.html).
                 #[cfg(target_os = "macos")]
-                let window = window
-                    .title_bar_style(tauri::TitleBarStyle::Overlay)
-                    .hidden_title(true);
+                let window = window.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
                 window.build()?;
             }
             #[cfg(mobile)]

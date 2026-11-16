@@ -234,7 +234,11 @@ fn track(data: &[u8], at: usize, end: usize) -> Result<(Track, usize), Error> {
         play_count: f(0x50)?,
         disc_number: f(0x5c)?,
         disc_count: f(0x60)?,
-        bpm: if header >= 0x7c { u16::from(u8_at(data, at + 0x7a)?) | u16::from(u8_at(data, at + 0x7b)?) << 8 } else { 0 },
+        bpm: if header >= 0x7c {
+            u16::from(u8_at(data, at + 0x7a)?) | u16::from(u8_at(data, at + 0x7b)?) << 8
+        } else {
+            0
+        },
         ..Track::default()
     };
     for_each_mhod(data, at + header, at + total, f(0x0c)?, |kind, text| {

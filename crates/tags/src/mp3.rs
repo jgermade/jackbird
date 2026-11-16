@@ -1,6 +1,9 @@
 //! MP3: the fields and the cover over an ID3v2 tag's frames.
 
-use jackbird_id3::{self as id3, Comment, Frame, Picture, Version, decode_comment, decode_picture, decode_text, encode_comment, encode_picture, encode_text};
+use jackbird_id3::{
+    self as id3, Comment, Frame, Picture, Version, decode_comment, decode_picture, decode_text, encode_comment,
+    encode_picture, encode_text,
+};
 
 use crate::year::{self, Timestamp};
 use crate::{Cover, CoverChange, Error, Field, Fields, Format, Refusal, Tags};
@@ -61,10 +64,17 @@ fn described(field: Field) -> bool {
 /// The comment (or lyrics) frame a field is: the first readable one with no description.
 fn shown_comment(version: Version, unsynchronised: bool, frames: &[Frame], field: Field) -> Option<(usize, Comment)> {
     reader_ids(version, field).iter().find_map(|id| {
-        frames.iter().enumerate().filter(|(_, frame)| frame.id == *id).find_map(|(index, frame)| {
-            let content = frame.content(version, unsynchronised).ok()?;
-            decode_comment(&content).ok().filter(|comment| comment.description.is_empty()).map(|comment| (index, comment))
-        })
+        frames
+            .iter()
+            .enumerate()
+            .filter(|(_, frame)| frame.id == *id)
+            .find_map(|(index, frame)| {
+                let content = frame.content(version, unsynchronised).ok()?;
+                decode_comment(&content)
+                    .ok()
+                    .filter(|comment| comment.description.is_empty())
+                    .map(|comment| (index, comment))
+            })
     })
 }
 
@@ -230,7 +240,9 @@ pub(crate) fn write(
                 continue;
             }
             let comment = Comment {
-                language: at.as_ref().map_or_else(|| "eng".to_owned(), |(_, comment)| comment.language.clone()),
+                language: at
+                    .as_ref()
+                    .map_or_else(|| "eng".to_owned(), |(_, comment)| comment.language.clone()),
                 description: String::new(),
                 text: value.clone(),
             };
@@ -348,7 +360,9 @@ pub(crate) fn check_kept(
         changes
             .iter()
             .filter(|(field, _)| described(*field))
-            .filter_map(|(field, _)| shown_comment(tag.version, tag.unsynchronised_v24(), &tag.frames, *field).map(|(index, _)| index))
+            .filter_map(|(field, _)| {
+                shown_comment(tag.version, tag.unsynchronised_v24(), &tag.frames, *field).map(|(index, _)| index)
+            })
             .collect()
     };
     let (touched_before, touched_after) = (touched(&before), touched(&after));
@@ -356,12 +370,17 @@ pub(crate) fn check_kept(
         frames
             .iter()
             .enumerate()
-            .filter(|(index, frame)| frame.id != "APIC" && !changed.contains(&frame.id.as_str()) && !skip.contains(index))
+            .filter(|(index, frame)| {
+                frame.id != "APIC" && !changed.contains(&frame.id.as_str()) && !skip.contains(index)
+            })
             .filter(|(_, frame)| !(discard && frame.discard_on_tag_change(version)))
             .map(|(_, frame)| frame.clone())
             .collect()
     };
-    let (expected, found) = (others(&before.frames, true, &touched_before), others(&after.frames, false, &touched_after));
+    let (expected, found) = (
+        others(&before.frames, true, &touched_before),
+        others(&after.frames, false, &touched_after),
+    );
     if expected != found {
         let at = expected
             .iter()

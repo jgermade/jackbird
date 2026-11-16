@@ -590,7 +590,10 @@ fn safeguard_3_refuses_a_flac_result_that_lost_a_block_or_a_comment() {
         title: "After".into(),
         ..Fields::default()
     };
-    let no_application = flac(&[streaminfo.clone(), comments(&[("TITLE", "After"), ("ORGANIZATION", "la")])]);
+    let no_application = flac(&[
+        streaminfo.clone(),
+        comments(&[("TITLE", "After"), ("ORGANIZATION", "la")]),
+    ]);
     let error = verify(Format::Flac, &source, &no_application, &change(&changes, &fields, None)).unwrap_err();
     assert_eq!(error, Error::Refused(Refusal::Kept("a metadata block".into())));
     let no_lyrics = flac(&[streaminfo.clone(), application.clone(), comments(&[("TITLE", "After")])]);
@@ -850,7 +853,14 @@ fn writes_the_comment_in_its_frame_and_keeps_itunes_comments_byte_for_byte() {
     };
     let out = write(&source, &edit).unwrap();
     let fields = read(&out).unwrap().fields;
-    assert_eq!((fields.comment.as_str(), fields.lyrics.as_str(), fields.composer.as_str()), ("Nueva canción ✓", "La la", "Someone"));
+    assert_eq!(
+        (
+            fields.comment.as_str(),
+            fields.lyrics.as_str(),
+            fields.composer.as_str()
+        ),
+        ("Nueva canción ✓", "La la", "Someone")
+    );
     let frames = frames_of(&out);
     assert_eq!(frames[0], itunes);
     assert_eq!(frames.iter().filter(|frame| frame.id == "COMM").count(), 2);
@@ -859,8 +869,19 @@ fn writes_the_comment_in_its_frame_and_keeps_itunes_comments_byte_for_byte() {
 #[test]
 fn removes_only_the_comment_when_it_is_emptied() {
     let itunes = comm("COMM", "iTunNORM", " 00000A1B");
-    let source = file(Version::V24, &[itunes.clone(), comm("COMM", "", "Bye"), comm("USLT", "", "Words")]);
-    let out = write(&source, &Edit { comment: Some(String::new()), lyrics: Some(String::new()), ..Edit::default() }).unwrap();
+    let source = file(
+        Version::V24,
+        &[itunes.clone(), comm("COMM", "", "Bye"), comm("USLT", "", "Words")],
+    );
+    let out = write(
+        &source,
+        &Edit {
+            comment: Some(String::new()),
+            lyrics: Some(String::new()),
+            ..Edit::default()
+        },
+    )
+    .unwrap();
     assert_eq!(frames_of(&out), vec![itunes]);
     assert_eq!(read(&out).unwrap().fields.comment, "");
 }
@@ -869,15 +890,44 @@ fn removes_only_the_comment_when_it_is_emptied() {
 fn reads_and_writes_composer_comment_and_lyrics_in_a_flac() {
     use jackbird_flac::{Block, Comments, entry};
     let mut block = Comments::new("v");
-    block.entries = vec![entry("TITLE", "T"), entry("DESCRIPTION", "Old comment"), entry("UNSYNCEDLYRICS", "Old words")];
-    let streaminfo = Block { kind: 0, body: vec![0; 34] };
-    let mut source = jackbird_flac::write(&[streaminfo, Block { kind: 4, body: block.to_bytes() }]).unwrap();
+    block.entries = vec![
+        entry("TITLE", "T"),
+        entry("DESCRIPTION", "Old comment"),
+        entry("UNSYNCEDLYRICS", "Old words"),
+    ];
+    let streaminfo = Block {
+        kind: 0,
+        body: vec![0; 34],
+    };
+    let mut source = jackbird_flac::write(&[
+        streaminfo,
+        Block {
+            kind: 4,
+            body: block.to_bytes(),
+        },
+    ])
+    .unwrap();
     source.extend_from_slice(&[0xff, 0xf8, 1, 2]);
     let before = read(&source).unwrap().fields;
-    assert_eq!((before.comment.as_str(), before.lyrics.as_str()), ("Old comment", "Old words"));
-    let out = write(&source, &Edit { comment: Some("New".into()), lyrics: Some("New words".into()), composer: Some("C".into()), ..Edit::default() }).unwrap();
+    assert_eq!(
+        (before.comment.as_str(), before.lyrics.as_str()),
+        ("Old comment", "Old words")
+    );
+    let out = write(
+        &source,
+        &Edit {
+            comment: Some("New".into()),
+            lyrics: Some("New words".into()),
+            composer: Some("C".into()),
+            ..Edit::default()
+        },
+    )
+    .unwrap();
     let after = read(&out).unwrap().fields;
-    assert_eq!((after.comment.as_str(), after.lyrics.as_str(), after.composer.as_str()), ("New", "New words", "C"));
+    assert_eq!(
+        (after.comment.as_str(), after.lyrics.as_str(), after.composer.as_str()),
+        ("New", "New words", "C")
+    );
 }
 
 // ---------------------------------------------------------------- bpm
@@ -887,12 +937,36 @@ fn reads_and_writes_the_bpm_in_a_flac() {
     use jackbird_flac::{Block, Comments, entry};
     let mut block = Comments::new("v");
     block.entries = vec![entry("TITLE", "T"), entry("BPM", "98")];
-    let streaminfo = Block { kind: 0, body: vec![0; 34] };
-    let mut source = jackbird_flac::write(&[streaminfo, Block { kind: 4, body: block.to_bytes() }]).unwrap();
+    let streaminfo = Block {
+        kind: 0,
+        body: vec![0; 34],
+    };
+    let mut source = jackbird_flac::write(&[
+        streaminfo,
+        Block {
+            kind: 4,
+            body: block.to_bytes(),
+        },
+    ])
+    .unwrap();
     source.extend_from_slice(&[0xff, 0xf8, 1, 2]);
     assert_eq!(read(&source).unwrap().fields.bpm, "98");
-    let out = write(&source, &Edit { bpm: Some("124".into()), ..Edit::default() }).unwrap();
+    let out = write(
+        &source,
+        &Edit {
+            bpm: Some("124".into()),
+            ..Edit::default()
+        },
+    )
+    .unwrap();
     assert_eq!(read(&out).unwrap().fields.bpm, "124");
-    let gone = write(&out, &Edit { bpm: Some(String::new()), ..Edit::default() }).unwrap();
+    let gone = write(
+        &out,
+        &Edit {
+            bpm: Some(String::new()),
+            ..Edit::default()
+        },
+    )
+    .unwrap();
     assert_eq!(read(&gone).unwrap().fields.bpm, "");
 }
