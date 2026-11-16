@@ -86,6 +86,8 @@ export type ListedSong = {
   trackNumber: string;
   discNumber: string;
   compilation: boolean;
+  /** Beats per minute, 0 for none. */
+  bpm?: number;
 };
 
 /** A listed song's fields as the library holds them, its cover by reference (`cover`, a name) when it has one. */
@@ -100,6 +102,11 @@ export function ipodSongMetadata(song: ListedSong, cover: string | null): TrackM
     discNumber: song.discNumber,
     albumArtist: song.albumArtist,
     compilation: song.compilation ? "1" : "",
+    // The iPod's listing in the browser carries none of these (the desktop app's carries the composer).
+    composer: "",
+    comment: "",
+    lyrics: "",
+    bpm: song.bpm ? String(song.bpm) : "",
     coverDataUrl: cover === null ? null : coverRef(cover)
   };
 }

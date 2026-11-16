@@ -79,6 +79,10 @@ describe("an iPod in a browser", () => {
       discNumber: "1/1",
       albumArtist: "The Fixtures",
       compilation: "",
+      composer: "",
+      comment: "",
+      lyrics: "",
+      bpm: "",
       coverDataUrl: "jackbird-cover:d924c6d434529eaa-64.png"
     });
     const other = ipodSongMetadata({ ...song, compilation: true }, null);

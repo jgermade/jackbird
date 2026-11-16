@@ -14,7 +14,10 @@
   const IpodFoot = await import("./ipod-foot.html")
 
   const { formatTrackNumber, trackLead } = await import("../helpers/format")
-  const { rowHeights } = await import("../helpers/density")
+  const { rowHeights, rowPixels } = await import("../helpers/density")
+  const { coverSrc } = await import("../lib/covers")
+  // Whether the stylesheet rounds the rows' heights to whole pixels (tokens.css).
+  const ROUNDS: boolean = typeof CSS !== "undefined" && CSS.supports("width", "round(1rem, 2px)")
   const { preferences } = await import("../lib/preferences")
   const { t } = await import("../lib/i18n")
   const { library } = await import("../lib/library")
@@ -38,7 +41,7 @@
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; inView?: string; missing?: boolean }
+  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
@@ -50,6 +53,20 @@
     const playing = nowPlaying.value
     const current = root()
     return playing && current && playing.rootId === current.id ? playing.trackId : null
+  }
+  // The playing track's path in this root, worked out once per change of what plays: a folder
+  // that holds it is drawn as holding it.
+  $: playingPath = ((): string | null => {
+    const id = playingId()
+    return id ? (root()?.tracks.find((track) => track.id === id)?.relativePath ?? null) : null
+  })()
+  // A group (an artist, an album, a playlist) or a folder that holds the playing track.
+  const holdsPlaying = (row: Row & { trackIds?: string[] }): boolean => {
+    if (row.kind === "track") return false
+    const id = playingId()
+    if (!id) return false
+    if (row.trackIds) return row.trackIds.includes(id)
+    return !!playingPath && !row.inView && playingPath.startsWith(`${row.album}/`)
   }
   const activeId = (): string | null => {
     const key = root()?.activeRowKey
@@ -63,10 +80,20 @@
   // `:window` takes the height in pixels.
   const songRow = (): number => rowHeights(preferences.density).song
   const windowed = (): boolean => view() === "songs"
-  const rowPx = (): number => (windowed() ? songRow() * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) : 0)
+  // A whole number of pixels where the stylesheet rounds the rows too (tokens.css, list-row.html).
+  const rowPx = (): number => (windowed() ? rowPixels(songRow(), parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, ROUNDS) : 0)
   // A track's artist goes under its title (`sub`), not at the row's end.
-  const rowSub = (row: Row): string => (row.kind === "track" && row.trackId ? (row.artist ?? "") : "")
-  const rowMeta = (row: Row): string => (rowSub(row) && row.meta === row.artist ? "" : (row.meta ?? ""))
+  // In Songs, the line under the title is the song's "Artist - Album" (its meta, helpers/views.ts),
+  // and the row's end is left empty: in a narrow library the title keeps the room.
+  // An album's row: its line of who it is by and its year (helpers/views.ts), in place of its meta;
+  // and its cover in place of its glyph, once its picture is in (lib/covers.ts).
+  const rowCover = (row: Row): string | null => (row.cover ? coverSrc(row.cover) : null)
+  const rowSub = (row: Row): string => {
+    if (row.sub) return row.sub
+    if (row.kind !== "track" || !row.trackId) return ""
+    return row.inView === "songs" ? (row.meta || row.artist || "") : (row.artist ?? "")
+  }
+  const rowMeta = (row: Row): string => (row.sub || (row.inView === "songs" && row.kind === "track") ? "" : rowSub(row) && row.meta === row.artist ? "" : (row.meta ?? ""))
   const emptyText = (): string => {
     if (isLoading()) return t("tree.loadingLibrary")
     if (view() === "playlists") return t("views.empty.playlists")
@@ -106,13 +133,12 @@
   // the ones under it); its ❯ key opens it in Details. Without the songs in the tree (a preference:
   // helpers/folders.ts), a folder that holds no other (a leaf) has nothing to enter: a tap opens it
   // in Details, and on a computer it has no toggle.
-  const PHONE = matchMedia("(max-width: 720px)")
-  let phone: boolean = PHONE.matches
-  const onPhone = (event: MediaQueryListEvent) => {
-    phone = event.matches
-  }
-  PHONE.addEventListener("change", onPhone)
-  $destroyed(() => PHONE.removeEventListener("change", onPhone))
+  const { watchMedia } = await import("../lib/media")
+  // Followed as the window is resized (lib/media.ts).
+  let phone: boolean = matchMedia("(max-width: 720px)").matches
+  $destroyed(watchMedia("(max-width: 720px)", (matches) => {
+    phone = matches
+  }))
   // What is listed: a computer's tree, or a phone's level; and, on a phone, the open levels above it.
   const listed = (): Row[] => (phone ? treeLevels.value.data.rows : rows())
   const levels = (): Row[] => (phone ? treeLevels.value.data.open : [])
@@ -139,6 +165,26 @@
     setCurrentRow(row.key)
     ui.pane = "details"
   }
+
+  // A track shown in the library (the faceplate's key, a track's menu): its row brought into view
+  // once drawn (lib/workspace.ts `revealTrack`).
+  const scrollOnReveal = (() => {
+    let seen: number | null = null
+    return (count: number): number => {
+      if (seen !== null && count !== seen) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const tree = $self(".tree") as (HTMLElement & { $scrollTo?: (index: number, options?: { block?: string }) => void }) | null
+          const at = listed().findIndex((row) => row.key === root()?.activeRowKey)
+          if (windowed() && tree?.$scrollTo && at >= 0) tree.$scrollTo(at, { block: "center" })
+          const id = activeId()
+          if (id) document.getElementById(id)?.scrollIntoView({ block: "center" })
+        }))
+      }
+      seen = count
+      return count
+    }
+  })()
+  $: revealTick = scrollOnReveal(ui.revealed)
 
   const onKey = (event: KeyboardEvent) => {
     if (!navigateTree(event.key, event.shiftKey, phone)) return
@@ -180,7 +226,10 @@
       </Key>
     </div>
     <!-- At the head's right: the folder scanned again (new, changed and removed files). -->
-    <div class="rescan"><Key square size="sm" variant="ghost" :label="t('library.rescan')" :title="t('library.rescan')" :disabled="isLoading()" @click="rescanRoot(root().id)">
+    <div class="rescan"><Key square size="sm" variant="ghost" :label="t('duplicates.find')" :title="t('duplicates.find')" :disabled="isLoading()" @click="ui.duplicatesOpen = true">
+      <!-- A lens over an equals sign: looking for the same song. -->
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="6.75" cy="6.75" r="4.75" /><path d="M10.25 10.25 14.25 14.25M4.75 5.75h4M4.75 7.75h4" /></svg>
+    </Key><Key square size="sm" variant="ghost" :label="t('library.rescan')" :title="t('library.rescan')" :disabled="isLoading()" @click="rescanRoot(root().id)">
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.25 8A5.25 5.25 0 1 1 11.7 4.3" /><path d="M12.25 1.75v2.9h-2.9" /></svg>
     </Key></div>
   </header>
@@ -199,6 +248,9 @@
       <ListRow :each="row in levels()"
                :key="row.key"
                kind="folder"
+               :glyph="glyphOf(row)"
+               :cover="rowCover(row)"
+               :round="!!row.round"
                :label="rowLabel(row)"
                :meta="rowMeta(row)"
                expanded
@@ -226,10 +278,14 @@
              :lead="rowLead(row)"
              :meta="rowMeta(row)"
              :sub="rowSub(row)"
+             :cover="rowCover(row)"
+             :framed="!!row.framed"
+             :round="!!row.round"
              :expanded="!!row.expanded"
              :chosen="isChosen(row)"
              :current="isCurrent(row)"
              :playing="row.kind === 'track' && row.trackId === playingId()"
+             :holds-playing="holdsPlaying(row)"
              :playing-active="playback.playing"
              :playing-source="readRowSpectrum"
              :row-id="rowDomId(row.key)"
@@ -272,8 +328,8 @@
     background: var(--mm-surface);
   }
   .views { display: flex; flex-wrap: wrap; align-items: center; gap: .125rem; }
-  /* The rescan key, alone at the head's right. */
-  .rescan { display: flex; margin-left: auto; }
+  /* The duplicates' and the rescan's keys, at the head's right. */
+  .rescan { display: flex; gap: .125rem; margin-left: auto; }
   .icon { width: .875rem; height: .875rem; }
 
   .messages { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-3) var(--mm-space-4) 0; }

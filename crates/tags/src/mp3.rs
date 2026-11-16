@@ -1,6 +1,9 @@
 //! MP3: the fields and the cover over an ID3v2 tag's frames.
 
-use jackbird_id3::{self as id3, Frame, Picture, Version, decode_picture, decode_text, encode_picture, encode_text};
+use jackbird_id3::{
+    self as id3, Comment, Frame, Picture, Version, decode_comment, decode_picture, decode_text, encode_comment,
+    encode_picture, encode_text,
+};
 
 use crate::year::{self, Timestamp};
 use crate::{Cover, CoverChange, Error, Field, Fields, Format, Refusal, Tags};
@@ -20,6 +23,10 @@ fn reader_ids(version: Version, field: Field) -> &'static [&'static str] {
         (Version::V22, Field::Disc) => &["TPA"],
         (Version::V22, Field::AlbumArtist) => &["TP2"],
         (Version::V22, Field::Compilation) => &["TCP"],
+        (Version::V22, Field::Composer) => &["TCM"],
+        (Version::V22, Field::Comment) => &["COM"],
+        (Version::V22, Field::Lyrics) => &["ULT"],
+        (Version::V22, Field::Bpm) => &["TBP"],
         (Version::V23, Field::Year) => &["TYER", "TDRC"],
         (Version::V24, Field::Year) => &["TDRC", "TYER"],
         (_, field) => &managed(field)[..1],
@@ -40,7 +47,35 @@ fn managed(field: Field) -> &'static [&'static str] {
         Field::AlbumArtist => &["TPE2"],
         // Not in the standard, but iTunes' and every player's that reads one.
         Field::Compilation => &["TCMP"],
+        Field::Composer => &["TCOM"],
+        // One frame of these, the one with no description (see `described`): never them all.
+        Field::Comment => &["COMM"],
+        Field::Lyrics => &["USLT"],
+        Field::Bpm => &["TBPM"],
     }
+}
+
+/// Whether a field's frames have a language and a description (`COMM`, `USLT`): the field is the
+/// one with no description, and the others (iTunes' `iTunNORM`, `iTunSMPB`, …) are not it.
+fn described(field: Field) -> bool {
+    matches!(field, Field::Comment | Field::Lyrics)
+}
+
+/// The comment (or lyrics) frame a field is: the first readable one with no description.
+fn shown_comment(version: Version, unsynchronised: bool, frames: &[Frame], field: Field) -> Option<(usize, Comment)> {
+    reader_ids(version, field).iter().find_map(|id| {
+        frames
+            .iter()
+            .enumerate()
+            .filter(|(_, frame)| frame.id == *id)
+            .find_map(|(index, frame)| {
+                let content = frame.content(version, unsynchronised).ok()?;
+                decode_comment(&content)
+                    .ok()
+                    .filter(|comment| comment.description.is_empty())
+                    .map(|comment| (index, comment))
+            })
+    })
 }
 
 fn picture_id(version: Version) -> &'static str {
@@ -56,6 +91,9 @@ fn text_of(version: Version, unsynchronised: bool, frame: &Frame) -> Option<Stri
 /// The frame a field is read from (the first readable one of its ids, in
 /// order of preference) and its text.
 fn shown(version: Version, unsynchronised: bool, frames: &[Frame], field: Field) -> Option<(usize, String)> {
+    if described(field) {
+        return shown_comment(version, unsynchronised, frames, field).map(|(index, comment)| (index, comment.text));
+    }
     reader_ids(version, field).iter().find_map(|id| {
         frames
             .iter()
@@ -112,6 +150,10 @@ fn fields_of(version: Version, unsynchronised: bool, frames: &[Frame]) -> Fields
         disc: text(Field::Disc),
         album_artist: text(Field::AlbumArtist),
         compilation: text(Field::Compilation),
+        composer: text(Field::Composer),
+        comment: text(Field::Comment),
+        lyrics: text(Field::Lyrics),
+        bpm: text(Field::Bpm),
     }
 }
 
@@ -187,6 +229,30 @@ pub(crate) fn write(
 
     for (field, value) in changes {
         let family = managed(*field);
+        if described(*field) {
+            // The comment (or the lyrics): its frame replaced, its language and description kept,
+            // or removed when emptied; the other comments stay as they are.
+            let at = shown_comment(version, unsynchronised, &frames, *field);
+            if value.is_empty() {
+                if let Some((index, _)) = at {
+                    frames.remove(index);
+                }
+                continue;
+            }
+            let comment = Comment {
+                language: at
+                    .as_ref()
+                    .map_or_else(|| "eng".to_owned(), |(_, comment)| comment.language.clone()),
+                description: String::new(),
+                text: value.clone(),
+            };
+            let frame = make(family[0], encode_comment(&comment, version));
+            match at {
+                Some((index, _)) => frames[index] = frame,
+                None => frames.push(frame),
+            }
+            continue;
+        }
         if value.is_empty() {
             frames.retain(|frame| !family.contains(&frame.id.as_str()));
             continue;
@@ -286,17 +352,35 @@ pub(crate) fn check_kept(
     let version = before.version;
     let changed: Vec<&str> = changes
         .iter()
+        .filter(|(field, _)| !described(*field))
         .flat_map(|(field, _)| managed(*field).iter().copied())
         .collect();
-    let others = |frames: &[Frame], discard: bool| -> Vec<Frame> {
-        frames
+    // A changed comment (or lyrics) touches its own frame alone: the other comments are checked.
+    let touched = |tag: &id3::Tag| -> Vec<usize> {
+        changes
             .iter()
-            .filter(|frame| frame.id != "APIC" && !changed.contains(&frame.id.as_str()))
-            .filter(|frame| !(discard && frame.discard_on_tag_change(version)))
-            .cloned()
+            .filter(|(field, _)| described(*field))
+            .filter_map(|(field, _)| {
+                shown_comment(tag.version, tag.unsynchronised_v24(), &tag.frames, *field).map(|(index, _)| index)
+            })
             .collect()
     };
-    let (expected, found) = (others(&before.frames, true), others(&after.frames, false));
+    let (touched_before, touched_after) = (touched(&before), touched(&after));
+    let others = |frames: &[Frame], discard: bool, skip: &[usize]| -> Vec<Frame> {
+        frames
+            .iter()
+            .enumerate()
+            .filter(|(index, frame)| {
+                frame.id != "APIC" && !changed.contains(&frame.id.as_str()) && !skip.contains(index)
+            })
+            .filter(|(_, frame)| !(discard && frame.discard_on_tag_change(version)))
+            .map(|(_, frame)| frame.clone())
+            .collect()
+    };
+    let (expected, found) = (
+        others(&before.frames, true, &touched_before),
+        others(&after.frames, false, &touched_after),
+    );
     if expected != found {
         let at = expected
             .iter()

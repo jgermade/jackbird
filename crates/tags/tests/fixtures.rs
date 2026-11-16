@@ -52,6 +52,11 @@ fn cases() -> Vec<Case> {
                     disc: text("disc"),
                     album_artist: text("albumArtist"),
                     compilation: text("compilation"),
+                    // Added after the fixtures: absent where a file has none.
+                    composer: case["fields"]["composer"].as_str().unwrap_or_default().to_owned(),
+                    comment: case["fields"]["comment"].as_str().unwrap_or_default().to_owned(),
+                    lyrics: case["fields"]["lyrics"].as_str().unwrap_or_default().to_owned(),
+                    bpm: case["fields"]["bpm"].as_str().unwrap_or_default().to_owned(),
                 },
                 cover: case["cover"].as_object().map(|cover| Cover {
                     data: fs::read(root().join(cover["file"].as_str().unwrap())).unwrap(),
@@ -153,6 +158,10 @@ fn every_field_at_once() {
         disc: "2/3".into(),
         album_artist: "Various Artists".into(),
         compilation: "1".into(),
+        composer: "Compositora".into(),
+        comment: "Un comentario ✓".into(),
+        lyrics: "Primera línea\nSegunda".into(),
+        bpm: "124".into(),
     };
     for case in writable() {
         let out = write(&case.bytes, &Edit::all(&wanted)).unwrap_or_else(|error| panic!("{}: {error}", case.name));
@@ -591,5 +600,39 @@ fn the_head_and_splice_path_gives_the_whole_files_bytes() {
             });
             assert_eq!(by_head, write(&case.bytes, edit), "{}: {edit:?}", case.name);
         }
+    }
+}
+
+#[test]
+fn every_case_with_audio_gives_its_length_and_rates() {
+    // As make.mjs makes their audio with ffmpeg: MP3 at 22,050 Hz, mono, 32 kbit/s, about half a
+    // second; FLAC at 8,000 Hz, mono, 16 bits, half a second.
+    for case in cases() {
+        let tail = &case.bytes[case.bytes.len().saturating_sub(TAIL_LEN)..];
+        let Ok(Layout::Known(layout)) = layout(&case.bytes, tail, case.bytes.len() as u64) else {
+            continue;
+        };
+        let Some(format) = layout.format else { continue };
+        let found = jackbird_tags::audio(&case.bytes, &layout).unwrap_or_else(|| panic!("{}: no audio", case.name));
+        match format {
+            Format::Mp3 => assert_eq!(
+                (found.sample_rate, found.channels, found.bitrate, found.bits),
+                (22_050, 1, 32, 0),
+                "{}",
+                case.name
+            ),
+            Format::Flac => assert_eq!(
+                (found.duration_ms, found.sample_rate, found.channels, found.bits),
+                (500, 8_000, 1, 16),
+                "{}",
+                case.name
+            ),
+        }
+        assert!(
+            (450..700).contains(&found.duration_ms),
+            "{}: {} ms",
+            case.name,
+            found.duration_ms
+        );
     }
 }

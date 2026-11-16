@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { RENAME_FIELDS, RENAME_PRESETS, fillPattern, planRenames, safeName, trackWidths } from "./rename.ts";
+import { RENAME_FIELDS, RENAME_PRESETS, completeField, fieldQuery, fieldsFor, fillPattern, planReads, planRenames, readTags, safeName, trackWidths } from "./rename.ts";
 
 const track = (relativePath: string, metadata: Partial<{ title: string; artist: string; album: string; year: string; genre: string; trackNumber: string }> = {}) => ({
   id: relativePath,
   name: relativePath.split("/").pop() ?? relativePath,
   relativePath,
-  metadata: { title: "", artist: "", album: "", year: "", genre: "", trackNumber: "", discNumber: "", albumArtist: "", compilation: "", coverDataUrl: null, ...metadata }
+  metadata: { title: "", artist: "", album: "", year: "", genre: "", trackNumber: "", discNumber: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "", coverDataUrl: null, ...metadata }
 });
 
 const soWhat = track("Jazz/Kind of Blue/01 so what.mp3", { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", trackNumber: "1/5" });
@@ -60,7 +60,7 @@ describe("planRenames", () => {
 
   it("gives each track its new path in its folder, with its extension", () => {
     const [plan] = planRenames([track("Album/b.mp3", { title: "Blue", trackNumber: "2/10" })], "%track% - %title%", library);
-    assert.deepEqual(plan, { trackId: "Album/b.mp3", from: "Album/b.mp3", to: "Album/02 - Blue.mp3", name: "02 - Blue.mp3", status: "ok" });
+    assert.deepEqual(plan, { trackId: "Album/b.mp3", from: "Album/b.mp3", to: "Album/02 - Blue.mp3", name: "02 - Blue.mp3", shownFrom: "b.mp3", shown: "02 - Blue.mp3", status: "ok" });
   });
 
   it("says when nothing changes", () => {
@@ -99,5 +99,122 @@ describe("planRenames", () => {
   it("offers the fields and the presets", () => {
     assert.ok(RENAME_FIELDS.includes("title"));
     assert.equal(RENAME_PRESETS[0], "%track% - %title%");
+  });
+});
+
+describe("readTags: tags from a file's name", () => {
+  it("reads a pattern's fields from the name, without its extension", () => {
+    assert.deepEqual(readTags("%track% - %title%", track("Album/03 - So What.mp3")), { trackNumber: "3", title: "So What" });
+    assert.deepEqual(readTags("%track%. %artist% - %title%", track("Album/7. Miles Davis - Blue in Green.flac")), {
+      trackNumber: "7",
+      artist: "Miles Davis",
+      title: "Blue in Green"
+    });
+  });
+
+  it("keeps the total a track had, and takes the text between the fields as it is", () => {
+    assert.deepEqual(readTags("%track% - %title%", track("A/03 - Song.mp3", { trackNumber: "1/12" })), { trackNumber: "3/12", title: "Song" });
+    assert.deepEqual(readTags("[%year%] (%album%) %title%", track("x/[1959] (Kind of Blue) So What.mp3")), { year: "1959", album: "Kind of Blue", title: "So What" });
+  });
+
+  it("reads the parent folders a pattern names with /, from the end of the path", () => {
+    assert.deepEqual(readTags("%artist%/%album%/%track% - %title%", track("Music/Miles Davis/Kind of Blue/01 - So What.mp3")), {
+      artist: "Miles Davis",
+      album: "Kind of Blue",
+      trackNumber: "1",
+      title: "So What"
+    });
+    // Fewer folders than the pattern asks for: no match.
+    assert.equal(readTags("%artist%/%album%/%title%", track("So What.mp3")), null);
+  });
+
+  it("does not match a name of another shape; digits fields take digits alone", () => {
+    assert.equal(readTags("%track% - %title%", track("So What.mp3")), null);
+    assert.equal(readTags("%track% - %title%", track("one - So What.mp3")), null);
+    assert.equal(readTags("", track("01 - So What.mp3")), null);
+  });
+
+  it("reads nothing from %filename% or an unknown %word%", () => {
+    assert.deepEqual(readTags("%filename%", track("So What.mp3")), {});
+    assert.deepEqual(readTags("%foo% - %title%", track("x - So What.mp3")), { title: "So What" });
+  });
+});
+
+describe("planReads", () => {
+  it("marks what would change, what would not, and what does not match", () => {
+    const tracks = [track("A/01 - New.mp3", { title: "Old", trackNumber: "1" }), track("A/02 - Same.mp3", { title: "Same", trackNumber: "2" }), track("A/Other.mp3")];
+    const plans = planReads(tracks, "%track% - %title%");
+    assert.deepEqual(plans.map((plan) => [plan.trackId, plan.status, plan.from]), [
+      ["A/01 - New.mp3", "ok", "01 - New"],
+      ["A/02 - Same.mp3", "same", "02 - Same"],
+      ["A/Other.mp3", "nomatch", "Other"]
+    ]);
+    assert.deepEqual(plans[0].tags, { trackNumber: "1", title: "New" });
+  });
+});
+
+describe("typing a field: fieldQuery, fieldsFor, completeField", () => {
+  it("knows a field is being typed after an opening %, not after a closing one", () => {
+    assert.deepEqual(fieldQuery("%", 1), { start: 0, query: "" });
+    assert.deepEqual(fieldQuery("%track% - %ti", 13), { start: 10, query: "ti" });
+    assert.equal(fieldQuery("%track%", 7), null);
+    assert.equal(fieldQuery("%track% - ", 10), null);
+    assert.equal(fieldQuery("100% sure", 9), null);
+    assert.equal(fieldQuery("no field", 8), null);
+  });
+
+  it("offers the fields that begin with what is typed", () => {
+    assert.deepEqual(fieldsFor(""), [...RENAME_FIELDS]);
+    assert.deepEqual(fieldsFor("t"), ["title", "track"]);
+    assert.deepEqual(fieldsFor("AR"), ["artist"]);
+    assert.deepEqual(fieldsFor("x"), []);
+  });
+
+  it("completes the field being typed, the caret after it", () => {
+    assert.deepEqual(completeField("%track% - %ti", 13, "title"), { value: "%track% - %title%", caret: 17 });
+    // Typed in the middle: the rest of a name and its closing % are replaced too.
+    assert.deepEqual(completeField("%ar% - x", 3, "artist"), { value: "%artist% - x", caret: 8 });
+    assert.deepEqual(completeField("plain", 5, "title"), { value: "plain", caret: 5 });
+  });
+});
+
+describe("planRenames with /: the folders above the file", () => {
+  const smash = (path: string, title: string, number: string) => track(path, { title, artist: "The Offspring", album: "Smash", trackNumber: number });
+
+  it("names the folder the file is in, from the end of its path; the folders above stay", () => {
+    const [plan] = planRenames([smash("Music/The Offspring - Smash/08-self_esteem.mp3", "Self Esteem", "8")], "%album%/%track% - %title%", []);
+    assert.equal(plan.to, "Music/Smash/08 - Self Esteem.mp3");
+    assert.equal(plan.shownFrom, "The Offspring - Smash/08-self_esteem.mp3");
+    assert.equal(plan.shown, "Smash/08 - Self Esteem.mp3");
+    assert.equal(plan.name, "08 - Self Esteem.mp3");
+    assert.equal(plan.status, "ok");
+  });
+
+  it("makes the folders a file has fewer of, and makes each one's name safe", () => {
+    const [plan] = planRenames([track("loose.mp3", { title: "One", artist: "AC/DC", album: "Live" })], "%artist%/%album%/%title%", []);
+    assert.equal(plan.to, "AC_DC/Live/One.mp3");
+    assert.equal(plan.shownFrom, "loose.mp3");
+  });
+
+  it("is empty when a folder's name would be, and finds clashes on the whole path", () => {
+    const [empty] = planRenames([track("A/x.mp3", { title: "T" })], "%album%/%title%", []);
+    assert.equal(empty.status, "empty");
+    const plans = planRenames([smash("A/1.mp3", "Same", "1"), smash("B/2.mp3", "Same", "1")], "%album%/%track% - %title%", []);
+    assert.deepEqual(plans.map((plan) => plan.status), ["clash", "clash"]);
+  });
+
+  it("keeps the file's folder without /, as before", () => {
+    const [plan] = planRenames([smash("Music/Smash/x.mp3", "Self Esteem", "8")], "%track% - %title%", []);
+    assert.equal(plan.to, "Music/Smash/08 - Self Esteem.mp3");
+    assert.equal(plan.shown, "08 - Self Esteem.mp3");
+    assert.equal(plan.shownFrom, "x.mp3");
+  });
+});
+
+describe("the composer and the comment in patterns", () => {
+  it("fills them, and reads them back from a name", () => {
+    const piece = track("Classical/Bolero.mp3", { title: "Boléro", composer: "Ravel" } as never);
+    assert.equal(fillPattern("%composer% - %title%", piece), "Ravel - Boléro");
+    assert.deepEqual(readTags("%composer% - %title%", track("x/Ravel - Boléro.mp3")), { composer: "Ravel", title: "Boléro" });
   });
 });

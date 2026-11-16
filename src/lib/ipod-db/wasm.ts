@@ -24,6 +24,8 @@ export type IpodSong = {
   path: string;
   size: number;
   lengthMs: number;
+  /** Beats per minute, 0 for none. */
+  bpm: number;
   title: string;
   artist: string;
   album: string;

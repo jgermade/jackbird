@@ -28,6 +28,7 @@ describe("the iPod module as wasm, on the fixture", () => {
       path: "iPod_Control/Music/F00/AAAA.mp3",
       size: 4000000,
       lengthMs: 197000,
+      bpm: 0,
       title: "First song",
       artist: "The Fixtures",
       album: "Fixtures",

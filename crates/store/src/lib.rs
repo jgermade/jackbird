@@ -86,6 +86,18 @@ pub struct FieldsJson {
     /// Part of a compilation (`1`), or empty.
     #[serde(default)]
     pub compilation: String,
+    /// Who wrote the music.
+    #[serde(default)]
+    pub composer: String,
+    /// The comment.
+    #[serde(default)]
+    pub comment: String,
+    /// The lyrics.
+    #[serde(default)]
+    pub lyrics: String,
+    /// Beats per minute.
+    #[serde(default)]
+    pub bpm: String,
 }
 
 impl From<&Fields> for FieldsJson {
@@ -100,6 +112,10 @@ impl From<&Fields> for FieldsJson {
             disc: fields.disc.clone(),
             album_artist: fields.album_artist.clone(),
             compilation: fields.compilation.clone(),
+            composer: fields.composer.clone(),
+            comment: fields.comment.clone(),
+            lyrics: fields.lyrics.clone(),
+            bpm: fields.bpm.clone(),
         }
     }
 }
@@ -116,6 +132,10 @@ impl From<&FieldsJson> for Fields {
             disc: fields.disc.clone(),
             album_artist: fields.album_artist.clone(),
             compilation: fields.compilation.clone(),
+            composer: fields.composer.clone(),
+            comment: fields.comment.clone(),
+            lyrics: fields.lyrics.clone(),
+            bpm: fields.bpm.clone(),
         }
     }
 }
@@ -165,6 +185,18 @@ pub struct Layer {
     /// The compilation mark it sets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compilation: Option<String>,
+    /// The composer it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composer: Option<String>,
+    /// The comment it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// The lyrics it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lyrics: Option<String>,
+    /// The beats per minute it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bpm: Option<String>,
     /// What it does to the cover.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<CoverLayer>,
@@ -188,6 +220,10 @@ impl Layer {
             disc: self.disc.clone().or_else(|| under.disc.clone()),
             album_artist: self.album_artist.clone().or_else(|| under.album_artist.clone()),
             compilation: self.compilation.clone().or_else(|| under.compilation.clone()),
+            composer: self.composer.clone().or_else(|| under.composer.clone()),
+            comment: self.comment.clone().or_else(|| under.comment.clone()),
+            lyrics: self.lyrics.clone().or_else(|| under.lyrics.clone()),
+            bpm: self.bpm.clone().or_else(|| under.bpm.clone()),
             cover: self.cover.clone().or_else(|| under.cover.clone()),
         }
     }
@@ -205,6 +241,10 @@ impl Layer {
             disc: pick(&self.disc, &file.disc),
             album_artist: pick(&self.album_artist, &file.album_artist),
             compilation: pick(&self.compilation, &file.compilation),
+            composer: pick(&self.composer, &file.composer),
+            comment: pick(&self.comment, &file.comment),
+            lyrics: pick(&self.lyrics, &file.lyrics),
+            bpm: pick(&self.bpm, &file.bpm),
         }
     }
 }
@@ -1000,6 +1040,10 @@ impl Library {
             disc: layer.disc.clone(),
             album_artist: layer.album_artist.clone(),
             compilation: layer.compilation.clone(),
+            composer: layer.composer.clone(),
+            comment: layer.comment.clone(),
+            lyrics: layer.lyrics.clone(),
+            bpm: layer.bpm.clone(),
             cover: match &layer.cover {
                 None => CoverEdit::Keep,
                 Some(CoverLayer::Remove) => CoverEdit::Remove,
@@ -1028,11 +1072,16 @@ impl Library {
         } else {
             Some((Fields::from(&layer.over(&song.file)), self.cover_under(&song, &layer)?))
         };
+        // The song's audio, from its blob's first bytes (the layers change no audio).
+        let audio = head_of(&self.blob_path(&song.blob, &song.format))
+            .ok()
+            .and_then(|(layout, head)| jackbird_tags::audio(&head, &layout));
         Ok(Inspection {
             stat: Library::stat_of(&song),
             full_checksum,
             audio_checksum: song.blob.clone(),
             tags,
+            audio,
         })
     }
 
@@ -1072,6 +1121,10 @@ impl Library {
         set(&mut layer.disc, &edit.disc, &under.disc);
         set(&mut layer.album_artist, &edit.album_artist, &under.album_artist);
         set(&mut layer.compilation, &edit.compilation, &under.compilation);
+        set(&mut layer.composer, &edit.composer, &under.composer);
+        set(&mut layer.comment, &edit.comment, &under.comment);
+        set(&mut layer.lyrics, &edit.lyrics, &under.lyrics);
+        set(&mut layer.bpm, &edit.bpm, &under.bpm);
         match &edit.cover {
             CoverEdit::Keep => {}
             CoverEdit::Set(cover) => {

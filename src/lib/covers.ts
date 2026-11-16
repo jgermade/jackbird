@@ -82,6 +82,11 @@ export function namesIn(snapshot: MetaSnapshot): Set<string> {
     const name = refName(record.metadata.coverDataUrl);
     if (name) names.add(name);
   }
+  // The artists' pictures (lib/artists.ts), kept the same way.
+  for (const ref of Object.values(snapshot.artists ?? {})) {
+    const name = refName(ref);
+    if (name) names.add(name);
+  }
   return names;
 }
 
@@ -203,7 +208,14 @@ export async function withDataUrls(snapshot: MetaSnapshot, names: Set<string>): 
     const name = refName(record.metadata.coverDataUrl);
     tracks[path] = name && urls.has(name) ? { ...record, metadata: { ...record.metadata, coverDataUrl: urls.get(name) ?? null } } : record;
   }
-  return { ...snapshot, tracks };
+  if (!snapshot.artists) return { ...snapshot, tracks };
+  const artists: Record<string, string> = {};
+  for (const [artist, ref] of Object.entries(snapshot.artists)) {
+    const name = refName(ref);
+    const url = name && urls.has(name) ? urls.get(name) : ref;
+    if (url) artists[artist] = url;
+  }
+  return { ...snapshot, tracks, artists };
 }
 
 /**

@@ -10,11 +10,13 @@ import { $reactive, $toRaw } from "jq79";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "../helpers/metadata";
 import type { EditableMetadata, MetaRecord, Track } from "../types";
 import { can } from "./account";
+import { computeBpms } from "./bpm";
 import { t, tn, type MessageKey } from "./i18n";
 import { en } from "./locales/en";
 import { TagError } from "./tags";
 import { library } from "./library";
 import { flushMeta } from "./meta";
+import { doneWriting, writingFile } from "./progress";
 import { updateRoots } from "./roots";
 import { ui, type SelectionTab } from "./ui";
 import { activeRoot, selectUnlessChosen, selectedTracks } from "./workspace";
@@ -29,7 +31,9 @@ export const editor = $reactive({
   form: emptyMetadata() as EditableMetadata,
   confirmed: [] as string[],
   /** In the family library (F3): saved for everyone (editors and up) or only for oneself. */
-  scope: "family" as "family" | "mine"
+  scope: "family" as "family" | "mine",
+  /** The BPM worked out for each of several tracks, by ID: Save writes each its own, unless one is typed for them all. */
+  bpms: {} as Record<string, string>
 });
 
 /** Whether the active root is the family library, where anyone edits their own version (F3). */
@@ -61,6 +65,7 @@ export function openSelection(tab: SelectionTab = "edit"): void {
   }
   editor.form = computeCommonMetadata(tracks);
   editor.confirmed = [];
+  editor.bpms = {};
   library.errorMessage = null;
   // A listener sees the files' info only (S3); in the family library they edit their own version (F3).
   // In someone's music shared with one, one saves one's own version (SH-D4).
@@ -131,38 +136,31 @@ async function showAsItIsNow(rootId: string, track: Track): Promise<void> {
 }
 
 /**
- * Writes the form to every selected track: a field the selection varied in
- * and the form left empty keeps each track's own value (see mergeDraft). Each
- * file gets its new tags and checksums; then the library takes the new
- * tracks and records, merged into the root as it is now, and `.meta/` is
- * written from it (flushMeta). `library.saving` is set throughout, which
- * holds the verifier off. A track the engine refuses stops the save there:
- * the tracks before it stay saved and are recorded, and the message names it
- * and why. Says what was saved, or why not, and closes the editor when it
- * all worked.
+ * Writes `items` (each track with the tags it is to have) to the active root's files, one at a time
+ * (the progress at the dialog's foot, lib/progress.ts): each file gets its new tags and checksums;
+ * then the library takes the new tracks and records, merged into the root as it is now, and
+ * `.meta/` is written from it (flushMeta). `library.saving` is set throughout, which holds the
+ * verifier off. A track the engine refuses stops there: the ones before it stay saved and are
+ * recorded, and the message names it and why. Resolves to whether every track was written. The
+ * edit dialog's save and the rename tab's "name → tags" (lib/rename.ts) both write through it.
  */
-export async function saveEdits(): Promise<void> {
+export async function saveMetadata(items: readonly { track: Track; metadata: Track["metadata"] }[]): Promise<boolean> {
   const root = activeRoot.value.data;
-  const tracks = selectedTracks.value.data;
-  if (!root || tracks.length === 0 || library.saving) {
-    return;
+  if (!root || items.length === 0 || library.saving) {
+    return false;
   }
-
-  const draft: EditableMetadata = { ...$toRaw(editor).form };
-  const confirmed = [...$toRaw(editor).confirmed];
   library.saving = true;
   library.errorMessage = null;
   library.infoMessage = null;
 
   try {
-    const varied = getVariedFields(tracks);
     const records: Record<string, MetaRecord> = {};
     const saved = new Map<string, Track>();
     // The track that could not be saved, and why: the ones before it are saved and recorded.
     let failed: { track: Track; reason: string; stale?: boolean } | null = null;
 
-    for (const track of tracks) {
-      const metadata = mergeDraft(track.metadata, draft, varied, confirmed);
+    for (const [index, { track, metadata }] of items.entries()) {
+      writingFile(index + 1, items.length, track.name);
       try {
         // In the family library (F4), the version read goes with it: a song changed since is refused.
         const expected = inLibrary() ? track.fullChecksum : undefined;
@@ -174,7 +172,8 @@ export async function saveEdits(): Promise<void> {
         const lastModified = written.lastModified ?? Date.now();
         const checked = { checksum: fullChecksum, fullChecksum, audioChecksum, size: written.size, lastModified, lastVerifiedAt: nowIso, metadata };
 
-        records[track.relativePath] = { ...checked, updatedAt: nowIso };
+        // Its audio, unchanged by a tag's write, kept in the record (none there would read it again).
+        records[track.relativePath] = { ...checked, audio: track.audio ?? null, updatedAt: nowIso };
         saved.set(track.id, { ...track, ...checked });
       } catch (error) {
         failed = { track, reason: reasonOf(error, metadata), stale: error instanceof TagError && error.code === "stale" };
@@ -202,14 +201,54 @@ export async function saveEdits(): Promise<void> {
       const message = t("message.saveFailedFor", { name: failed.track.name, reason: failed.reason });
       library.errorMessage = saved.size > 0 ? `${message} ${tn("message.savedBefore", saved.size)}` : message;
       if (failed.stale) await showAsItIsNow(root.id, failed.track);
-      return;
+      return false;
     }
-    const target = tracks.length === 1 ? tracks[0].name : tn("tracks.count", tracks.length);
+    const target = items.length === 1 ? items[0].track.name : tn("tracks.count", items.length);
     library.infoMessage = t("message.saved", { target });
-    ui.selectionOpen = false;
+    return true;
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : t("message.saveFailed");
+    return false;
   } finally {
+    doneWriting();
     library.saving = false;
   }
+}
+
+/** Saves the edit dialog's form to the selected tracks (saveMetadata), and closes it when it all worked. */
+export async function saveEdits(): Promise<void> {
+  const tracks = selectedTracks.value.data;
+  if (tracks.length === 0 || library.saving) return;
+  const draft: EditableMetadata = { ...$toRaw(editor).form };
+  const confirmed = [...$toRaw(editor).confirmed];
+  const varied = getVariedFields(tracks);
+  // The BPM worked out for each, where none was typed for them all (nor the field emptied on purpose).
+  const bpms = { ...$toRaw(editor).bpms };
+  const ownBpm = !draft.bpm.trim() && !confirmed.includes("bpm");
+  const metadataOf = (track: Track): Track["metadata"] => {
+    const merged = mergeDraft(track.metadata, draft, varied, confirmed);
+    return ownBpm && bpms[track.id] ? { ...merged, bpm: bpms[track.id] } : merged;
+  };
+  if (await saveMetadata(tracks.map((track) => ({ track, metadata: metadataOf(track) })))) {
+    ui.selectionOpen = false;
+  }
+}
+
+/**
+ * Works out the selection's BPM (lib/bpm.ts): one track's into the field; several tracks' kept, each
+ * its own, for Save. Says how many could not be told.
+ */
+export async function calculateBpm(): Promise<void> {
+  const root = activeRoot.value.data;
+  const tracks = selectedTracks.value.data;
+  if (!root || tracks.length === 0) return;
+  library.errorMessage = null;
+  const single = tracks.length === 1;
+  if (!single) editor.bpms = {};
+  const failed = await computeBpms(root.source, tracks, (track, bpm) => {
+    if (!bpm) return;
+    if (single) editor.form = { ...editor.form, bpm };
+    else editor.bpms = { ...editor.bpms, [track.id]: bpm };
+  });
+  if (failed > 0) library.errorMessage = tn("bpm.failed", failed);
 }

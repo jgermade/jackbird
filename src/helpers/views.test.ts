@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track as fixture } from "./fixtures.test-support.ts";
-import { albumArtistOf, albumFolder, albumKey, artistKey, buildViewRows } from "./views.ts";
+import { albumArtistOf, albumFolder, albumKey, artistKey, artistName, artistOfKey, buildViewRows, coverOfTracks, trackPlace, yearOfTracks } from "./views.ts";
 
 const labels = { unknownArtist: "Unknown artist", unknownAlbum: "No album", variousArtists: "Various", missing: "Missing", locale: "en" };
 
@@ -119,5 +119,90 @@ describe("buildViewRows", () => {
       [false, 3, "@pl:Playlists/Road.m3u8#3"]
     ]);
     assert.equal(rows[3].meta, "Missing");
+  });
+});
+
+describe("an album's row: its cover, and who it is by and its year", () => {
+  const covered = [
+    fixture("Miles/Kind of Blue/01.mp3", { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959-08-17" }),
+    fixture("Miles/Kind of Blue/02.mp3", { title: "Freddie", artist: "Miles Davis", album: "Kind of Blue", coverDataUrl: "jackbird-cover:kob.jpg" }),
+    fixture("Trane/Giant Steps/01.mp3", { title: "Giant Steps", artist: "John Coltrane", album: "Giant Steps" })
+  ];
+
+  it("takes the first track's cover that has one, and a date's year", () => {
+    assert.equal(coverOfTracks(covered.slice(0, 2)), "jackbird-cover:kob.jpg");
+    assert.equal(coverOfTracks(covered.slice(2)), undefined);
+    assert.equal(yearOfTracks(covered), "1959");
+    assert.equal(yearOfTracks([fixture("a.mp3", { year: "circa 70s" })]), "circa 70s");
+  });
+
+  it("gives Albums' rows their cover and a line of artist and year; none without them", () => {
+    const rows = buildViewRows("albums", covered, [], labels);
+    const blue = rows.find((row) => row.label === "Kind of Blue");
+    const steps = rows.find((row) => row.label === "Giant Steps");
+    assert.equal(blue?.cover, "jackbird-cover:kob.jpg");
+    assert.equal(blue?.sub, "Miles Davis · 1959");
+    assert.equal(blue?.meta, "Miles Davis");
+    assert.equal(steps?.cover, undefined);
+    assert.equal(steps?.sub, "John Coltrane");
+    // Both with a cover's room, so their names line up.
+    assert.equal(blue?.framed, true);
+    assert.equal(steps?.framed, true);
+  });
+
+  it("in Albums by artist, an album's line is its year alone, its artist the row above", () => {
+    const rows = buildViewRows("albumsByArtist", covered, "all", labels);
+    const blue = rows.find((row) => row.label === "Kind of Blue");
+    assert.equal(blue?.sub, "1959");
+    assert.equal(blue?.cover, "jackbird-cover:kob.jpg");
+    assert.equal(rows.find((row) => row.label === "Miles Davis")?.cover, undefined);
+  });
+});
+
+describe("trackPlace", () => {
+  it("names a track's row and the rows to open above it, the outermost first", () => {
+    const rows = buildViewRows("albumsByArtist", tracks, "all", labels);
+    const id = tracks.find((one) => one.metadata.title === "So What")!.id;
+    const place = trackPlace(rows, id);
+    assert.equal(place?.key, `track:${id}`);
+    assert.equal(place?.open.length, 2);
+    assert.ok(place?.open[0].startsWith("@artist:"));
+    assert.ok(place?.open[1].startsWith("@aba:"));
+  });
+
+  it("is null where the list has no row of it", () => {
+    assert.equal(trackPlace(buildViewRows("playlists", tracks, "all", labels), tracks[0].id), null);
+    assert.equal(trackPlace(buildViewRows("songs", tracks, "all", labels), tracks[0].id)?.open.length, 0);
+  });
+});
+
+describe("an artist's picture in the rows", () => {
+  const two = [
+    fixture("a/1.mp3", { title: "One", artist: "Fugazi", album: "Repeater" }),
+    fixture("b/1.mp3", { title: "Two", artist: "  Bad Brains ", album: "Rock for Light" })
+  ];
+
+  it("keeps a picture by the artist's name without case, and reads it back from a group's key", () => {
+    assert.equal(artistName("  Bad Brains "), "bad brains");
+    assert.equal(artistOfKey("@artist:fugazi"), "fugazi");
+    assert.equal(artistOfKey("@album:x::y"), null);
+  });
+
+  it("gives artist rows their picture, round, all of them a picture's room when one has one", () => {
+    const rows = buildViewRows("artists", two, [], labels, [], { fugazi: "jackbird-cover:f.jpg" });
+    const fugazi = rows.find((row) => row.label === "Fugazi");
+    const bad = rows.find((row) => row.label === "Bad Brains");
+    assert.equal(fugazi?.cover, "jackbird-cover:f.jpg");
+    assert.equal(fugazi?.round, true);
+    assert.equal(bad?.cover, undefined);
+    assert.equal(bad?.framed, true);
+    assert.equal(bad?.round, true);
+  });
+
+  it("does the same in Albums by artist, and nothing where no artist has a picture", () => {
+    const rows = buildViewRows("albumsByArtist", two, [], labels, [], { "bad brains": "jackbird-cover:b.jpg" });
+    assert.equal(rows.find((row) => row.label === "Bad Brains")?.cover, "jackbird-cover:b.jpg");
+    const none = buildViewRows("artists", two, [], labels);
+    assert.ok(none.every((row) => !row.framed && !row.round && !row.cover));
   });
 });

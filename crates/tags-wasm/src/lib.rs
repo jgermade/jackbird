@@ -80,7 +80,7 @@ pub extern "C" fn tags_read() -> u32 {
     let request = take_input();
     answer(match wire::read_request(&request) {
         Ok((layout, head)) => jackbird_tags::read_head(head, &layout)
-            .map(|tags| wire::tags(&tags))
+            .map(|tags| wire::tags(&tags, jackbird_tags::audio(head, &layout)))
             .map_err(|error| wire::error(&error)),
         Err(why) => Err(bad_request(why)),
     })
@@ -170,8 +170,8 @@ mod tests {
 
         let mut request = vec![1, 5, 0, 0, 0];
         request.extend_from_slice(b"Blue!");
-        // The other fields left, the cover kept.
-        request.extend_from_slice(&[0; 9]);
+        // The other twelve fields left, the cover kept.
+        request.extend_from_slice(&[0; 13]);
         request.extend_from_slice(&layout);
         request.extend_from_slice(&file[..25]);
         let (status, out) = call(&request, tags_write);

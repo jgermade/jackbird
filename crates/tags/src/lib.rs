@@ -15,13 +15,16 @@
 //! `jackbird-flac`. See `RECORD/2026-08-11.musikmatch-rust-migration.WIP.md`
 //! (21:45 to 22:20).
 
+mod audio;
 mod flac;
 mod mp3;
+pub mod mpeg;
 mod region;
 mod year;
 
 use std::fmt;
 
+pub use audio::{AUDIO_PROBE, Audio, audio};
 pub use region::{FIRST_HEAD, FileLayout, Layout, TAIL_LEN, audio_region, format_of, layout};
 
 /// The formats the engine reads and writes.
@@ -55,12 +58,20 @@ pub enum Field {
     /// Part of a compilation: `1`, or as the file holds it (iTunes' `TCMP`,
     /// Vorbis' `COMPILATION`).
     Compilation,
+    /// Who wrote the music.
+    Composer,
+    /// A comment: ID3's `COMM` with no description (iTunes' own, described, are not it).
+    Comment,
+    /// The lyrics, unsynchronised: ID3's `USLT` with no description.
+    Lyrics,
+    /// Beats per minute, a whole number: ID3's `TBPM`, Vorbis' `BPM`.
+    Bpm,
 }
 
 impl Field {
     /// Every field, in the wire's order (`crates/tags-wasm`): the six the
     /// engine started with, then those added after them.
-    pub const ALL: [Field; 9] = [
+    pub const ALL: [Field; 13] = [
         Field::Title,
         Field::Artist,
         Field::Album,
@@ -70,6 +81,10 @@ impl Field {
         Field::Disc,
         Field::AlbumArtist,
         Field::Compilation,
+        Field::Composer,
+        Field::Comment,
+        Field::Lyrics,
+        Field::Bpm,
     ];
 }
 
@@ -95,6 +110,14 @@ pub struct Fields {
     pub album_artist: String,
     /// Part of a compilation: `1`, or as the file holds it; empty when not.
     pub compilation: String,
+    /// Who wrote the music.
+    pub composer: String,
+    /// The comment.
+    pub comment: String,
+    /// The lyrics.
+    pub lyrics: String,
+    /// Beats per minute.
+    pub bpm: String,
 }
 
 impl Fields {
@@ -110,6 +133,10 @@ impl Fields {
             Field::Disc => &self.disc,
             Field::AlbumArtist => &self.album_artist,
             Field::Compilation => &self.compilation,
+            Field::Composer => &self.composer,
+            Field::Comment => &self.comment,
+            Field::Lyrics => &self.lyrics,
+            Field::Bpm => &self.bpm,
         }
     }
 
@@ -124,6 +151,10 @@ impl Fields {
             Field::Disc => self.disc = value,
             Field::AlbumArtist => self.album_artist = value,
             Field::Compilation => self.compilation = value,
+            Field::Composer => self.composer = value,
+            Field::Comment => self.comment = value,
+            Field::Lyrics => self.lyrics = value,
+            Field::Bpm => self.bpm = value,
         }
     }
 }
@@ -185,6 +216,14 @@ pub struct Edit {
     pub album_artist: Option<String>,
     /// The new compilation mark (`1`, or empty to remove it).
     pub compilation: Option<String>,
+    /// The new composer.
+    pub composer: Option<String>,
+    /// The new comment.
+    pub comment: Option<String>,
+    /// The new lyrics.
+    pub lyrics: Option<String>,
+    /// The new beats per minute.
+    pub bpm: Option<String>,
     /// What happens to the cover.
     pub cover: CoverEdit,
 }
@@ -202,6 +241,10 @@ impl Edit {
             disc: Some(fields.disc.clone()),
             album_artist: Some(fields.album_artist.clone()),
             compilation: Some(fields.compilation.clone()),
+            composer: Some(fields.composer.clone()),
+            comment: Some(fields.comment.clone()),
+            lyrics: Some(fields.lyrics.clone()),
+            bpm: Some(fields.bpm.clone()),
             cover: CoverEdit::Keep,
         }
     }
@@ -218,6 +261,10 @@ impl Edit {
             Field::Disc => self.disc.as_deref(),
             Field::AlbumArtist => self.album_artist.as_deref(),
             Field::Compilation => self.compilation.as_deref(),
+            Field::Composer => self.composer.as_deref(),
+            Field::Comment => self.comment.as_deref(),
+            Field::Lyrics => self.lyrics.as_deref(),
+            Field::Bpm => self.bpm.as_deref(),
         }
     }
 }

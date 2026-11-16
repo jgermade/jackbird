@@ -58,3 +58,41 @@ export function trackLead(trackNumber: string | undefined, loading: boolean, num
   if (loading) return "…";
   return numbered ? " " : "";
 }
+
+/**
+ * A track's number alone, for a list: its leading digits as a number, its total and anything after
+ * them dropped ("2 de 6", "2/6", "2/" and "02" give "2"); a value with no leading digits as it is
+ * (its part before a "/"); none, "".
+ */
+export function cleanTrackNumber(value: string | undefined): string {
+  const trimmed = (value ?? "").trim();
+  const digits = trimmed.match(/^\d+/);
+  return digits ? String(Number(digits[0])) : formatTrackNumber(trimmed);
+}
+
+/** A track's length: "3:17", "1:02:03" past the hour; "" when unknown. */
+export function formatDuration(ms: number | undefined | null): string {
+  if (!ms || !Number.isFinite(ms) || ms <= 0) return "";
+  const whole = Math.round(ms / 1000);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const seconds = String(whole % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+/** A file's audio as one line for a list: "MP3 · 320 kbps · 44.1 kHz · 3:17", in `locale`'s decimals; what is unknown left out. */
+export function audioLine(
+  audio: { durationMs: number; bitrate: number; sampleRate: number; bits: number; vbr: boolean } | null | undefined,
+  format: string,
+  locale: string
+): string {
+  const parts = [format];
+  if (audio) {
+    if (audio.bitrate > 0) parts.push(`${audio.bitrate} kbps${audio.vbr && !audio.bits ? " VBR" : ""}`);
+    if (audio.sampleRate > 0) parts.push(`${(audio.sampleRate / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} kHz`);
+    if (audio.bits > 0) parts.push(`${audio.bits} bits`);
+    const length = formatDuration(audio.durationMs);
+    if (length) parts.push(length);
+  }
+  return parts.filter(Boolean).join(" · ");
+}

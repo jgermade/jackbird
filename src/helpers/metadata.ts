@@ -7,13 +7,13 @@ export type VariedFields = Record<keyof TrackMetadata, boolean>;
 export type TextField = Exclude<keyof TrackMetadata, "coverDataUrl">;
 
 /** The text fields, the six the tags started with first. */
-export const TEXT_FIELDS: readonly TextField[] = ["title", "artist", "album", "year", "genre", "trackNumber", "discNumber", "albumArtist", "compilation"];
+export const TEXT_FIELDS: readonly TextField[] = ["title", "artist", "album", "year", "genre", "trackNumber", "discNumber", "albumArtist", "compilation", "composer", "comment", "lyrics", "bpm"];
 
 /**
  * The fields added after the first six: a library read before them (in `.meta/`, a service's
  * catalogue) does not have them, and their tags are read again (`readsEveryField`).
  */
-export const LATER_FIELDS: readonly TextField[] = ["discNumber", "albumArtist", "compilation"];
+export const LATER_FIELDS: readonly TextField[] = ["discNumber", "albumArtist", "compilation", "composer", "comment", "lyrics", "bpm"];
 
 /** Metadata with every field empty and no cover. */
 export function emptyMetadata(): TrackMetadata {
@@ -27,6 +27,10 @@ export function emptyMetadata(): TrackMetadata {
     discNumber: "",
     albumArtist: "",
     compilation: "",
+    composer: "",
+    comment: "",
+    lyrics: "",
+    bpm: "",
     coverDataUrl: null
   };
 }
@@ -90,7 +94,8 @@ export function getVariedFields(tracks: Track[]): VariedFields {
  */
 export function mergeDraft(original: TrackMetadata, draft: EditableMetadata, varied: VariedFields, confirmed: readonly string[] = []): TrackMetadata {
   const merged = {
-    coverDataUrl: varied.coverDataUrl && draft.coverDataUrl === null ? original.coverDataUrl : draft.coverDataUrl
+    // No cover in the draft keeps each track's own where they varied, unless it was removed on purpose (confirmed).
+    coverDataUrl: varied.coverDataUrl && draft.coverDataUrl === null && !confirmed.includes("coverDataUrl") ? original.coverDataUrl : draft.coverDataUrl
   } as TrackMetadata;
   for (const field of TEXT_FIELDS) {
     merged[field] = varied[field] && !draft[field] && !confirmed.includes(field) ? original[field] : draft[field];

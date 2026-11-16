@@ -77,6 +77,8 @@ pub struct Track {
     pub size: u32,
     /// Bit rate in kbit/s (`0x38`).
     pub bitrate: u32,
+    /// Beats per minute, 0 for none (`0x7A`, two bytes).
+    pub bpm: u16,
     /// Times played, as the last sync left it (`0x50`).
     pub play_count: u32,
     /// Rating, 0 to 100 in steps of 20 (`0x1F`).
@@ -232,6 +234,11 @@ fn track(data: &[u8], at: usize, end: usize) -> Result<(Track, usize), Error> {
         play_count: f(0x50)?,
         disc_number: f(0x5c)?,
         disc_count: f(0x60)?,
+        bpm: if header >= 0x7c {
+            u16::from(u8_at(data, at + 0x7a)?) | u16::from(u8_at(data, at + 0x7b)?) << 8
+        } else {
+            0
+        },
         ..Track::default()
     };
     for_each_mhod(data, at + header, at + total, f(0x0c)?, |kind, text| {

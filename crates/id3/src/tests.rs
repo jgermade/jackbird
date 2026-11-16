@@ -393,3 +393,47 @@ fn errors_say_what_went_wrong() {
         assert!(!error.to_string().is_empty());
     }
 }
+
+#[test]
+fn round_trips_a_comment_in_each_encoding() {
+    for (version, text) in [
+        (Version::V23, "Plain text"),
+        (Version::V23, "Señor ✓"),
+        (Version::V24, "Señor ✓"),
+        (Version::V24, "Plain"),
+    ] {
+        let comment = crate::Comment {
+            language: "spa".into(),
+            description: String::new(),
+            text: text.into(),
+        };
+        let content = crate::encode_comment(&comment, version);
+        assert_eq!(crate::decode_comment(&content).unwrap(), comment, "{version:?} {text}");
+    }
+}
+
+#[test]
+fn reads_a_comments_description_and_a_bad_language_as_written_eng() {
+    // ISO-8859-1, "eng", description "iTunNORM", text " 00000123".
+    let mut content = vec![0];
+    content.extend_from_slice(b"engiTunNORM\0 00000123");
+    let comment = crate::decode_comment(&content).unwrap();
+    assert_eq!(
+        (
+            comment.language.as_str(),
+            comment.description.as_str(),
+            comment.text.as_str()
+        ),
+        ("eng", "iTunNORM", " 00000123")
+    );
+    let written = crate::encode_comment(
+        &crate::Comment {
+            language: "x".into(),
+            description: String::new(),
+            text: "a".into(),
+        },
+        Version::V23,
+    );
+    assert_eq!(&written[1..4], b"eng");
+    assert!(crate::decode_comment(&[0, b'e']).is_err());
+}

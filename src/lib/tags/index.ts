@@ -9,7 +9,7 @@
 import { editFor } from "../../helpers/cover.ts";
 import { internCoverBytes } from "../covers.ts";
 import { emptyMetadata } from "../../helpers/metadata.ts";
-import type { TrackMetadata } from "../../types.ts";
+import type { AudioProps, TrackMetadata } from "../../types.ts";
 import type { WireLayout, WireTags } from "../../helpers/tagwire.ts";
 import { layoutOf, readBlob, readOf, writeOf } from "./engine.ts";
 import { TagError } from "./error.ts";
@@ -43,6 +43,19 @@ function layoutFor(one: Engine, bytes: Uint8Array): WireLayout {
   return layout;
 }
 
+/** A file's tags and audio, read from a `Blob`'s head and tail only (lib/tags/engine.ts's `readBlob`). */
+export async function readBlobAll(blob: Blob): Promise<{ metadata: TrackMetadata; audio: AudioProps | null }> {
+  const one = await engine();
+  let tags;
+  try {
+    tags = await readBlob(one, blob);
+  } catch (error) {
+    if (!(error instanceof TagError) || error.code === "engine-failed") throw error;
+    tags = null;
+  }
+  return tags ? { metadata: metadataOf(tags), audio: tags.audio } : { metadata: emptyMetadata(), audio: null };
+}
+
 /** A file's tags as the library holds them, read from a `Blob`'s head and tail only (lib/tags/engine.ts's `readBlob`). */
 export async function readBlobTags(blob: Blob): Promise<TrackMetadata> {
   const one = await engine();
@@ -54,6 +67,20 @@ export async function readBlobTags(blob: Blob): Promise<TrackMetadata> {
     tags = null;
   }
   return tags ? metadataOf(tags) : emptyMetadata();
+}
+
+/** A file's tags and audio. A file the engine cannot read reads as untagged, with no audio. */
+export async function readAll(bytes: Uint8Array): Promise<{ metadata: TrackMetadata; audio: AudioProps | null }> {
+  const one = await engine();
+  let tags;
+  try {
+    const layout = layoutFor(one, bytes);
+    tags = layout.format ? readOf(one, bytes, layout) : null;
+  } catch (error) {
+    if (!(error instanceof TagError) || error.code === "engine-failed") throw error;
+    tags = null;
+  }
+  return tags ? { metadata: metadataOf(tags), audio: tags.audio } : { metadata: emptyMetadata(), audio: null };
 }
 
 /** A file's tags as the library holds them. A file the engine cannot read reads as untagged. */
@@ -87,6 +114,10 @@ function metadataOf(tags: WireTags): TrackMetadata {
     discNumber: tags.fields.disc,
     albumArtist: tags.fields.albumArtist,
     compilation: tags.fields.compilation,
+    composer: tags.fields.composer,
+    comment: tags.fields.comment,
+    lyrics: tags.fields.lyrics,
+    bpm: tags.fields.bpm,
     // Kept once, by reference (lib/covers.ts): never made into a data URL to be read back.
     coverDataUrl: tags.cover ? internCoverBytes(tags.cover) : null
   };

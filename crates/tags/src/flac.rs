@@ -26,6 +26,10 @@ fn keys(field: Field) -> &'static [&'static str] {
         Field::Disc => &["DISCNUMBER", "DISCTOTAL", "TOTALDISCS"],
         Field::AlbumArtist => &["ALBUMARTIST", "ALBUM ARTIST"],
         Field::Compilation => &["COMPILATION"],
+        Field::Composer => &["COMPOSER"],
+        Field::Comment => &["COMMENT", "DESCRIPTION"],
+        Field::Lyrics => &["LYRICS", "UNSYNCEDLYRICS"],
+        Field::Bpm => &["BPM"],
     }
 }
 
@@ -63,6 +67,10 @@ fn fields_of(comments: &Comments) -> Fields {
         disc: numbered(comments, ["DISCNUMBER", "DISCTOTAL", "TOTALDISCS"]),
         album_artist: comments.get("ALBUMARTIST").unwrap_or_else(|| get("ALBUM ARTIST")),
         compilation: get("COMPILATION"),
+        composer: get("COMPOSER"),
+        comment: comments.get("COMMENT").unwrap_or_else(|| get("DESCRIPTION")),
+        lyrics: comments.get("LYRICS").unwrap_or_else(|| get("UNSYNCEDLYRICS")),
+        bpm: get("BPM"),
     }
 }
 

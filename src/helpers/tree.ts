@@ -43,8 +43,13 @@ export function buildWizardRows(tracks: Track[], expandedFolders: readonly strin
     }
 
     const files = [...node.tracks].sort((left, right) => compareText(left.relativePath, right.relativePath, "es"));
+    // Each track its own cover; a folder's tracks, one of them with a cover, all with a cover's room.
+    const framed = files.some((track) => track.metadata.coverDataUrl);
     for (const track of files) {
+      const cover = track.metadata.coverDataUrl;
       rows.push({
+        ...(cover ? { cover } : {}),
+        ...(framed ? { framed } : {}),
         key: `track:${track.id}`,
         kind: "track",
         album: parentPath,

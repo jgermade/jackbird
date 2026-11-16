@@ -110,3 +110,21 @@ describe("treeKeyAction", () => {
     assert.equal(treeKeyAction(rows, null, " "), null);
   });
 });
+
+describe("covers in Files: the tracks', not the folders'", () => {
+  const a = "jackbird-cover:a.jpg";
+
+  it("gives each track its own cover, and none to a folder", () => {
+    const rows = buildWizardRows([track("Band/Album/01.mp3", { coverDataUrl: a }, "t1"), track("Band/Album/02.mp3", {}, "t2")], ["Band", "Band/Album"]);
+    assert.equal(rows.find((row) => row.album === "Band/Album" && row.kind === "album")?.cover, undefined);
+    assert.equal(rows.find((row) => row.trackId === "t1")?.cover, a);
+    assert.equal(rows.find((row) => row.trackId === "t2")?.cover, undefined);
+  });
+
+  it("gives a folder's tracks a cover's room when one of them has a cover; none elsewhere", () => {
+    const rows = buildWizardRows([track("One/01.mp3", { coverDataUrl: a }, "t1"), track("One/02.mp3", {}, "t2"), track("Two/01.mp3", {}, "t3")], ["One", "Two"]);
+    assert.equal(rows.find((row) => row.trackId === "t2")?.framed, true);
+    assert.equal(rows.find((row) => row.trackId === "t3")?.framed, undefined);
+    assert.ok(rows.filter((row) => row.kind === "album").every((row) => !row.framed));
+  });
+});

@@ -18,6 +18,16 @@ const HEIGHTS: Record<Density, RowHeights> = {
   spacious: { row: 2.75, song: 3.25, queue: 4 }
 };
 
+/**
+ * A row's height in pixels, for a list drawn a window at a time: `rem` at a root of `rootPx`, rounded
+ * to an even number of pixels where the stylesheet rounds it too (`round(…, 2px)` in tokens.css,
+ * where the engine has it), so the list's arithmetic and the rows' boxes agree.
+ */
+export function rowPixels(rem: number, rootPx: number, rounds: boolean): number {
+  const px = rem * rootPx;
+  return rounds ? Math.round(px / 2) * 2 : px;
+}
+
 /** The density a saved value names, else the default. */
 export function densityOf(value: unknown): Density {
   return DENSITIES.find((density) => density === value) ?? DEFAULT_DENSITY;

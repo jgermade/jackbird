@@ -68,7 +68,8 @@ export async function hydrateRoot(
     fullChecksum: stored.fullChecksum || stored.checksum,
     audioChecksum: stored.audioChecksum,
     lastVerifiedAt: stored.lastVerifiedAt,
-    metadata: withEveryField(stored.metadata)
+    metadata: withEveryField(stored.metadata),
+    audio: stored.audio
   }));
 
   updateRoots((currentRoots) => {
@@ -148,7 +149,14 @@ export async function hydrateRoot(
         // Kept before the disc, album artist and compilation were read: read again, for them.
         if (!stored) return false;
         const cover = refName(stored.metadata.coverDataUrl);
-        return stored.size !== f.size || stored.lastModified !== f.lastModified || !readsEveryField(stored.metadata) || (cover !== null && missingCovers.has(cover));
+        // So too a record kept before the audio's length and rates were read (none: not even null).
+        return (
+          stored.size !== f.size ||
+          stored.lastModified !== f.lastModified ||
+          !readsEveryField(stored.metadata) ||
+          stored.audio === undefined ||
+          (cover !== null && missingCovers.has(cover))
+        );
       });
 
       const staleOrNewFiles = [...newFiles, ...modifiedFiles];
@@ -273,6 +281,7 @@ export async function hydrateRoot(
             lastModified: found.lastModified ?? file.lastModified,
             lastVerifiedAt: nowIso,
             metadata,
+            audio: found.audio ?? stored?.audio ?? null,
             updatedAt: nowIso
           }
         });
@@ -332,6 +341,7 @@ export async function hydrateRoot(
                   lastModified: found.lastModified,
                   lastVerifiedAt: undefined,
                   metadata: withEveryField(found.metadata),
+                  audio: found.audio ?? null,
                   updatedAt: nowIso
                 }
               });

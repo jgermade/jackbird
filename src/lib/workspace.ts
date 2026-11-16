@@ -12,15 +12,16 @@ import { withoutSongs } from "../helpers/folders";
 import { levelsOf, openOnEntering, openOnLeaving, type Levels } from "../helpers/levels";
 import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
-import { orderDetailPlaylist } from "../helpers/tracks";
+import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
-import { albumKey, artistKey, buildViewRows, type ViewLabels } from "../helpers/views";
+import { albumKey, artistKey, buildViewRows, trackPlace, type ViewLabels } from "../helpers/views";
 import type { LibraryView, Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
 import { addToQueue, dropFromQueue, nowPlaying, playNext, playQueue, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
+import { ui } from "./ui";
 
 import { Opaque } from "./opaque";
 
@@ -54,7 +55,7 @@ function rowsOf(root: RootWorkspace): WizardTreeRow[] {
   const view = root.view ?? "files";
   return view === "files"
     ? buildWizardRows(root.tracks, root.expandedAlbums)
-    : buildViewRows(view, root.tracks, root.expandedAlbums, viewLabels(), root.playlists ?? []);
+    : buildViewRows(view, root.tracks, root.expandedAlbums, viewLabels(), root.playlists ?? [], root.metaSnapshot.artists ?? {});
 }
 
 /**
@@ -477,4 +478,33 @@ export function selectUnlessChosen(trackId: string): void {
     return;
   }
   updateActive((item) => ({ ...item, selectedTrackId: trackId, selectedTrackIds: [trackId], selectionAnchorTrackId: trackId }));
+}
+
+/**
+ * Shows a track in the library: its root active, the rows above it open in the root's view (its
+ * folders in Files; its artist, album or both in the others), and it the current row; then the
+ * list scrolls to it (`ui.revealed`). A view with no row of it (Playlists) gives way to Files.
+ * The selection stays as it is. On a phone the library comes into view.
+ */
+export function revealTrack(rootId: string, trackId: string): void {
+  library.activeRootId = rootId;
+  updateRoots((roots) =>
+    roots.map((root) => {
+      const track = root.id === rootId ? root.tracks.find((item) => item.id === trackId) : undefined;
+      if (!track) return root;
+      const view = root.view ?? "files";
+      const place = view === "files" ? null : trackPlace(buildViewRows(view, root.tracks, "all", viewLabels(), root.playlists ?? []), trackId);
+      const files = view === "files" || !place;
+      const open = files ? collectFolderPaths([track]) : place.open;
+      return { ...root, view: files ? "files" : view, expandedAlbums: [...new Set([...root.expandedAlbums, ...open])], activeRowKey: `track:${track.id}` };
+    })
+  );
+  ui.pane = "library";
+  ui.revealed += 1;
+}
+
+/** Shows the track playing in the library (the faceplate's key); nothing when none plays. */
+export function revealPlaying(): void {
+  const playing = $toRaw(nowPlaying.value);
+  if (playing) revealTrack(playing.rootId, playing.trackId);
 }

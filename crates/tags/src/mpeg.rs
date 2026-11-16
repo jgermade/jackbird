@@ -22,6 +22,8 @@ pub struct Frame {
     pub bitrate: u32,
     /// Its sample rate, Hz.
     pub sample_rate: u32,
+    /// One channel (mono), else two.
+    pub mono: bool,
     /// The Xing or VBRI header of a variable bit rate file.
     pub vbr: Option<Vbr>,
 }
@@ -149,6 +151,7 @@ pub fn first_frame(bytes: &[u8]) -> Option<Frame> {
             offset: at,
             bitrate: h.bitrate,
             sample_rate: h.sample_rate,
+            mono: h.mono,
             vbr,
         });
     }
@@ -244,6 +247,7 @@ mod tests {
                 offset: 15,
                 bitrate: 128,
                 sample_rate: 44_100,
+                mono: false,
                 vbr: None
             })
         );

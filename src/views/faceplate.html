@@ -15,7 +15,9 @@
   const DeckKeys = await import("./deck-keys.html")
   const DeckDisplay = await import("./deck-display.html")
 
-  const { isEmbed } = await import("../lib/platform")
+  const { isDesktop, isEmbed, isPhone } = await import("../lib/platform")
+  // The desktop app on macOS: its window's keys sit on the faceplate's top left (src-tauri/src/lib.rs).
+  const macWindow: boolean = isDesktop && !isPhone && /Mac/.test(navigator.userAgent)
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { importing, openImport } = await import("../lib/importing")
@@ -30,13 +32,12 @@
   const { ui } = await import("../lib/ui")
   const { preferences } = await import("../lib/preferences")
   // The display's spectrum: 24 bands above 640px, 12 below.
-  const WIDE = matchMedia("(min-width: 641px)")
-  let wide: boolean = WIDE.matches
-  const onWidth = (event: MediaQueryListEvent) => {
-    wide = event.matches
-  }
-  WIDE.addEventListener("change", onWidth)
-  $destroyed(() => WIDE.removeEventListener("change", onWidth))
+  const { watchMedia } = await import("../lib/media")
+  // Followed as the window is resized (lib/media.ts).
+  let wide: boolean = matchMedia("(min-width: 641px)").matches
+  $destroyed(watchMedia("(min-width: 641px)", (matches) => {
+    wide = matches
+  }))
   $: hasRoots = library.roots.length > 0
   $: folderLabel = library.loading ? t("picker.scanning") : hasRoots ? t("picker.addRoot") : t("picker.openLibrary")
   // On a computer the key reads "+ Folder" once a root is open; on a phone, the + alone.
@@ -59,15 +60,17 @@
   }))
 </script>
 
-<header class="faceplate">
-  <div class="deck">
-    <div class="brand-mark">
-      <span class="wordmark" :data-label="t('app.name')">{{ t("app.name") }}</span>
+<!-- The faceplate's bare metal (and the wordmark) drags the desktop app's window: on macOS its title
+     bar is see-through, and the window's own keys sit on the faceplate (src-tauri/src/lib.rs). -->
+<header class="faceplate" :class.mac-window="macWindow" data-tauri-drag-region>
+  <div class="deck" data-tauri-drag-region>
+    <div class="brand-mark" data-tauri-drag-region>
+      <span class="wordmark" :data-label="t('app.name')" data-tauri-drag-region>{{ t("app.name") }}</span>
     </div>
 
     <div class="screen"><DeckDisplay :bands="wide ? 24 : 12" /></div>
 
-    <div class="controls"><DeckKeys place="header" /></div>
+    <div class="controls" data-tauri-drag-region><DeckKeys place="header" /></div>
   </div>
 
   <!-- While no folder is open: the sources' tabs, a folder or a server (their content is the
@@ -75,7 +78,7 @@
   <Tabs :if="!hasRoots && !library.restoring && sourceTabs().length > 1" :label="t('sources.tabs')" :items="sourceTabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
   <!-- The roots' bar: hidden while nothing is open, coming back or to import (the welcome is the
        page then, and the panes' key has no panes to turn between). -->
-  <Tabs :elseif="hasRoots || library.restoring || (importing.available && can('editor'))" :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" :closable="!isEmbed" compact
+  <Tabs :elseif="hasRoots || library.restoring || (importing.available && can('editor'))" :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" :closable="!isEmbed"
         :add-label="folderLabel" :add-disabled="library.loading || !canAdd()" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
@@ -173,6 +176,14 @@
     .wordmark { display: none; }
   }
   .count-narrow { display: none; }
+  /* On macOS the window's keys sit over the wordmark: it goes a little lower, out of their way. */
+  .mac-window .wordmark { top: .5rem; }
+  /* Narrower, the display or the wordmark's row is at the top: the faceplate keeps a strip over
+     it for the keys, as tall as a title bar. */
+  @media (max-width: 900px) {
+    .mac-window .deck { padding-top: 1.75rem; }
+    .mac-window .wordmark { top: 0; }
+  }
 
   /* Narrow screens: the brand and the keys share the first row, the display
      takes the second. */
@@ -195,15 +206,14 @@
     .wordmark { display: none; }
     }
   /* Phones: the keys go to the footer, and the panes' key goes to the roots' bar;
-     once a root is open, adding another is an option of the root picker, and
-     the selection's key is its count. */
+     the roots are tabs, as on a computer (the bar scrolls sideways when they do not fit), with the
+     + key after them; and the selection's key is its count. */
   @media (max-width: 720px) {
     /* One row: the display alone (the key that turns between the panes is in the roots' bar). */
     .deck { grid-template-columns: minmax(0, 1fr); grid-template-areas: "screen"; }
     .brand-mark { display: none; }
     .controls { display: none; }
     .pane-pick { display: flex; }
-    .open-folder.has-roots { display: none; }
     .count-wide { display: none; }
     .count-narrow { display: inline; }
   }

@@ -1,0 +1,17 @@
+<script :setup lang="ts">
+  // The picture crop's keys (lib/picture.ts): remove the picture there is, cancel, save the crop;
+  // short words, so the three fit one row.
+  const Key = await import("../../theme/default/components/key.html")
+  const { t } = await import("../lib/i18n")
+  const { closePicture, picture, removePicture, savePicture } = await import("../lib/picture")
+</script>
+
+<span class="keys">
+  <Key :if="picture.ask?.removable" variant="ghost" :disabled="picture.saving" @click="removePicture()">{{ t("picture.remove") }}</Key>
+  <Key variant="ghost" :disabled="picture.saving" @click="closePicture()">{{ t("editor.cancel") }}</Key>
+  <Key variant="primary" :disabled="!picture.size || picture.saving" @click="savePicture()">{{ t("picture.save") }}</Key>
+</span>
+
+<style scoped>
+  .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
+</style>

@@ -452,11 +452,16 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 app.manage(audio::Audio::start(app.handle().clone()));
-                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                     .title("jackbird")
                     .inner_size(1280.0, 800.0)
-                    .min_inner_size(360.0, 480.0)
-                    .build()?;
+                    .min_inner_size(360.0, 480.0);
+                // On macOS the title bar is see-through and its title hidden: the window's own
+                // keys sit on the faceplate, whose bare metal drags the window
+                // (src/views/faceplate.html).
+                #[cfg(target_os = "macos")]
+                let window = window.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
+                window.build()?;
             }
             #[cfg(mobile)]
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into())).build()?;

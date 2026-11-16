@@ -18,7 +18,11 @@
   lead = '',
   label = '',
   meta = '',
-  sub = ''
+  sub = '',
+  cover = null,
+  framed = false,
+  round = false,
+  holdsPlaying = false
 }: Props" lang="ts">
   // One row of the library tree: a folder or a track. It is a `treeitem`;
   // the tree around it owns focus and the arrow keys, which reach it as
@@ -79,6 +83,14 @@
     lead?: string | number
     label?: string
     meta?: string | number
+    /** A folder's picture in place of its glyph (an album's cover), as a URL; null for its glyph. */
+    cover?: string | null
+    /** A folder drawn with a cover's room even without one (its glyph in a frame), lined up with those that have one. */
+    framed?: boolean | ""
+    /** A folder that holds the track playing: its name in the accent, as the track's. */
+    holdsPlaying?: boolean | ""
+    /** The picture (or its frame) round: an artist's. */
+    round?: boolean | ""
   }
 
   const EqBars = await import("./eq-bars.html")
@@ -86,6 +98,10 @@
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: isFolder = kind === "folder"
+  // A picture in place of the glyph: a folder's (an album's, an artist's), or a track's own cover
+  // (Files); `framed`, the room for one without it, so the rows line up.
+  $: covered = !!cover
+  $: roomy = !!cover || flag(framed)
   $: isPickable = !isFolder && flag(selectable)
   $: isCued = !isFolder && (flag(playable) || flag(playing))
   $: level = Math.max(0, Number(depth) || 0)
@@ -102,9 +118,12 @@
 <div class="row"
      :class.folder="isFolder"
      :class.playing="flag(playing)"
+     :class.holds="isFolder && flag(holdsPlaying)"
      :class.current="flag(current)"
      :class.muted="flag(muted)"
      :class.two="!!sub"
+     :class.covered="roomy"
+     :class.round="roomy && flag(round)"
      :class.keyed="!!$slots.action"
      :class.numbered="isPickable && hasLead"
      :id="rowId || null"
@@ -113,17 +132,20 @@
      :aria-expanded="isFolder ? String(flag(expanded)) : null"
      :aria-selected="String(flag(chosen))"
      :tabindex="flag(focusable) ? 0 : -1"
-     :style="`--depth: ${level}; --indent: ${isFolder ? level : Math.max(0, level - 1)}` + (Number(height) > 0 ? `; height: ${Number(height)}rem; min-height: 0` : '')"
+     :style="`--depth: ${level}; --indent: ${isFolder ? level : Math.max(0, level - 1)}` + (Number(height) > 0 ? `; height: ${Number(height)}rem; height: round(${Number(height)}rem, 2px); min-height: 0` : '')"
      @click="$emit('select', $event)"
      @dblclick="$emit('activate', $event)">
-  <span class="icon" :class.pick="isPickable" :class.toggle="toggles" @click="onGlyph($event)">
-    <svg :if="isFolder && glyph === 'artist'" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.75c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" /></g></svg>
+  <span class="icon" :class.pick="isPickable" :class.toggle="toggles" :class.frame="roomy && !covered" @click="onGlyph($event)">
+    <img :if="covered && isFolder" class="cover" :src="cover" alt="" draggable="false" />
+    <svg :elseif="isFolder && glyph === 'artist'" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.75c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" /></g></svg>
     <svg :elseif="isFolder && glyph === 'album'" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.4" fill="currentColor" /></svg>
     <svg :elseif="isFolder && glyph === 'playlist'" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 4h8M2 7.5h8M2 11h5M12.25 12.5V5.5l2-.75" /></g><circle cx="11" cy="12.5" r="1.3" fill="currentColor" /></svg>
     <svg :elseif="isFolder && flag(expanded)" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 13V3.5h4.2l1.4 1.6h5.4v2.2M1.5 13l2.1-5.7h11.1L12.6 13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
     <svg :elseif="isFolder" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h4.2l1.4 1.6h7.4v8.4h-13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /></svg>
     <span :elseif="isPickable" class="box"><SelectBox :chosen="flag(chosen)" @pick="$emit('pick', $event.detail)" /></span>
-    <svg :else viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
+    <svg :elseif="!roomy" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
+    <img :if="covered && !isFolder" class="cover track-cover" :src="cover" alt="" draggable="false" />
+    <span :elseif="roomy && !isFolder" class="track-frame" aria-hidden="true"></span>
     <span :if="isPickable && hasLead" class="slot-lead">{{ lead }}</span>
   </span>
   <span class="label" :class.led="hasLead"><span :if="hasLead" class="lead">{{ lead }}</span><span class="title">{{ label }}</span><span :if="sub" class="sub">{{ sub }}</span></span>
@@ -170,7 +192,11 @@
   .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   /* Something the row stands for that is not there (a playlist's entry missing from the library). */
   .row.muted .label, .row.muted .meta { color: var(--mm-fg-subtle); font-style: italic; }
-  .row.current:not([aria-selected="true"]) { background: var(--mm-hover); box-shadow: inset 0 0 0 1px var(--mm-border-strong); }
+  /* The current row's frame: a border on a layer over it, not an inset shadow. A border is drawn
+     on whole pixels; a shadow is not, and where the list's width (the splitter's share) ends on a
+     fraction of a pixel, the frame's right side came out thinner than its left. */
+  .row.current:not([aria-selected="true"]) { position: relative; background: var(--mm-hover); }
+  .row.current:not([aria-selected="true"])::after { content: ""; position: absolute; inset: 0; border: 1px solid var(--mm-border-strong); pointer-events: none; }
 
   /* A folder opens and closes from its glyph, or anywhere between it and the row's left edge:
      the glyph alone takes too much aim. */
@@ -194,11 +220,33 @@
   .label.led .title { grid-column: 2; grid-row: 1; }
   .label.led .sub { grid-column: 2; grid-row: 2; }
   .two .label { row-gap: .0625rem; padding-block: var(--mm-space-1); }
+  /* A folder with a picture (an album's cover) in place of its glyph: the glyph's column as wide as
+     it, the row as tall as two lines. Its size a whole, even number of pixels, as the rows'
+     (tokens.css). */
+  .row.covered { --cover: 1.75rem; grid-template-columns: var(--cover) minmax(0, 1fr) auto; min-height: var(--mm-row-two); contain-intrinsic-size: auto var(--mm-row-two); }
+  @supports (width: round(1rem, 2px)) { .row.covered { --cover: round(1.75rem, 2px); } }
+  /* No cover in a cover's room: the glyph in a frame of the cover's size. */
+  .icon.frame { align-self: center; width: var(--cover); height: var(--cover); border-radius: var(--mm-radius-key); background: var(--mm-sunken); box-shadow: inset 0 0 0 1px var(--mm-border); }
+  /* A track's cover (Files), or its frame without one, under its box: the box over it, shown as on
+     any row (on a pointer's hover, chosen, focused). Its number goes beside its title, not in the
+     glyph's place. */
+  .track-frame { display: block; width: var(--cover); height: var(--cover); border-radius: var(--mm-radius-key); background: var(--mm-sunken); box-shadow: inset 0 0 0 1px var(--mm-border); }
+  .covered .icon .box { position: relative; z-index: 1; }
+  .covered.numbered .slot-lead { display: none; }
+  .covered.numbered .label .lead { display: block; }
+  .covered.numbered .label.led { grid-template-columns: auto minmax(0, 1fr); }
+  .covered.numbered .label.led .title, .covered.numbered .label.led .sub { grid-column: 2; }
+  /* An artist's picture, and its frame: round. */
+  .round .cover, .round .icon.frame { border-radius: 50%; }
+  .cover { display: block; width: var(--cover); height: var(--cover); border-radius: var(--mm-radius-key); object-fit: cover; box-shadow: 0 0 0 1px var(--mm-border); }
   /* A row with a line under its title, as tall as the density says for two lines (tokens.css). */
   .row.two { min-height: var(--mm-row-two); contain-intrinsic-size: auto var(--mm-row-two); }
   /* A row's box: smaller than a form's, and dimmed until it is ticked or the row is pointed at. */
   .icon.pick > * { grid-area: 1 / 1; }
-  .icon .box { display: grid; place-items: center; transform: scale(.75); opacity: .55; transition: opacity var(--mm-duration) var(--mm-ease); }
+  /* No fades in a row: an animated opacity takes a layer of its own, and WebKit (the desktop app),
+     sorting the list's layers again, drew other rows' icons on new ones, a pixel off: they shook on
+     every hover. Shown and hidden at once instead. */
+  .icon .box { display: grid; place-items: center; transform: scale(.75); opacity: .55; }
   .row[aria-selected="true"] .icon .box, .row.current .icon .box { opacity: 1; }
   @media (hover: hover) { .row:hover .icon .box { opacity: 1; } }
   /* With a pointer (a computer) the box shows only on the row pointed at (and on a chosen one,
@@ -218,14 +266,16 @@
   /* The second line: smaller and lighter than the label, in the subtle ink. */
   .sub { font-size: var(--mm-text-xs); font-weight: var(--mm-weight-light); line-height: var(--mm-leading-tight); color: var(--mm-fg-muted); }
   .lead { grid-column: 1; grid-row: 1; min-width: 1.5em; margin-right: var(--mm-space-2); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
-  .action { display: flex; align-items: center; min-width: 1.5rem; opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .action { display: flex; align-items: center; min-width: 1.5rem; opacity: 0; }
   .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
   @media (hover: hover) { .row:hover .action { opacity: 1; } }
   .folder .label { font-weight: var(--mm-weight-bold); }
   .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
+  /* A folder (an artist, an album) that holds the track playing: its name in the accent too. */
+  .holds .title { color: var(--mm-accent-ink); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; }
   .cue { display: grid; place-items: center; width: 1.5rem; }
-  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
+  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; }
   @media (hover: hover) { .row:hover .cue-play { opacity: 1; } }
   .meta { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
   /* A key revealed on hover cannot be found without one: on a touch screen the

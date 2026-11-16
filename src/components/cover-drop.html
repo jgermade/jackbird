@@ -1,19 +1,15 @@
-<script :setup="{ model = null, src = null, alt = '', dropLabel = '', chooseLabel = '', removeLabel = '', failLabel = '' }: Props" lang="ts">
-  // A cover being edited: the image, or the empty sleeve. An image file
-  // dropped on it, or chosen with its key, becomes the cover as a data URL;
-  // the other key removes it. While a file is dragged over it, `dropLabel`
-  // says it can be dropped there.
+<script :setup="{ model = null, src = null, alt = '', dropLabel = '', editLabel = '', disabled = false }: Props" lang="ts">
+  // A cover being edited: the image, or the empty sleeve. The sleeve is a key: a click on it asks
+  // for the cover to be edited (`edit`), and an image file dropped on it asks the same, with that
+  // file (`dropped`, the file as `$event.detail`). Whoever owns it opens the picture crop
+  // (lib/picture.ts, in the edit dialog's sub-modal) and sets the cover. While a file is dragged over
+  // it, `dropLabel` says it can be dropped there; `editLabel` is the key's name.
   //
   //   <CoverDrop :model="form.coverDataUrl" alt="Cover" drop-label="Drop an image here"
-  //              choose-label="Choose image" remove-label="Remove" fail-label="Could not read the image."
-  //              @error="message = $event.detail" />
-  //
-  // The data URL (or `null`) goes up through `:model` and as `change`. A file
-  // that cannot be read emits `error` with `failLabel`; one that is not an
-  // image is ignored.
+  //              edit-label="Change the cover" @edit="crop()" @dropped="crop($event.detail)" />
   //
   // Store-free (src/components/): its texts come as props. See
-  // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
+  // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7, and 25).
 
   type Props = {
     model?: string | null
@@ -21,81 +17,81 @@
     src?: string | null
     alt?: string
     dropLabel?: string
-    chooseLabel?: string
-    removeLabel?: string
-    failLabel?: string
+    editLabel?: string
+    /** Not to be changed now (tracks of several albums, until asked): dimmed, no pencil, no drop. */
+    disabled?: boolean | ""
   }
 
-  const Key = await import("../../theme/default/components/key.html")
   const Stripes = await import("../../theme/default/components/stripes.html")
 
   let over: boolean = false
-
-  const set = (next: string | null) => {
-    $updateModel(next)
-    $emit("change", next)
-  }
-
-  const read = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(String(reader.result))
-      reader.onerror = () => reject(reader.error)
-      reader.readAsDataURL(file)
-    })
-
-  const take = async (files: FileList | null | undefined) => {
-    const file = files?.[0]
-    if (!file || !file.type.startsWith("image/")) return
-    try {
-      set(await read(file))
-    } catch {
-      $emit("error", failLabel)
-    }
-  }
+  const off = (): boolean => disabled === "" || disabled === true
 
   const enter = (event: DragEvent) => {
+    if (off()) return
     event.preventDefault()
     over = true
   }
   const drop = (event: DragEvent) => {
     event.preventDefault()
     over = false
-    void take(event.dataTransfer?.files)
-  }
-  const choose = () => ($self("input[type=file]") as HTMLInputElement | null)?.click()
-  const picked = (event: Event) => {
-    const input = event.target as HTMLInputElement
-    void take(input.files)
-    input.value = ""
+    if (off()) return
+    const file = event.dataTransfer?.files?.[0]
+    if (file && file.type.startsWith("image/")) $emit("dropped", file)
   }
 </script>
 
 <div class="cover-drop">
-  <div class="sleeve" :class.over="over" :title="dropLabel || null" @dragover="enter($event)" @dragleave="over = false" @drop="drop($event)">
+  <button type="button" class="sleeve" :class.over="over" :disabled="off()" :aria-label="editLabel || null" :title="editLabel || null"
+          @click="$emit('edit')" @dragover="enter($event)" @dragleave="over = false" @drop="drop($event)">
     <img :if="src || model?.startsWith('data:')" class="image" :src="src || model" :alt="alt" />
     <span :else class="band"><Stripes variant="band" /></span>
     <span :if="over" class="mm-legend hint">{{ dropLabel }}</span>
-  </div>
-  <div class="keys">
-    <Key size="sm" @click="choose()">{{ chooseLabel }}</Key>
-    <Key size="sm" variant="ghost" :disabled="!model" @click="set(null)">{{ removeLabel }}</Key>
-  </div>
-  <input class="file" type="file" accept="image/*" tabindex="-1" aria-hidden="true" @change="picked($event)">
+    <!-- A pencil on its corner, always there (a touch screen has no hover): it can be changed. -->
+    <span :elseif="!off()" class="badge" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.75 2.75l2.5 2.5-7.5 7.5-3.25.75.75-3.25z" /><path d="M9.25 4.25l2.5 2.5" /></svg>
+    </span>
+  </button>
 </div>
 
 <style scoped>
-  .cover-drop { display: grid; gap: var(--mm-space-2); width: 9rem; }
+  .cover-drop { display: grid; width: 9rem; }
   .sleeve {
     position: relative;
+    display: block;
     aspect-ratio: 1;
+    width: 100%;
+    padding: 0;
     overflow: hidden;
+    border: 0;
     border-radius: var(--mm-radius-key);
     background: var(--mm-display-bezel);
     box-shadow: var(--mm-shadow-md);
+    cursor: pointer;
   }
   .sleeve.over { outline: 2px dashed var(--mm-accent); outline-offset: 2px; }
+  .sleeve:disabled { cursor: default; opacity: .55; }
+  .sleeve:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+  @media (hover: hover) { .sleeve:hover:not(:disabled) { filter: brightness(1.05); } }
   .image { display: block; width: 100%; height: 100%; object-fit: cover; }
+  /* The pencil: a small round key on the cover's corner, lit on hover and focus. */
+  .badge {
+    position: absolute;
+    right: var(--mm-space-2);
+    bottom: var(--mm-space-2);
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: linear-gradient(var(--mm-key-top), var(--mm-key-bottom));
+    box-shadow: var(--mm-shadow-md), 0 0 0 1px var(--mm-border-strong);
+    color: var(--mm-fg);
+    opacity: .9;
+  }
+  .badge svg { width: .875rem; height: .875rem; }
+  .sleeve:focus-visible .badge { opacity: 1; color: var(--mm-accent-ink, var(--mm-accent)); }
+  @media (hover: hover) { .sleeve:hover .badge { opacity: 1; color: var(--mm-accent-ink, var(--mm-accent)); } }
   .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
   .hint {
     position: absolute;
@@ -105,6 +101,4 @@
     color: var(--mm-chassis-hi);
     text-align: center;
   }
-  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-1); }
-  .file { display: none; }
 </style>

@@ -1,0 +1,21 @@
+<script :setup lang="ts">
+  // The picture crop in a dialog of its own (lib/picture.ts): an artist's picture, asked from the
+  // details' breadcrumb. A cover in the edit dialog asks in a sub-modal of it instead.
+  const Modal = await import("../../theme/default/components/modal.html")
+  const PictureCrop = await import("./picture-crop.html")
+  const PictureKeys = await import("./picture-keys.html")
+  const { t } = await import("../lib/i18n")
+  const { closePicture, picture } = await import("../lib/picture")
+  const shown = (): boolean => picture.ask?.place === "modal"
+</script>
+
+<div class="picture-dialog">
+  <Modal :open="shown()" :eyebrow="picture.ask?.eyebrow ?? ''" :title="picture.ask?.title ?? ''" size="sm" :close-label="t('artist.close')" @close="closePicture()">
+    <PictureCrop :if="shown()" />
+    <template :slot.foot><PictureKeys /></template>
+  </Modal>
+</div>
+
+<style scoped>
+  .picture-dialog { display: contents; }
+</style>

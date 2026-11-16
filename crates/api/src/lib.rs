@@ -112,6 +112,18 @@ pub struct Metadata {
     /// Part of a compilation: `1`, or as the file holds it; empty when not.
     #[serde(default)]
     pub compilation: String,
+    /// Who wrote the music. Absent in what an older interface or `.meta/` sends.
+    #[serde(default)]
+    pub composer: String,
+    /// The comment.
+    #[serde(default)]
+    pub comment: String,
+    /// The lyrics.
+    #[serde(default)]
+    pub lyrics: String,
+    /// Beats per minute.
+    #[serde(default)]
+    pub bpm: String,
     /// The cover, as a data URL.
     pub cover_data_url: Option<String>,
 }
@@ -130,6 +142,8 @@ pub struct InspectionJson {
     pub audio_checksum: String,
     /// Its tags, unless they were not read again.
     pub metadata: Option<Metadata>,
+    /// Its audio's length and rates, when they can be told.
+    pub audio: Option<AudioJson>,
 }
 
 /// A cover's name, as `coverName` (`src/helpers/cover.ts`) makes it: two 32-bit FNV-1a hashes of
@@ -174,6 +188,10 @@ fn metadata_of(fields: jackbird_tags::Fields, cover_data_url: Option<String>) ->
         disc_number: fields.disc,
         album_artist: fields.album_artist,
         compilation: fields.compilation,
+        composer: fields.composer,
+        comment: fields.comment,
+        lyrics: fields.lyrics,
+        bpm: fields.bpm,
         cover_data_url,
     }
 }
@@ -191,6 +209,39 @@ pub struct ScannedJson {
     pub last_modified: u64,
     /// Its tags, the cover a reference to one of the batch's `covers` or to one the interface has.
     pub metadata: Metadata,
+    /// Its audio's length and rates, when they can be told.
+    pub audio: Option<AudioJson>,
+}
+
+/// A file's audio (`AudioProps` in `src/types.ts`): its length, rates, channels and depth.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioJson {
+    /// Its length, in milliseconds.
+    pub duration_ms: u32,
+    /// Its bit rate, kbit/s.
+    pub bitrate: u32,
+    /// Its sample rate, Hz.
+    pub sample_rate: u32,
+    /// Its channels.
+    pub channels: u8,
+    /// Its bits per sample; 0 for MP3.
+    pub bits: u8,
+    /// Whether its bit rate varies.
+    pub vbr: bool,
+}
+
+impl From<jackbird_tags::Audio> for AudioJson {
+    fn from(audio: jackbird_tags::Audio) -> Self {
+        AudioJson {
+            duration_ms: audio.duration_ms,
+            bitrate: audio.bitrate,
+            sample_rate: audio.sample_rate,
+            channels: audio.channels,
+            bits: audio.bits,
+            vbr: audio.vbr,
+        }
+    }
 }
 
 /// A cover, the first time a scan meets it: its name and its bytes in base64.
@@ -212,6 +263,7 @@ pub fn scanned(path: String, tagged: Tagged) -> (ScannedJson, Option<(String, Co
         size: tagged.stat.size,
         last_modified: tagged.stat.mtime,
         metadata: metadata_of(fields, named.as_ref().map(|(name, _)| cover_ref(name))),
+        audio: tagged.audio.map(AudioJson::from),
     };
     (json, named)
 }
@@ -262,6 +314,7 @@ impl From<Inspection> for InspectionJson {
             last_modified: found.stat.mtime,
             full_checksum: found.full_checksum,
             audio_checksum: found.audio_checksum,
+            audio: found.audio.map(AudioJson::from),
             metadata: found.tags.map(|(fields, cover)| {
                 metadata_of(
                     fields,
@@ -295,8 +348,9 @@ pub fn cover_of(url: &str) -> Option<Cover> {
 
 /// The edit that writes `metadata` over the tags the library held (`previous`), as
 /// `editFor` (`src/helpers/cover.ts`) makes it in the browser: the six first fields whole, and
-/// the disc, the album artist and the compilation only when they changed (a library read before
-/// they were known holds them empty, which must not empty the file's).
+/// the disc, the album artist, the compilation, the composer, the comment and the lyrics only when
+/// they changed (a library read before they were known holds them empty, which must not empty the
+/// file's).
 pub fn edit_for(previous: &Metadata, metadata: Metadata) -> Edit {
     let changed = |before: &String, now: String| (*before != now).then_some(now);
     let cover = match (&previous.cover_data_url, &metadata.cover_data_url) {
@@ -314,6 +368,10 @@ pub fn edit_for(previous: &Metadata, metadata: Metadata) -> Edit {
         disc: changed(&previous.disc_number, metadata.disc_number),
         album_artist: changed(&previous.album_artist, metadata.album_artist),
         compilation: changed(&previous.compilation, metadata.compilation),
+        composer: changed(&previous.composer, metadata.composer),
+        comment: changed(&previous.comment, metadata.comment),
+        lyrics: changed(&previous.lyrics, metadata.lyrics),
+        bpm: changed(&previous.bpm, metadata.bpm),
         cover,
     }
 }
@@ -333,6 +391,10 @@ mod tests {
             disc_number: "1/2".into(),
             album_artist: String::new(),
             compilation: String::new(),
+            composer: String::new(),
+            comment: String::new(),
+            lyrics: String::new(),
+            bpm: String::new(),
             cover_data_url: cover.map(Into::into),
         }
     }

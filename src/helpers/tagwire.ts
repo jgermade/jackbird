@@ -1,3 +1,4 @@
+import type { AudioProps } from "../types.ts";
 /**
  * The wire format between jackbird's tag engine, built as WebAssembly
  * (`crates/tags-wasm`), and the web app: the mirror of
@@ -7,7 +8,7 @@
  */
 
 /** The fields, in the engine's order (`Field::ALL`). */
-export const WIRE_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "albumArtist", "compilation"] as const;
+export const WIRE_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "albumArtist", "compilation", "composer", "comment", "lyrics", "bpm"] as const;
 
 export type WireField = (typeof WIRE_FIELDS)[number];
 
@@ -19,6 +20,8 @@ export type WireTags = {
   format: "mp3" | "flac";
   fields: Record<WireField, string>;
   cover: WireCover | null;
+  /** The file's audio, when the engine could tell it (from the head given, past the audio's start). */
+  audio: AudioProps | null;
 };
 
 /** What a write does: a field left out stays, "" removes it; the cover is kept, set or removed. */
@@ -47,6 +50,9 @@ export type WireSplice = { replaceEnd: number; with: Uint8Array };
 
 /** How many of a file's last bytes the engine reads (`TAIL_LEN`). */
 export const TAIL_LEN = 160;
+
+/** How many bytes past the audio's start the head holds for its audio (`AUDIO_PROBE`). */
+export const AUDIO_PROBE = 4096;
 
 /** How many first bytes to give the engine the first time (`FIRST_HEAD`). */
 export const FIRST_HEAD = 64 * 1024;
@@ -125,7 +131,11 @@ export function decodeTags(bytes: Uint8Array): WireTags {
     fields[field] = reader.string();
   }
   const cover = reader.byte() === 1 ? { mime: reader.string(), data: reader.run().slice() } : null;
-  return { format: format === 0 ? "mp3" : "flac", fields, cover };
+  const audio =
+    reader.byte() === 1
+      ? { durationMs: reader.u32(), bitrate: reader.u32(), sampleRate: reader.u32(), channels: reader.byte(), bits: reader.byte(), vbr: reader.byte() === 1 }
+      : null;
+  return { format: format === 0 ? "mp3" : "flac", fields, cover, audio };
 }
 
 /** An error's code and message. */

@@ -22,6 +22,9 @@
   const ImportDialog = await import("./import-dialog.html")
   const IpodDialog = await import("./ipod-dialog.html")
   const Compact = await import("./compact.html")
+  const Toast = await import("./toast.html")
+  const PictureDialog = await import("./picture-dialog.html")
+  const DuplicatesDialog = await import("./duplicates-dialog.html")
   const { t } = await import("../lib/i18n")
   const { compact, compactMarker } = await import("../lib/compact")
   const { embedKind } = await import("../lib/platform")
@@ -111,6 +114,9 @@
   <IpodDialog />
   <SigninDialog />
   <SourcesDialog />
+  <PictureDialog />
+  <DuplicatesDialog />
+  <Toast :if="!small" />
 </main>
 <!-- Embedded: the compact player, outside the window (which turns and clips what it holds). -->
 <div :if="embed" class="mini" :class.listed="compact.list"><Compact /></div>
