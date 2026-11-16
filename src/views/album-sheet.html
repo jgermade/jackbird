@@ -334,10 +334,10 @@
   .mm-table td { box-sizing: border-box; height: var(--mm-row); padding-block: 0; }
   /* No line under a disc's last track. */
   .mm-table tbody tr:last-child td { border-bottom: 0; }
-  /* The box flush with the disc's heading (the owner, 2026-11-16). A numbered disc's box holds its
+  /* A little room before the box (the owner, 2026-11-16). A numbered disc's box holds its
      track's number and always shows (SelectBox's `number`); with a pointer (a computer) a disc
      without numbers shows its box only on the row pointed at, chosen or with the keyboard's focus. */
-  .mm-table .pick-cell { width: 1%; padding-left: 0; padding-right: 0; }
+  .mm-table .pick-cell { width: 1%; padding-left: var(--mm-space-2); padding-right: 0; }
   .pick-box { display: grid; }
   @media (hover: hover) and (min-width: 721px) {
     .pick-box:not(.numbered) { visibility: hidden; }
