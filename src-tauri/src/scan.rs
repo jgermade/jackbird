@@ -109,17 +109,18 @@ const COVERS_DIR: &str = ".meta/covers";
 /// [`scan_tags_with`].
 #[cfg(test)]
 pub fn scan_tags(root: &Root, paths: Vec<String>, known_covers: Vec<String>, channel: &Channel<TagsBatch>) {
-    scan_tags_with(root, paths, known_covers, channel, true);
+    scan_tags_with(root, paths, known_covers, channel, COVERS_DIR);
 }
 
-/// [`scan_tags`], each new cover written into `.meta/covers/` only with `write_covers`: without it
-/// (an iPod's Rockbox library, W7: nothing is written to an iPod's drive) every cover is sent.
+/// [`scan_tags`], each new cover written into `covers_dir` (`.meta/covers/` for a folder; an iPod's
+/// Rockbox library keeps its own under `iPod_Control/jackbird/covers/`). One that cannot be written
+/// is sent whole.
 pub fn scan_tags_with(
     root: &Root,
     paths: Vec<String>,
     known_covers: Vec<String>,
     channel: &Channel<TagsBatch>,
-    write_covers: bool,
+    covers_dir: &str,
 ) {
     let mut sent: HashSet<String> = known_covers.into_iter().collect();
     let mut batch = TagsBatch::default();
@@ -134,9 +135,8 @@ pub fn scan_tags_with(
                 if let Some((name, cover)) = cover
                     && sent.insert(name.clone())
                 {
-                    let at = format!("{COVERS_DIR}/{name}");
-                    let kept =
-                        write_covers && (matches!(root.stat(&at), Ok(Some(_))) || root.write(&at, &cover.data).is_ok());
+                    let at = format!("{covers_dir}/{name}");
+                    let kept = matches!(root.stat(&at), Ok(Some(_))) || root.write(&at, &cover.data).is_ok();
                     if !kept {
                         batch.covers.push(CoverJson {
                             name,
@@ -188,12 +188,12 @@ pub async fn scan(
     root: String,
     paths: Vec<String>,
     known_covers: Vec<String>,
-    write_covers: Option<bool>,
+    covers_dir: Option<String>,
     channel: Channel<TagsBatch>,
 ) -> Answer<()> {
     let root = root_of(&roots, &root)?;
-    let write_covers = write_covers.unwrap_or(true);
-    tauri::async_runtime::spawn_blocking(move || scan_tags_with(&root, paths, known_covers, &channel, write_covers))
+    let covers_dir = covers_dir.unwrap_or_else(|| COVERS_DIR.to_owned());
+    tauri::async_runtime::spawn_blocking(move || scan_tags_with(&root, paths, known_covers, &channel, &covers_dir))
         .await
         .map_err(|error| jackbird_api::failure("io", error.to_string()))
 }

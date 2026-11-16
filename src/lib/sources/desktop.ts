@@ -44,7 +44,7 @@ export async function streamed<B extends { done: boolean }>(command: string, arg
 }
 
 /** The small-file adapter over the app's commands. */
-function desktopVfs(root: string, name: string): VFSAdapter {
+export function desktopVfs(root: string, name: string): VFSAdapter {
   return {
     name,
     list: (path) => call<VFSListEntry[]>("list", { root, path }),

@@ -348,11 +348,13 @@ pub fn list(root: &Path) -> Result<Listing, Error> {
     Ok(Listing { name, songs })
 }
 
-/// An iPod's covers, its `ArtworkDB` and image files read once, each image given as a PNG.
+/// An iPod's covers, its `ArtworkDB` read once and each image read from its file's slot alone,
+/// given as a PNG. The image files are opened once and never read whole: on a classic they hold
+/// hundreds of MB, read over USB.
 pub struct Covers {
     root: PathBuf,
     images: std::collections::HashMap<u32, artwork::Image>,
-    files: std::collections::HashMap<String, Option<Vec<u8>>>,
+    files: std::collections::HashMap<String, Option<std::fs::File>>,
 }
 
 impl Covers {
@@ -370,19 +372,22 @@ impl Covers {
         }
     }
 
-    /// Image `id` as a PNG: its largest size, decoded from its image file (read the first time
-    /// an image needs it). `None` when there is no such image or it cannot be read.
+    /// Image `id` as a PNG: its largest size, decoded from its slot in its image file. `None`
+    /// when there is no such image or it cannot be read.
     pub fn png(&mut self, id: u32) -> Option<Vec<u8>> {
+        use std::io::{Read, Seek, SeekFrom};
         let thumb = self.images.get(&id)?.largest()?;
         let name = thumb.file.trim_start_matches(':').to_string();
         let dir = artwork_dir(&self.root);
         let file = self
             .files
             .entry(name.clone())
-            .or_insert_with(|| std::fs::read(dir.join(&name)).ok())
-            .as_ref()?;
-        let slot = file.get(thumb.offset as usize..thumb.offset as usize + thumb.size as usize)?;
-        artwork::cover_png(slot, thumb)
+            .or_insert_with(|| std::fs::File::open(dir.join(&name)).ok())
+            .as_mut()?;
+        let mut slot = vec![0; thumb.size as usize];
+        file.seek(SeekFrom::Start(u64::from(thumb.offset))).ok()?;
+        file.read_exact(&mut slot).ok()?;
+        artwork::cover_png(&slot, thumb)
     }
 }
 

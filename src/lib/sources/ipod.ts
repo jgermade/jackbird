@@ -7,6 +7,7 @@
 import { MemoryAdapter, type WalkedFile } from "@cloudauthn/vfs-sync";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { rockboxLibraryPaths } from "../../helpers/ipod";
+import { metaIn } from "../../helpers/meta-in";
 import type { Inspection, IpodDeviceInfo, MediaHandle, RootSource, TagsBatch } from "../../types";
 import { TagError } from "../tags";
 
@@ -27,7 +28,8 @@ export type IpodInfo = { path: string; name: string; writable: boolean; reason: 
 /** A song sent: its path in the folder, where it went, and whether its cover went with it. */
 export type Sent = { path: string; to: string; cover: boolean };
 
-type IpodTracks = { tracks: TagsBatch["tracks"]; covers: TagsBatch["covers"]; pids: [string, string][] };
+type IpodTracks = { tracks: TagsBatch["tracks"]; pids: [string, string][] };
+type CoversBatch = { done: boolean; covers: TagsBatch["covers"] };
 type MediaUrl = { kind: "asset"; path: string } | { kind: "http"; url: string };
 
 /** The iPods mounted on this machine. */
@@ -60,11 +62,7 @@ function ipodSource(root: string, name: string): RootSource {
   let listing: Promise<IpodTracks> | null = null;
   // Its Rockbox library, made the first time it is asked for (W7).
   let rockbox: Promise<RootSource> | null = null;
-  const load = (): Promise<IpodTracks> =>
-    (listing ??= call<IpodTracks>("ipod_tracks", { path: root, knownCovers: [...coversHad] }).then((found) => {
-      for (const cover of found.covers) coversHad.add(cover.name);
-      return found;
-    }));
+  const load = (): Promise<IpodTracks> => (listing ??= call<IpodTracks>("ipod_tracks", { path: root }));
   const pids = async (): Promise<Map<string, string>> => new Map((await load()).pids);
   const readOnly = (path: string): Error => new DOMException(`Read-only: ${path}`, "NoModificationAllowedError");
   const self: RootSource = {
@@ -85,15 +83,16 @@ function ipodSource(root: string, name: string): RootSource {
     isTrack: () => true,
     walk: async (): Promise<WalkedFile[]> =>
       (await load()).tracks.map((track) => ({ path: track.path, stat: { kind: "file", size: track.size, mtime: track.lastModified } })),
+    // The songs at once, from its database; their covers after, in batches, those the interface
+    // lacks (the owner's rule, 2026-11-16: the information first, the pictures in the background).
     async scanTags(paths, knownCovers, take) {
       const found = await load();
       const wanted = new Set(paths);
-      const known = new Set(knownCovers);
-      take({
-        done: true,
-        tracks: found.tracks.filter((track) => wanted.has(track.path)),
-        covers: found.covers.filter((cover) => !known.has(cover.name)),
-        unread: []
+      take({ done: false, tracks: found.tracks.filter((track) => wanted.has(track.path)), covers: [], unread: [] });
+      const { streamed } = await import("./desktop");
+      await streamed<CoversBatch>("ipod_covers", { path: root, knownCovers: [...new Set([...knownCovers, ...coversHad])] }, (batch) => {
+        for (const cover of batch.covers) coversHad.add(cover.name);
+        take({ done: batch.done, tracks: [], covers: batch.covers, unread: [] });
       });
     },
     // Its songs' fields come from its database, not their files: the same again, with no checksum
@@ -129,27 +128,33 @@ async function mediaOf(root: string, path: string): Promise<MediaHandle> {
   };
 }
 
+/** Where an iPod's Rockbox library keeps its `.meta/`: in Apple's folder, which Rockbox's library leaves out. */
+export const ROCKBOX_META = "iPod_Control/jackbird";
+
+
 /**
  * The Rockbox library of the iPod at `root` (W7): its drive as Rockbox's database lists it
  * (helpers/ipod.ts's `rockboxLibraryPaths`), read with the app's tag engine as a folder is, in
- * bulk. Only read, as its Apple library: nothing is written to the drive, not even the covers the
- * scan meets (`writeCovers: false`: they come in the batches, kept in memory).
+ * bulk. Its songs only read, as its Apple library: what it writes is its own `.meta/` and covers,
+ * in `iPod_Control/jackbird/` (`metaIn`).
  */
 async function rockboxSource(root: string, name: string, apple: RootSource): Promise<RootSource> {
   const readOnly = (path: string): Error => new DOMException(`Read-only: ${path}`, "NoModificationAllowedError");
-  const { streamed } = await import("./desktop");
+  const { desktopVfs, streamed } = await import("./desktop");
   const self: RootSource = {
     kind: "desktop",
     readOnly: true,
     ipod: { path: root, pidOf: async () => undefined, info: apple.ipod!.info, library: "rockbox", counterpart: async () => apple },
-    vfs: new MemoryAdapter(name),
+    // Its `.meta/` kept on the iPod, in `iPod_Control/jackbird/` (the owner's idea, 2026-11-16): the
+    // second opening lists it at once. Nothing else on the drive is written.
+    vfs: metaIn(desktopVfs(root, name), ROCKBOX_META),
     saved: `ipod-rockbox:${root}`,
     async walk(): Promise<WalkedFile[]> {
       const all = await call<WalkedFile[]>("walk", { root });
       const kept = new Set(rockboxLibraryPaths(all.map((file) => file.path)));
       return all.filter((file) => kept.has(file.path));
     },
-    scanTags: (paths, knownCovers, take) => streamed<TagsBatch>("scan", { root, paths, knownCovers, writeCovers: false }, take),
+    scanTags: (paths, knownCovers, take) => streamed<TagsBatch>("scan", { root, paths, knownCovers, coversDir: `${ROCKBOX_META}/covers` }, take),
     inspect: (path, known) => call<Inspection>("inspect", { root, path, known: known ?? null }),
     save: (path) => Promise.reject(readOnly(path)),
     openMedia: (path) => mediaOf(root, path),
