@@ -1,4 +1,4 @@
-<script :setup="{ chosen = false, mixed = false, label = '' }: Props" lang="ts">
+<script :setup="{ chosen = false, mixed = false, label = '', number = '' }: Props" lang="ts">
   // The box that selects a row, in a list whose row click does something
   // else (plays the track): the box `Checkbox` draws, with no label and no
   // `<input>`. Ticked, it fills with the signal colour.
@@ -24,7 +24,8 @@
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
 
-  type Props = { chosen?: boolean | ""; mixed?: boolean | ""; label?: string }
+  /** `number`: on a touch screen, a track's number drawn inside a larger box (its total and leading zeros dropped). */
+  type Props = { chosen?: boolean | ""; mixed?: boolean | ""; label?: string; number?: string | number }
 
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
 
@@ -39,12 +40,19 @@
     event.stopPropagation()
     $emit("pick", event)
   }
+  // A track's number alone: "03/12" gives "3"; one with no digits first, as it is.
+  const shown = (): string => {
+    const text = String(number ?? "").trim()
+    const digits = text.match(/^\d+/)
+    return digits ? String(Number(digits[0])) : text.split("/")[0].trim()
+  }
   const state = (): string => (flag(chosen) ? "true" : flag(mixed) ? "mixed" : "false")
 </script>
 
 <span class="box"
       :class.on="flag(chosen)"
       :class.mixed="!flag(chosen) && flag(mixed)"
+      :class.numbered="!!shown()"
       :role="label ? 'checkbox' : null"
       :aria-checked="label ? state() : null"
       :aria-label="label || null"
@@ -53,7 +61,7 @@
       :aria-hidden="label ? null : 'true'"
       @click="pick($event)"
       @keydown="key($event)"
-      @dblclick="stop($event)"></span>
+      @dblclick="stop($event)"><span :if="shown()" class="number">{{ shown() }}</span></span>
 
 <style scoped>
   .box {
@@ -89,4 +97,29 @@
   .mixed { background: var(--mm-accent); border-color: var(--mm-accent-hover); box-shadow: none; }
   .mixed::after { width: .5rem; height: 0; border-width: 0 0 2px; transform: none; opacity: 1; }
   .box:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+  /* A track's number in the box, on a touch screen (the owner's design, 2026-11-16): a larger box,
+     its border dimmed, the number in it and no check mark; chosen, filled in the accent. With a
+     pointer the number is not drawn here (the row shows it in the box's place). */
+  .number { display: none; }
+  @media (hover: none), (max-width: 720px) {
+    .numbered {
+      min-width: 2rem;
+      height: 2rem;
+      padding: 0 .25rem;
+      border-color: var(--mm-border);
+      border-radius: var(--mm-radius-key);
+      box-sizing: border-box;
+    }
+    .numbered::after { display: none; }
+    .numbered .number {
+      display: block;
+      font-family: var(--mm-font-mono);
+      font-size: var(--mm-text-sm);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      color: var(--mm-fg);
+    }
+    .numbered.on { border-color: var(--mm-accent); background: var(--mm-accent); }
+    .numbered.on .number { color: var(--mm-on-accent); }
+  }
 </style>

@@ -159,12 +159,18 @@ impl Root {
     }
 
     /// Every file under the root, with its size and date. Links are not
-    /// followed, so none leads out of it or round in a loop.
+    /// followed, so none leads out of it or round in a loop. A folder inside
+    /// it that cannot be read is left out (a drive's `.Trashes` or
+    /// `.Spotlight-V100`, which macOS refuses); only the root's own is an error.
     pub fn walk(&self) -> Result<Vec<Entry>, Error> {
         let mut out = Vec::new();
         let mut folders = vec![(self.path.clone(), String::new())];
         while let Some((folder, prefix)) = folders.pop() {
-            let entries = fs::read_dir(&folder).map_err(io(&prefix))?;
+            let entries = match fs::read_dir(&folder) {
+                Ok(entries) => entries,
+                Err(_) if !prefix.is_empty() => continue,
+                Err(error) => return Err(io(&prefix)(error)),
+            };
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().into_owned();
                 let path = if prefix.is_empty() {

@@ -433,6 +433,7 @@ pub fn run() {
         ipod::ipod_eject,
         ipod::ipod_open,
         ipod::ipod_tracks,
+        ipod::ipod_covers,
         ipod::ipod_send,
         ipod::ipod_remove,
         ipod::ipod_save_sysinfo

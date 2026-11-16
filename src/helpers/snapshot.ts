@@ -173,8 +173,10 @@ export function applyScanResults<Root extends WithSnapshot>(root: Root, results:
     if (!track || checksumOf(track) !== readFrom) {
       continue;
     }
+    // Its tags read: no longer what its name said.
+    const { pending: _pending, ...read } = track;
     changed.set(trackId, {
-      ...track,
+      ...read,
       checksum: record.checksum,
       fullChecksum: record.fullChecksum,
       audioChecksum: record.audioChecksum,

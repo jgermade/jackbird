@@ -152,6 +152,7 @@ describe("an iPod's Rockbox library", () => {
       ".rockbox/rocks/viewers/x.rock",
       ".Trashes/501/old.mp3",
       "iPod_Control/Music/F00/ABCD.mp3",
+      "IPOD_CONTROL/Music/F01/EFGH.m4a",
       "Podcasts/database.ignore",
       "Podcasts/show/1.mp3",
       "Podcasts/keep/database.unignore",
@@ -162,7 +163,6 @@ describe("an iPod's Rockbox library", () => {
     ];
     assert.deepEqual(rockboxLibraryPaths(drive), [
       "Music/A/01.mp3",
-      "iPod_Control/Music/F00/ABCD.mp3",
       "Podcasts/keep/database.unignore",
       "Podcasts/keep/2.mp3",
       "Podcasts/keep/deeper/3.mp3",

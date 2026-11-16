@@ -7,7 +7,8 @@
  * 22:12 and W5's plan).
  */
 
-import type { Track } from "../types.ts";
+import type { Track, TrackMetadata } from "../types.ts";
+import { emptyMetadata } from "./metadata.ts";
 import { inferDiscNumber } from "./tracks.ts";
 
 /** The fields a pattern can use. */
@@ -281,4 +282,23 @@ export function completeField(value: string, caret: number, field: string): { va
   const rest = value.slice(caret).match(/^\w*%?/)?.[0] ?? "";
   const token = `%${field}%`;
   return { value: value.slice(0, at.start) + token + value.slice(caret + rest.length), caret: at.start + token.length };
+}
+
+/** The names a file's tags are guessed from before they are read (the first that matches). */
+const GUESSES = ["%track% - %title%", "%track%. %title%", "%track% %title%", "%artist% - %title%"] as const;
+
+/**
+ * What a file's name says of its tags, shown until they are read (a folder opened with no
+ * `.meta/`): its number and title, or its artist and title, by the first of `GUESSES` that matches;
+ * else its name without the extension as its title. Only the name: a folder (`Music/mp3/`) is no
+ * artist or album.
+ */
+export function inferredMetadata(relativePath: string): TrackMetadata {
+  const metadata = emptyMetadata();
+  const track = { relativePath, metadata };
+  for (const pattern of GUESSES) {
+    const read = readTags(pattern, track);
+    if (read?.title) return { ...metadata, ...read };
+  }
+  return { ...metadata, title: readSubject(relativePath, 1) ?? relativePath };
 }

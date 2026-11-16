@@ -216,7 +216,9 @@ export type IpodLibrary = "apple" | "rockbox";
  * file, but none under a folder that holds a `database.ignore` (a folder below it that holds a
  * `database.unignore` counts again), and none whose path has a part starting with "." (Rockbox's
  * own `.rockbox/`, the system's `.Trashes` and `.Spotlight-V100`, macOS's `._` files beside each
- * file on a FAT drive). Which of them are tracks is the app's own rule (by extension).
+ * file on a FAT drive). Nor Apple's songs under `iPod_Control/`, which the Apple library shows (the
+ * owner's ask, 2026-11-16): each library its own music. Which of them are tracks is the app's own
+ * rule (by extension).
  */
 export function rockboxLibraryPaths(paths: readonly string[]): string[] {
   const marked = (name: string): Set<string> =>
@@ -233,5 +235,6 @@ export function rockboxLibraryPaths(paths: readonly string[]): string[] {
     }
     return out;
   };
-  return paths.filter((path) => !path.split("/").some((part) => part.startsWith(".")) && !ignored(path));
+  const apple = (path: string): boolean => path.split("/")[0].toLowerCase() === "ipod_control";
+  return paths.filter((path) => !apple(path) && !path.split("/").some((part) => part.startsWith(".")) && !ignored(path));
 }

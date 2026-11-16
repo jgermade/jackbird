@@ -38,6 +38,8 @@ export type Track = {
   metadata: TrackMetadata;
   /** Its audio's length and rates (crates/tags `Audio`), when known. */
   audio?: AudioProps | null;
+  /** Its tags not read yet: what its name says shown meanwhile (a folder opened with no `.meta/`). */
+  pending?: boolean;
 };
 
 export type EditableMetadata = TrackMetadata;
@@ -78,6 +80,8 @@ export type WizardTreeRow = {
   playlistIndex?: number;
   /** A playlist entry that is not in the library. */
   missing?: boolean;
+  /** A track whose tags are not read yet (`Track.pending`). */
+  pending?: boolean;
 };
 
 /** How the library lists a root: its folders, or grouped by tags, or its playlists. */
@@ -161,6 +165,11 @@ export type RootWorkspace = {
   vfs: VFSAdapter;
   /** Where the root lives (the browser's folder, or the desktop app's path), and the work done on its files. */
   source: RootSource;
+  /**
+   * An iPod's other library's tracks while this one is shown (W7: both share the root), so a song
+   * playing from it keeps its name and can be shown again (`locatePlaying`).
+   */
+  shelved?: Track[];
   tracks: Track[];
   selectedTrackId: string | null;
   selectedTrackIds: string[];

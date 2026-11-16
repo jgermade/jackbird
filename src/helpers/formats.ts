@@ -28,3 +28,15 @@ export function isAudioFile(path: string): boolean {
 export function audioMimeType(path: string): string {
   return audioFormatOf(path)?.mime ?? "";
 }
+
+/**
+ * The word a track's row shows for its format: a known format's name ("MP3", "FLAC"), else its
+ * extension in capitals (an iPod's "M4A"); "" with none.
+ */
+export function formatLabel(path: string): string {
+  const known = audioFormatOf(path);
+  if (known) return known.name;
+  const name = path.split("/").pop() ?? path;
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toUpperCase() : "";
+}

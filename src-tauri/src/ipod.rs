@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use jackbird_api::{AudioJson, CoverJson, Failure, Metadata, Opened, ScannedJson, cover_ref, failure};
 use jackbird_ipod_sync::listing::{self, Found};
 use serde::{Deserialize, Serialize};
+use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 
 use crate::{Answer, Roots, register, root_of};
@@ -134,13 +135,12 @@ pub fn ipod_open(app: AppHandle, path: String) -> Answer<Opened> {
     register(&app, &path)
 }
 
-/// The songs of an iPod, as the interface's scan gives a folder's, with their covers (each
-/// image once, unless the interface has it already).
+/// The songs of an iPod, as the interface's scan gives a folder's, their covers by reference
+/// only: the pictures come after, from [`ipod_covers`] (the owner's rule: the information at once).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IpodTracks {
     tracks: Vec<ScannedJson>,
-    covers: Vec<CoverJson>,
     /// Each song's pid, by its path, to take it off: as text, since a 64-bit integer does not
     /// survive JavaScript's numbers.
     pids: Vec<(String, String)>,
@@ -172,38 +172,73 @@ fn cover_name(root: &Path, id: u32) -> String {
     )
 }
 
-/// The songs of the iPod at `path`, from its database.
+/// The songs of the iPod at `path`, from its database (a fraction of a second).
 #[tauri::command]
-pub async fn ipod_tracks(path: String, known_covers: Vec<String>) -> Answer<IpodTracks> {
+pub async fn ipod_tracks(path: String) -> Answer<IpodTracks> {
     let root = ipod_at(&path)?;
-    blocking(move || tracks_of(&root, &known_covers)).await
+    blocking(move || tracks_of(&root)).await
 }
 
-/// [`ipod_tracks`]'s work: the songs of the iPod at `root`, and the covers not in `known_covers`.
-fn tracks_of(root: &Path, known_covers: &[String]) -> Answer<IpodTracks> {
+/// How many covers a batch of [`ipod_covers`] holds: each takes ~7 ms to make (126 ms in a debug
+/// build), so the interface draws them as they come.
+const COVERS_BATCH: usize = 16;
+
+/// A batch of an iPod's covers, as PNGs; `done` on the last one.
+#[derive(Default, Serialize)]
+pub struct CoversBatch {
+    done: bool,
+    covers: Vec<CoverJson>,
+}
+
+/// The covers of the iPod at `path` not in `known_covers`, each image once, in the order of its
+/// songs, in batches over `channel`: what follows [`ipod_tracks`], in the background.
+#[tauri::command]
+pub async fn ipod_covers(path: String, known_covers: Vec<String>, channel: Channel<CoversBatch>) -> Answer<()> {
+    let root = ipod_at(&path)?;
+    blocking(move || {
+        covers_of(&root, &known_covers, |batch| {
+            let _ = channel.send(batch);
+        })
+    })
+    .await
+}
+
+/// [`ipod_covers`]'s work, each batch handed to `send`, the last one `done` (even when empty).
+fn covers_of(root: &Path, known_covers: &[String], mut send: impl FnMut(CoversBatch)) -> Answer<()> {
+    let listing = listing::list(root).map_err(sync_failure)?;
+    let mut images = listing::Covers::open(root);
+    let mut seen: std::collections::HashSet<String> = known_covers.iter().cloned().collect();
+    let mut batch = CoversBatch::default();
+    for id in listing.songs.iter().filter_map(|song| song.track.artwork_id) {
+        let name = cover_name(root, id);
+        if !seen.insert(name.clone()) {
+            continue;
+        }
+        if let Some(png) = images.png(id) {
+            batch.covers.push(CoverJson {
+                name,
+                data: base64(&png),
+            });
+        }
+        if batch.covers.len() == COVERS_BATCH {
+            send(std::mem::take(&mut batch));
+        }
+    }
+    batch.done = true;
+    send(batch);
+    Ok(())
+}
+
+/// [`ipod_tracks`]'s work: the songs of the iPod at `root`, each cover by its name.
+fn tracks_of(root: &Path) -> Answer<IpodTracks> {
     {
         let root = root.to_path_buf();
         let listing = listing::list(&root).map_err(sync_failure)?;
-        let mut images = listing::Covers::open(&root);
-        let mut covers = Vec::new();
-        let mut sent = std::collections::HashSet::new();
         let mut tracks = Vec::new();
         let mut pids = Vec::new();
         for song in listing.songs {
             let t = &song.track;
-            let cover = t.artwork_id.map(|id| {
-                let name = cover_name(&root, id);
-                if !known_covers.contains(&name)
-                    && sent.insert(name.clone())
-                    && let Some(png) = images.png(id)
-                {
-                    covers.push(CoverJson {
-                        name: name.clone(),
-                        data: base64(&png),
-                    });
-                }
-                cover_ref(&name)
-            });
+            let cover = t.artwork_id.map(|id| cover_ref(&cover_name(&root, id)));
             let text = |s: &Option<String>| s.clone().unwrap_or_default();
             pids.push((song.path.clone(), (t.database_id as i64).to_string()));
             tracks.push(ScannedJson {
@@ -239,7 +274,7 @@ fn tracks_of(root: &Path, known_covers: &[String]) -> Answer<IpodTracks> {
                 }),
             });
         }
-        Ok(IpodTracks { tracks, covers, pids })
+        Ok(IpodTracks { tracks, pids })
     }
 }
 
@@ -417,20 +452,23 @@ mod tests {
     use super::*;
 
     /// On a copy of a real iPod (`JACKBIRD_IPOD_COPY`, its root), skipped otherwise: every cover a
-    /// song names comes in the answer, as a PNG, under a name the interface takes.
+    /// song names comes from [`covers_of`], as a PNG, under a name the interface takes, in batches
+    /// of at most [`COVERS_BATCH`], the last one done.
     #[test]
     fn every_cover_named_is_sent() {
         let Some(root) = std::env::var_os("JACKBIRD_IPOD_COPY").map(PathBuf::from) else {
             return;
         };
-        let Ok(answer) = tracks_of(&root, &[]) else {
+        let Ok(answer) = tracks_of(&root) else {
             panic!("{} could not be read", root.display())
         };
-        let sent: std::collections::HashMap<&str, &str> = answer
-            .covers
-            .iter()
-            .map(|c| (c.name.as_str(), c.data.as_str()))
-            .collect();
+        let mut batches = Vec::new();
+        assert!(covers_of(&root, &[], |batch| batches.push(batch)).is_ok());
+        assert!(batches.last().is_some_and(|batch| batch.done));
+        assert!(batches.iter().all(|batch| batch.covers.len() <= COVERS_BATCH));
+        let all: Vec<&CoverJson> = batches.iter().flat_map(|batch| &batch.covers).collect();
+        let sent: std::collections::HashMap<&str, &str> =
+            all.iter().map(|c| (c.name.as_str(), c.data.as_str())).collect();
         let mut named = std::collections::BTreeSet::new();
         for track in &answer.tracks {
             if let Some(reference) = &track.metadata.cover_data_url {
@@ -442,11 +480,7 @@ mod tests {
                 assert!(data.starts_with("iVBORw0KGgo"), "{name} is not a PNG");
             }
         }
-        eprintln!(
-            "{} covers named, every one sent ({} in all)",
-            named.len(),
-            answer.covers.len()
-        );
+        eprintln!("{} covers named, every one sent ({} in all)", named.len(), all.len());
     }
 
     #[test]

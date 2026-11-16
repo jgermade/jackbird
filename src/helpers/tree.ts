@@ -58,6 +58,7 @@ export function buildWizardRows(tracks: Track[], expandedFolders: readonly strin
         trackNumber: track.metadata.trackNumber,
         artist: track.metadata.artist,
         relativePath: track.relativePath,
+        ...(track.pending ? { pending: true } : {}),
         parentKey,
         depth
       });

@@ -211,7 +211,7 @@
                       :data-playing="String(track.id === playingId())"
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
-                    <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-stack"><span class="pick-box"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></span><span :if="discNumbered(disc)" class="pick-num mm-num">{{ numberOf(track) }}</span><span :if="discNumbered(disc)" class="num-box mm-num" :class.on="isChosen(track)" aria-hidden="true">{{ numberOf(track) }}</span></span></td>
+                    <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-stack"><span class="pick-box"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span><span :if="discNumbered(disc)" class="pick-num mm-num">{{ numberOf(track) }}</span></span></td>
                     <td :if="discNumbered(disc)" class="mm-num num-cell">{{ numberOf(track) }}</td>
                     <td><span class="mm-title">{{ titleOf(track) }}</span></td>
                     <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
@@ -241,11 +241,9 @@
 
 <style scoped>
   .sheet { color: var(--mm-fg); }
-  /* On a computer the sheet's content is at most 960px wide (53.33rem at the 18px root), in the
-     middle of its pane. */
-  @media (min-width: 721px) {
-    .sheet { max-width: 53.33rem; margin-inline: auto; }
-  }
+  /* The sheet's content is at most 960px wide (53.33rem at the 18px root), in the middle of its
+     pane; a narrower pane (a phone's) is not limited by it. */
+  .sheet { max-width: 53.33rem; margin-inline: auto; }
   .icon { width: .875rem; height: .875rem; }
   /* Orange only as the glyph: the key itself stays a chassis key, like the rest of the deck. */
   .icon.signal { color: var(--mm-accent-ink); }
@@ -288,7 +286,10 @@
   .crumb-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .crumb-link:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; border-radius: 2px; }
   @media (hover: hover) { .crumb-link:hover { color: var(--mm-fg); text-decoration: underline; } }
-  .albums { display: grid; gap: var(--mm-space-5); padding: var(--mm-space-5); container-type: inline-size; }
+  /* Its one column declared, as wide as the sheet and no wider: left implicit, WebKit (the macOS app)
+     kept it as wide as before after the separator narrowed the pane, and the albums were cut on
+     their right (2026-11-16). */
+  .albums { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-5); padding: var(--mm-space-5); container-type: inline-size; }
 
   /* The cover beside the head and the discs; in a narrow sheet the discs go under both. */
   .album {
@@ -305,9 +306,11 @@
     background: var(--mm-surface);
     /* An album out of view is not laid out or painted: the whole root is hundreds of them, and
        each change of the sheet's width (the splitter, the window) would lay them all out again,
-       which WebKit (the macOS app) feels most. It keeps its last height while away. */
+       which WebKit (the macOS app) feels most. It keeps its last height while away, and only its
+       height: `contain-intrinsic-size: auto 14rem` kept its width too, and in WebKit an album kept
+       its old width after the separator narrowed the pane, cut on its right (2026-11-16). */
     content-visibility: auto;
-    contain-intrinsic-size: auto 14rem;
+    contain-intrinsic-block-size: auto 14rem;
   }
   .cover { grid-area: cover; width: 8.25rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
   /* On wider screens the cover stays in view while its album's tracks scroll past. */
@@ -338,7 +341,7 @@
   .pick-stack > * { grid-area: 1 / 1; }
   .pick-box { display: grid; }
   .pick-num { display: none; }
-  @media (hover: hover) {
+  @media (hover: hover) and (min-width: 721px) {
     .num-cell { display: none; }
     .mm-table .pick-cell:has(.pick-num) { padding-right: .5rem; }
     .pick-num { display: block; }
@@ -370,34 +373,24 @@
     .cue-play { display: none; }
     .menu-cell > * { opacity: 1; }
   }
-  /* A touch screen: the track's number in a larger box, which is its box (filled when chosen). */
-  .num-box { display: none; }
-  @media (hover: none) {
+  /* A touch screen: the track's number is drawn inside its box (SelectBox's `number`), so no
+     column of its own. */
+  @media (hover: none), (max-width: 720px) {
     .num-cell { display: none; }
-    .pick-cell:has(.num-box) .pick-box { display: none; }
-    .num-box {
-      display: grid;
-      place-items: center;
-      min-width: 2rem;
-      height: 2rem;
-      padding: 0 .25rem;
-      border: 1.5px solid var(--mm-border-strong);
-      border-radius: var(--mm-radius-key);
-      background: var(--mm-field);
-      color: var(--mm-fg);
-      font-size: var(--mm-text-sm);
-    }
-    .num-box.on { border-color: var(--mm-accent); background: var(--mm-accent); color: var(--mm-on-accent); }
   }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
   .prompt p { margin: 0; color: var(--mm-fg-muted); }
 
-  @media (max-width: 720px) {
+  /* A narrow details pane (a phone's, or beside a wide library): by its own width (workspace.html's
+     `sheet` container), not the window's. */
+  @container sheet (max-width: 40rem) {
     .albums { padding: var(--mm-space-4); }
   }
-  @container (max-width: 30rem) {
+  /* Under 40rem (~720px) the cover goes over the tracks: beside them it left the titles too little
+     room, and they broke over two lines (the owner, 2026-11-16: 30rem was too low). */
+  @container (max-width: 40rem) {
     .album {
       grid-template-columns: 5.5rem minmax(0, 1fr);
       grid-template-rows: auto auto;

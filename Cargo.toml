@@ -37,3 +37,20 @@ strip = true
 [profile.wasm-speed]
 inherits = "wasm"
 opt-level = 3
+
+# The iPod's covers, decoded and made PNGs, optimised in debug builds too (`make desktop`): unoptimised
+# they took 126 ms each, 221 s for the classic's 1747, against 7 ms in a release build.
+[profile.dev.package.jackbird-ipod]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3
+[profile.dev.package.adler2]
+opt-level = 3
