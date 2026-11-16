@@ -178,8 +178,7 @@
     min-height: var(--mm-row);
     /* Each folder one step in from the one that holds it; an item one step less, so its number
        (or its box) sits under its folder's icon and its title under the folder's name. */
-    padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + var(--indent, var(--depth)) * 1rem);
-    border-left: .1875rem solid transparent;
+    padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + .1875rem + var(--indent, var(--depth)) * 1rem);
     color: var(--mm-fg);
     font: var(--mm-text-sm) / var(--mm-leading-tight) var(--mm-font-sans);
     cursor: pointer;
@@ -196,7 +195,8 @@
   .action { order: 2; }
   @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row:active { background: var(--mm-sunken); }
-  .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
+  /* Chosen: the soft accent, with no bar on its left (the owner, 2026-11-16). */
+  .row[aria-selected="true"] { background: var(--mm-accent-soft); }
   .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   /* Something the row stands for that is not there (a playlist's entry missing from the library). */
   .row.muted .label, .row.muted .meta { color: var(--mm-fg-subtle); font-style: italic; }
