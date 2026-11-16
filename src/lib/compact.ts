@@ -153,6 +153,9 @@ async function windowFull(): Promise<void> {
   const { win, LogicalSize } = await windowApi();
   await keepOnTop(win, false);
   await win.setDecorations(true);
+  // On macOS the title bar is see-through, the window's keys on the faceplate (src-tauri/src/lib.rs):
+  // given back with the decorations, it is made so again.
+  if (/Mac/.test(navigator.userAgent)) await win.setTitleBarStyle("overlay");
   await win.setMinSize(new LogicalSize(FULL_MIN.width, FULL_MIN.height));
   // The title bar comes asynchronously on macOS: give it a moment before sizing (placeAndSize checks after).
   await new Promise((resolve) => setTimeout(resolve, 200));

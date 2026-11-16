@@ -18,7 +18,8 @@
 pub mod cover;
 pub mod genres;
 pub mod listing;
-pub mod mpeg;
+/// The MPEG audio scanner, shared with the tag engine's audio properties (`jackbird_tags::mpeg`).
+pub use jackbird_tags::mpeg;
 
 use std::path::{Path, PathBuf};
 

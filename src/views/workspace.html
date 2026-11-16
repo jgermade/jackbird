@@ -29,13 +29,12 @@
   const { ui } = await import("../lib/ui")
   const { clearSelection } = await import("../lib/workspace")
 
-  const NARROW = matchMedia("(max-width: 720px)")
-  let narrow: boolean = NARROW.matches
-  const onWidth = (event: MediaQueryListEvent) => {
-    narrow = event.matches
-  }
-  NARROW.addEventListener("change", onWidth)
-  $destroyed(() => NARROW.removeEventListener("change", onWidth))
+  const { watchMedia } = await import("../lib/media")
+  // Followed as the window is resized (lib/media.ts).
+  let narrow: boolean = matchMedia("(max-width: 720px)").matches
+  $destroyed(watchMedia("(max-width: 720px)", (matches) => {
+    narrow = matches
+  }))
 
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || document.querySelector("dialog[open], :popover-open")) return
@@ -311,7 +310,9 @@
     background: repeating-linear-gradient(180deg, var(--mm-on-accent-key) 0 1px, transparent 1px .25rem);
   }
   .pane { min-height: 0; overflow: auto; }
-  .tree-pane { border-right: var(--mm-border-width) solid var(--mm-border); background: var(--mm-surface); }
+  /* A scrollbar that takes room (the desktop app on macOS draws its own, base.css) takes as much on
+     the left too: the rows keep even sides. Overlay scrollbars take none either way. */
+  .tree-pane { border-right: var(--mm-border-width) solid var(--mm-border); background: var(--mm-surface); scrollbar-gutter: stable both-edges; }
   .sheet-pane { background: var(--mm-sheet); }
 
   /* Phones: one pane per screen width, in a row that snaps as it is swiped. */

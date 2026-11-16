@@ -10,9 +10,8 @@ import { askRemove, askSend, canSendFrom } from "./ipod";
 import { isFavourite, toggleFavourite } from "./mine";
 import { t, tn } from "./i18n";
 import { moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
-import { showInLibrary } from "./roots";
 import { ui } from "./ui";
-import { activeRoot, folderTracks, goToGroup, menuTargetCount, menuTargets, playFromTree, queueFolder, queueTracks, setCurrentRow } from "./workspace";
+import { activeRoot, folderTracks, goToGroup, menuTargetCount, menuTargets, playFromTree, queueFolder, queueTracks, revealTrack, setCurrentRow } from "./workspace";
 
 /** An item of a menu, as the theme's `Menu` takes it: its glyph, and the row it shares (`group`). */
 export type MenuItem = { id: string; label: string; danger?: boolean; rule?: boolean; icon?: string; group?: string; disabled?: boolean };
@@ -138,8 +137,7 @@ export function onTrackMenu(trackId: string, choice: string): void {
     case "show": {
       const root = activeRoot.value.data;
       if (root) {
-        showInLibrary(root.id, trackId);
-        ui.pane = "library";
+        revealTrack(root.id, trackId);
       }
       break;
     }

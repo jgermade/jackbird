@@ -14,6 +14,14 @@ export type TrackMetadata = {
   albumArtist: string;
   /** Part of a compilation: "1" (or as the file holds it); "" when not. */
   compilation: string;
+  /** Who wrote the music. */
+  composer: string;
+  /** The comment (ID3's `COMM` with no description, Vorbis' `COMMENT`). */
+  comment: string;
+  /** The lyrics, unsynchronised (`USLT`, `LYRICS`). */
+  lyrics: string;
+  /** Beats per minute, a whole number as text (`TBPM`, `BPM`); "" when not known. */
+  bpm: string;
   coverDataUrl: string | null;
 };
 
@@ -28,6 +36,8 @@ export type Track = {
   lastModified?: number;
   lastVerifiedAt?: string;
   metadata: TrackMetadata;
+  /** Its audio's length and rates (crates/tags `Audio`), when known. */
+  audio?: AudioProps | null;
 };
 
 export type EditableMetadata = TrackMetadata;
@@ -51,6 +61,14 @@ export type WizardTreeRow = {
   relativePath?: string;
   /** Small text at the row's end; else a track's artist. */
   meta?: string;
+  /** An album's line under its name (who it is by, its year), drawn there in place of `meta`. */
+  sub?: string;
+  /** An album's (or an album folder's) cover, as its tracks hold it (`jackbird-cover:<name>`). */
+  cover?: string;
+  /** Drawn with a cover's room, with or without one: every album row, and folders beside one with a cover, line up. */
+  framed?: boolean;
+  /** Its picture drawn round: an artist's. */
+  round?: boolean;
   /** A view's group: its tracks' ids, in the order they play. */
   trackIds?: string[];
   /** The view a row belongs to, when it is not Files. */
@@ -86,6 +104,19 @@ export type Playlist = {
 };
 
 /** What `.meta/mp3-manager.json` keeps about one track, by relative path. */
+/** A file's audio (crates/tags `Audio`): its length, rates, channels and depth. */
+export type AudioProps = {
+  durationMs: number;
+  /** kbit/s; its average for a variable one. */
+  bitrate: number;
+  /** Hz; 0 where it is not known (an iPod's database keeps none). */
+  sampleRate: number;
+  channels: number;
+  /** Bits per sample; 0 for MP3. */
+  bits: number;
+  vbr: boolean;
+};
+
 export type MetaRecord = {
   checksum: string;
   fullChecksum?: string;
@@ -94,6 +125,8 @@ export type MetaRecord = {
   lastModified?: number;
   lastVerifiedAt?: string;
   metadata: TrackMetadata;
+  /** Its audio; null when it cannot be told; absent in a record kept before it was read (read again then). */
+  audio?: AudioProps | null;
   updatedAt: string;
 };
 
@@ -101,6 +134,8 @@ export type MetaRecord = {
 export type MetaSnapshot = {
   version: 1;
   tracks: Record<string, MetaRecord>;
+  /** Each artist's picture, by the artist's name without case (helpers/views.ts `artistName`): a cover's reference. */
+  artists?: Record<string, string>;
 };
 
 export type Theme = "light" | "dark";
@@ -165,6 +200,8 @@ export type Inspection = {
   audioChecksum: string;
   /** Null when the file still has the checksum the caller knew: its tags were not read again. */
   metadata: TrackMetadata | null;
+  /** Its audio, when it can be told. */
+  audio?: AudioProps | null;
 };
 
 /** What the player's <audio> element plays a track from. */
@@ -184,7 +221,7 @@ export type Unread = { path: string; message: string };
 /** Tags read in bulk: the files (covers by reference), the covers met for the first time (base64), the files not read. */
 export type TagsBatch = {
   done: boolean;
-  tracks: { path: string; size: number; lastModified: number; metadata: TrackMetadata }[];
+  tracks: { path: string; size: number; lastModified: number; metadata: TrackMetadata; audio?: AudioProps | null }[];
   /** Each cover's bytes come as base64 (`data`), or as they are (`bytes`, the web's iPod: no round trip through text). */
   covers: { name: string; data: string; bytes?: Uint8Array }[];
   unread: Unread[];

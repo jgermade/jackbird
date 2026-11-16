@@ -256,6 +256,10 @@ impl Library {
         layer.disc = pick(&fields.disc, &under.disc);
         layer.album_artist = pick(&fields.album_artist, &under.album_artist);
         layer.compilation = pick(&fields.compilation, &under.compilation);
+        layer.composer = pick(&fields.composer, &under.composer);
+        layer.comment = pick(&fields.comment, &under.comment);
+        layer.lyrics = pick(&fields.lyrics, &under.lyrics);
+        layer.bpm = pick(&fields.bpm, &under.bpm);
         self.put_own_layer(person, song.id, &layer)
     }
 

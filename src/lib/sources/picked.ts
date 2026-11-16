@@ -8,7 +8,7 @@ import { MemoryAdapter, type VFSAdapter, type VFSListEntry, type VFSStat, type W
 import { audioMimeType } from "../../helpers/formats";
 import { folderAccess, isHandheld, splitPicked, type FolderAccess } from "../../helpers/picked";
 import type { Inspection, MediaHandle, RootSource } from "../../types";
-import { checksums, readTags } from "../tags";
+import { checksums, readAll } from "../tags";
 
 /** What this browser can do with a folder of the person's (helpers/picked.ts). */
 export function folderAccessHere(): FolderAccess {
@@ -102,8 +102,11 @@ function pickedSource(vfs: PickedFolder): RootSource {
       if (!file) throw new DOMException(`Not found: ${path}`, "NotFoundError");
       const bytes = new Uint8Array(await file.arrayBuffer());
       const sums = await checksums(bytes);
-      const metadata = sums.fullChecksum === known ? null : await readTags(bytes);
-      return { size: file.size, lastModified: file.lastModified, ...sums, metadata };
+      // Its audio always (a record kept before it was read lacks it); its tags unless unchanged.
+      const read = await readAll(bytes);
+      const metadata = sums.fullChecksum === known ? null : read.metadata;
+      const audio = read.audio;
+      return { size: file.size, lastModified: file.lastModified, ...sums, metadata, audio };
     },
     save: (path) => Promise.reject(readOnly(path)),
     async openMedia(path): Promise<MediaHandle> {

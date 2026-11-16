@@ -46,6 +46,16 @@ export function artistKey(track: Pick<Track, "metadata">): string {
   return `@artist:${track.metadata.artist.trim().toLowerCase()}`;
 }
 
+/** An artist's name as their picture is kept by (`MetaSnapshot.artists`): without case or spaces round it. */
+export function artistName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** The artist an artist's group key names (`@artist:…`), as their picture is kept by; null for another key. */
+export function artistOfKey(key: string): string | null {
+  return key.startsWith("@artist:") ? key.slice("@artist:".length) : null;
+}
+
 /** The key of a track's album's group: its album tag, without case, in its album's folder. */
 export function albumKey(track: Pick<Track, "metadata" | "relativePath">): string {
   return `@album:${albumFolder(track)}::${track.metadata.album.trim().toLowerCase()}`;
@@ -119,6 +129,17 @@ const albumArtistsOf = (tracks: readonly Track[], labels: ViewLabels): Group[] =
   }));
 };
 
+/** The cover an album's tracks show: the first one's that has one. */
+export function coverOfTracks(tracks: readonly Pick<Track, "metadata">[]): string | undefined {
+  return tracks.find((track) => track.metadata.coverDataUrl)?.metadata.coverDataUrl ?? undefined;
+}
+
+/** An album's year: its first track's that has one, as four digits when the tag is a date. */
+export function yearOfTracks(tracks: readonly Pick<Track, "metadata">[]): string {
+  const year = tracks.find((track) => track.metadata.year.trim())?.metadata.year.trim() ?? "";
+  return /^\d{4}/.test(year) ? year.slice(0, 4) : year;
+}
+
 /**
  * The rows of `view` (not Files) for a root's `tracks`: a group's tracks
  * only when its key is in `expanded` (or `"all"`). `playlists` are the
@@ -129,13 +150,35 @@ export function buildViewRows(
   tracks: readonly Track[],
   expanded: readonly string[] | "all",
   labels: ViewLabels,
-  playlists: readonly Playlist[] = []
+  playlists: readonly Playlist[] = [],
+  artistPictures: Readonly<Record<string, string>> = {}
 ): WizardTreeRow[] {
   const open = (key: string): boolean => expanded === "all" || expanded.includes(key);
   const rows: WizardTreeRow[] = [];
-  const groupRow = (group: Group, parentKey: string | null, depth: number): boolean => {
+  // An album's row: its cover, and under its name who it is by and its year (`by`: false where its
+  // artist is the row above it, in Albums by artist).
+  // Every album row has a cover's room, so their names line up whether they have one or not.
+  const albumExtras = (group: Group, by: boolean): Pick<WizardTreeRow, "cover" | "sub" | "framed"> => {
+    const cover = coverOfTracks(group.tracks);
+    const sub = [by ? group.meta : "", yearOfTracks(group.tracks)].filter(Boolean).join(" · ");
+    return { framed: true, ...(cover ? { cover } : {}), ...(sub ? { sub } : {}) };
+  };
+  // An artist's row: their picture, round; every artist row with a picture's room when one has one.
+  const artistExtras = (artists: readonly Group[]) => {
+    const pictureOf = (group: Group): string | undefined => {
+      const name = artistOfKey(group.key);
+      return name === null ? undefined : artistPictures[name];
+    };
+    const framed = artists.some((group) => pictureOf(group));
+    return (group: Group): Pick<WizardTreeRow, "cover" | "framed" | "round"> => {
+      const cover = pictureOf(group);
+      return framed ? { framed, round: true, ...(cover ? { cover } : {}) } : {};
+    };
+  };
+  const groupRow = (group: Group, parentKey: string | null, depth: number, extras: Pick<WizardTreeRow, "cover" | "sub" | "framed" | "round"> = {}): boolean => {
     const isOpen = open(group.key);
     rows.push({
+      ...extras,
       key: group.key,
       kind: "album",
       album: group.key,
@@ -174,17 +217,21 @@ export function buildViewRows(
     const byWhom = (track: Track): string => [track.metadata.artist.trim(), track.metadata.album.trim()].filter(Boolean).join(" - ");
     for (const track of byTitle) trackRow(track, null, 0, byWhom(track));
   } else if (view === "artists") {
-    for (const artist of artistsOf(tracks, labels)) {
-      if (groupRow(artist, null, 0)) {
+    const artists = artistsOf(tracks, labels);
+    const pictured = artistExtras(artists);
+    for (const artist of artists) {
+      if (groupRow(artist, null, 0, pictured(artist))) {
         for (const track of artist.tracks) trackRow(track, artist.key, 1, track.metadata.album);
       }
     }
   } else if (view === "albumsByArtist") {
-    for (const artist of albumArtistsOf(tracks, labels)) {
-      if (!groupRow(artist, null, 0)) continue;
+    const artists = albumArtistsOf(tracks, labels);
+    const pictured = artistExtras(artists);
+    for (const artist of artists) {
+      if (!groupRow(artist, null, 0, pictured(artist))) continue;
       for (const album of albumsOf(artist.tracks, labels)) {
         const sub = { ...album, key: `@aba:${artist.key.slice(8)}::${album.key.slice(7)}`, meta: "" };
-        if (groupRow(sub, artist.key, 1)) {
+        if (groupRow(sub, artist.key, 1, albumExtras(sub, false))) {
           for (const track of album.tracks) trackRow(track, sub.key, 2, track.metadata.artist);
         }
       }
@@ -192,7 +239,7 @@ export function buildViewRows(
   } else if (view === "albums" || view === "compilations") {
     const albums = albumsOf(tracks, labels).filter((album) => view === "albums" || isCompilationAlbum(album.tracks));
     for (const album of albums) {
-      if (groupRow(album, null, 0)) {
+      if (groupRow(album, null, 0, albumExtras(album, true))) {
         for (const track of album.tracks) trackRow(track, album.key, 1, track.metadata.artist);
       }
     }
@@ -229,4 +276,21 @@ export function buildViewRows(
     }
   }
   return rows;
+}
+
+/**
+ * Where a track is in a list of rows drawn all open: its row's key, and the keys that open the rows
+ * above it (their `album`, from the outermost); null when the list has no row of it (a playlist's
+ * entries are rows of their own).
+ */
+export function trackPlace(rows: readonly WizardTreeRow[], trackId: string): { key: string; open: string[] } | null {
+  const key = `track:${trackId}`;
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  const row = byKey.get(key);
+  if (!row) return null;
+  const open: string[] = [];
+  for (let parent = row.parentKey ? byKey.get(row.parentKey) : undefined; parent; parent = parent.parentKey ? byKey.get(parent.parentKey) : undefined) {
+    open.unshift(parent.album);
+  }
+  return { key, open };
 }

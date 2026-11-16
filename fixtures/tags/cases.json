@@ -15,7 +15,11 @@
         "track": "3/12",
         "disc": "1/2",
         "albumArtist": "Album Artist",
-        "compilation": "1"
+        "compilation": "1",
+        "composer": "",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -44,7 +48,11 @@
         "track": "3/12",
         "disc": "1/2",
         "albumArtist": "Album Artist",
-        "compilation": "1"
+        "compilation": "1",
+        "composer": "",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -73,7 +81,11 @@
         "track": "3/12",
         "disc": "1/2",
         "albumArtist": "Album Artist",
-        "compilation": "1"
+        "compilation": "1",
+        "composer": "",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -102,7 +114,11 @@
         "track": "3/12",
         "disc": "1/2",
         "albumArtist": "Album Artist",
-        "compilation": "1"
+        "compilation": "1",
+        "composer": "",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -131,7 +147,11 @@
         "track": "3/12",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -156,7 +176,11 @@
         "track": "3/12",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -181,7 +205,11 @@
         "track": "3/12",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -206,7 +234,11 @@
         "track": "3/12",
         "disc": "1/2",
         "albumArtist": "Album Artist",
-        "compilation": "1"
+        "compilation": "1",
+        "composer": "",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -235,7 +267,11 @@
         "track": "3/12",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -260,7 +296,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -285,7 +325,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -310,7 +354,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -335,7 +383,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -360,7 +412,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -385,7 +441,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -410,7 +470,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -435,7 +499,11 @@
         "track": "1/9",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "hi",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover2.jpg",
@@ -464,7 +532,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "unreadable",
@@ -489,7 +561,11 @@
         "track": "3/12",
         "disc": "1/2",
         "albumArtist": "Album Artist",
-        "compilation": "1"
+        "compilation": "1",
+        "composer": "",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -518,7 +594,11 @@
         "track": "3",
         "disc": "1",
         "albumArtist": "Album Artist",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "Hi",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -547,7 +627,11 @@
         "track": "3",
         "disc": "1",
         "albumArtist": "Album Artist",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "Hi",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -576,7 +660,11 @@
         "track": "3",
         "disc": "1",
         "albumArtist": "Album Artist",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "Hi",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -605,7 +693,11 @@
         "track": "3",
         "disc": "1",
         "albumArtist": "Album Artist",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "Hi",
+        "lyrics": "La la la",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover1.jpg",
@@ -634,7 +726,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -659,7 +755,11 @@
         "track": "",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "��",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": null,
       "write": "ok",
@@ -684,7 +784,11 @@
         "track": "3/12",
         "disc": "",
         "albumArtist": "",
-        "compilation": ""
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
       },
       "cover": {
         "file": "covers/cover3.png",

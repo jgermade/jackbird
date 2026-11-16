@@ -7,7 +7,7 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::Path;
 
-use jackbird_tags::{Cover, Edit, FIRST_HEAD, FileLayout, Layout, Refusal, TAIL_LEN, Tags};
+use jackbird_tags::{AUDIO_PROBE, Audio, Cover, Edit, FIRST_HEAD, FileLayout, Layout, Refusal, TAIL_LEN, Tags};
 use sha1::{Digest, Sha1};
 use sha2::{Digest as _, Sha256};
 
@@ -28,10 +28,26 @@ pub struct Inspection {
     /// Its tags, unless its full checksum was the one the caller knew; a
     /// file the engine cannot read reads as untagged, as in the browser.
     pub tags: Option<(jackbird_tags::Fields, Option<Cover>)>,
+    /// Its audio's length and rates, when they can be told (`jackbird_tags::audio`).
+    pub audio: Option<Audio>,
+}
+
+/// A file's layout, and its first bytes: at least up to the end of its tags, and
+/// [`AUDIO_PROBE`] past its audio's start (its first frame, for its length and rates).
+fn layout_of(file: &mut File, len: u64, shown: &str) -> Result<(FileLayout, Vec<u8>), Error> {
+    let (layout, mut head) = tags_layout_of(file, len, shown)?;
+    let want = len.min(layout.audio.start + AUDIO_PROBE) as usize;
+    if head.len() < want {
+        let have = head.len();
+        head.resize(want, 0);
+        file.seek(SeekFrom::Start(have as u64)).map_err(io(shown))?;
+        file.read_exact(&mut head[have..]).map_err(io(shown))?;
+    }
+    Ok((layout, head))
 }
 
 /// A file's layout, and its first bytes: at least up to the end of its tags.
-fn layout_of(file: &mut File, len: u64, shown: &str) -> Result<(FileLayout, Vec<u8>), Error> {
+fn tags_layout_of(file: &mut File, len: u64, shown: &str) -> Result<(FileLayout, Vec<u8>), Error> {
     let tail_len = len.min(TAIL_LEN as u64);
     let mut tail = vec![0; tail_len as usize];
     file.seek(SeekFrom::Start(len - tail_len)).map_err(io(shown))?;
@@ -99,6 +115,8 @@ pub struct Examined {
     pub audio_sha256: String,
     /// Its tags; a file the engine cannot read reads as untagged.
     pub tags: (jackbird_tags::Fields, Option<Cover>),
+    /// Its audio's length and rates.
+    pub audio: Option<Audio>,
 }
 
 /// Examines a file anywhere (the library's import reads folders it does not open as roots).
@@ -127,7 +145,9 @@ pub fn examine(path: &Path) -> Result<Examined, Error> {
         at += read as u64;
     }
     let tags = found(&head, &layout);
+    let audio = jackbird_tags::audio(&head, &layout);
     Ok(Examined {
+        audio,
         layout,
         head,
         stat: Stat::of(&metadata),
@@ -182,6 +202,7 @@ fn inspect_handle(file: &mut File, shown: &str, known: Option<&str>) -> Result<I
     let (full_checksum, audio_checksum) = hashes(file, &layout.audio, shown)?;
     let tags = (known != Some(full_checksum.as_str())).then(|| found(&head, &layout));
     Ok(Inspection {
+        audio: jackbird_tags::audio(&head, &layout),
         stat: Stat::of(&metadata),
         full_checksum,
         audio_checksum,
@@ -198,6 +219,8 @@ pub struct Tagged {
     pub stat: Stat,
     /// Its tags; a file the engine cannot read reads as untagged, as in [`inspect`].
     pub tags: (jackbird_tags::Fields, Option<Cover>),
+    /// Its audio's length and rates.
+    pub audio: Option<Audio>,
 }
 
 /// A file's tags, from its head: [`Tagged`].
@@ -208,6 +231,7 @@ pub fn read_tags(root: &Root, relative: &str) -> Result<Tagged, Error> {
     let (layout, head) = layout_of(&mut file, metadata.len(), relative)?;
     Ok(Tagged {
         stat: Stat::of(&metadata),
+        audio: jackbird_tags::audio(&head, &layout),
         tags: found(&head, &layout),
     })
 }

@@ -10,12 +10,14 @@
 //! ID3v2.2, v2.3 and v2.4). No I/O, no dependencies. See
 //! `RECORD/2026-08-11.musikmatch-rust-migration.WIP.md` (21:45 to 22:20).
 
+mod comment;
 mod error;
 mod picture;
 mod sync;
 mod tag;
 mod text;
 
+pub use comment::{Comment, decode_comment, encode_comment};
 pub use error::Error;
 pub use picture::{Picture, decode_picture, encode_picture};
 pub use sync::{resynchronise, unsynchronise};

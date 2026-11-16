@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use jackbird_api::{CoverJson, Failure, Metadata, Opened, ScannedJson, cover_ref, failure};
+use jackbird_api::{AudioJson, CoverJson, Failure, Metadata, Opened, ScannedJson, cover_ref, failure};
 use jackbird_ipod_sync::listing::{self, Found};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -220,8 +220,23 @@ fn tracks_of(root: &Path, known_covers: &[String]) -> Answer<IpodTracks> {
                     disc_number: numbered(t.disc_number, t.disc_count),
                     album_artist: text(&t.album_artist),
                     compilation: if t.compilation { "1".into() } else { String::new() },
+                    composer: text(&t.composer),
+                    // Its database keeps no comment jackbird reads.
+                    comment: String::new(),
+                    // The iPod's database has no lyrics (they live in the file's tags).
+                    lyrics: String::new(),
+                    bpm: if t.bpm == 0 { String::new() } else { t.bpm.to_string() },
                     cover_data_url: cover,
                 },
+                // Its length and bit rate as its database keeps them; no sample rate there.
+                audio: (t.length_ms > 0).then_some(AudioJson {
+                    duration_ms: t.length_ms,
+                    bitrate: t.bitrate,
+                    sample_rate: 0,
+                    channels: 0,
+                    bits: 0,
+                    vbr: false,
+                }),
             });
         }
         Ok(IpodTracks { tracks, covers, pids })

@@ -22,7 +22,7 @@
   const { moveInQueue, playAt, queueEntries, queueIsAlbum, readRowSpectrum, removeFromQueue } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
   const { preferences } = await import("../lib/preferences")
-  const { rowHeights } = await import("../helpers/density")
+  const { rowHeights, rowPixels } = await import("../helpers/density")
 
   type Entry = { index: number; title: string; artist: string; rootLabel: string; cover: string | null; state: "played" | "current" | "upcoming"; missing: boolean }
 
@@ -43,7 +43,8 @@
   // (helpers/density.ts, `--mm-row-queue`), which `:window` takes in pixels; the list's
   // `$scrollTo(index)` brings a track into view, drawing it.
   const rootPx = (): number => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-  const rowPx = (): number => rowHeights(preferences.density).queue * rootPx()
+  // A whole number of pixels where the stylesheet rounds the rows too (tokens.css).
+  const rowPx = (): number => rowPixels(rowHeights(preferences.density).queue, rootPx(), typeof CSS !== "undefined" && CSS.supports("width", "round(1rem, 2px)"))
   const reveal = (index: number, block: "nearest" | "center") => {
     const list = $self("ol.queue") as (HTMLElement & { $scrollTo?: (index: number, options?: { block?: string }) => void }) | null
     list?.$scrollTo?.(index, { block })

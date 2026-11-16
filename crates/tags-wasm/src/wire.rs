@@ -4,7 +4,9 @@
 //!
 //! - A read's result: the format (`u8`: 0 MP3, 1 FLAC), the fields as
 //!   strings in [`Field::ALL`]'s order, then `u8` 1 and the cover's MIME type
-//!   and bytes, or `u8` 0.
+//!   and bytes, or `u8` 0; then `u8` 1 and the audio (its length in ms, bit
+//!   rate and sample rate as `u32`, its channels, bits and whether its bit rate
+//!   varies as `u8`), or `u8` 0.
 //! - An error: its code and its message, as strings.
 //! - An edit: for each field in order, `u8` 0 to leave it, or `u8` 1 and its
 //!   new value; then the cover: `u8` 0 to keep it, 1 and a MIME type and bytes
@@ -20,7 +22,7 @@
 //! the bytes the splice replaces (`u32`; it starts at 0), then what replaces
 //! them (the rest). An error answers any of them.
 
-use jackbird_tags::{Cover, CoverEdit, Edit, Error, Field, FileLayout, Format, Layout, Splice, Tags};
+use jackbird_tags::{Audio, Cover, CoverEdit, Edit, Error, Field, FileLayout, Format, Layout, Splice, Tags};
 
 fn put_len(out: &mut Vec<u8>, len: usize) {
     out.extend_from_slice(&(len as u32).to_le_bytes());
@@ -31,8 +33,8 @@ fn put_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
     out.extend_from_slice(bytes);
 }
 
-/// A read's result.
-pub fn tags(tags: &Tags) -> Vec<u8> {
+/// A read's result, and the file's audio.
+pub fn tags(tags: &Tags, audio: Option<Audio>) -> Vec<u8> {
     let cover = tags
         .cover
         .as_ref()
@@ -50,6 +52,16 @@ pub fn tags(tags: &Tags) -> Vec<u8> {
             out.push(1);
             put_bytes(&mut out, cover.mime.as_bytes());
             put_bytes(&mut out, &cover.data);
+        }
+        None => out.push(0),
+    }
+    match audio {
+        Some(audio) => {
+            out.push(1);
+            for value in [audio.duration_ms, audio.bitrate, audio.sample_rate] {
+                out.extend_from_slice(&value.to_le_bytes());
+            }
+            out.extend_from_slice(&[audio.channels, audio.bits, u8::from(audio.vbr)]);
         }
         None => out.push(0),
     }
@@ -193,6 +205,10 @@ fn edit(reader: &mut Reader<'_>) -> Result<Edit, String> {
         disc: next(),
         album_artist: next(),
         compilation: next(),
+        composer: next(),
+        comment: next(),
+        lyrics: next(),
+        bpm: next(),
         cover,
     })
 }
@@ -227,7 +243,7 @@ mod tests {
     use super::*;
 
     /// An edit as `tagwire.ts` encodes it.
-    fn encoded(fields: [Option<&str>; 9], cover: &[u8]) -> Vec<u8> {
+    fn encoded(fields: [Option<&str>; 13], cover: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
         for value in fields {
             match value {
@@ -268,6 +284,10 @@ mod tests {
                 Some("2/2"),
                 Some("Various Artists"),
                 Some("1"),
+                Some("Composer"),
+                None,
+                Some("Words"),
+                Some("120"),
             ],
             &cover,
         );
@@ -286,6 +306,10 @@ mod tests {
                 disc: Some("2/2".into()),
                 album_artist: Some("Various Artists".into()),
                 compilation: Some("1".into()),
+                composer: Some("Composer".into()),
+                comment: None,
+                lyrics: Some("Words".into()),
+                bpm: Some("120".into()),
                 cover: CoverEdit::Set(Cover {
                     data: vec![9, 8, 7],
                     mime: "image/png".into()
@@ -294,7 +318,7 @@ mod tests {
         );
         assert_eq!(layout, layout_flac());
         assert_eq!(head, b"fLaC...");
-        let mut request = encoded([None; 9], &[2]);
+        let mut request = encoded([None; 13], &[2]);
         request.extend_from_slice(&[255, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0]);
         let (edit, layout, head) = write_request(&request).unwrap();
         assert_eq!(edit.cover, CoverEdit::Remove);
@@ -318,7 +342,7 @@ mod tests {
         assert!(write_request(&[]).unwrap_err().contains("ends early"));
         assert!(write_request(&[3]).unwrap_err().contains("field marked 3"));
         assert!(
-            write_request(&encoded([None; 9], &[5]))
+            write_request(&encoded([None; 13], &[5]))
                 .unwrap_err()
                 .contains("cover marked 5")
         );
@@ -349,18 +373,24 @@ mod tests {
         };
         let mut expected = vec![1, 1, 0, 0, 0, b'T', 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0];
         expected.extend_from_slice(b"1959");
-        // genre, track, disc, album artist and compilation: empty.
-        expected.extend_from_slice(&[0; 20]);
+        // genre, track, disc, album artist, compilation, composer, comment, lyrics and bpm: empty.
+        expected.extend_from_slice(&[0; 36]);
         expected.extend_from_slice(&[1, 10, 0, 0, 0]);
         expected.extend_from_slice(b"image/jpeg");
         expected.extend_from_slice(&[2, 0, 0, 0, 1, 2]);
-        assert_eq!(tags(&read), expected);
+        let mut with_audio = expected.clone();
+        expected.push(0);
+        assert_eq!(tags(&read, None), expected);
+        with_audio.push(1);
+        with_audio.extend_from_slice(&[0xe8, 3, 0, 0, 128, 0, 0, 0, 0x44, 0xac, 0, 0, 2, 16, 1]);
+        let audio = Audio { duration_ms: 1000, bitrate: 128, sample_rate: 44_100, channels: 2, bits: 16, vbr: true };
+        assert_eq!(tags(&read, Some(audio)), with_audio);
         let untagged = Tags {
             format: Format::Mp3,
             fields: Fields::default(),
             cover: None,
         };
-        assert_eq!(tags(&untagged), [vec![0], vec![0; 36], vec![0]].concat());
+        assert_eq!(tags(&untagged, None), [vec![0], vec![0; 52], vec![0], vec![0]].concat());
         let mut expected = vec![6, 0, 0, 0];
         expected.extend_from_slice(b"id3v22");
         let message = Error::Id3v22.to_string();

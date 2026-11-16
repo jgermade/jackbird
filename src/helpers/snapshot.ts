@@ -181,7 +181,8 @@ export function applyScanResults<Root extends WithSnapshot>(root: Root, results:
       size: record.size ?? track.size,
       lastModified: record.lastModified,
       lastVerifiedAt: record.lastVerifiedAt,
-      metadata: record.metadata
+      metadata: record.metadata,
+      ...(record.audio !== undefined ? { audio: record.audio } : {})
     });
     records[track.relativePath] = record;
   }

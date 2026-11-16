@@ -13,7 +13,7 @@
 import { FSAAdapter, isFSAAvailable, walk } from "@cloudauthn/vfs-sync";
 import { audioMimeType } from "../../helpers/formats";
 import type { Inspection, MediaHandle, RootSource, TrackMetadata } from "../../types";
-import { checksums, readTags, writeTags } from "../tags";
+import { checksums, readAll, writeTags } from "../tags";
 
 /** A file under a folder's handle, by its path. */
 export async function fileOf(root: FileSystemDirectoryHandle, relativePath: string): Promise<File> {
@@ -44,8 +44,11 @@ export function browserSource(vfs: FSAAdapter): RootSource {
     async inspect(path, known): Promise<Inspection> {
       const bytes = await vfs.read(path);
       const sums = await checksums(bytes);
-      const metadata = sums.fullChecksum === known ? null : await readTags(bytes);
-      return { ...(await stamp(path, bytes.byteLength)), ...sums, metadata };
+      // Its audio always (a record kept before it was read lacks it); its tags unless unchanged.
+      const read = await readAll(bytes);
+      const metadata = sums.fullChecksum === known ? null : read.metadata;
+      const audio = read.audio;
+      return { ...(await stamp(path, bytes.byteLength)), ...sums, metadata, audio };
     },
     async save(path: string, previous: TrackMetadata, metadata: TrackMetadata): Promise<Inspection> {
       const bytes = await writeTags(await vfs.read(path), previous, metadata);

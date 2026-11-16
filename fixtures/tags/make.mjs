@@ -120,11 +120,11 @@ function e0Frames(version) {
   ].map((f) => (f.id === "TPE4" ? { ...f, flags: [version === 4 ? 0x40 : 0x80, 0] } : f));
 }
 
-const EMPTY = { title: "", artist: "", album: "", year: "", genre: "", track: "", disc: "", albumArtist: "", compilation: "" };
+const EMPTY = { title: "", artist: "", album: "", year: "", genre: "", track: "", disc: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "" };
 /** E0's first six frames: the six fields the engine started with. */
 const E0_SIX = { ...EMPTY, title: "Before", artist: "Artist", album: "Album", year: "1959", genre: "Jazz", track: "3/12" };
-/** All of E0's: TPOS, TPE2 and TCMP too. */
-const E0_FIELDS = { ...E0_SIX, disc: "1/2", albumArtist: "Album Artist", compilation: "1" };
+/** All of E0's: TPOS, TPE2 and TCMP too, and its COMM and USLT (read since the composer, comment and lyrics fields). */
+const E0_FIELDS = { ...E0_SIX, disc: "1/2", albumArtist: "Album Artist", compilation: "1", comment: "A comment", lyrics: "La la la" };
 const COVER1 = { file: "covers/cover1.jpg", mime: "image/jpeg" };
 
 const id3v1 = bytes("TAG", "Before".padEnd(30, " "), "Artist".padEnd(30, " "), "Album".padEnd(30, " "), "1959", "v1 comment".padEnd(28, " "), [0, 3, 8]);
@@ -193,7 +193,7 @@ const fullBlocks = [
   picture(4, "image/jpeg", "back", cover("cover2.jpg"), [24, 24, 24]),
   block(1, new Uint8Array(512)),
 ];
-const FLAC_FIELDS = { ...EMPTY, title: "Before", artist: "One", album: "Album", year: "1959", genre: "Jazz", track: "3", disc: "1", albumArtist: "Album Artist" };
+const FLAC_FIELDS = { ...EMPTY, title: "Before", artist: "One", album: "Album", year: "1959", genre: "Jazz", track: "3", disc: "1", albumArtist: "Album Artist", comment: "Hi", lyrics: "La la la" };
 
 // ---------------------------------------------------------------- cases
 
@@ -244,7 +244,7 @@ mp3("mp3-v23-utf16", tag(3, [text("TIT2", 1, "Ñandú — 東京"), frame("TPE1"
 mp3("mp3-v24-unicode", tag(4, [text("TIT2", 2, "東京"), text("TPE1", 3, "One\0Two"), frame("TALB", bytes([1], encoded(1, "A"), [0, 0], encoded(1, "B")))], { padding: 64 }),
   expect({ ...EMPTY, title: "東京", artist: "One/Two", album: "A/B" }), { about: "UTF-16BE, and several values in UTF-8 and in UTF-16" });
 mp3("mp3-v22", tag22([frame("TT2", bytes([0], "Old")), frame("TP1", bytes([0], "Artist")), frame("TAL", bytes([0], "Album")), frame("TYE", bytes([0], "1990")), frame("TCO", bytes([0], "Rock")), frame("TRK", bytes([0], "1/9")), frame("PIC", bytes([0], "JPG", [3, 0], cover("cover2.jpg"))), frame("COM", bytes([0], "eng", [0], "hi"))], 32),
-  expect({ ...EMPTY, title: "Old", artist: "Artist", album: "Album", year: "1990", genre: "Rock", track: "1/9" }, { file: "covers/cover2.jpg", mime: "image/jpeg" }, "id3v22"), { about: "ID3v2.2 (read; a save is refused)" });
+  expect({ ...EMPTY, title: "Old", artist: "Artist", album: "Album", year: "1990", genre: "Rock", track: "1/9", comment: "hi" }, { file: "covers/cover2.jpg", mime: "image/jpeg" }, "id3v22"), { about: "ID3v2.2 (read; a save is refused)" });
 mp3("mp3-junk", tag(3, [text("TIT2", 0, "Junk"), text("TPE1", 0, "Artist")], { padding: 16, junk: [1, 2, 3, 4] }),
   expect({ ...EMPTY, title: "Junk", artist: "Artist" }, null, "unreadable"), { about: "bytes after the frames that are neither a frame nor padding (read; a save is refused)" });
 
@@ -264,7 +264,7 @@ flacCase("flac-no-padding", [], fullBlocks.slice(0, 7), expect(FLAC_FIELDS, COVE
 flacCase("flac-id3-prefix", tag(3, [text("TIT2", 0, "id3 before fLaC")]), fullBlocks, expect(FLAC_FIELDS, COVER1), "flac-full after an ID3v2 tag, which FLAC readers skip");
 flacCase("flac-no-comments", [], [streaminfo, block(1, new Uint8Array(64))], expect(EMPTY), "STREAMINFO and padding only");
 flacCase("flac-odd-comments", [], [streaminfo, vorbis("odd", ["TITLE=Odd", "NOEQUALS", bytes("COMMENT=", [0xff, 0xfe]), "KéY=v", "title=lower"]), block(1, new Uint8Array(64))],
-  expect({ ...EMPTY, title: "Odd" }), "an entry without =, one with invalid UTF-8, a key with a non-ASCII letter, a second title in lower case");
+  expect({ ...EMPTY, title: "Odd", comment: "\uFFFD\uFFFD" }), "an entry without =, one with invalid UTF-8, a key with a non-ASCII letter, a second title in lower case");
 flacCase("flac-track-total", [], [streaminfo, vorbis("totals", ["TITLE=Totals", "TRACKNUMBER=3", "TOTALTRACKS=12", "YEAR=2001"]), picture(3, "image/png", "", cover("cover3.png"), [16, 16, 24]), block(1, new Uint8Array(64))],
   expect({ ...EMPTY, title: "Totals", year: "2001", track: "3/12" }, { file: "covers/cover3.png", mime: "image/png" }), "TRACKNUMBER with TOTALTRACKS, YEAR without DATE, a PNG cover");
 

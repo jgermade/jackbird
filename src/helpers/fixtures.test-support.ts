@@ -18,6 +18,10 @@ export function track(relativePath: string, metadata: Partial<TrackMetadata> = {
       discNumber: "",
       albumArtist: "",
       compilation: "",
+      composer: "",
+      comment: "",
+      lyrics: "",
+      bpm: "",
       coverDataUrl: null,
       ...metadata
     }

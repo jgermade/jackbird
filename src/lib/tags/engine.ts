@@ -5,7 +5,10 @@
  * then the tags alone, to read or to write. The audio never enters the
  * module. Over any `Engine`, so the tests drive it without the app's loader.
  */
-import { FIRST_HEAD, TAIL_LEN, type WireEdit, type WireLayout, type WireTags } from "../../helpers/tagwire.ts";
+import { AUDIO_PROBE, FIRST_HEAD, TAIL_LEN, type WireEdit, type WireLayout, type WireTags } from "../../helpers/tagwire.ts";
+
+/** The head a read gives the module: the tags, and a little past the audio's start for its length and rates. */
+const readEnd = (layout: WireLayout, length: number): number => Math.min(length, Math.max(layout.tagsEnd, layout.audio.start + AUDIO_PROBE));
 import { TagError } from "./error.ts";
 import type { Engine } from "./wasm.ts";
 
@@ -50,8 +53,9 @@ export async function readBlob(engine: Engine, blob: Blob): Promise<WireTags | n
     if ("known" in answer) {
       const layout = answer.known;
       if (!layout.format) return null;
-      if (head.length < layout.tagsEnd) head = await bytesOf(0, layout.tagsEnd);
-      return engine.read(head.subarray(0, layout.tagsEnd), layout);
+      const end = readEnd(layout, length);
+      if (head.length < end) head = await bytesOf(0, end);
+      return engine.read(head.subarray(0, end), layout);
     }
     if (answer.needHead <= given || answer.needHead > length) break;
     given = Math.min(length, Math.max(answer.needHead, given * 2));
@@ -62,7 +66,7 @@ export async function readBlob(engine: Engine, blob: Blob): Promise<WireTags | n
 
 /** A file's tags, the module given only them. */
 export function readOf(engine: Engine, bytes: Uint8Array, layout: WireLayout): WireTags {
-  return engine.read(bytes.subarray(0, layout.tagsEnd), layout);
+  return engine.read(bytes.subarray(0, readEnd(layout, bytes.length)), layout);
 }
 
 /** The file `edit` makes: the module's new tags, then the file's own bytes after its old ones; the same bytes when nothing changes. */

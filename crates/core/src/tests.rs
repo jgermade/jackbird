@@ -238,6 +238,10 @@ fn save_gives_the_engines_bytes_in_place_or_beside() {
                 disc: "1/2".into(),
                 album_artist: "Various Artists".into(),
                 compilation: "1".into(),
+                composer: "Composer B".into(),
+                comment: "A comment".into(),
+                lyrics: "Some words".into(),
+                bpm: String::new(),
             })
         },
         Edit {

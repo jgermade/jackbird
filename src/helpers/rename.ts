@@ -11,7 +11,7 @@ import type { Track } from "../types.ts";
 import { inferDiscNumber } from "./tracks.ts";
 
 /** The fields a pattern can use. */
-export const RENAME_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "filename"] as const;
+export const RENAME_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "composer", "comment", "filename"] as const;
 
 /** Ready-made patterns; the first is the default. */
 export const RENAME_PRESETS = ["%track% - %title%", "%artist% - %title%", "%track%. %artist% - %title%", "%disc%-%track% %title%"] as const;
@@ -25,6 +25,12 @@ export type RenamePlan = {
   to: string;
   /** The new file name, extension included. */
   name: string;
+  /**
+   * The part of the path the pattern names, before and after: the file's name, and with `/` the
+   * folders above it it names too (what the preview shows and compares).
+   */
+  shownFrom: string;
+  shown: string;
   status: RenameStatus;
 };
 
@@ -76,6 +82,8 @@ export function fillPattern(pattern: string, track: Named, width = 2): string {
     genre: track.metadata.genre,
     track: number === null ? "" : String(number).padStart(width, "0"),
     disc: String(inferDiscNumber(track as Track)),
+    composer: track.metadata.composer,
+    comment: track.metadata.comment,
     filename: track.name.slice(0, track.name.length - extensionOf(track.name).length)
   };
   return pattern.replace(/%(\w+)%/g, (whole, field: string) => (field.toLowerCase() in values ? values[field.toLowerCase()] : whole));
@@ -99,18 +107,28 @@ export function safeName(name: string): string {
  */
 export function planRenames(tracks: readonly Named[], pattern: string, libraryPaths: readonly string[]): RenamePlan[] {
   const widths = trackWidths(tracks);
+  // With `/`, the pattern names the folders above the file too, from the end of its path: those are
+  // replaced (made when the file has fewer), and the folders above them stay.
+  const segments = pattern.split("/");
+  const named = segments.length - 1;
   const draft = tracks.map((track) => {
-    const folder = folderOf(track.relativePath);
-    const base = safeName(fillPattern(pattern, track, widths.get(folder)));
-    const name = base ? `${base}${extensionOf(track.name)}` : "";
-    return { track, folder, name, to: `${folder}${name}` };
+    const width = widths.get(folderOf(track.relativePath));
+    const folders = track.relativePath.split("/").slice(0, -1);
+    const kept = folders.slice(0, Math.max(0, folders.length - named));
+    const made = segments.slice(0, -1).map((segment) => safeName(fillPattern(segment, track, width)));
+    const base = safeName(fillPattern(segments[segments.length - 1], track, width));
+    const name = base && made.every(Boolean) ? `${base}${extensionOf(track.name)}` : "";
+    const to = [...kept, ...made, name].join("/");
+    const shownFrom = track.relativePath.split("/").slice(-(named + 1)).join("/");
+    const shown = name ? [...made, name].join("/") : "";
+    return { track, name, to, shownFrom, shown };
   });
   const targets = new Map<string, number>();
   for (const one of draft) {
     if (one.name) targets.set(one.to.toLowerCase(), (targets.get(one.to.toLowerCase()) ?? 0) + 1);
   }
   const taken = new Map(libraryPaths.map((path) => [path.toLowerCase(), path]));
-  return draft.map(({ track, name, to }): RenamePlan => {
+  return draft.map(({ track, name, to, shownFrom, shown }): RenamePlan => {
     const from = track.relativePath;
     const key = to.toLowerCase();
     let status: RenameStatus = "ok";
@@ -121,6 +139,146 @@ export function planRenames(tracks: readonly Named[], pattern: string, libraryPa
     } else if ((targets.get(key) ?? 0) > 1 || (taken.has(key) && key !== from.toLowerCase())) {
       status = "clash";
     }
-    return { trackId: track.id, from, to: name ? to : from, name, status };
+    return { trackId: track.id, from, to: name ? to : from, name, shownFrom, shown, status };
   });
+}
+
+// ---- the other way: tags from a file's name (and its folders) -------------------------------
+
+/** The tags a pattern's fields set, read from a name. */
+export type ReadTags = Partial<Record<"title" | "artist" | "album" | "year" | "genre" | "trackNumber" | "discNumber" | "composer" | "comment", string>>;
+
+/** What reading a track's name would do: set tags (`ok`), nothing new (`same`), or the name does not match (`nomatch`). */
+export type ReadStatus = "ok" | "same" | "nomatch";
+
+export type ReadPlan = {
+  trackId: string;
+  /** The part of the path the pattern was matched against: the file's name, and as many folders above it as the pattern has. */
+  from: string;
+  tags: ReadTags;
+  status: ReadStatus;
+};
+
+const DIGITS = new Set(["track", "disc", "year"]);
+const TAG_OF: Record<string, keyof ReadTags | null> = {
+  title: "title",
+  artist: "artist",
+  album: "album",
+  year: "year",
+  genre: "genre",
+  track: "trackNumber",
+  disc: "discNumber",
+  composer: "composer",
+  comment: "comment",
+  filename: null
+};
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** A pattern as a regular expression over a path's tail, and the field each group reads; null for an empty pattern. */
+export function patternReader(pattern: string): { regex: RegExp; fields: string[]; depth: number } | null {
+  const trimmed = pattern.trim().replace(/^\/+|\/+$/g, "");
+  if (!trimmed) return null;
+  const fields: string[] = [];
+  let source = "";
+  let last = 0;
+  for (const match of trimmed.matchAll(/%(\w+)%/g)) {
+    source += escapeRegExp(trimmed.slice(last, match.index)).replace(/\//g, "\\/");
+    const field = match[1].toLowerCase();
+    if (field in TAG_OF) {
+      fields.push(field);
+      source += DIGITS.has(field) ? "\\s*(\\d+)\\s*" : "([^/]+?)";
+    } else {
+      // An unknown %word%: anything there, read as nothing.
+      source += "[^/]+?";
+    }
+    last = (match.index ?? 0) + match[0].length;
+  }
+  source += escapeRegExp(trimmed.slice(last)).replace(/\//g, "\\/");
+  return { regex: new RegExp(`^${source}$`, "u"), fields, depth: trimmed.split("/").length };
+}
+
+/** A number field as read ("03" gives "3"), keeping the total the track had ("3/12"). */
+function withTotal(read: string, had: string): string {
+  const number = String(Number(read));
+  const total = had.match(/\/\s*(\d+)/);
+  return total ? `${number}/${total[1]}` : number;
+}
+
+/** The path's tail a pattern `depth` segments deep reads: its last folders and the file's name, without its extension; null when it has not as many. */
+export function readSubject(relativePath: string, depth: number): string | null {
+  const parts = relativePath.split("/");
+  if (parts.length < depth) return null;
+  const tail = parts.slice(-depth);
+  const name = tail[tail.length - 1];
+  tail[tail.length - 1] = name.slice(0, name.length - extensionOf(name).length);
+  return tail.join("/");
+}
+
+/** The tags a track's name gives by `pattern`; null when it does not match. */
+export function readTags(pattern: string, track: Pick<Named, "relativePath" | "metadata">): ReadTags | null {
+  const reader = patternReader(pattern);
+  if (!reader) return null;
+  const subject = readSubject(track.relativePath, reader.depth);
+  if (subject === null) return null;
+  const match = subject.match(reader.regex);
+  if (!match) return null;
+  const tags: ReadTags = {};
+  reader.fields.forEach((field, index) => {
+    const key = TAG_OF[field];
+    const value = match[index + 1]?.trim() ?? "";
+    // A field the pattern names twice: its first reading.
+    if (!key || !value || key in tags) return;
+    if (key === "trackNumber") tags.trackNumber = withTotal(value, track.metadata.trackNumber);
+    else if (key === "discNumber") tags.discNumber = withTotal(value, track.metadata.discNumber);
+    else tags[key] = value;
+  });
+  return tags;
+}
+
+/** What reading each track's name by `pattern` would set. */
+export function planReads(tracks: readonly Named[], pattern: string): ReadPlan[] {
+  const depth = patternReader(pattern)?.depth ?? 1;
+  return tracks.map((track) => {
+    const tags = readTags(pattern, track);
+    const from = readSubject(track.relativePath, depth) ?? track.name;
+    if (!tags || Object.keys(tags).length === 0) return { trackId: track.id, from, tags: {}, status: "nomatch" };
+    const same = (Object.keys(tags) as (keyof ReadTags)[]).every((key) => track.metadata[key] === tags[key]);
+    return { trackId: track.id, from, tags, status: same ? "same" : "ok" };
+  });
+}
+
+// ---- typing a pattern: the fields offered after a % -------------------------------------------
+
+/**
+ * Whether the caret is in a field being typed: after a `%` that opens one (the `%`s before it, from
+ * the start, are an even number: the pairs closed), with only a word's letters since. Its place and
+ * what is typed of its name; null otherwise.
+ */
+export function fieldQuery(value: string, caret: number): { start: number; query: string } | null {
+  const before = value.slice(0, caret);
+  const start = before.lastIndexOf("%");
+  if (start < 0) return null;
+  const query = before.slice(start + 1);
+  if (!/^\w*$/.test(query)) return null;
+  const opened = (before.slice(0, start).match(/%/g)?.length ?? 0) % 2 === 0;
+  return opened ? { start, query } : null;
+}
+
+/** The fields a typed beginning (`query`) can complete, in the fields' order. */
+export function fieldsFor(query: string): string[] {
+  const lower = query.toLowerCase();
+  return RENAME_FIELDS.filter((field) => field.startsWith(lower));
+}
+
+/**
+ * The value with the field being typed at `caret` completed as `%field%` (a closing `%` and a name's
+ * rest after the caret replaced too), and where the caret goes: after it.
+ */
+export function completeField(value: string, caret: number, field: string): { value: string; caret: number } {
+  const at = fieldQuery(value, caret);
+  if (!at) return { value, caret };
+  const rest = value.slice(caret).match(/^\w*%?/)?.[0] ?? "";
+  const token = `%${field}%`;
+  return { value: value.slice(0, at.start) + token + value.slice(caret + rest.length), caret: at.start + token.length };
 }

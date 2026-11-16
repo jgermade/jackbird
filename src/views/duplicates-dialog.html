@@ -1,0 +1,173 @@
+<script :setup lang="ts">
+  // The active root's duplicates (helpers/duplicates.ts; RECORD/2026-11-03.deck-design-system.WIP.md,
+  // 2026-11-16 00:55): exact copies, the same audio, the one kept said; and, apart, songs that may be
+  // the same (the same artist and title, other audio), the best in quality said, none marked by
+  // themselves. Rows are marked by hand, or the extra exact copies at once; nothing is deleted here:
+  // the marked ones become the selection, and the selection dialog's Delete tab asks as always.
+
+  const Modal = await import("../../theme/default/components/modal.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Checkbox = await import("../../theme/default/components/checkbox.html")
+
+  const { t, tn } = await import("../lib/i18n")
+  const { ui } = await import("../lib/ui")
+  const { activeRoot, clearSelection, revealTrack, selectTracks } = await import("../lib/workspace")
+  const { bestOf, extraCopies, findDuplicates, keptOf } = await import("../helpers/duplicates")
+  const { audioLine, formatBytes } = await import("../helpers/format")
+  const { preferences } = await import("../lib/preferences")
+
+  type Audio = { durationMs: number; bitrate: number; sampleRate: number; bits: number; vbr: boolean }
+  type Track = { id: string; name: string; relativePath: string; size: number; audioChecksum?: string; audio?: Audio | null; metadata: { title: string; artist: string; coverDataUrl: string | null } }
+  type Group = { key: string; title: string; artist: string; trackIds: string[] }
+
+  const root = () => activeRoot.value.data
+  // Worked out once per change of the root's tracks.
+  const found = (() => {
+    let tracks: unknown = null
+    let result: { exact: Group[]; probable: Group[] } = { exact: [], probable: [] }
+    return (): { exact: Group[]; probable: Group[] } => {
+      const now = root()?.tracks ?? []
+      if (now !== tracks) {
+        tracks = now
+        result = findDuplicates(now)
+      }
+      return result
+    }
+  })()
+  const byId = (): Map<string, Track> => new Map((root()?.tracks ?? []).map((track: Track) => [track.id, track]))
+  const membersOf = (group: Group): Track[] => {
+    const all = byId()
+    return group.trackIds.flatMap((id) => all.get(id) ?? [])
+  }
+  const keptId = (group: Group): string => keptOf(membersOf(group) as never, (root()?.tracks ?? []) as never).id
+  const bestId = (group: Group): string => bestOf(membersOf(group) as never).id
+  const unchecked = (): number => (root()?.tracks ?? []).filter((track: Track) => !track.audioChecksum).length
+
+  let marked: string[] = []
+  // Opened again: nothing marked.
+  const resetFor = (() => {
+    let was = false
+    return (open: boolean): boolean => {
+      if (open && !was) marked = []
+      was = open
+      return open
+    }
+  })()
+  $: openNow = resetFor(ui.duplicatesOpen)
+
+  const isMarked = (id: string): boolean => marked.includes(id)
+  const mark = (id: string, on: boolean) => {
+    marked = on ? [...new Set([...marked, id])] : marked.filter((one) => one !== id)
+  }
+  const markExtra = () => {
+    marked = [...new Set([...marked, ...extraCopies(found().exact as never, (root()?.tracks ?? []) as never)])]
+  }
+  const close = () => {
+    ui.duplicatesOpen = false
+  }
+  const show = (id: string) => {
+    const current = root()
+    if (!current) return
+    close()
+    revealTrack(current.id, id)
+  }
+  const deleteMarked = () => {
+    if (marked.length === 0) return
+    const chosen = [...marked]
+    close()
+    clearSelection()
+    selectTracks(chosen, true)
+    ui.selectionTab = "danger"
+    ui.selectionOpen = true
+  }
+  // Its format, rates and length (helpers/format.ts), then its size: what "best" is told by.
+  const factsOf = (track: Track): string => [audioLine(track.audio, (track.name.split(".").pop() ?? "").toUpperCase(), preferences.language), formatBytes(track.size)].join(" · ")
+</script>
+
+<div class="duplicates-dialog">
+  <Modal :open="ui.duplicatesOpen" :eyebrow="t('duplicates.eyebrow')" :title="t('duplicates.title', { name: root()?.label ?? '' })" size="lg" :close-label="t('duplicates.close')" @close="close()">
+    <div :if="ui.duplicatesOpen" class="body">
+      <p :if="found().exact.length === 0 && found().probable.length === 0" class="none">{{ t("duplicates.none") }}</p>
+      <p :if="unchecked() > 0" class="note">{{ tn("duplicates.unchecked", unchecked()) }}</p>
+
+      <section :if="found().exact.length > 0" class="kind">
+        <h3 class="mm-legend">{{ t("duplicates.exact") }} · {{ found().exact.length }}</h3>
+        <p class="note">{{ t("duplicates.exactHint") }}</p>
+        <div :each="group in found().exact" :key="group.key" class="group">
+          <h4>{{ group.title }}<span :if="group.artist" class="by"> — {{ group.artist }}</span></h4>
+          <ul>
+            <li :each="track in membersOf(group)" :key="track.id" :class.marked="isMarked(track.id)">
+              <Checkbox :id="`dup-${track.id}`" :model="isMarked(track.id)" @change="mark(track.id, $event.detail)"><span class="visually-hidden">{{ t("duplicates.mark", { name: track.name }) }}</span></Checkbox>
+              <span class="path">{{ track.relativePath }}</span>
+              <span class="facts">{{ factsOf(track) }}<span :if="track.metadata.coverDataUrl"> · {{ t("duplicates.cover") }}</span></span>
+              <span class="flag" :class.kept="track.id === keptId(group)">{{ track.id === keptId(group) ? t("duplicates.kept") : "" }}</span>
+              <Key square size="sm" variant="ghost" :label="t('duplicates.show')" :title="t('duplicates.show')" @click="show(track.id)">
+                <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="4.75" /><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" /></svg>
+              </Key>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section :if="found().probable.length > 0" class="kind">
+        <h3 class="mm-legend">{{ t("duplicates.probable") }} · {{ found().probable.length }}</h3>
+        <p class="note">{{ t("duplicates.probableHint") }}</p>
+        <div :each="group in found().probable" :key="group.key" class="group">
+          <h4>{{ group.title }}<span :if="group.artist" class="by"> — {{ group.artist }}</span></h4>
+          <ul>
+            <li :each="track in membersOf(group)" :key="track.id" :class.marked="isMarked(track.id)">
+              <Checkbox :id="`dup-p-${track.id}`" :model="isMarked(track.id)" @change="mark(track.id, $event.detail)"><span class="visually-hidden">{{ t("duplicates.mark", { name: track.name }) }}</span></Checkbox>
+              <span class="path">{{ track.relativePath }}</span>
+              <span class="facts">{{ factsOf(track) }}<span :if="track.metadata.coverDataUrl"> · {{ t("duplicates.cover") }}</span></span>
+              <span class="flag" :class.best="track.id === bestId(group)">{{ track.id === bestId(group) ? t("duplicates.best") : "" }}</span>
+              <Key square size="sm" variant="ghost" :label="t('duplicates.show')" :title="t('duplicates.show')" @click="show(track.id)">
+                <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="4.75" /><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" /></svg>
+              </Key>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </div>
+    <template :slot.foot>
+      <span class="keys">
+        <Key :if="found().exact.length > 0" variant="ghost" @click="markExtra()">{{ t("duplicates.selectExtra") }}</Key>
+        <Key variant="ghost" @click="close()">{{ t("duplicates.close") }}</Key>
+        <Key variant="danger" :disabled="marked.length === 0" @click="deleteMarked()">{{ tn("duplicates.delete", marked.length) }}</Key>
+      </span>
+    </template>
+  </Modal>
+</div>
+
+<style scoped>
+  .duplicates-dialog { display: contents; }
+  .body { display: grid; gap: var(--mm-space-5); }
+  .none, .note { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .kind { display: grid; gap: var(--mm-space-3); }
+  .kind h3 { margin: 0; }
+  .group h4 { margin: 0 0 var(--mm-space-1); font-size: var(--mm-text-sm); font-weight: var(--mm-weight-bold); }
+  .group .by { color: var(--mm-fg-muted); font-weight: var(--mm-weight-regular); }
+  .group ul { display: grid; margin: 0; padding: 0; list-style: none; border-top: var(--mm-border-width) solid var(--mm-border); }
+  .group li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: var(--mm-space-3);
+    min-height: var(--mm-row);
+    padding: 0 var(--mm-space-2);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+  }
+  .group li.marked { background: var(--mm-bad-soft); }
+  .path { overflow-wrap: anywhere; font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); }
+  .facts { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); white-space: nowrap; }
+  /* Always there, empty on the rows that are neither kept nor the best, so the columns hold. */
+  .flag { min-width: 6rem; padding: 1px var(--mm-space-2); border-radius: var(--mm-radius-full); font-size: var(--mm-text-xs); text-align: center; white-space: nowrap; }
+  .flag.kept { background: var(--mm-accent-soft); color: var(--mm-accent-ink, var(--mm-fg)); }
+  .flag.best { background: var(--mm-sunken); color: var(--mm-fg); }
+  .icon { width: .875rem; height: .875rem; }
+  .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  @media (max-width: 720px) {
+    .group li { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .facts { grid-column: 2; }
+  }
+</style>

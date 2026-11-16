@@ -28,5 +28,9 @@ export const ui = $reactive({
   selectionOpen: false,
   selectionTab: "edit" as SelectionTab,
   playlist: null as PlaylistDialog | null,
-  pane: "library" as Pane
+  pane: "library" as Pane,
+  /** Bumped when a track is shown in the library (lib/workspace.ts `revealTrack`): the list scrolls to its row. */
+  revealed: 0,
+  /** The active root's duplicates dialog (views/duplicates-dialog.html). */
+  duplicatesOpen: false
 });

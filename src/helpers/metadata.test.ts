@@ -3,11 +3,11 @@ import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, isCompilation, mergeDraft, readsEveryField, withEveryField } from "./metadata.ts";
 
-const kindOfBlue = { artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", discNumber: "", albumArtist: "", compilation: "", coverDataUrl: "data:cover" };
+const kindOfBlue = { artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", discNumber: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "", coverDataUrl: "data:cover" };
 
 describe("emptyMetadata", () => {
   it("has every field empty and no cover", () => {
-    assert.deepEqual(emptyMetadata(), { title: "", artist: "", album: "", year: "", genre: "", trackNumber: "", discNumber: "", albumArtist: "", compilation: "", coverDataUrl: null });
+    assert.deepEqual(emptyMetadata(), { title: "", artist: "", album: "", year: "", genre: "", trackNumber: "", discNumber: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "", coverDataUrl: null });
   });
 
   it("returns a new object each time", () => {
@@ -45,7 +45,7 @@ describe("computeCommonMetadata", () => {
 });
 
 describe("getVariedFields", () => {
-  const none = { title: false, artist: false, album: false, year: false, genre: false, trackNumber: false, discNumber: false, albumArtist: false, compilation: false, coverDataUrl: false };
+  const none = { title: false, artist: false, album: false, year: false, genre: false, trackNumber: false, discNumber: false, albumArtist: false, compilation: false, composer: false, comment: false, lyrics: false, bpm: false, coverDataUrl: false };
 
   it("varies in nothing for no tracks or one", () => {
     assert.deepEqual(getVariedFields([]), none);
@@ -63,9 +63,9 @@ describe("getVariedFields", () => {
 });
 
 describe("mergeDraft", () => {
-  const original = { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", trackNumber: "1", discNumber: "", albumArtist: "", compilation: "", coverDataUrl: "data:cover" };
+  const original = { title: "So What", artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", trackNumber: "1", discNumber: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "", coverDataUrl: "data:cover" };
   const nothingVaried = getVariedFields([]);
-  const everythingVaried = { title: true, artist: true, album: true, year: true, genre: true, trackNumber: true, discNumber: true, albumArtist: true, compilation: true, coverDataUrl: true };
+  const everythingVaried = { title: true, artist: true, album: true, year: true, genre: true, trackNumber: true, discNumber: true, albumArtist: true, compilation: true, composer: true, comment: true, lyrics: true, bpm: true, coverDataUrl: true };
 
   it("takes the draft whole when nothing varied, empty fields and no cover included", () => {
     assert.deepEqual(mergeDraft(original, emptyMetadata(), nothingVaried), emptyMetadata());
@@ -90,6 +90,14 @@ describe("mergeDraft", () => {
     assert.deepEqual(mergeDraft(original, emptyMetadata(), everythingVaried, ["genre", "year"]), { ...original, genre: "", year: "" });
   });
 
+  it("removes a varied cover when its removal was confirmed", () => {
+    const original = { ...emptyMetadata(), coverDataUrl: "data:mine" };
+    const draft = { ...emptyMetadata(), coverDataUrl: null };
+    const varied = { ...nothingVaried, coverDataUrl: true };
+    assert.equal(mergeDraft(original, draft, varied).coverDataUrl, "data:mine");
+    assert.equal(mergeDraft(original, draft, varied, ["coverDataUrl"]).coverDataUrl, null);
+  });
+
   it("returns a new object", () => {
     assert.notEqual(mergeDraft(original, original, nothingVaried), original);
   });
@@ -102,7 +110,9 @@ describe("the fields that came later", () => {
     assert.equal(readsEveryField(before), false);
     assert.equal(readsEveryField({ ...before, discNumber: "", albumArtist: "" }), false);
     assert.equal(readsEveryField(emptyMetadata()), true);
-    assert.deepEqual(withEveryField(before), { ...before, discNumber: "", albumArtist: "", compilation: "" });
+    assert.deepEqual(withEveryField(before), { ...before, discNumber: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "" });
+    // Read before the composer, the comment, the lyrics and the BPM: read again too.
+    assert.equal(readsEveryField({ ...before, discNumber: "", albumArtist: "", compilation: "" }), false);
     assert.equal(withEveryField({ ...emptyMetadata(), discNumber: "2" }).discNumber, "2");
   });
 

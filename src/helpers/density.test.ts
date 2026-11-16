@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Density } from "../types.ts";
-import { DEFAULT_DENSITY, DENSITIES, densityOf, rowHeights } from "./density.ts";
+import { DEFAULT_DENSITY, DENSITIES, densityOf, rowHeights, rowPixels } from "./density.ts";
 
 describe("densityOf", () => {
   it("takes a density it knows", () => {
@@ -31,5 +31,19 @@ describe("rowHeights", () => {
 
   it("gives the default's heights for a density it does not know", () => {
     assert.deepEqual(rowHeights("huge" as Density), rowHeights("comfortable"));
+  });
+});
+
+describe("rowPixels", () => {
+  it("rounds to an even number of pixels where the stylesheet does, as CSS round(…, 2px) does", () => {
+    assert.equal(rowPixels(2.25, 18, true), 40);
+    assert.equal(rowPixels(2.75, 18, true), 50);
+    assert.equal(rowPixels(3.5, 18, true), 64);
+    // A tie goes up, as CSS round() rounds it.
+    assert.equal(rowPixels(2.5, 16.4, true), 42);
+  });
+
+  it("keeps the exact height where it does not", () => {
+    assert.equal(rowPixels(2.25, 18, false), 40.5);
   });
 });

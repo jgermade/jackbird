@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clockParts, dimmedLead, formatBytes, formatTime, formatTrackNumber, trackLead } from "./format.ts";
+import { audioLine, cleanTrackNumber, clockParts, dimmedLead, formatBytes, formatDuration, formatTime, formatTrackNumber, trackLead } from "./format.ts";
 
 describe("formatBytes", () => {
   it("writes zero as 0 Bytes", () => {
@@ -97,5 +97,37 @@ describe("trackLead", () => {
     assert.equal(trackLead(undefined, false, true), "\u00a0");
     assert.equal(trackLead(" ", false, true), "\u00a0");
     assert.equal(trackLead(undefined, false, false), "");
+  });
+});
+
+describe("cleanTrackNumber", () => {
+  it("keeps the number alone, its total and the rest dropped", () => {
+    assert.equal(cleanTrackNumber("2 de 6"), "2");
+    assert.equal(cleanTrackNumber("2/6"), "2");
+    assert.equal(cleanTrackNumber("2/"), "2");
+    assert.equal(cleanTrackNumber(" 02 "), "2");
+    assert.equal(cleanTrackNumber("A1"), "A1");
+    assert.equal(cleanTrackNumber(""), "");
+    assert.equal(cleanTrackNumber(undefined), "");
+  });
+});
+
+describe("formatDuration", () => {
+  it("gives minutes and seconds, hours past the hour, nothing when unknown", () => {
+    assert.equal(formatDuration(197_000), "3:17");
+    assert.equal(formatDuration(59_600), "1:00");
+    assert.equal(formatDuration(3_723_000), "1:02:03");
+    assert.equal(formatDuration(0), "");
+    assert.equal(formatDuration(undefined), "");
+  });
+});
+
+describe("audioLine", () => {
+  it("says the format, the rates, the depth and the length, what is unknown left out", () => {
+    assert.equal(audioLine({ durationMs: 197_000, bitrate: 320, sampleRate: 44_100, bits: 0, vbr: false }, "MP3", "es"), "MP3 · 320 kbps · 44,1 kHz · 3:17");
+    assert.equal(audioLine({ durationMs: 197_000, bitrate: 245, sampleRate: 44_100, bits: 0, vbr: true }, "MP3", "en"), "MP3 · 245 kbps VBR · 44.1 kHz · 3:17");
+    assert.equal(audioLine({ durationMs: 60_000, bitrate: 900, sampleRate: 48_000, bits: 24, vbr: true }, "FLAC", "en"), "FLAC · 900 kbps · 48 kHz · 24 bits · 1:00");
+    assert.equal(audioLine({ durationMs: 60_000, bitrate: 256, sampleRate: 0, bits: 0, vbr: false }, "AAC", "en"), "AAC · 256 kbps · 1:00");
+    assert.equal(audioLine(null, "MP3", "en"), "MP3");
   });
 });

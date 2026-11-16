@@ -93,8 +93,8 @@ export function refName(value: string | null | undefined): string | null {
 /**
  * The edit that saves `metadata` over a track whose tags were `previous`:
  * the first six fields (the engine leaves alone those that do not change, and
- * removes the empty ones), and the disc, album artist and compilation when
- * they change; the cover kept when it is the track's own, removed when
+ * removes the empty ones), and the disc, album artist, compilation, composer, comment, BPM and
+ * lyrics when they change; the cover kept when it is the track's own, removed when
  * the form has none, else set.
  */
 export function editFor(previous: TrackMetadata, metadata: TrackMetadata): WireEdit {
@@ -108,7 +108,7 @@ export function editFor(previous: TrackMetadata, metadata: TrackMetadata): WireE
   };
   // The fields that came later, only when they change: a library read before them holds them
   // empty, which must not empty the file's (crates/api's edit_for does the same).
-  const later = { disc: "discNumber", albumArtist: "albumArtist", compilation: "compilation" } as const;
+  const later = { disc: "discNumber", albumArtist: "albumArtist", compilation: "compilation", composer: "composer", comment: "comment", lyrics: "lyrics", bpm: "bpm" } as const;
   for (const [wire, field] of Object.entries(later) as [keyof typeof later, (typeof later)[keyof typeof later]][]) {
     if (metadata[field] !== previous[field]) fields[wire] = metadata[field];
   }

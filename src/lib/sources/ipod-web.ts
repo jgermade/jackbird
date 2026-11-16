@@ -11,7 +11,7 @@
 import { FSAAdapter, MemoryAdapter, walk, type WalkedFile } from "@cloudauthn/vfs-sync";
 import { audioMimeType } from "../../helpers/formats";
 import { IPOD_ARTWORK, IPOD_DATABASES, inGroups, ipodCoverName, ipodSongMetadata, rockboxLibraryPaths } from "../../helpers/ipod";
-import type { Inspection, IpodDeviceInfo, MediaHandle, RootSource, TagsBatch } from "../../types";
+import type { AudioProps, Inspection, IpodDeviceInfo, MediaHandle, RootSource, TagsBatch } from "../../types";
 import type { IpodDb, IpodImage, IpodListing, IpodSong } from "../ipod-db/wasm";
 import { fileOf } from "./browser";
 import { PickedFolder } from "./picked";
@@ -113,8 +113,9 @@ export function rockboxWebSource(drive: DriveFiles, apple: RootSource): RootSour
   const tagsOf = async (path: string): Promise<TagsBatch["tracks"][number]> => {
     const file = await drive.file(path);
     if (!file) throw new DOMException(`Not found: ${path}`, "NotFoundError");
-    const { readBlobTags } = await import("../tags");
-    return { path, size: file.size, lastModified: file.lastModified, metadata: await readBlobTags(file) };
+    const { readBlobAll } = await import("../tags");
+    const { metadata, audio } = await readBlobAll(file);
+    return { path, size: file.size, lastModified: file.lastModified, metadata, audio };
   };
   return {
     kind: "browser",
@@ -150,12 +151,18 @@ export function rockboxWebSource(drive: DriveFiles, apple: RootSource): RootSour
     },
     async inspect(path): Promise<Inspection> {
       const track = await tagsOf(path);
-      return { size: track.size, lastModified: track.lastModified, fullChecksum: "", audioChecksum: "", metadata: track.metadata };
+      return { size: track.size, lastModified: track.lastModified, fullChecksum: "", audioChecksum: "", metadata: track.metadata, audio: track.audio ?? null };
     },
     save: (path) => Promise.reject(readOnly(path)),
     openMedia: (path) => driveMedia(drive, path),
     close: () => undefined
   };
+}
+
+/** A listed song's length, as its database keeps it (no rates there): its bit rate worked out from its size. */
+function songAudio(song: IpodSong): AudioProps | null {
+  if (!(song.lengthMs > 0)) return null;
+  return { durationMs: song.lengthMs, bitrate: Math.round((song.size * 8) / song.lengthMs), sampleRate: 0, channels: 0, bits: 0, vbr: false };
 }
 
 /** An iPod's root over a drive that holds a database (`database`, found by ipodDatabase). */
@@ -237,7 +244,8 @@ export async function webIpodSource(drive: DriveFiles, database: File): Promise<
         path: song.path,
         size: song.size,
         lastModified: 0,
-        metadata: ipodSongMetadata(song, coverOf(song))
+        metadata: ipodSongMetadata(song, coverOf(song)),
+        audio: songAudio(song)
       }));
       // The songs at once; their covers after, those the interface lacks, each image once.
       const known = new Set(knownCovers);
@@ -263,7 +271,7 @@ export async function webIpodSource(drive: DriveFiles, database: File): Promise<
     // (an iPod's files are not hashed, as in the desktop app).
     async inspect(path): Promise<Inspection> {
       const song = listed(path);
-      return { size: song.size, lastModified: 0, fullChecksum: "", audioChecksum: "", metadata: ipodSongMetadata(song, coverOf(song)) };
+      return { size: song.size, lastModified: 0, fullChecksum: "", audioChecksum: "", metadata: ipodSongMetadata(song, coverOf(song)), audio: songAudio(song) };
     },
     save: (path) => Promise.reject(readOnly(path)),
     async openMedia(path): Promise<MediaHandle> {

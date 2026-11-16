@@ -20,13 +20,12 @@
   const { closePlaylistDialog, openPlaylistDialog } = await import("../lib/playlists")
   const { ui } = await import("../lib/ui")
 
-  const WIDE = matchMedia("(min-width: 721px)")
-  let wide: boolean = WIDE.matches
-  const onWidth = (event: MediaQueryListEvent) => {
-    wide = event.matches
-  }
-  WIDE.addEventListener("change", onWidth)
-  $destroyed(() => WIDE.removeEventListener("change", onWidth))
+  const { watchMedia } = await import("../lib/media")
+  // Followed as the window is resized (lib/media.ts).
+  let wide: boolean = matchMedia("(min-width: 721px)").matches
+  $destroyed(watchMedia("(min-width: 721px)", (matches) => {
+    wide = matches
+  }))
 
   // Read through a function: the entries are boxed (see Opaque).
   const nothingAfter = (): boolean => {

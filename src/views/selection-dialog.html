@@ -16,14 +16,20 @@
   const Modal = await import("../../theme/default/components/modal.html")
   const Select = await import("../../theme/default/components/select.html")
   const Checkbox = await import("../../theme/default/components/checkbox.html")
+  const Choice = await import("../../theme/default/components/choice.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
   const CoverDrop = await import("../components/cover-drop.html")
+  const SubModal = await import("../../theme/default/components/sub-modal.html")
+  const PictureCrop = await import("./picture-crop.html")
+  const PictureKeys = await import("./picture-keys.html")
+  const { blobToDataUrl, closePicture, openPicture, picture } = await import("../lib/picture")
 
-  const { formatBytes } = await import("../helpers/format")
+  const { audioLine, formatBytes, formatDuration } = await import("../helpers/format")
+  const { bpmJob, cancelBpms } = await import("../lib/bpm")
   const { audioFormatOf } = await import("../helpers/formats")
   const { getVariedFields } = await import("../helpers/metadata")
-  const { canChange, closeSelection, confirmField, editor, inSharedMusic, saveEdits, setCompilation } = await import("../lib/editor")
+  const { calculateBpm, canChange, closeSelection, confirmField, editor, inSharedMusic, saveEdits, setCompilation } = await import("../lib/editor")
   const { t, tn } = await import("../lib/i18n")
   const { coverSrc } = await import("../lib/covers")
   const { can } = await import("../lib/account")
@@ -36,11 +42,14 @@
   ]
   const ownFields = (): string[] => Object.keys(mine.layers?.mine ?? {})
   const { library } = await import("../lib/library")
+  const { writing } = await import("../lib/progress")
+  // While saving or renaming, at the foot's left: the file being written, and "3 of 12" with several.
+  const writingText = (): string => (writing.total > 1 ? t("editor.progress", { at: writing.at, total: writing.total, name: writing.name }) : writing.name)
   const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
   const { activeRoot, removeSelectedTracks, selectedTracks } = await import("../lib/workspace")
-  const { canRename, renamePlan, renameSelected, renamer, setRenamePattern } = await import("../lib/rename")
-  const { RENAME_FIELDS, RENAME_PRESETS } = await import("../helpers/rename")
+  const { canRename, readPlan, readSelected, renamePlan, renameSelected, renamer, setRenameDirection, setRenamePattern } = await import("../lib/rename")
+  const { RENAME_PRESETS, completeField, fieldQuery, fieldsFor, fillPattern, patternReader, readSubject } = await import("../helpers/rename")
   const { nameDiff } = await import("../helpers/namediff")
 
   type Track = {
@@ -65,8 +74,18 @@
     { key: "year", label: "field.year", example: "1975", plain: true, numeric: true },
     { key: "trackNumber", label: "field.track", example: "1/12", plain: true, numeric: true },
     { key: "discNumber", label: "field.disc", example: "1/2", plain: true, numeric: true },
-    { key: "genre", label: "field.genre", example: "Rock", plain: true, wide: true }
+    { key: "genre", label: "field.genre", example: "Rock", plain: true },
+    { key: "composer", label: "field.composer", example: "Freddie Mercury", plain: true },
+    // With "Calculate" inside it (lib/bpm.ts).
+    { key: "bpm", label: "field.bpm", example: "120", plain: true, numeric: true }
   ] as const
+  // The longer ones, in text areas under the fields: the comment, and the lyrics (folded).
+  type LongField = "comment" | "lyrics"
+  const longPlaceholder = (key: LongField): string => (varied()[key] ? t("editor.multipleValues") : "")
+  const setLong = (key: LongField, value: string) => {
+    editor.form = { ...editor.form, [key]: value }
+  }
+  const longConfirmed = (key: LongField): boolean => !!editor.form[key] || editor.confirmed.includes(key)
   type FieldSpec = (typeof FIELDS)[number]
 
   // Read through functions, not `$:` copies: the selection is boxed (see
@@ -98,16 +117,48 @@
     return varied().artist ? t("editor.variousArtists") : editor.form.artist || t("editor.sharedArtist")
   }
   const placeholder = (field: FieldSpec): string =>
-    varied()[field.key] ? t("editor.multipleValues") : "plain" in field ? field.example : t("editor.example", { value: field.example })
+    field.key === "bpm" && Object.keys(editor.bpms).length > 0
+      ? t("bpm.each")
+      : varied()[field.key] ? t("editor.multipleValues") : "plain" in field ? field.example : t("editor.example", { value: field.example })
   // A varied field's "Override" box: ticked while it has text, or ticked on it empty.
   const isConfirmed = (field: FieldSpec): boolean => !!editor.form[field.key] || editor.confirmed.includes(field.key)
   // The "Compilation" box: ticked when the form marks one; neither ticked nor not where the
   // selection varies and nothing was chosen yet.
   const compilationOn = (): boolean => editor.form.compilation.trim() === "1"
   const compilationMixed = (): boolean => varied().compilation && !compilationOn() && !editor.confirmed.includes("compilation")
-  const coverFailed = (message: string) => {
-    library.errorMessage = message
+  // The cover: the picture crop in a sub-modal of this dialog (lib/picture.ts), from the cover there
+  // is or a file dropped on it; what it gives goes into the form as a data URL, or none when removed.
+  // Tracks of several albums (their album varies): one cover for them all only when asked, afresh
+  // for each selection.
+  const severalAlbums = (): boolean => varied().album
+  let coverForAll: boolean = false
+  const coverAskFor = (() => {
+    let seen: unknown = null
+    return (tracks: unknown): boolean => {
+      if (tracks !== seen) {
+        seen = tracks
+        coverForAll = false
+      }
+      return true
+    }
+  })()
+  $: coverAsked = coverAskFor(selectedTracks.value.data)
+  const editCover = async (file?: File) => {
+    if (severalAlbums() && !coverForAll) return
+    const current = editor.form.coverDataUrl
+    const result = await openPicture({ eyebrow: t("cover.dialogEyebrow"), title: t("cover.dialogEyebrow"), round: false, removable: !!current, max: 1000, place: "sub" }, file ?? coverSrc(current))
+    if (result === undefined) return
+    editor.form.coverDataUrl = result ? await blobToDataUrl(result) : null
+    // Removed on purpose: every track loses it, even where they had different ones (helpers/metadata.ts).
+    const rest = editor.confirmed.filter((one) => one !== "coverDataUrl")
+    editor.confirmed = result ? rest : [...rest, "coverDataUrl"]
   }
+
+  // Info: a file's format by its extension (AAC on an iPod too), and its audio as one line in the list.
+  // The BPM being worked out, at the footer's left as a save is.
+  const bpmText = (): string => t("bpm.working", { at: bpmJob.at, total: bpmJob.total, name: bpmJob.name })
+  const formatName = (track: Track): string => audioFormatOf(track.name)?.name ?? (track.name.split(".").pop() ?? "").toUpperCase()
+  const audioOf = (track: Track): string => [audioLine(track.audio, formatName(track), preferences.language), formatBytes(track.size)].join(" · ")
 
   // Info
   const totalSize = (): number => tracks().reduce((sum, track) => sum + track.size, 0)
@@ -123,9 +174,18 @@
       { label: t("field.compilation"), text: track.metadata.compilation.trim() === "1" ? t("common.yes") : t("common.no") },
       { label: t("field.year"), text: track.metadata.year || none },
       { label: t("field.genre"), text: track.metadata.genre || none },
+      { label: t("field.composer"), text: track.metadata.composer || none },
+      { label: t("field.bpm"), text: track.metadata.bpm || none },
+      { label: t("field.comment"), text: track.metadata.comment || none, long: true },
+      { label: t("field.lyrics"), text: track.metadata.lyrics || none, long: true },
       { label: t("info.relativePath"), text: track.relativePath, mono: true },
       { label: t("info.fileName"), text: track.name },
-      { label: t("info.format"), text: audioFormatOf(track.name)?.name ?? none },
+      { label: t("info.format"), text: formatName(track) || none },
+      { label: t("info.duration"), text: formatDuration(track.audio?.durationMs) || none },
+      { label: t("info.bitrate"), text: track.audio?.bitrate ? `${track.audio.bitrate} kbps${track.audio.vbr && !track.audio.bits ? " (VBR)" : ""}` : none },
+      { label: t("info.sampleRate"), text: track.audio?.sampleRate ? `${(track.audio.sampleRate / 1000).toLocaleString(preferences.language, { maximumFractionDigits: 1 })} kHz` : none },
+      { label: t("info.channels"), text: track.audio?.channels ? (track.audio.channels === 1 ? t("info.mono") : track.audio.channels === 2 ? t("info.stereo") : String(track.audio.channels)) : none },
+      ...(track.audio?.bits ? [{ label: t("info.bits"), text: `${track.audio.bits} bits` }] : []),
       { label: t("editor.size"), text: formatBytes(track.size) },
       { label: t("info.fullChecksum"), text: track.fullChecksum || track.checksum || none, mono: true },
       { label: t("info.audioChecksum"), text: track.audioChecksum || none, mono: true },
@@ -134,20 +194,38 @@
   }
 
   // Rename: the pattern (typed, or a preset), its fields, the preview, and its key.
-  type Plan = { trackId: string; from: string; name: string; status: "ok" | "same" | "empty" | "clash" }
+  type Plan = { trackId: string; from: string; name: string; shownFrom: string; shown: string; status: "ok" | "same" | "empty" | "clash" }
   const plans = (): Plan[] => renamePlan.value.data
   const presetOptions = () => [{ value: "", label: t("rename.custom") }, ...RENAME_PRESETS.map((preset: string) => ({ value: preset, label: preset }))]
   const presetValue = (): string => ((RENAME_PRESETS as readonly string[]).includes(renamer.pattern) ? renamer.pattern : "")
   const pickPreset = (value: string) => {
     if (value) setRenamePattern(value)
   }
-  const fieldList = (): string => RENAME_FIELDS.map((field: string) => `%${field}%`).join(" ")
+  // Under the pattern, examples made from the first track chosen (the fields themselves are offered
+  // as a % is typed): what two patterns name it; the other way, the part of its path a pattern with
+  // folders reads.
+  // Patterns to show, the first two whose fields the track has all filled (no example with gaps).
+  const EXAMPLES = ["%track% - %title%", "%artist% - %album% (%year%)", "%artist% - %title%", "%artist% - %album%", "%title%"]
+  // The other way, the deepest its folders allow.
+  const READ_EXAMPLES = ["%artist%/%album%/%track% - %title%", "%album%/%title%", "%title%"]
+  const filled = (pattern: string, track: Track): boolean => (pattern.match(/%\w+%/g) ?? []).every((field) => fillPattern(field, track) !== "")
+  const examples = (): string => {
+    const track = tracks()[0]
+    if (!track) return ""
+    if (fromName()) {
+      const pattern = READ_EXAMPLES.find((one) => readSubject(track.relativePath, one.split("/").length) !== null) ?? "%title%"
+      return t("rename.exampleRead", { pattern, name: readSubject(track.relativePath, pattern.split("/").length) ?? track.name })
+    }
+    const shown = EXAMPLES.filter((pattern) => filled(pattern, track)).slice(0, 2)
+    return t("rename.examples", { examples: shown.map((pattern) => `${pattern} → ${fillPattern(pattern, track)}`).join(" · ") })
+  }
   const fileName = (path: string): string => path.split("/").pop() ?? path
   // The preview's names with what changes marked, when asked for (and when the name changes).
   let diffShown = false
-  type Plan = { from: string; name: string; status: string }
-  const showsDiff = (plan: Plan): boolean => diffShown && plan.status !== "same" && !!plan.name
-  const diffOf = (plan: Plan) => nameDiff(fileName(plan.from), plan.name)
+  type Plan = { from: string; name: string; shownFrom: string; shown: string; status: string }
+  const showsDiff = (plan: Plan): boolean => diffShown && plan.status !== "same" && !!plan.shown
+  // The part of the path the pattern names: the name, and with / the folders above it.
+  const diffOf = (plan: Plan) => nameDiff(plan.shownFrom, plan.shown)
   const statusLabel = (plan: Plan): string =>
     plan.status === "same" ? t("rename.same") : plan.status === "clash" ? t("rename.clash") : plan.status === "empty" ? t("rename.empty") : ""
   const reading = (): boolean => !!activeRoot.value.data?.loadingMetadata
@@ -158,6 +236,97 @@
   const renameCount = (): number => plans().filter((plan) => plan.status === "ok").length
   const rename = async () => {
     if (await renameSelected()) closeSelection()
+  }
+
+  // The rename tab the other way: the tags the names (and their folders, with /) give.
+  type Read = { trackId: string; from: string; tags: Record<string, string>; status: "ok" | "same" | "nomatch" }
+  const directions = () => [
+    { value: "toName", label: t("rename.toName") },
+    { value: "fromName", label: t("rename.fromName") }
+  ]
+  const fromName = (): boolean => renamer.direction === "fromName"
+  const reads = (): Read[] => readPlan.value.data
+  // The pattern's fields, once each, as the preview's columns: the tag each sets, and its name.
+  const READ_COLUMNS: Record<string, { tag: string; label: string }> = {
+    track: { tag: "trackNumber", label: "field.track" },
+    disc: { tag: "discNumber", label: "field.disc" },
+    artist: { tag: "artist", label: "field.artist" },
+    album: { tag: "album", label: "field.album" },
+    title: { tag: "title", label: "field.title" },
+    year: { tag: "year", label: "field.year" },
+    genre: { tag: "genre", label: "field.genre" },
+    composer: { tag: "composer", label: "field.composer" },
+    comment: { tag: "comment", label: "field.comment" }
+  }
+  const readColumns = () => [...new Set(patternReader(renamer.pattern)?.fields ?? [])].flatMap((field: string) => (READ_COLUMNS[field] ? [READ_COLUMNS[field]] : []))
+  const readCount = (): number => reads().filter((read) => read.status === "ok").length
+  const readLabel = (read: Read): string => (read.status === "same" ? t("rename.same") : read.status === "nomatch" ? t("rename.nomatch") : "")
+  const readNames = async () => {
+    if (await readSelected()) closeSelection()
+  }
+
+  // The pattern's typeahead: after a % that opens a field, the fields that begin with what follows
+  // it (helpers/rename.ts). Arrows move, Enter or Tab puts the field in, Escape closes the list
+  // (not the dialog); a click puts it in too. The field is a combobox while the list shows.
+  let fieldItems: string[] = []
+  let fieldActive = 0
+  const FIELD_LABELS: Record<string, string> = {
+    title: "field.title", artist: "field.artist", album: "field.album", year: "field.year",
+    genre: "field.genre", track: "field.track", disc: "field.disc", composer: "field.composer", comment: "field.comment", filename: "rename.fieldFilename"
+  }
+  const patternInput = (): HTMLInputElement | null => $self("#rename-pattern") as HTMLInputElement | null
+  const markCombobox = () => {
+    const input = patternInput()
+    if (!input) return
+    input.setAttribute("role", "combobox")
+    input.setAttribute("aria-autocomplete", "list")
+    input.setAttribute("aria-controls", "pattern-fields")
+    input.setAttribute("aria-expanded", fieldItems.length > 0 ? "true" : "false")
+    if (fieldItems.length > 0) input.setAttribute("aria-activedescendant", `pattern-field-${fieldItems[fieldActive]}`)
+    else input.removeAttribute("aria-activedescendant")
+  }
+  const closeFields = () => {
+    fieldItems = []
+    fieldActive = 0
+    markCombobox()
+  }
+  const lookForField = () => {
+    const input = patternInput()
+    const at = input ? fieldQuery(input.value, input.selectionStart ?? input.value.length) : null
+    fieldItems = at ? fieldsFor(at.query) : []
+    fieldActive = 0
+    markCombobox()
+  }
+  const putField = (field: string) => {
+    const input = patternInput()
+    if (!input) return
+    const done = completeField(input.value, input.selectionStart ?? input.value.length, field)
+    setRenamePattern(done.value)
+    closeFields()
+    requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(done.caret, done.caret)
+    })
+  }
+  const onPatternKey = (event: KeyboardEvent) => {
+    if (fieldItems.length === 0) return
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault()
+      fieldActive = (fieldActive + (event.key === "ArrowDown" ? 1 : -1) + fieldItems.length) % fieldItems.length
+      markCombobox()
+    } else if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault()
+      putField(fieldItems[fieldActive])
+    } else if (event.key === "Escape") {
+      event.preventDefault()
+      event.stopPropagation()
+      closeFields()
+    }
+  }
+  const pickField = (event: MouseEvent, field: string) => {
+    // Before the field loses the focus.
+    event.preventDefault()
+    putField(field)
   }
 
   // Delete: the tab is the confirmation, so its key removes at once.
@@ -177,13 +346,16 @@
 
     <div :elseif="ui.selectionTab === 'edit'" class="editor">
       <div class="hero">
+        <div class="hero-cover">
         <CoverDrop :model="editor.form.coverDataUrl" :src="coverSrc(editor.form.coverDataUrl)"
                    :alt="t('editor.cover')"
                    :drop-label="t('cover.dropHere')"
-                   :choose-label="t('cover.choose')"
-                   :remove-label="t('cover.remove')"
-                   :fail-label="t('cover.readFailed')"
-                   @error="coverFailed($event.detail)" />
+                   :edit-label="t('cover.edit')"
+                   :disabled="severalAlbums() && !coverForAll"
+                   @edit="editCover()" @dropped="editCover($event.detail)" />
+        <!-- Tracks of several albums: the cover is left alone unless asked to give them all one. -->
+        <span :if="severalAlbums()" class="cover-all"><Checkbox id="cover-all" :model="coverForAll" @change="coverForAll = $event.detail">{{ t("cover.forAll") }}</Checkbox></span>
+        </div>
         <div class="hero-info">
           <h3 class="hero-title">{{ heroTitle() }}</h3>
           <p class="subtitle">{{ heroSubtitle() }}</p>
@@ -212,6 +384,10 @@
                     <span>{{ t("field.compilation") }}</span>
                     <svg class="box" viewBox="0 0 16 16" aria-hidden="true"><rect class="box-frame" x="1.5" y="1.5" width="13" height="13" rx="2" /><path :if="compilationOn()" class="box-tick" d="M4.4 8.3 6.9 10.8 11.7 5.6" /><path :elseif="compilationMixed()" class="box-tick" d="M4.5 8h7" /></svg>
                   </label>
+                  <span :if="field.key === 'bpm'" class="bpm-key">
+                    <Key :if="bpmJob.total > 0" size="sm" variant="ghost" @click="cancelBpms()">{{ t("bpm.stop") }}</Key>
+                    <Key :else size="sm" variant="ghost" :title="t('bpm.calculateTitle')" :disabled="library.saving" @click="calculateBpm()">{{ t("bpm.calculate") }}</Key>
+                  </span>
                   <label :if="varied()[field.key]" class="override" :class.on="isConfirmed(field)" :title="t('editor.overrideTitle')">
                     <input type="checkbox" class="override-input" :checked="isConfirmed(field)" @change="confirmField(field.key, $event.target.checked)">
                     <svg :if="isConfirmed(field)" class="warn" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6 15.2 14.4H.8z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><path d="M8 6v3.6" stroke="var(--mm-on-accent)" stroke-width="1.6" stroke-linecap="round" /><circle cx="8" cy="11.9" r=".95" fill="var(--mm-on-accent)" /></svg>
@@ -223,6 +399,23 @@
             </Field>
           </div>
         </div>
+      </section>
+
+      <!-- The comment, and the lyrics folded: text areas, with the same "empty them all" as the fields where the tracks differ. -->
+      <section class="long-fields">
+        <Field :label="t('field.comment')" control="edit-comment">
+          <textarea id="edit-comment" class="long-input" rows="3" :value="editor.form.comment" :placeholder="longPlaceholder('comment')" @input="setLong('comment', $event.target.value)"></textarea>
+        </Field>
+        <label :if="varied().comment" class="long-override" :title="t('editor.overrideTitle')">
+          <input type="checkbox" :checked="longConfirmed('comment')" @change="confirmField('comment', $event.target.checked)"> {{ t("editor.override") }}
+        </label>
+        <details class="lyrics" :open="!!editor.form.lyrics">
+          <summary class="mm-legend">{{ t("field.lyrics") }}</summary>
+          <textarea id="edit-lyrics" class="long-input" rows="10" :aria-label="t('field.lyrics')" :value="editor.form.lyrics" :placeholder="longPlaceholder('lyrics')" @input="setLong('lyrics', $event.target.value)"></textarea>
+          <label :if="varied().lyrics" class="long-override" :title="t('editor.overrideTitle')">
+            <input type="checkbox" :checked="longConfirmed('lyrics')" @change="confirmField('lyrics', $event.target.checked)"> {{ t("editor.override") }}
+          </label>
+        </details>
       </section>
 
       <details :if="single()" class="file-data">
@@ -242,7 +435,7 @@
         <dl class="info-facts">
           <div :each="fact in facts(single())" :key="fact.label">
             <dt>{{ fact.label }}</dt>
-            <dd :class.mono="!!fact.mono">{{ fact.text }}</dd>
+            <dd :class.mono="!!fact.mono" :class.long="!!fact.long">{{ fact.text }}</dd>
           </div>
         </dl>
         <div :if="inLibrary() && songExtras.download" class="library-extras">
@@ -272,7 +465,7 @@
             <tbody>
               <tr :each="track in tracks()" :key="track.id">
                 <td class="mm-num">{{ track.metadata.trackNumber || t("common.none") }}</td>
-                <td><span class="mm-title">{{ track.metadata.title || track.name }}</span></td>
+                <td><span class="mm-title">{{ track.metadata.title || track.name }}</span><span class="file-path">{{ track.relativePath }}</span><span class="file-audio">{{ audioOf(track) }}</span></td>
                 <td class="artist">{{ track.metadata.artist || t("album.unknownArtist") }}</td>
               </tr>
             </tbody>
@@ -282,28 +475,49 @@
     </div>
 
     <div :elseif="ui.selectionTab === 'rename'" class="rename">
+      <!-- Which way: the tags give the name, or the name (and its folders) gives the tags. -->
+      <Choice :label="t('rename.direction')" :options="directions()" :model="renamer.direction" @change="setRenameDirection($event.detail)" />
       <div class="rename-head">
         <Field :label="t('rename.pattern')" control="rename-pattern">
-          <TextInput id="rename-pattern" :model="renamer.pattern" @input="setRenamePattern($event.detail)" />
+          <div class="pattern-field" @input="lookForField()" @click="lookForField()" @keydown="onPatternKey($event)" @focusout="closeFields()">
+            <TextInput id="rename-pattern" autocomplete="off" :model="renamer.pattern" @input="setRenamePattern($event.detail)" />
+            <ul :if="fieldItems.length > 0" id="pattern-fields" class="field-menu" role="listbox" :aria-label="t('rename.fieldsLabel')">
+              <li :each="(field, at) in fieldItems" :key="field" :id="`pattern-field-${field}`" role="option" :aria-selected="at === fieldActive ? 'true' : 'false'" :class.on="at === fieldActive" @mousedown="pickField($event, field)">
+                <span class="mono">%{{ field }}%</span><span class="field-name">{{ t(FIELD_LABELS[field]) }}</span>
+              </li>
+            </ul>
+          </div>
         </Field>
         <Field :label="t('rename.presets')" control="rename-preset">
           <Select id="rename-preset" :model="presetValue()" :options="presetOptions()" @change="pickPreset($event.detail)" />
         </Field>
-        <!-- Under the pattern, its fields; under the templates, the diff's checkbox: one line. -->
-        <p class="hint mono">{{ t("rename.fields", { fields: fieldList() }) }}</p>
-        <span class="rename-diff"><Checkbox id="rename-diff" :model="diffShown" @change="diffShown = $event.detail">{{ t("rename.diff") }}</Checkbox></span>
+        <!-- Under the pattern, examples from the first track chosen; under the templates, the diff's checkbox: one line. -->
+        <p class="hint">{{ examples() }}</p>
+        <span :if="!fromName()" class="rename-diff"><Checkbox id="rename-diff" :model="diffShown" @change="diffShown = $event.detail">{{ t("rename.diff") }}</Checkbox></span>
       </div>
       <p :if="reading()" class="failure" role="status">{{ t("rename.loading") }}</p>
       <p :if="library.errorMessage" class="failure" role="alert">{{ library.errorMessage }}</p>
-      <div class="mm-table-wrap">
+      <div :if="fromName()" class="mm-table-wrap">
+        <table class="mm-table preview">
+          <thead><tr><th>{{ t("rename.name") }}</th><th :each="column in readColumns()" :key="column.tag">{{ t(column.label) }}</th><th></th></tr></thead>
+          <tbody>
+            <tr :each="read in reads()" :key="read.trackId" :class.unchanged="read.status === 'same'" :class.wrong="read.status === 'nomatch'">
+              <td class="mono">{{ read.from }}</td>
+              <td :each="column in readColumns()" :key="column.tag">{{ read.tags[column.tag] ?? "—" }}</td>
+              <td class="state"><span :if="read.status !== 'ok'" class="flag">{{ readLabel(read) }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div :else class="mm-table-wrap">
         <table class="mm-table preview">
           <thead><tr><th>{{ t("rename.from") }}</th><th>{{ t("rename.to") }}</th><th></th></tr></thead>
           <tbody>
             <tr :each="plan in plans()" :key="plan.trackId" :class.unchanged="plan.status === 'same'" :class.wrong="plan.status === 'clash' || plan.status === 'empty'">
               <td :if="showsDiff(plan)" class="mono"><span :each="piece in diffOf(plan).before" :class.removed="piece.changed">{{ piece.text }}</span></td>
-              <td :else class="mono">{{ fileName(plan.from) }}</td>
+              <td :else class="mono">{{ plan.shownFrom }}</td>
               <td :if="showsDiff(plan)" class="mono"><span :each="piece in diffOf(plan).after" :class.added="piece.changed">{{ piece.text }}</span></td>
-              <td :else class="mono">{{ plan.name || "—" }}</td>
+              <td :else class="mono">{{ plan.shown || "—" }}</td>
               <td class="state"><span :if="plan.status !== 'ok'" class="flag">{{ statusLabel(plan) }}</span></td>
             </tr>
           </tbody>
@@ -316,12 +530,22 @@
       <p>{{ tn("danger.body", tracks().length) }}</p>
     </div>
 
+    <!-- The cover's picture crop, over this dialog's body (lib/picture.ts). -->
+    <SubModal :open="picture.ask?.place === 'sub'" :title="picture.ask?.title ?? ''" :close-label="t('artist.close')" @close="closePicture()">
+      <PictureCrop :if="picture.ask?.place === 'sub'" />
+      <template :slot.foot><PictureKeys /></template>
+    </SubModal>
     <template :slot.foot>
+      <span class="writing" role="status" :title="writing.total > 0 ? writingText() : bpmJob.total > 0 ? bpmText() : null">{{ writing.total > 0 ? writingText() : bpmJob.total > 0 ? bpmText() : "" }}</span>
       <span :if="ui.selectionTab === 'edit'" class="keys">
         <span :if="inLibrary() && can('editor') && !inSharedMusic()" class="scope"><Select id="save-scope" :model="editor.scope" :options="scopes()" @change="editor.scope = $event.detail" /></span>
         <span :elseif="inLibrary()" class="scope-note">{{ t("editor.forMeOnly") }}</span>
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
         <Key variant="primary" :disabled="library.saving || tracks().length === 0" @click="saveEdits()">{{ library.saving ? t("editor.saving") : t("editor.save") }}</Key>
+      </span>
+      <span :elseif="ui.selectionTab === 'rename' && fromName()" class="keys">
+        <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
+        <Key variant="primary" :disabled="library.saving || reading() || readCount() === 0" @click="readNames()">{{ library.saving ? t("editor.saving") : tn("rename.read", readCount()) }}</Key>
       </span>
       <span :elseif="ui.selectionTab === 'rename'" class="keys">
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
@@ -341,11 +565,40 @@
 <style scoped>
   .selection-dialog { display: contents; }
   .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); }
+  /* The file being written, at the foot's left; cut short rather than wrapped. Always there (empty
+     otherwise), so a screen reader hears it change. */
+  .writing { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--mm-fg-muted); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
   .none { margin: 0; color: var(--mm-fg-muted); }
   .mono { font-family: var(--mm-font-mono); font-size: var(--mm-text-sm); }
 
   /* Edit */
   .editor { display: grid; gap: var(--mm-space-5); }
+  /* The cover, and under it, with tracks of several albums, the box that lets it change for them all. */
+  .hero-cover { display: grid; gap: var(--mm-space-2); width: 9rem; }
+  .cover-all { display: block; font-size: var(--mm-text-sm); }
+  /* The comment and the lyrics: text areas drawn as the fields are (theme's text-input). */
+  .long-fields { display: grid; gap: var(--mm-space-3); }
+  .long-input {
+    display: block;
+    width: 100%;
+    min-height: 4.5rem;
+    padding: .5rem .625rem;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-field);
+    box-shadow: var(--mm-well-shadow);
+    color: var(--mm-fg);
+    font-family: var(--mm-font-sans);
+    font-size: var(--mm-text-md);
+    line-height: var(--mm-leading-normal, 1.45);
+    resize: vertical;
+  }
+  .long-input::placeholder { color: var(--mm-fg-subtle); font-style: italic; opacity: 1; }
+  .long-input:focus-visible { outline: none; border-color: var(--mm-accent); box-shadow: var(--mm-well-shadow), 0 0 0 1px var(--mm-accent); }
+  .lyrics summary { cursor: pointer; margin-bottom: var(--mm-space-2); }
+  .long-override { display: inline-flex; align-items: center; gap: var(--mm-space-1); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  /* Info's long texts (the comment, the lyrics): their lines kept. */
+  dd.long { white-space: pre-wrap; max-height: 12rem; overflow: auto; }
   .hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--mm-space-5); align-items: start; }
   .hero-info { display: grid; gap: var(--mm-space-2); min-width: 0; }
   .hero-title {
@@ -405,10 +658,36 @@
   .artist { color: var(--mm-fg-muted); }
 
   /* Rename */
+  /* Info's list of several tracks: each file's path under its title. */
+  .bpm-key { display: inline-flex; margin-right: calc(var(--mm-space-1) * -1); }
+  .file-audio { display: block; margin-top: .125rem; color: var(--mm-fg-subtle); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; }
+  .file-path { display: block; margin-top: .125rem; color: var(--mm-fg-muted); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); overflow-wrap: anywhere; }
   .rename { display: grid; gap: var(--mm-space-3); }
   .rename-head { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--mm-space-3); }
   .rename-head .hint { align-self: center; }
   .rename-diff { display: flex; align-items: center; }
+  /* The pattern's typeahead, under its field. */
+  .pattern-field { position: relative; }
+  .field-menu {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + .125rem);
+    left: 0;
+    min-width: 16rem;
+    max-height: 14rem;
+    overflow: auto;
+    margin: 0;
+    padding: var(--mm-space-1);
+    list-style: none;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-surface);
+    box-shadow: var(--mm-shadow-lg);
+  }
+  .field-menu li { display: flex; justify-content: space-between; gap: var(--mm-space-4); padding: var(--mm-space-1) var(--mm-space-2); border-radius: var(--mm-radius-key); font-size: var(--mm-text-sm); cursor: pointer; }
+  .field-menu li.on { background: var(--mm-accent-soft); }
+  @media (hover: hover) { .field-menu li:hover { background: var(--mm-hover); } }
+  .field-menu .field-name { color: var(--mm-fg-muted); }
   /* The diff: what goes struck through in the error's ink, what comes highlighted in the good ink. */
   .preview .removed { border-radius: 2px; background: var(--mm-bad-soft); color: var(--mm-bad); text-decoration: line-through; }
   .preview .added { border-radius: 2px; background: var(--mm-ok-soft); color: var(--mm-ok); }

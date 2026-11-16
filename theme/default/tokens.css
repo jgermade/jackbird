@@ -275,6 +275,15 @@ html { font-size: 18px; }
 :root { --mm-row: 2.25rem; --mm-row-two: 2.75rem; --mm-row-queue: 3.5rem; }
 html[data-density="compact"] { --mm-row: 1.75rem; --mm-row-two: 2.25rem; --mm-row-queue: 3.5rem; }
 html[data-density="spacious"] { --mm-row: 2.75rem; --mm-row-two: 3.25rem; --mm-row-queue: 4rem; }
+/* Each height an even number of pixels: at 18px, 2.25rem is 40.5px, and every other row sat on a
+   half pixel; and in an odd height a 16px icon, centred, sits on one too. Either way the engine
+   (WebKit, in the desktop app) re-rounded them on a hover elsewhere, and the icons moved. The lists
+   drawn a window at a time round the same way (helpers/density.ts). */
+@supports (width: round(1rem, 2px)) {
+  :root { --mm-row: round(2.25rem, 2px); --mm-row-two: round(2.75rem, 2px); --mm-row-queue: round(3.5rem, 2px); }
+  html[data-density="compact"] { --mm-row: round(1.75rem, 2px); --mm-row-two: round(2.25rem, 2px); --mm-row-queue: round(3.5rem, 2px); }
+  html[data-density="spacious"] { --mm-row: round(2.75rem, 2px); --mm-row-two: round(3.25rem, 2px); --mm-row-queue: round(4rem, 2px); }
+}
 @media (max-width: 420px) {
   html { font-size: var(--mm-root-phone); }
 }

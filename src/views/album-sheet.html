@@ -19,6 +19,9 @@
   const { nowPlaying, readRowSpectrum } = await import("../lib/player")
   const { onTrackMenu, trackMenu } = await import("../lib/menus")
   const { openFolder } = await import("../lib/roots")
+  const { artistName, artistOfKey } = await import("../helpers/views")
+  const { openPicture } = await import("../lib/picture")
+  const { setArtistPicture } = await import("../lib/artists")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
   const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
@@ -39,7 +42,11 @@
     return playing && current && playing.rootId === current.id ? playing.trackId : null
   }
 
+  const { cleanTrackNumber, formatDuration } = await import("../helpers/format")
   const titleOf = (track: Track): string => track.metadata.title || track.name
+  // The number alone ("2/6", "2 de 6" give "2"), and the length where the ▶ was (helpers/format.ts).
+  const numberOf = (track: Track): string => cleanTrackNumber(track.metadata.trackNumber)
+  const durationOf = (track: Track): string => formatDuration(track.audio?.durationMs)
   // A disc's number column, only when one of its tracks has a number; a track without one leaves it blank.
   const discNumbered = (disc: { tracks: Track[] }): boolean => disc.tracks.some((track) => !!track.metadata.trackNumber?.trim())
 
@@ -78,18 +85,36 @@
   // its folders in Files; the groups in the other views; the view's name for its whole list). A
   // step before the last goes back to it.
   const crumbs = () => detailCrumbs.value.data
+  // The artist the details show (the breadcrumb's last step an artist's group), with a name; else null.
+  const shownArtist = (): { key: string; label: string } | null => {
+    const last = crumbs().at(-1)
+    const name = last?.key ? artistOfKey(last.key) : null
+    return last && name ? { key: last.key as string, label: last.label } : null
+  }
+  const artistPictureSrc = (): string | null => {
+    const artist = shownArtist()
+    return artist ? coverSrc(root()?.metaSnapshot.artists?.[artistName(artist.label)] ?? null) : null
+  }
+  // Their picture: the picture dialog, round, to paste, drop or choose one and crop it (lib/picture.ts).
+  const editArtistPicture = async () => {
+    const artist = shownArtist()
+    const id = root()?.id
+    if (!artist || !id) return
+    const current = artistPictureSrc()
+    const result = await openPicture({ eyebrow: t("artist.dialogEyebrow"), title: artist.label, round: true, removable: !!current, max: 512, place: "modal" }, current)
+    if (result !== undefined) await setArtistPicture(id, artist.label, result)
+  }
   const view = (): string => root()?.view ?? "files"
   const VIEW_LABELS: Record<string, string> = { files: "views.files", playlists: "views.playlists", artists: "views.artists", albumsByArtist: "views.albumsByArtist", albums: "views.albums", compilations: "views.compilations", songs: "views.songs" }
   // Without the songs in the tree (a preference), a phone has no key between the library and
   // Details: the breadcrumb goes back. Its ‹ to the library as it was; a step to the library in
   // that folder (the top: the root's first level).
-  const PHONE = matchMedia("(max-width: 720px)")
-  let phone: boolean = PHONE.matches
-  const onPhone = (event: MediaQueryListEvent) => {
-    phone = event.matches
-  }
-  PHONE.addEventListener("change", onPhone)
-  $destroyed(() => PHONE.removeEventListener("change", onPhone))
+  const { watchMedia } = await import("../lib/media")
+  // Followed as the window is resized (lib/media.ts).
+  let phone: boolean = matchMedia("(max-width: 720px)").matches
+  $destroyed(watchMedia("(max-width: 720px)", (matches) => {
+    phone = matches
+  }))
   const backToLibrary = (): boolean => phone && !preferences.songsInTree
   const toLibrary = () => {
     ui.pane = "library"
@@ -122,12 +147,12 @@
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">
       <!-- Where this comes from: the view's glyph, then its steps; each but the last goes back to it. -->
+      <div class="sheet-head">
       <nav class="crumbs" :aria-label="t('crumbs.label')">
-        <button :if="backToLibrary()" type="button" class="crumb-back" @click="toLibrary()">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
-          {{ t("library.title") }}
-        </button>
-        <span class="crumb-glyph" role="img" :aria-label="t(VIEW_LABELS[view()] ?? 'views.files')">
+        <!-- The view's glyph; with a way back to the library (a narrow window, the songs not in the
+             tree), a ‹ before it, the two one key that goes back. -->
+        <button type="button" class="crumb-glyph" :class.back="backToLibrary()" :disabled="!backToLibrary()" :aria-label="backToLibrary() ? t('library.title') : t(VIEW_LABELS[view()] ?? 'views.files')" @click="toLibrary()">
+          <svg :if="backToLibrary()" class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
           <svg :if="view() === 'playlists'" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h8M2 7.5h8M2 11h5M12.25 12.5V5.5l2-.75" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><circle cx="11" cy="12.5" r="1.3" fill="currentColor" /></svg>
           <svg :elseif="view() === 'artists'" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="5.25" r="2.5" /><path d="M3 13.75c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" /></g></svg>
           <svg :elseif="view() === 'albumsByArtist'" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="4.5" r="2" /><path d="M1.5 11.5c.4-2 1.8-3.25 3.5-3.25" /><circle cx="11" cy="10.5" r="3.75" /></g><circle cx="11" cy="10.5" r=".8" fill="currentColor" /></svg>
@@ -135,13 +160,20 @@
           <svg :elseif="view() === 'compilations'" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="6" cy="8" r="4.75" /><path d="M10 3.6a4.75 4.75 0 0 1 0 8.8M12.75 3.6a4.75 4.75 0 0 1 0 8.8" /></g><circle cx="6" cy="8" r=".8" fill="currentColor" /></svg>
           <svg :elseif="view() === 'songs'" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" /></svg>
           <svg :else viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
-        </span>
+        </button>
         <span :if="crumbs().length === 0" class="crumb sep current">{{ t(VIEW_LABELS[view()] ?? "views.files") }}</span>
         <span :each="(crumb, at) in crumbs()" :key="crumb.key ?? '@top'" class="crumb sep" :class.current="at === crumbs().length - 1">
           <button :if="at < crumbs().length - 1" type="button" class="crumb-link" @click="goTo(crumb.key)">{{ crumb.label }}</button>
-          <span :else aria-current="location">{{ crumb.label }}</span>
+          <span :else aria-current="location"><img :if="at === crumbs().length - 1 && artistPictureSrc()" class="crumb-picture" :src="artistPictureSrc()" alt="" />{{ crumb.label }}</span>
         </span>
       </nav>
+      <!-- While it shows an artist: their picture, chosen or removed (lib/artists.ts). -->
+      <span :if="shownArtist()" class="sheet-actions">
+        <Key square size="sm" variant="ghost" :label="t('artist.picture', { name: shownArtist().label })" :title="t('artist.picture', { name: shownArtist().label })" @click="editArtistPicture()">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25" /><circle cx="8" cy="6.5" r="2" /><path d="M4.25 12.5c.75-1.75 2.1-2.6 3.75-2.6s3 .85 3.75 2.6" /></svg>
+        </Key>
+      </span>
+      </div>
       <article :each="album in albums()" :key="album.key" class="album">
         <div class="cover">
           <img :if="coverSrc(album.coverDataUrl)" :src="coverSrc(album.coverDataUrl)" :alt="t('album.coverOf', { title: album.title })" />
@@ -179,12 +211,13 @@
                       :data-playing="String(track.id === playingId())"
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
-                    <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-stack"><span class="pick-box"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></span><span :if="discNumbered(disc)" class="pick-num mm-num">{{ track.metadata.trackNumber?.trim() ?? "" }}</span></span></td>
-                    <td :if="discNumbered(disc)" class="mm-num num-cell">{{ track.metadata.trackNumber?.trim() ?? "" }}</td>
+                    <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-stack"><span class="pick-box"><SelectBox :chosen="isChosen(track)" @pick="pick(track, $event.detail)" /></span><span :if="discNumbered(disc)" class="pick-num mm-num">{{ numberOf(track) }}</span><span :if="discNumbered(disc)" class="num-box mm-num" :class.on="isChosen(track)" aria-hidden="true">{{ numberOf(track) }}</span></span></td>
+                    <td :if="discNumbered(disc)" class="mm-num num-cell">{{ numberOf(track) }}</td>
                     <td><span class="mm-title">{{ titleOf(track) }}</span></td>
+                    <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
-                      <svg :else class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg>
+                      <span :else class="cue-stack"><span class="duration">{{ durationOf(track) }}</span><svg class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg></span>
                     </td>
                     <td class="menu-cell">
                       <Menu :label="t('menu.track', { title: titleOf(track) })" :items="() => trackMenu(track.id, 'sheet')" @select="onTrackMenu(track.id, $event.detail)" />
@@ -236,12 +269,18 @@
      tree (a tablet upright) stacks them as a phone does. */
   /* The breadcrumb: the view's glyph, then the steps, each after a chevron; the last in the ink,
      the ones before it links in the muted ink. */
+  /* The breadcrumb, and at its right the details' actions (an artist's picture). */
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-3); min-width: 0; }
+  .sheet-actions { display: flex; flex: none; align-items: center; }
+  /* The artist's picture beside their name: round. */
+  .crumb-picture { width: 1.5rem; height: 1.5rem; margin-right: var(--mm-space-2); border-radius: 50%; object-fit: cover; vertical-align: middle; box-shadow: 0 0 0 1px var(--mm-border); }
   .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-1) var(--mm-space-2); min-width: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
-  .crumb-glyph { display: inline-flex; flex: none; color: var(--mm-fg-muted); }
+  /* The view's glyph: a key only with a way back (its ‹ before it, both in the accent). */
+  .crumb-glyph { display: inline-flex; flex: none; align-items: center; gap: var(--mm-space-1); margin: 0; padding: 0; border: 0; background: none; color: var(--mm-fg-muted); font: inherit; }
+  .crumb-glyph:disabled { cursor: default; }
+  .crumb-glyph.back { min-height: 2rem; margin-right: var(--mm-space-1); color: var(--mm-accent-ink, var(--mm-fg)); cursor: pointer; }
+  .crumb-glyph.back:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; border-radius: 2px; }
   /* Back to the library, on a phone without the songs in the tree: a step of the trail, the first. */
-  .crumb-back { display: inline-flex; flex: none; align-items: center; gap: var(--mm-space-1); min-height: 2rem; margin-right: var(--mm-space-1); padding: 0 var(--mm-space-2) 0 0; border: 0; background: none; color: var(--mm-accent-ink, var(--mm-fg)); font: inherit; font-weight: var(--mm-weight-medium); cursor: pointer; }
-  .crumb-back svg { width: 1rem; height: 1rem; }
-  .crumb-back:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; border-radius: 2px; }
   .crumb-glyph svg { width: 1rem; height: 1rem; }
   .crumb { display: inline-flex; align-items: center; gap: var(--mm-space-2); min-width: 0; overflow-wrap: anywhere; }
   .crumb.sep::before { content: "›"; color: var(--mm-fg-subtle); }
@@ -308,16 +347,48 @@
     .mm-table tr:hover .pick-num, .mm-table tr[aria-selected="true"] .pick-num, .mm-table tr:focus-visible .pick-num, .mm-table tr:has(:focus-visible) .pick-num { visibility: hidden; }
   }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
-  .mm-table .cue-cell { width: 1%; padding-left: 0; text-align: right; line-height: 0; }
+  /* Room after the length, before the menu's key. */
+  .mm-table .cue-cell { width: 1%; padding-left: 0; padding-right: var(--mm-space-3); text-align: right; line-height: 0; }
   .mm-table .menu-cell { width: 1%; padding-block: 0; padding-left: 0; line-height: 0; }
   /* The menu shows as the cue does: on hover, focus, the selected and playing rows; always on a touch screen. */
   .menu-cell > * { opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
   .mm-table tr:focus-within .menu-cell > *, .mm-table tr[aria-selected="true"] .menu-cell > *, .mm-table tr[data-playing="true"] .menu-cell > * { opacity: 1; }
   @media (hover: hover) { .mm-table tr:hover .menu-cell > * { opacity: 1; } }
-  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .mm-table tr:focus-visible .cue-play { opacity: 1; }
-  @media (hover: hover) { .mm-table tr:hover .cue-play { opacity: 1; } }
-  @media (hover: none) { .cue-play, .menu-cell > * { opacity: 1; } }
+  /* The length, and the ▶ over it: the ▶ in its place on a computer's hover and on focus; on a
+     touch screen the length alone. */
+  .cue-stack { display: inline-grid; place-items: center end; min-width: 2.5rem; line-height: 1; }
+  .cue-stack > * { grid-area: 1 / 1; }
+  .duration { color: var(--mm-fg-muted); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); visibility: hidden; }
+  .mm-table tr:focus-visible .cue-play { visibility: visible; }
+  .mm-table tr:focus-visible .duration { visibility: hidden; }
+  @media (hover: hover) {
+    .mm-table tr:hover .cue-play { visibility: visible; }
+    .mm-table tr:hover .duration { visibility: hidden; }
+  }
+  @media (hover: none) {
+    .cue-play { display: none; }
+    .menu-cell > * { opacity: 1; }
+  }
+  /* A touch screen: the track's number in a larger box, which is its box (filled when chosen). */
+  .num-box { display: none; }
+  @media (hover: none) {
+    .num-cell { display: none; }
+    .pick-cell:has(.num-box) .pick-box { display: none; }
+    .num-box {
+      display: grid;
+      place-items: center;
+      min-width: 2rem;
+      height: 2rem;
+      padding: 0 .25rem;
+      border: 1.5px solid var(--mm-border-strong);
+      border-radius: var(--mm-radius-key);
+      background: var(--mm-field);
+      color: var(--mm-fg);
+      font-size: var(--mm-text-sm);
+    }
+    .num-box.on { border-color: var(--mm-accent); background: var(--mm-accent); color: var(--mm-on-accent); }
+  }
 
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }

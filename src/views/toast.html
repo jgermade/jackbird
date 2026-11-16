@@ -1,0 +1,41 @@
+<script :setup lang="ts">
+  // The toast (lib/toast.ts): a short word over the app's bottom, centred, gone by itself; a click
+  // takes it away sooner. A status: screen readers say it, politely.
+  const { toast, hideToast } = await import("../lib/toast")
+</script>
+
+<div class="toasts" role="status" aria-live="polite">
+  <button :if="toast.text" :key="toast.id" type="button" class="toast" @click="hideToast()">{{ toast.text }}</button>
+</div>
+
+<style scoped>
+  .toasts {
+    position: fixed;
+    z-index: 30;
+    left: 50%;
+    bottom: calc(var(--mm-space-6) + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    justify-items: center;
+    width: min(32rem, calc(100vw - 2 * var(--mm-space-4)));
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .toast {
+    max-width: 100%;
+    padding: var(--mm-space-2) var(--mm-space-4);
+    border: var(--mm-border-width) solid var(--mm-border-strong);
+    border-radius: var(--mm-radius-md);
+    background: var(--mm-surface);
+    box-shadow: var(--mm-shadow-lg);
+    color: var(--mm-fg);
+    font: var(--mm-text-sm) / var(--mm-leading-tight) var(--mm-font-sans);
+    text-align: center;
+    cursor: pointer;
+    pointer-events: auto;
+    animation: toast-in var(--mm-duration) var(--mm-ease);
+  }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(.5rem); } }
+  @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+  /* A phone's keys are at the bottom: over them. */
+  @media (max-width: 720px) { .toasts { bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); } }
+</style>

@@ -6,21 +6,33 @@
 // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00, 22:12, W5's plan).
 
 import { $computed, $reactive, $toRaw } from "jq79";
-import { RENAME_PRESETS, planRenames, type RenamePlan } from "../helpers/rename";
+import { RENAME_PRESETS, planReads, planRenames, type ReadPlan, type RenamePlan } from "../helpers/rename";
 import type { MetaRecord, Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
+import { saveMetadata } from "./editor";
 import { flushMeta } from "./meta";
 import { Opaque } from "./opaque";
+import { doneWriting, writingFile } from "./progress";
 import { followRename } from "./player";
 import { followRenameInPlaylists } from "./playlists";
 import { updateRoots } from "./roots";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 
-/** The pattern being typed, as last used (or the first preset). */
+/** Which way the rename tab works: the tags give the file's name, or the name (and its folders) gives the tags. */
+export type RenameDirection = "toName" | "fromName";
+
+/** The pattern being typed, as last used (or the first preset), and the way it is used, as last chosen. */
 export const renamer = $reactive({
-  pattern: readStored(STORAGE_KEYS.renamePattern) || RENAME_PRESETS[0]
+  pattern: readStored(STORAGE_KEYS.renamePattern) || RENAME_PRESETS[0],
+  direction: (readStored(STORAGE_KEYS.renameDirection) === "fromName" ? "fromName" : "toName") as RenameDirection
 });
+
+/** Sets the way the rename tab works, and keeps it for the next time. */
+export function setRenameDirection(direction: RenameDirection): void {
+  renamer.direction = direction;
+  writeStored(STORAGE_KEYS.renameDirection, direction);
+}
 
 /** Sets the pattern, and keeps it for the next time. */
 export function setRenamePattern(pattern: string): void {
@@ -94,12 +106,16 @@ export async function renameSelected(): Promise<boolean> {
   const done = new Map<string, string>();
   let failure: string | null = null;
   try {
-    for (const plan of plans) {
+    for (const [index, plan] of plans.entries()) {
+      writingFile(index + 1, plans.length, nameOf(plan.from));
       const caseOnly = plan.from.toLowerCase() === plan.to.toLowerCase();
       try {
         if (!caseOnly && (await root.vfs.stat(plan.to))) {
           throw new Error(t("rename.exists"));
         }
+        // Into a folder the pattern names (with /): made first, where the source can.
+        const folder = plan.to.slice(0, plan.to.lastIndexOf("/") + 1);
+        if (folder && folder !== plan.from.slice(0, plan.from.lastIndexOf("/") + 1)) await root.vfs.mkdir?.(folder.slice(0, -1));
         await root.vfs.rename(plan.from, plan.to);
         done.set(plan.from, plan.to);
       } catch (error) {
@@ -108,6 +124,7 @@ export async function renameSelected(): Promise<boolean> {
       }
     }
   } finally {
+    doneWriting();
     if (done.size > 0) {
       updateRoots((roots) => roots.map((item) => (item.id === root.id ? renamedRoot(item, done) : item)));
       followRename(root.id, done);
@@ -122,4 +139,32 @@ export async function renameSelected(): Promise<boolean> {
   }
   library.infoMessage = tn("message.renamed", done.size);
   return true;
+}
+
+/**
+ * What the pattern reads from the names of the active root's selection (boxed, see Opaque): the
+ * tags each file's name (and its folders, with `/`) gives (helpers/rename.ts `planReads`).
+ */
+export const readPlan = $computed((): Opaque<ReadPlan[]> => {
+  const pattern = renamer.pattern;
+  const root = library.roots.find((item) => item.id === library.activeRootId);
+  if (!root) return new Opaque([]);
+  const chosen = new Set(root.selectedTrackIds);
+  return new Opaque(planReads(root.tracks.filter((track) => chosen.has(track.id)), pattern));
+});
+
+/**
+ * Writes the tags the selected tracks' names give, those that change something, through the edit
+ * dialog's save (lib/editor.ts `saveMetadata`): only the pattern's fields change. Resolves to
+ * whether it all went.
+ */
+export async function readSelected(): Promise<boolean> {
+  const root = $toRaw(library).roots.find((item) => item.id === $toRaw(library).activeRootId);
+  if (!root || root.loadingMetadata) return false;
+  const byId = new Map(root.tracks.map((track) => [track.id, track]));
+  const items = $toRaw(readPlan).value.data.flatMap((plan) => {
+    const track = byId.get(plan.trackId);
+    return track && plan.status === "ok" ? [{ track, metadata: { ...track.metadata, ...plan.tags } }] : [];
+  });
+  return saveMetadata(items);
 }

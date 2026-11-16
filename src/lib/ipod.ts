@@ -3,6 +3,7 @@
 // it, each asked first in views/ipod-dialog.html. The desktop app only: it reaches the iPod's disk
 // and USB through its commands (src-tauri/src/ipod.rs).
 
+import { showToast } from "./toast";
 import { $reactive, $toRaw } from "jq79";
 import { parseSaved } from "../helpers/instance";
 import { isSendable, likelyDuplicates } from "../helpers/ipod";
@@ -327,7 +328,9 @@ export async function ejectIpod(path: string): Promise<void> {
     const { ejectDrive } = await import("./sources/ipod");
     await ejectDrive(path);
     ipods.found = ipods.found.filter((one) => one.path !== path);
-    library.infoMessage = t("ipod.ejected", { name });
+    // A toast, not the library's message: the iPod's tab is closed, and that message would sit over
+    // another root's list (lib/toast.ts).
+    showToast(t("ipod.ejected", { name }));
   } catch (error) {
     library.errorMessage = t("ipod.ejectFailed", { name, reason: error instanceof Error ? error.message : String(error) });
   } finally {
