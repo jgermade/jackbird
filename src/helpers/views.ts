@@ -202,6 +202,7 @@ export function buildViewRows(
       trackNumber: track.metadata.trackNumber,
       artist: track.metadata.artist,
       relativePath: track.relativePath,
+      ...(track.pending ? { pending: true } : {}),
       meta,
       parentKey,
       depth,

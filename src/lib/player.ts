@@ -29,7 +29,7 @@ import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
 import { DISPLAY_BANDS, SPECTRUM_DECIBELS, SPECTRUM_FFT, SPECTRUM_RANGE, SPECTRUM_SMOOTHING, SPECTRUM_TILT, foldBands, spectrumBands } from "../helpers/spectrum";
 import { streamInfo, streamInfoNeeds, type StreamInfo } from "../helpers/stream-info";
-import type { MediaHandle, PlaybackQueue, QueueItem } from "../types";
+import type { MediaHandle, PlaybackQueue, QueueItem, RootWorkspace, Track } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
 import { PhoneAudio, phoneAudioAvailable, type PhoneSong } from "./phone-audio";
 import { coverDataUrlNow } from "./covers";
@@ -59,13 +59,21 @@ export type NowPlaying = {
   lastModified?: number;
 };
 
+/**
+ * A track of a root by its id: among those it shows, else among those of an iPod's other library
+ * (`shelved`, W7), so a song playing from it goes on being known after the switch.
+ */
+export function trackIn(root: Pick<RootWorkspace, "tracks" | "shelved"> | undefined, trackId: string): Track | undefined {
+  return root?.tracks.find((one) => one.id === trackId) ?? root?.shelved?.find((one) => one.id === trackId);
+}
+
 export const nowPlaying = $computed((): NowPlaying | null => {
   const queue = playback.queue;
   const item = queue?.items[playback.index];
   if (!queue || !item) {
     return null;
   }
-  const track = library.roots.find((root) => root.id === item.rootId)?.tracks.find((one) => one.id === item.trackId);
+  const track = trackIn(library.roots.find((root) => root.id === item.rootId), item.trackId);
   if (!track) {
     return null;
   }
@@ -132,7 +140,7 @@ export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
   return new Opaque(
     queue.items.map((item, at) => {
       const root = roots.get(item.rootId);
-      const track = root?.tracks.find((one) => one.id === item.trackId);
+      const track = trackIn(root, item.trackId);
       return {
         index: at,
         title: track ? track.metadata.title || track.name : item.trackId.split("/").pop() || item.trackId,
@@ -153,7 +161,7 @@ export const queueIsAlbum = $computed((): boolean => {
   const roots = new Map(library.roots.map((root) => [root.id, root]));
   return isOneAlbum(
     queue.items.map((item) => {
-      const track = roots.get(item.rootId)?.tracks.find((one) => one.id === item.trackId);
+      const track = trackIn(roots.get(item.rootId), item.trackId);
       if (!track) return null;
       const folder = `${item.rootId}/${track.relativePath.split("/").slice(0, -1).join("/")}`;
       return { album: track.metadata.album, artist: track.metadata.artist, folder };
@@ -456,9 +464,10 @@ function setSource(opened: MediaHandle, key: string): void {
 function songOf(opened: MediaHandle, key: string): PhoneSong {
   const [rootId, ...rest] = key.split(":");
   const trackId = rest.join(":");
-  const track = $toRaw(library)
-    .roots.find((root) => root.id === rootId)
-    ?.tracks.find((one) => one.id === trackId);
+  const track = trackIn(
+    $toRaw(library).roots.find((root) => root.id === rootId),
+    trackId
+  );
   const metadata = track?.metadata;
   return {
     key,
@@ -480,7 +489,7 @@ async function openAhead(count: number): Promise<Ahead[] | null> {
   const opened = await Promise.all(
     items.map(async (item): Promise<Ahead | null> => {
       const root = roots.find((one) => one.id === item.rootId);
-      const track = root?.tracks.find((one) => one.id === item.trackId);
+      const track = trackIn(root, item.trackId);
       if (!root || !track) return null;
       const media = await root.source.openMedia(track.relativePath).catch(() => null);
       return media ? { key: keyOf(item), rootId: item.rootId, relativePath: track.relativePath, lastModified: track.lastModified, media } : null;
@@ -510,7 +519,7 @@ async function sendNext(): Promise<void> {
   const after = queue ? upcomingIndices(index, queue.items.length, playMode())[0] : undefined;
   const item = after === undefined ? undefined : queue?.items[after];
   const root = item ? $toRaw(library).roots.find((one) => one.id === item.rootId) : undefined;
-  const track = item ? root?.tracks.find((one) => one.id === item.trackId) : undefined;
+  const track = item ? trackIn(root, item.trackId) : undefined;
   if (audio !== native || !item || !root || !track) {
     upcoming = [];
     native.setNext(null);

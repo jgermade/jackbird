@@ -12,7 +12,8 @@ import { preferences } from "./preferences";
 import { hydrateRoot } from "./roots";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 import { ui } from "./ui";
-import { setCurrentRow, showWhole } from "./workspace";
+import { nowPlaying } from "./player";
+import { revealPlaying, setCurrentRow, showWhole } from "./workspace";
 
 /** Each open iPod's facts, by its root's id: asked (`null`) or known. A root that could not tell has none. */
 export const ipodInfo = $reactive({ byRoot: {} as Record<string, IpodDeviceInfo | null> });
@@ -137,4 +138,29 @@ export async function showIpodLibrary(rootId: string, which: IpodLibrary): Promi
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : String(error);
   }
+}
+
+/**
+ * Shows the song playing in the library (the faceplate's locate key). One of an iPod's other
+ * library (on its root's shelf) first has that library shown, Apple's or Rockbox's (the owner's
+ * ask, 2026-11-16).
+ */
+export async function locatePlaying(): Promise<void> {
+  const playing = $toRaw(nowPlaying.value);
+  const root = playing ? $toRaw(library).roots.find((one) => one.id === playing.rootId) : undefined;
+  const ipod = root?.source.ipod;
+  if (playing && root && ipod && !root.tracks.some((track) => track.id === playing.trackId)) {
+    await showIpodLibrary(root.id, ipod.library === "apple" ? "rockbox" : "apple");
+    // Read for the first time this session, its tracks come in as its walk goes: the song awaited.
+    await until(() => {
+      const shown = $toRaw(library).roots.find((one) => one.id === root.id);
+      return !shown || !shown.loadingMetadata || shown.tracks.some((track) => track.id === playing.trackId);
+    });
+  }
+  revealPlaying();
+}
+
+/** Resolves once `done` holds, looked at every 200 ms. */
+async function until(done: () => boolean): Promise<void> {
+  while (!done()) await new Promise((resolve) => setTimeout(resolve, 200));
 }

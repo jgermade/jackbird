@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { RENAME_FIELDS, RENAME_PRESETS, completeField, fieldQuery, fieldsFor, fillPattern, planReads, planRenames, readTags, safeName, trackWidths } from "./rename.ts";
+import { RENAME_FIELDS, RENAME_PRESETS, completeField, fieldQuery, fieldsFor, fillPattern, inferredMetadata, planReads, planRenames, readTags, safeName, trackWidths } from "./rename.ts";
 
 const track = (relativePath: string, metadata: Partial<{ title: string; artist: string; album: string; year: string; genre: string; trackNumber: string }> = {}) => ({
   id: relativePath,
@@ -216,5 +216,24 @@ describe("the composer and the comment in patterns", () => {
     const piece = track("Classical/Bolero.mp3", { title: "Boléro", composer: "Ravel" } as never);
     assert.equal(fillPattern("%composer% - %title%", piece), "Ravel - Boléro");
     assert.deepEqual(readTags("%composer% - %title%", track("x/Ravel - Boléro.mp3")), { composer: "Ravel", title: "Boléro" });
+  });
+});
+
+describe("tags guessed from a file's name, before they are read", () => {
+  const guessed = (path: string) => {
+    const { title, artist, album, trackNumber } = inferredMetadata(path);
+    return { title, artist, album, trackNumber };
+  };
+  it("reads a number and a title", () => {
+    assert.deepEqual(guessed("Music/FLAC/Metallica/1988/01 - Blackened.flac"), { title: "Blackened", artist: "", album: "", trackNumber: "1" });
+    assert.deepEqual(guessed("x/02. Eye of the Beholder.mp3"), { title: "Eye of the Beholder", artist: "", album: "", trackNumber: "2" });
+    assert.deepEqual(guessed("x/03 One.mp3"), { title: "One", artist: "", album: "", trackNumber: "3" });
+  });
+  it("reads an artist and a title", () => {
+    assert.deepEqual(guessed("mp3/Amy Winehouse - Rehab.mp3"), { title: "Rehab", artist: "Amy Winehouse", album: "", trackNumber: "" });
+  });
+  it("takes the name as the title otherwise, and never the folders", () => {
+    assert.deepEqual(guessed("Music/mp3/Blackened.mp3"), { title: "Blackened", artist: "", album: "", trackNumber: "" });
+    assert.deepEqual(guessed("song"), { title: "song", artist: "", album: "", trackNumber: "" });
   });
 });

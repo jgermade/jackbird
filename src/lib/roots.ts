@@ -5,6 +5,7 @@
 import { $toRaw } from "jq79";
 import type { SampleList } from "../helpers/samples";
 import { emptyMetadata, readsEveryField, withEveryField } from "../helpers/metadata";
+import { inferredMetadata } from "../helpers/rename";
 import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
 import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
@@ -31,6 +32,21 @@ export function updateRoots(update: (roots: RootWorkspace[]) => RootWorkspace[])
  * `.meta/` remembers at once, then walks the folder in the background and
  * reads the tags of new and changed files.
  */
+/** Tracks no longer loading: one whose tags could not be read keeps what its name said. */
+function settled(tracks: Track[]): Track[] {
+  if (!tracks.some((track) => track.pending)) return tracks;
+  return tracks.map(({ pending: _pending, ...track }) => track);
+}
+
+/**
+ * What an iPod's root keeps on its shelf when `next` replaces its source: the tracks it showed when
+ * `next` is its other library, else the shelf it had.
+ */
+function shelvedOn(root: RootWorkspace, next: RootSource): Track[] | undefined {
+  const was = root.source.ipod?.library;
+  return was && next.ipod && next.ipod.library !== was ? root.tracks : root.shelved;
+}
+
 export async function hydrateRoot(
   given: RootSource,
   options: {
@@ -105,7 +121,9 @@ export async function hydrateRoot(
       expandedDiscs: currentRoots[existingIndex].expandedDiscs,
       activeRowKey: currentRoots[existingIndex].activeRowKey,
       view: currentRoots[existingIndex].view,
-      playlists: currentRoots[existingIndex].playlists
+      playlists: currentRoots[existingIndex].playlists,
+      // An iPod's other library now shown: the tracks of the one left kept on the shelf (W7).
+      shelved: shelvedOn(currentRoots[existingIndex], source)
     };
     return copy;
   });
@@ -161,10 +179,6 @@ export async function hydrateRoot(
 
       const staleOrNewFiles = [...newFiles, ...modifiedFiles];
       const isFullyCached = staleOrNewFiles.length === 0 && removedPaths.length === 0;
-      // Read in bulk (the desktop app), a new file comes in with its tags, a batch at a time: no
-      // empty row first, which drew the whole library once more for nothing.
-      const bulk = !!source.scanTags;
-      const adding = new Set(bulk ? newFiles.map((file) => file.relativePath) : []);
 
       // Drop tracks that are gone from disk
       updateRoots((currentRoots) =>
@@ -176,8 +190,9 @@ export async function hydrateRoot(
           const removed = new Set(removedPaths);
           const tracks = root.tracks.filter((t) => !removed.has(t.relativePath));
 
-          // Add genuinely new files (not in snapshot at all) as empty placeholder tracks
-          for (const file of bulk ? [] : newFiles) {
+          // The whole list at once (the owner's rule, 2026-11-16): a file new to the library is
+          // listed straight away with what its name says, marked as loading until its tags come.
+          for (const file of newFiles) {
             tracks.push({
               id: file.relativePath,
               name: file.name,
@@ -188,7 +203,8 @@ export async function hydrateRoot(
               fullChecksum: undefined,
               audioChecksum: undefined,
               lastVerifiedAt: undefined,
-              metadata: emptyMetadata()
+              metadata: inferredMetadata(file.relativePath),
+              pending: true
             });
           }
 
@@ -234,7 +250,7 @@ export async function hydrateRoot(
         updateRoots((currentRoots) =>
           currentRoots.map((root) =>
             root.id === rootId
-              ? { ...applyScanResults(root, updates, adding), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
+              ? { ...applyScanResults(root, updates), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
               : root
           )
         );
@@ -323,6 +339,9 @@ export async function hydrateRoot(
       // inspected, several at once.
       async function inBulk(scanTags: NonNullable<RootSource["scanTags"]>): Promise<void> {
         const readFrom = new Map(staleOrNewFiles.map((file) => [file.relativePath, checksumNow(file.relativePath)]));
+        // The first tracks are drawn as they come: an iPod's songs come in one batch at once, and its
+        // covers after it, the first of them seconds later.
+        let drawn = false;
         await scanTags(
           staleOrNewFiles.map((file) => file.relativePath),
           [],
@@ -350,7 +369,8 @@ export async function hydrateRoot(
             failedCount += batch.unread.length;
             loadedCount += batch.tracks.length + batch.unread.length;
             snapshotDirty ||= batch.tracks.length > 0;
-            if (batch.done || Date.now() - flushedAt >= FLUSH_EVERY_MS) {
+            if (batch.done || (!drawn && batch.tracks.length > 0) || Date.now() - flushedAt >= FLUSH_EVERY_MS) {
+              drawn ||= batch.tracks.length > 0;
               flushedAt = Date.now();
               flush();
             }
@@ -372,7 +392,7 @@ export async function hydrateRoot(
 
       updateRoots((currentRoots) =>
         currentRoots.map((root) =>
-          root.id === rootId ? { ...root, loadingMetadata: false, loadedCount: totalAfterWalk } : root
+          root.id === rootId ? { ...root, tracks: settled(root.tracks), loadingMetadata: false, loadedCount: totalAfterWalk } : root
         )
       );
 
@@ -384,7 +404,7 @@ export async function hydrateRoot(
       console.error(`jackbird: could not finish loading ${rootLabel}`, error);
       updateRoots((currentRoots) =>
         currentRoots.map((root) =>
-          root.id === rootId ? { ...root, loadingMetadata: false } : root
+          root.id === rootId ? { ...root, tracks: settled(root.tracks), loadingMetadata: false } : root
         )
       );
     }

@@ -163,6 +163,13 @@ describe("applyScanResults", () => {
     updatedAt: now
   });
 
+  it("a track listed by its name loads no more once read", () => {
+    const listed = { ...root, tracks: [{ ...loading, pending: true }, known] };
+    const next = applyScanResults(listed, [{ trackId: "Jazz/so-what.mp3", readFrom: "", record: recordFor("So What", "new") }]);
+    assert.equal("pending" in next.tracks[0], false);
+    assert.equal(next.tracks[0].metadata.title, "So What");
+  });
+
   it("sets each track read and its record, as new objects", () => {
     const copy = structuredClone(root);
     const record = recordFor("So What", "new");
