@@ -158,7 +158,7 @@
     <span :elseif="roomy && !isFolder" class="track-frame" aria-hidden="true"></span>
     <!-- A track's glyph under its box, shown while the box is not (the owner, 2026-11-16): its
          format's mark, or a note without one (a row with no file). -->
-    <span :if="isPickable && !roomy && format" class="glyph mark"><CodecMark :format="format" /></span>
+    <span :if="isPickable && !roomy && format" class="glyph mark"><CodecMark tinted :format="format" /></span>
     <svg :elseif="isPickable && !roomy" class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.25 12.25V3.5l6.5-1.5v2.75L6.25 6.25" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><circle cx="4.5" cy="12.25" r="1.85" fill="currentColor" /></svg>
   </span>
   <span class="label" :class.led="hasLead"><span :if="hasLead" class="lead">{{ lead }}</span><span class="title">{{ label }}</span><span :if="sub" class="sub">{{ sub }}</span></span>

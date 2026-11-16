@@ -214,7 +214,7 @@
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-box" :class.numbered="discNumbered(disc)"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span></td>
-                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="formatLabel(track.relativePath)" class="format"><CodecMark :format="formatLabel(track.relativePath)" /></span></span></td>
+                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="formatLabel(track.relativePath)" class="format"><CodecMark tinted :format="formatLabel(track.relativePath)" /></span></span></td>
                     <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />

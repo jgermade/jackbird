@@ -1,10 +1,13 @@
-<script :setup="{ format = '' }: Props" lang="ts">
+<script :setup="{ format = '', tinted = false }: Props" lang="ts">
   // A codec as the display prints it: FLAC in the heavy lower case of its own lettering, MP3 and
   // Ogg (Vorbis too) by their marks, any other as a framed DisplayIcon ("M4A"). All in the colour
   // around it, at a size that follows the font size around it: the marks 1.9em tall, or
   // `--codec-size` (a list's smaller marks).
   //
   //   <CodecMark format="MP3" />
+  //
+  // `tinted`: in its codec's own colour (`--mm-codec-*`, tokens.css), as a list shows it; else in
+  // the colour around it, as the display lights it.
   //
   // Decorative marks carry the format as their `aria-label`. The display lights them with its ink
   // and glow (`--mm-display-glow`); a list sets the glow to `none` and its own grey.
@@ -17,7 +20,9 @@
   const mp3Url: string = (await import("../marks/mp3.svg?url")).default
   const oggUrl: string = (await import("../marks/ogg.svg?url")).default
 
-  type Props = { format?: string }
+  type Props = { format?: string; tinted?: boolean | "" }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
 
   // Each mark and its proportions. Ogg's stands for its Vorbis too.
   const MARKS: Record<string, { url: string; ratio: string }> = {
@@ -27,6 +32,7 @@
   }
   const name = (): string => String(format ?? "").trim().toUpperCase()
   const markOf = () => MARKS[name()] ?? null
+  const codec = (): string => (name() === "FLAC" ? "flac" : name() === "MP3" ? "mp3" : markOf() ? "ogg" : "other")
   // The URL quoted: a small mark comes inlined by Vite as a data URL with single quotes in it,
   // which an unquoted url() does not take (the mask is dropped, and the mark shows as a block).
   const markStyle = (): string => {
@@ -35,10 +41,14 @@
   }
 </script>
 
-<span class="codec"><span :if="name() === 'FLAC'" class="flac" role="img" aria-label="FLAC">flac</span><span :elseif="markOf()" class="mark" role="img" :aria-label="name()" :style="markStyle()"></span><DisplayIcon :elseif="name()">{{ name() }}</DisplayIcon></span>
+<span class="codec" :class.tinted="flag(tinted)" :data-codec="codec()"><span :if="name() === 'FLAC'" class="flac" role="img" aria-label="FLAC">flac</span><span :elseif="markOf()" class="mark" role="img" :aria-label="name()" :style="markStyle()"></span><DisplayIcon :elseif="name()">{{ name() }}</DisplayIcon></span>
 
 <style scoped>
   .codec { display: inline-flex; align-items: center; }
+  .tinted[data-codec="flac"] { color: var(--mm-codec-flac); }
+  .tinted[data-codec="mp3"] { color: var(--mm-codec-mp3); }
+  .tinted[data-codec="ogg"] { color: var(--mm-codec-ogg); }
+  .tinted[data-codec="other"] { color: var(--mm-codec-other); }
   /* A codec's mark, its shape in the ink around it. */
   .mark {
     display: block;

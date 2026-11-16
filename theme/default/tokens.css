@@ -98,6 +98,13 @@
   --mm-stripe-2: #f2a900;
   --mm-stripe-3: #f05a1a;
 
+  /* A codec's colour, where a list tints its mark (CodecMark's `tinted`; the owner, 2026-11-16):
+     FLAC in the stripes' teal, MP3 in their amber, Ogg in a violet, any other in the info blue. */
+  --mm-codec-flac: #1f9c8a;
+  --mm-codec-mp3: #c98c00;
+  --mm-codec-ogg: #7d5bc4;
+  --mm-codec-other: #2f78d0;
+
   /* What a modal lays over the page. */
   --mm-overlay: rgba(27, 29, 29, .42);
 
@@ -241,6 +248,11 @@
   --mm-display-dim: rgba(95, 242, 214, .07);
   --mm-display-glow: 0 0 6px rgba(95, 242, 214, .55);
   --mm-display-bezel: #000000;
+
+  --mm-codec-flac: #45c9b5;
+  --mm-codec-mp3: #e8b432;
+  --mm-codec-ogg: #a98be8;
+  --mm-codec-other: #5ea4f2;
 
   /* A white veil: on a dark page, a darker one would hide the modal's edges. */
   --mm-overlay: rgba(255, 255, 255, .2);
