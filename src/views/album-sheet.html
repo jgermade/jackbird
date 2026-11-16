@@ -364,10 +364,7 @@
   /* The length and the menu's key up to the row's end (the owner, 2026-11-16). */
   .mm-table .cue-cell { width: 1%; padding-left: 0; padding-right: 0; text-align: right; line-height: 0; }
   .mm-table .menu-cell { width: 1%; padding-block: 0; padding-inline: 0; line-height: 0; }
-  /* The menu shows as the cue does: on hover, focus, the selected and playing rows; always on a touch screen. */
-  .menu-cell > * { opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .mm-table tr:focus-within .menu-cell > *, .mm-table tr[aria-selected="true"] .menu-cell > *, .mm-table tr[data-playing="true"] .menu-cell > * { opacity: 1; }
-  @media (hover: hover) { .mm-table tr:hover .menu-cell > * { opacity: 1; } }
+  /* The menu's key shows on every track, always (the owner, 2026-11-16). */
   /* The length, and the ▶ over it: the ▶ in its place on a computer's hover and on focus; on a
      touch screen the length alone. */
   .cue-stack { display: inline-grid; place-items: center end; min-width: 2.5rem; line-height: 1; }
@@ -382,7 +379,6 @@
   }
   @media (hover: none) {
     .cue-play { display: none; }
-    .menu-cell > * { opacity: 1; }
   }
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
