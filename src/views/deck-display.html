@@ -14,6 +14,7 @@
 
   const Counter = await import("../../theme/default/components/counter.html")
   const Display = await import("../../theme/default/components/display.html")
+  const CodecMark = await import("../../theme/default/components/codec-mark.html")
   const DisplayIcon = await import("../../theme/default/components/display-icon.html")
   const Meter = await import("../../theme/default/components/meter.html")
   const Spectrum = await import("../../theme/default/components/spectrum.html")
@@ -27,22 +28,6 @@
   const { preferences } = await import("../lib/preferences")
   const { peakMotion } = await import("../helpers/spectrum")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
-  const mp3Url: string = (await import("../assets/formats/mp3.svg?url")).default
-  const oggUrl: string = (await import("../assets/formats/ogg.svg?url")).default
-  // The codecs drawn by their marks (lit in the display's ink, as the logo is): each mark and its
-  // proportions. Ogg's stands for its Vorbis too.
-  const CODEC_MARKS: Record<string, { url: string; ratio: string }> = {
-    MP3: { url: mp3Url, ratio: "917 / 463" },
-    OGG: { url: oggUrl, ratio: "510 / 340" },
-    VORBIS: { url: oggUrl, ratio: "510 / 340" }
-  }
-  const markOf = () => CODEC_MARKS[markParts()?.format ?? ""] ?? null
-  // The URLs quoted: a small mark comes inlined by Vite as a data URL with single quotes in it,
-  // which an unquoted url() does not take (the mask is dropped, and the mark shows as a block).
-  const codecStyle = (): string => {
-    const mark = markOf()
-    return mark ? `--codec: url("${mark.url}"); --ratio: ${mark.ratio}` : ""
-  }
   const logoStyle = `--logo: url("${logoUrl}")`
 
   $: current = nowPlaying.value
@@ -191,12 +176,10 @@
               :aria-label="t(MARK_LABELS[nextMarkView()])"
               :title="soundingText()" @click="mark.toggle()">
         <span :if="markView === 'format' && markParts()" class="lcd-format">
-          <!-- The codec: FLAC in the heavy lower case of its own lettering, MP3 and Ogg by their marks
-               (lit in the display's ink, as the logo is), any other as an icon of the display's own. -->
+          <!-- The codec (CodecMark): FLAC in the heavy lower case of its own lettering, MP3 and Ogg by
+               their marks (lit in the display's ink, as the logo is), any other as a framed icon. -->
           <span class="icons">
-            <span :if="markParts()?.format === 'FLAC'" class="codec-flac">flac</span>
-            <span :elseif="markOf()" class="codec-mark" role="img" :aria-label="markParts()?.format" :style="codecStyle()"></span>
-            <DisplayIcon :else>{{ markParts()?.format }}</DisplayIcon>
+            <CodecMark :format="markParts()?.format ?? ''" />
           </span>
           <!-- Its parts one under the other: "24 bit" over "96 kHz"; a varying bitrate marked VBR, lit
                solid, before it. -->
@@ -347,25 +330,6 @@
     align-items: center;
     gap: .3em;
     font-size: clamp(.5625rem, 12cqw, .9375rem);
-  }
-  /* A codec's mark, its shape lit in the display's ink. */
-  .codec-mark {
-    display: block;
-    height: 1.9em;
-    aspect-ratio: var(--ratio);
-    background: currentColor;
-    -webkit-mask: var(--codec) center / contain no-repeat;
-    mask: var(--codec) center / contain no-repeat;
-  }
-  /* FLAC as its lettering is: lower case, at the label face's heaviest and its normal width, tight. */
-  .codec-flac {
-    font-family: var(--mm-font-label);
-    font-stretch: 100%;
-    font-weight: 900;
-    font-size: 1.9em;
-    line-height: .85;
-    letter-spacing: -.045em;
-    text-shadow: var(--mm-display-glow);
   }
   .lcd-format .quality {
     font-family: var(--mm-font-label);
