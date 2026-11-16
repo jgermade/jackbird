@@ -268,7 +268,7 @@
              :depth="phone ? 0 : row.depth"
              :label="rowLabel(row)"
              :meta="rowMeta(row)"
-             :format="view() === 'files' && row.kind === 'track' && row.relativePath ? formatLabel(row.relativePath) : ''"
+             :format="row.kind === 'track' && row.relativePath ? formatLabel(row.relativePath) : ''"
              :sub="rowSub(row)"
              :cover="rowCover(row)"
              :framed="!!row.framed"

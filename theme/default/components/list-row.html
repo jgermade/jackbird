@@ -87,7 +87,7 @@
     lead?: string | number
     label?: string
     meta?: string | number
-    /** A track's format ("MP3", "FLAC"): its mark (CodecMark) in its glyph's place, as Files shows a file. */
+    /** A track's format ("MP3", "FLAC"): its mark (CodecMark) in its glyph's place. */
     format?: string
     /** A folder's picture in place of its glyph (an album's cover), as a URL; null for its glyph. */
     cover?: string | null
@@ -157,7 +157,7 @@
     <img :if="covered && !isFolder" class="cover track-cover" :src="cover" alt="" draggable="false" />
     <span :elseif="roomy && !isFolder" class="track-frame" aria-hidden="true"></span>
     <!-- A track's glyph under its box, shown while the box is not (the owner, 2026-11-16): its
-         format's mark (Files), or a note. -->
+         format's mark, or a note without one (a row with no file). -->
     <span :if="isPickable && !roomy && format" class="glyph mark"><CodecMark :format="format" /></span>
     <svg :elseif="isPickable && !roomy" class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.25 12.25V3.5l6.5-1.5v2.75L6.25 6.25" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><circle cx="4.5" cy="12.25" r="1.85" fill="currentColor" /></svg>
   </span>
@@ -196,7 +196,7 @@
      to the right of its last glyph is about the room to the left of its own. A track's cue (its ▶
      or its bars) goes before its keys, where a folder has its ❯, so every row's ⋮ is in one column. */
   .row.folder, .row.keyed { padding-right: calc(1.125rem - .5rem); }
-  /* A file's format mark in its glyph's place (Files): a wider first column. */
+  /* A track's format mark in its glyph's place: a wider first column. */
   .row.marked { grid-template-columns: 1.75rem minmax(0, 1fr) auto; }
   .cue { order: 1; }
   .action { order: 2; }
@@ -284,7 +284,7 @@
     .numbered:not(.covered) .icon .box, .row:hover .icon .box, .row[aria-selected="true"] .icon .box, .row:focus-visible .icon .box, .row:has(:focus-visible) .icon .box { visibility: visible; }
     .row:hover .glyph, .row[aria-selected="true"] .glyph, .row:focus-visible .glyph, .row:has(:focus-visible) .glyph { visibility: hidden; }
   }
-  /* A track's glyph (a note, or its format's mark in Files) holds the box's place until the box
+  /* A track's glyph (its format's mark, or a note) holds the box's place until the box
      shows (the owner, 2026-11-16). On a touch screen or the phone layout the box is always there,
      so no glyph. */
   .glyph { display: grid; place-items: center; color: var(--mm-fg-subtle); }
