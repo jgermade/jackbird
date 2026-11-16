@@ -20,6 +20,7 @@
   const { onTrackMenu, trackMenu } = await import("../lib/menus")
   const { openFolder } = await import("../lib/roots")
   const { artistName, artistOfKey } = await import("../helpers/views")
+  const { formatLabel } = await import("../helpers/formats")
   const { openPicture } = await import("../lib/picture")
   const { setArtistPicture } = await import("../lib/artists")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
@@ -212,7 +213,7 @@
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-box" :class.numbered="discNumbered(disc)"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span></td>
-                    <td><span class="mm-title">{{ titleOf(track) }}</span></td>
+                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="formatLabel(track.relativePath)" class="format">{{ formatLabel(track.relativePath) }}</span></span></td>
                     <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
@@ -340,6 +341,23 @@
   @media (hover: hover) and (min-width: 721px) {
     .pick-box:not(.numbered) { visibility: hidden; }
     .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-visible .pick-box, .mm-table tr:has(:focus-visible) .pick-box { visibility: visible; }
+  }
+  /* The track's format after its title, small and in the subtle ink (the owner, 2026-11-16),
+     framed as the library's rows print it (list-row.html). */
+  .title-line { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
+  .format {
+    flex: none;
+    padding: .18em .35em .14em;
+    border: 1px solid currentColor;
+    border-radius: .22em;
+    font-family: var(--mm-font-label);
+    font-stretch: var(--mm-stretch-label);
+    font-size: .5625rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--mm-fg-subtle);
   }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   /* Room after the length, before the menu's key. */
