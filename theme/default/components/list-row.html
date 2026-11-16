@@ -154,7 +154,6 @@
     <svg :elseif="!roomy" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
     <img :if="covered && !isFolder" class="cover track-cover" :src="cover" alt="" draggable="false" />
     <span :elseif="roomy && !isFolder" class="track-frame" aria-hidden="true"></span>
-    <span :if="isPickable && hasLead" class="slot-lead">{{ lead }}</span>
   </span>
   <span class="label" :class.led="hasLead"><span :if="hasLead" class="lead">{{ lead }}</span><span class="title">{{ label }}</span><span :if="sub" class="sub">{{ sub }}</span></span>
   <span class="end"><span :if="format" class="format">{{ format }}</span><span class="meta">{{ meta }}</span></span>
@@ -246,7 +245,6 @@
      glyph's place. */
   .track-frame { display: block; width: var(--cover); height: var(--cover); border-radius: var(--mm-radius-key); background: var(--mm-sunken); box-shadow: inset 0 0 0 1px var(--mm-border); }
   .covered .icon .box { position: relative; z-index: 1; }
-  .covered.numbered .slot-lead { display: none; }
   .covered.numbered .label .lead { display: block; }
   .covered.numbered .label.led { grid-template-columns: auto minmax(0, 1fr); }
   .covered.numbered .label.led .title, .covered.numbered .label.led .sub { grid-column: 2; }
@@ -263,28 +261,19 @@
   .icon .box { display: grid; place-items: center; transform: scale(.75); opacity: .55; }
   .row[aria-selected="true"] .icon .box, .row.current .icon .box { opacity: 1; }
   @media (hover: hover) { .row:hover .icon .box { opacity: 1; } }
-  /* With a pointer (a computer) the box shows only on the row pointed at (and on a chosen one,
-     and where the keyboard's focus is), and the number, if the row has one, sits in its place
-     otherwise. On a touch screen the box is always there and the number beside it, in the label. */
-  .slot-lead { display: none; }
-  /* On a touch screen the number is inside the box (SelectBox's `number`), not beside it: the box
-     whole (not shrunk nor faded) in a column as wide as it. A row with a cover keeps the number
-     beside its title, the box over the cover. */
-  @media (hover: none), (max-width: 720px) {
-    .numbered:not(.covered) { grid-template-columns: 2rem minmax(0, 1fr) auto; }
-    .numbered:not(.covered) .icon .box { transform: none; opacity: 1; }
-    .numbered:not(.covered) .label .lead { display: none; }
-    .numbered:not(.covered) .label.led { grid-template-columns: minmax(0, 1fr); }
-    .numbered:not(.covered) .label.led .title, .numbered:not(.covered) .label.led .sub { grid-column: 1; }
-  }
+  /* A track's number is inside its box (SelectBox's `number`), not beside it: the box whole (not
+     shrunk nor faded) and always shown, in a column as wide as it (the owner, 2026-11-16). A row
+     with a cover keeps the number beside its title, the box over the cover. */
+  .numbered:not(.covered) { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+  .numbered:not(.covered) .icon .box { transform: none; opacity: 1; }
+  .numbered:not(.covered) .label .lead { display: none; }
+  .numbered:not(.covered) .label.led { grid-template-columns: minmax(0, 1fr); }
+  .numbered:not(.covered) .label.led .title, .numbered:not(.covered) .label.led .sub { grid-column: 1; }
+  /* With a pointer (a computer) any other box shows only on the row pointed at, chosen, or where
+     the keyboard's focus is. */
   @media (hover: hover) and (min-width: 721px) {
-    .numbered .slot-lead { display: block; font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; line-height: 1; color: var(--mm-fg-subtle); }
-    .numbered .label .lead { display: none; }
-    .numbered .label.led { grid-template-columns: minmax(0, 1fr); }
-    .numbered .label.led .title, .numbered .label.led .sub { grid-column: 1; }
     .icon .box { visibility: hidden; }
-    .row:hover .icon .box, .row[aria-selected="true"] .icon .box, .row:focus-visible .icon .box, .row:has(:focus-visible) .icon .box { visibility: visible; }
-    .numbered:hover .slot-lead, .numbered[aria-selected="true"] .slot-lead, .numbered:focus-visible .slot-lead, .numbered:has(:focus-visible) .slot-lead { visibility: hidden; }
+    .numbered:not(.covered) .icon .box, .row:hover .icon .box, .row[aria-selected="true"] .icon .box, .row:focus-visible .icon .box, .row:has(:focus-visible) .icon .box { visibility: visible; }
   }
   .title, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The second line: smaller and lighter than the label, in the subtle ink. */
