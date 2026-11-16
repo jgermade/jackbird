@@ -155,26 +155,23 @@ export function buildViewRows(
 ): WizardTreeRow[] {
   const open = (key: string): boolean => expanded === "all" || expanded.includes(key);
   const rows: WizardTreeRow[] = [];
-  // An album's row: its cover, and under its name who it is by and its year (`by`: false where its
-  // artist is the row above it, in Albums by artist).
+  // An album's row: its cover, and under its name who it is by (Albums, `by`) or its year (Albums
+  // by artist, where its artist is the row above it).
   // Every album row has a cover's room, so their names line up whether they have one or not.
   const albumExtras = (group: Group, by: boolean): Pick<WizardTreeRow, "cover" | "sub" | "framed"> => {
     const cover = coverOfTracks(group.tracks);
-    const sub = [by ? group.meta : "", yearOfTracks(group.tracks)].filter(Boolean).join(" · ");
+    const sub = by ? group.meta : yearOfTracks(group.tracks);
     return { framed: true, ...(cover ? { cover } : {}), ...(sub ? { sub } : {}) };
   };
-  // An artist's row: their picture, round; every artist row with a picture's room when one has one.
-  const artistExtras = (artists: readonly Group[]) => {
-    const pictureOf = (group: Group): string | undefined => {
-      const name = artistOfKey(group.key);
-      return name === null ? undefined : artistPictures[name];
-    };
-    const framed = artists.some((group) => pictureOf(group));
-    return (group: Group): Pick<WizardTreeRow, "cover" | "framed" | "round"> => {
-      const cover = pictureOf(group);
-      return framed ? { framed, round: true, ...(cover ? { cover } : {}) } : {};
-    };
+  // An artist's row, round: their picture, else the cover of the first of their albums that has
+  // one; every artist row with its room, so their names line up.
+  const artistExtras = (group: Group): Pick<WizardTreeRow, "cover" | "framed" | "round"> => {
+    const name = artistOfKey(group.key);
+    const cover = (name === null ? undefined : artistPictures[name]) ?? coverOfTracks(group.tracks);
+    return { framed: true, round: true, ...(cover ? { cover } : {}) };
   };
+  // "Artist - Album": the line under a song's title, so two songs of one title tell themselves apart.
+  const byWhom = (track: Track): string => [track.metadata.artist.trim(), track.metadata.album.trim()].filter(Boolean).join(" - ");
   const groupRow = (group: Group, parentKey: string | null, depth: number, extras: Pick<WizardTreeRow, "cover" | "sub" | "framed" | "round"> = {}): boolean => {
     const isOpen = open(group.key);
     rows.push({
@@ -192,8 +189,10 @@ export function buildViewRows(
     });
     return isOpen;
   };
-  const trackRow = (track: Track, parentKey: string | null, depth: number, meta: string): void => {
+  // A track's row: its title; `extras` its line under it and, in Songs, its album's cover.
+  const trackRow = (track: Track, parentKey: string | null, depth: number, meta: string, extras: Pick<WizardTreeRow, "cover" | "sub" | "framed"> = {}): void => {
     rows.push({
+      ...extras,
       key: `track:${track.id}`,
       kind: "track",
       album: "",
@@ -214,22 +213,24 @@ export function buildViewRows(
     const byTitle = [...tracks].sort(
       (left, right) => compareText(left.metadata.title || left.name, right.metadata.title || right.name, labels.locale) || left.relativePath.localeCompare(right.relativePath)
     );
-    // "Artist - Album", so two songs of one title tell themselves apart.
-    const byWhom = (track: Track): string => [track.metadata.artist.trim(), track.metadata.album.trim()].filter(Boolean).join(" - ");
-    for (const track of byTitle) trackRow(track, null, 0, byWhom(track));
+    // Each song with its album's cover and, under its title, who and which album.
+    for (const track of byTitle) {
+      const cover = track.metadata.coverDataUrl;
+      const sub = byWhom(track);
+      trackRow(track, null, 0, sub, { framed: true, ...(cover ? { cover } : {}), ...(sub ? { sub } : {}) });
+    }
   } else if (view === "artists") {
-    const artists = artistsOf(tracks, labels);
-    const pictured = artistExtras(artists);
-    for (const artist of artists) {
-      if (groupRow(artist, null, 0, pictured(artist))) {
-        for (const track of artist.tracks) trackRow(track, artist.key, 1, track.metadata.album);
+    for (const artist of artistsOf(tracks, labels)) {
+      if (groupRow(artist, null, 0, artistExtras(artist))) {
+        for (const track of artist.tracks) {
+          const sub = byWhom(track);
+          trackRow(track, artist.key, 1, track.metadata.album, sub ? { sub } : {});
+        }
       }
     }
   } else if (view === "albumsByArtist") {
-    const artists = albumArtistsOf(tracks, labels);
-    const pictured = artistExtras(artists);
-    for (const artist of artists) {
-      if (!groupRow(artist, null, 0, pictured(artist))) continue;
+    for (const artist of albumArtistsOf(tracks, labels)) {
+      if (!groupRow(artist, null, 0, artistExtras(artist))) continue;
       for (const album of albumsOf(artist.tracks, labels)) {
         const sub = { ...album, key: `@aba:${artist.key.slice(8)}::${album.key.slice(7)}`, meta: "" };
         if (groupRow(sub, artist.key, 1, albumExtras(sub, false))) {
@@ -269,7 +270,7 @@ export function buildViewRows(
         const track = found[index];
         const base = { key: `@pl:${playlist.path}#${index}`, kind: "track" as const, album: "", parentKey: key, depth: 1, inView: view, playlist: playlist.path, playlistIndex: index };
         if (track) {
-          rows.push({ ...base, label: track.metadata.title || track.name, trackId: track.id, trackNumber: track.metadata.trackNumber, artist: track.metadata.artist, relativePath: track.relativePath, meta: track.metadata.artist });
+          rows.push({ ...base, label: track.metadata.title || track.name, trackId: track.id, trackNumber: track.metadata.trackNumber, artist: track.metadata.artist, relativePath: track.relativePath, meta: track.metadata.artist, ...(track.metadata.artist ? { sub: track.metadata.artist } : {}) });
         } else {
           rows.push({ ...base, label: entry.title || entry.raw.split(/[\\/]/).pop() || entry.raw, meta: labels.missing, missing: true });
         }

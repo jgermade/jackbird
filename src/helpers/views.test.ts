@@ -136,12 +136,12 @@ describe("an album's row: its cover, and who it is by and its year", () => {
     assert.equal(yearOfTracks([fixture("a.mp3", { year: "circa 70s" })]), "circa 70s");
   });
 
-  it("gives Albums' rows their cover and a line of artist and year; none without them", () => {
+  it("gives Albums' rows their cover and a line of their artist; none without them", () => {
     const rows = buildViewRows("albums", covered, [], labels);
     const blue = rows.find((row) => row.label === "Kind of Blue");
     const steps = rows.find((row) => row.label === "Giant Steps");
     assert.equal(blue?.cover, "jackbird-cover:kob.jpg");
-    assert.equal(blue?.sub, "Miles Davis · 1959");
+    assert.equal(blue?.sub, "Miles Davis");
     assert.equal(blue?.meta, "Miles Davis");
     assert.equal(steps?.cover, undefined);
     assert.equal(steps?.sub, "John Coltrane");
@@ -155,7 +155,21 @@ describe("an album's row: its cover, and who it is by and its year", () => {
     const blue = rows.find((row) => row.label === "Kind of Blue");
     assert.equal(blue?.sub, "1959");
     assert.equal(blue?.cover, "jackbird-cover:kob.jpg");
-    assert.equal(rows.find((row) => row.label === "Miles Davis")?.cover, undefined);
+    // The artist's row: their first album's cover, with no picture of their own.
+    assert.equal(rows.find((row) => row.label === "Miles Davis")?.cover, "jackbird-cover:kob.jpg");
+    // Its tracks: their title alone.
+    assert.ok(rows.filter((row) => row.kind === "track").every((row) => !row.sub && !row.cover));
+  });
+
+  it("gives Songs their album's cover and a line of artist and album; Artists' tracks the same line", () => {
+    const songs = buildViewRows("songs", covered, [], labels);
+    const freddie = songs.find((row) => row.label === "Freddie");
+    assert.equal(freddie?.cover, "jackbird-cover:kob.jpg");
+    assert.equal(freddie?.sub, "Miles Davis - Kind of Blue");
+    assert.ok(songs.every((row) => row.framed));
+    const artists = buildViewRows("artists", covered, "all", labels);
+    assert.equal(artists.find((row) => row.label === "Freddie")?.sub, "Miles Davis - Kind of Blue");
+    assert.equal(artists.find((row) => row.label === "Freddie")?.cover, undefined);
   });
 });
 
@@ -199,10 +213,10 @@ describe("an artist's picture in the rows", () => {
     assert.equal(bad?.round, true);
   });
 
-  it("does the same in Albums by artist, and nothing where no artist has a picture", () => {
+  it("does the same in Albums by artist, and keeps the room where no artist has a picture", () => {
     const rows = buildViewRows("albumsByArtist", two, [], labels, [], { "bad brains": "jackbird-cover:b.jpg" });
     assert.equal(rows.find((row) => row.label === "Bad Brains")?.cover, "jackbird-cover:b.jpg");
     const none = buildViewRows("artists", two, [], labels);
-    assert.ok(none.every((row) => !row.framed && !row.round && !row.cover));
+    assert.ok(none.every((row) => row.framed && row.round && !row.cover));
   });
 });
