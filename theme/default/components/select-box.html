@@ -105,8 +105,10 @@
     .numbered {
       min-width: 1.25rem;
       height: 1.25rem;
-      padding: 0 .25rem;
-      border-color: var(--mm-border);
+      padding: 0 .125rem;
+      /* Lighter than the plain box: the border half way to clear, and no well. */
+      border-color: color-mix(in srgb, var(--mm-border) 55%, transparent);
+      box-shadow: none;
       border-radius: var(--mm-radius-key);
       box-sizing: border-box;
     }
@@ -117,9 +119,11 @@
     .numbered .number {
       display: block;
       font-family: var(--mm-font-mono);
-      font-size: var(--mm-text-sm);
+      font-size: var(--mm-text-md);
       font-variant-numeric: tabular-nums;
       line-height: 1;
+      /* Centred on its digits, not on the font's ascent and descent, which sit it high. */
+      text-box: trim-both cap alphabetic;
       color: var(--mm-fg);
     }
     .numbered.on { border-color: var(--mm-accent); background: var(--mm-accent); }
