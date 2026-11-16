@@ -436,3 +436,24 @@ fn a_large_file_is_hashed_by_chunks() {
     assert_eq!(after.audio_checksum, found.audio_checksum);
     assert_eq!(fs::read(path).unwrap().len(), bytes.len());
 }
+
+/// A folder inside the root that cannot be read is left out of the walk, and
+/// the rest is still walked (a drive's `.Trashes`, which macOS refuses).
+#[cfg(unix)]
+#[test]
+fn a_folder_that_cannot_be_read_is_left_out_of_the_walk() {
+    use std::os::unix::fs::PermissionsExt;
+    let folder = scratch();
+    let root = Root::open(&folder).unwrap();
+    root.write("Music/a.mp3", b"a").unwrap();
+    root.write(".Trashes/501/b.mp3", b"b").unwrap();
+    let locked = folder.join(".Trashes");
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+    let readable = fs::read_dir(&locked).is_ok(); // as root, nothing is refused
+    let walked = root.walk();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
+    let walked: Vec<String> = walked.unwrap().into_iter().map(|entry| entry.path).collect();
+    if !readable {
+        assert_eq!(walked, ["Music/a.mp3"]);
+    }
+}
