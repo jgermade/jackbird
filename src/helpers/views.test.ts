@@ -90,6 +90,14 @@ describe("buildViewRows", () => {
     assert.deepEqual(songs.map((song) => song.label).sort(), ["One", "Two"]);
   });
 
+  it("Compilations: their rows as Albums draws them (the owner, 2026-11-16)", () => {
+    const strip = (rows: ReturnType<typeof buildViewRows>) => rows.map(({ inView, ...row }) => row);
+    const compilations = buildViewRows("compilations", tracks, "all", labels);
+    const albums = buildViewRows("albums", tracks, "all", labels).filter((row) => compilations.some((one) => one.key === row.key));
+    assert.ok(compilations.length > 0);
+    assert.deepEqual(strip(compilations), strip(albums));
+  });
+
   it("Albums by artist: each artist, their albums, the tracks", () => {
     const rows = buildViewRows("albumsByArtist", tracks, "all", labels);
     const coltrane = rows.findIndex((row) => row.label === "John Coltrane");
