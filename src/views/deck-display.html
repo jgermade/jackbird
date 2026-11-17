@@ -33,7 +33,7 @@
   $: current = nowPlaying.value
   // The display's left, while the music plays: the song's format (the file's), the spectrum, and
   // while the music goes to a DAC, the DAC (its name, and the depth and rate it runs at). A click or
-  // a tap turns from one to the next; each song starts on its format for two seconds, then turns to
+  // a tap turns from one to the next; each song starts on its format for a second, then turns to
   // the spectrum.
   type MarkView = "format" | "spectrum" | "dac"
   let markView: MarkView = "spectrum"
@@ -45,7 +45,7 @@
   const MARK_LABELS: Record<MarkView, string> = { format: "faceplate.showFormat", spectrum: "faceplate.showSpectrum", dac: "faceplate.showDac" }
   const markParts = () => soundingParts(stream.key === current?.key ? stream.info : null, current?.relativePath)
   const mark = (() => {
-    const FORMAT_FIRST = 2000
+    const FORMAT_FIRST = 1000
     let timer = 0
     let song: string | null = null
     return {
@@ -62,12 +62,32 @@
       toggle() {
         window.clearTimeout(timer)
         markView = nextMarkView()
+        // Turned while the spectrum fell after a pause: nothing left to wait for.
+        if (!playback.playing) falling = false
       },
       stop: () => window.clearTimeout(timer)
     }
   })()
   $: mark.song(current?.key ?? null)
   $destroyed(() => mark.stop())
+  // On a pause, the spectrum stays until its columns have fallen (it says so: `settled`; a moment,
+  // the peaks left out), and only then the logo takes its place; the format and the DAC give way at once. Played again meanwhile,
+  // it just goes on.
+  let falling = false
+  const fall = (() => {
+    let was = false
+    return {
+      playing(on: boolean) {
+        if (was && !on && markView === "spectrum") falling = true
+        if (on) falling = false
+        was = on
+      },
+      settled() {
+        if (!playback.playing) falling = false
+      }
+    }
+  })()
+  $: fall.playing(playback.playing)
   // The state, in words for screen readers (the play key shows it, lit while it plays).
   $: stateLabel =
     playback.error ? t("faceplate.state.error")
@@ -172,7 +192,7 @@
   <Display live joined>
     <div class="lcd" :class.small="flag(small)">
       <!-- The logo, lit; while the music plays, the spectrum or the song's format in its place, turned with a click. -->
-      <button :if="playback.playing" type="button" class="lcd-mark playing"
+      <button :if="playback.playing || falling" type="button" class="lcd-mark playing"
               :aria-label="t(MARK_LABELS[nextMarkView()])"
               :title="soundingText()" @click="mark.toggle()">
         <span :if="markView === 'format' && markParts()" class="lcd-format">
@@ -194,7 +214,7 @@
           <span class="icons"><DisplayIcon filled>DAC</DisplayIcon></span>
           <span :if="soundingDevice()?.quality" class="quality"><span :each="part in soundingDevice()?.quality.split(' · ') ?? []">{{ part }}</span></span>
         </span>
-        <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="bands" :active="playback.playing" :look="preferences.spectrumLook" :peaks="peakMotion(preferences.peakFall)" /></span>
+        <span :else class="lcd-spectrum"><Spectrum :source="readSpectrum" :bands="bands" :active="playback.playing" :look="preferences.spectrumLook" :peaks="peakMotion(preferences.peakFall)" :settled="fall.settled" /></span>
       </button>
       <span :else class="lcd-mark" aria-hidden="true">
         <span class="lcd-logo" :style="logoStyle"></span>
