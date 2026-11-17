@@ -246,6 +246,11 @@ export function withCovers(source: RootSource): RootSource {
               const name = refName(track.metadata.coverDataUrl);
               if (name && !kept.has(name)) coverAt(name, source.vfs);
             }
+            // The desktop scan's second pass names them apart from the tags.
+            for (const { cover } of batch.covered ?? []) {
+              const name = refName(cover);
+              if (name && !kept.has(name)) coverAt(name, source.vfs);
+            }
             take(batch);
           })
       : undefined,

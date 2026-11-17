@@ -108,6 +108,15 @@
   --mm-codec-pcm: #a5776a;
   --mm-codec-ogg: #8579a8;
   --mm-codec-other: #7c8890;
+  /* The same codecs as text (a length in Details; the owner, 2026-11-17): more saturated, and at
+     5:1 or more on the surface, where the marks' colours fell under 4.5:1. */
+  --mm-codec-flac-ink: #0f7a6c;
+  --mm-codec-mp3-ink: #8a5d00;
+  --mm-codec-aac-ink: #2263a6;
+  --mm-codec-alac-ink: #8a3c7c;
+  --mm-codec-pcm-ink: #a3462b;
+  --mm-codec-ogg-ink: #6243aa;
+  --mm-codec-other-ink: #55626b;
 
   /* What a modal lays over the page. */
   --mm-overlay: rgba(27, 29, 29, .42);
@@ -260,6 +269,13 @@
   --mm-codec-pcm: #c29589;
   --mm-codec-ogg: #a197c2;
   --mm-codec-other: #98a3ab;
+  --mm-codec-flac-ink: #4fd8c4;
+  --mm-codec-mp3-ink: #f2bc3c;
+  --mm-codec-aac-ink: #78b4ff;
+  --mm-codec-alac-ink: #e597d6;
+  --mm-codec-pcm-ink: #f5a184;
+  --mm-codec-ogg-ink: #bba8ff;
+  --mm-codec-other-ink: #b6c1c9;
 
   /* A white veil: on a dark page, a darker one would hide the modal's edges. */
   --mm-overlay: rgba(255, 255, 255, .2);

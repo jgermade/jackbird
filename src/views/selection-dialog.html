@@ -25,9 +25,10 @@
   const PictureKeys = await import("./picture-keys.html")
   const { blobToDataUrl, closePicture, openPicture, picture } = await import("../lib/picture")
 
-  const { audioLine, formatBytes, formatDuration } = await import("../helpers/format")
+  const { audioLine, formatBytes } = await import("../helpers/format")
   const { bpmJob, cancelBpms } = await import("../lib/bpm")
   const { audioFormatOf } = await import("../helpers/formats")
+  const { allFacts, trackFacts } = await import("../helpers/track-facts")
   const { getVariedFields } = await import("../helpers/metadata")
   const { calculateBpm, canChange, closeSelection, confirmField, editor, inSharedMusic, saveEdits, setCompilation } = await import("../lib/editor")
   const { t, tn } = await import("../lib/i18n")
@@ -162,36 +163,8 @@
 
   // Info
   const totalSize = (): number => tracks().reduce((sum, track) => sum + track.size, 0)
-  const facts = (track: Track) => {
-    const none = t("common.none")
-    return [
-      { label: t("field.title"), text: track.metadata.title || none },
-      { label: t("field.artist"), text: track.metadata.artist || none },
-      { label: t("field.album"), text: track.metadata.album || none },
-      { label: t("field.albumArtist"), text: track.metadata.albumArtist || none },
-      { label: t("field.track"), text: track.metadata.trackNumber || none },
-      { label: t("field.disc"), text: track.metadata.discNumber || none },
-      { label: t("field.compilation"), text: track.metadata.compilation.trim() === "1" ? t("common.yes") : t("common.no") },
-      { label: t("field.year"), text: track.metadata.year || none },
-      { label: t("field.genre"), text: track.metadata.genre || none },
-      { label: t("field.composer"), text: track.metadata.composer || none },
-      { label: t("field.bpm"), text: track.metadata.bpm || none },
-      { label: t("field.comment"), text: track.metadata.comment || none, long: true },
-      { label: t("field.lyrics"), text: track.metadata.lyrics || none, long: true },
-      { label: t("info.relativePath"), text: track.relativePath, mono: true },
-      { label: t("info.fileName"), text: track.name },
-      { label: t("info.format"), text: formatName(track) || none },
-      { label: t("info.duration"), text: formatDuration(track.audio?.durationMs) || none },
-      { label: t("info.bitrate"), text: track.audio?.bitrate ? `${track.audio.bitrate} kbps${track.audio.vbr && !track.audio.bits ? " (VBR)" : ""}` : none },
-      { label: t("info.sampleRate"), text: track.audio?.sampleRate ? `${(track.audio.sampleRate / 1000).toLocaleString(preferences.language, { maximumFractionDigits: 1 })} kHz` : none },
-      { label: t("info.channels"), text: track.audio?.channels ? (track.audio.channels === 1 ? t("info.mono") : track.audio.channels === 2 ? t("info.stereo") : String(track.audio.channels)) : none },
-      ...(track.audio?.bits ? [{ label: t("info.bits"), text: `${track.audio.bits} bits` }] : []),
-      { label: t("editor.size"), text: formatBytes(track.size) },
-      { label: t("info.fullChecksum"), text: track.fullChecksum || track.checksum || none, mono: true },
-      { label: t("info.audioChecksum"), text: track.audioChecksum || none, mono: true },
-      { label: t("info.lastVerified"), text: track.lastVerifiedAt ? new Date(track.lastVerifiedAt).toLocaleString(preferences.language) : none }
-    ]
-  }
+  // The track's facts, as its own info dialog lists them (helpers/track-facts.ts), in one list.
+  const facts = (track: Track) => allFacts(trackFacts(track, t, preferences.language))
 
   // Rename: the pattern (typed, or a preset), its fields, the preview, and its key.
   type Plan = { trackId: string; from: string; name: string; shownFrom: string; shown: string; status: "ok" | "same" | "empty" | "clash" }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { MetaRecord, MetaSnapshot } from "../types.ts";
 import { track } from "./fixtures.test-support.ts";
-import { applyScanResults, applySums, applyVerification, checksumOf, emptySnapshot, omitRecords, parseMetaSnapshot, serializeMetaSnapshot } from "./snapshot.ts";
+import { applyCovers, applyScanResults, applySums, applyVerification, checksumOf, emptySnapshot, omitRecords, parseMetaSnapshot, serializeMetaSnapshot } from "./snapshot.ts";
 
 const snapshot: MetaSnapshot = {
   version: 1,
@@ -317,5 +317,34 @@ describe("applySums", () => {
     const bare = { ...root, metaSnapshot: { version: 1 as const, tracks: {} as Record<string, MetaRecord> } };
     const { root: next } = applySums(bare, [sums("hunter.mp3")], now);
     assert.equal(next.metaSnapshot.tracks["hunter.mp3"].updatedAt, now);
+  });
+});
+
+describe("applyCovers", () => {
+  const bare = track("Jazz/so-what.mp3");
+  const saved = { ...track("Jazz/hunter.mp3"), metadata: { ...track("Jazz/hunter.mp3").metadata, coverDataUrl: "jackbird-cover:saved.jpg" } };
+  const root = {
+    id: "root",
+    tracks: [bare, saved],
+    metaSnapshot: { version: 1, tracks: { "Jazz/so-what.mp3": { checksum: "a", metadata: bare.metadata, updatedAt: "before" } } } as MetaSnapshot
+  };
+
+  it("gives a track and its record their cover, as new objects", () => {
+    const copy = structuredClone(root);
+    const next = applyCovers(root, [{ path: "Jazz/so-what.mp3", cover: "jackbird-cover:a.jpg" }]);
+    assert.equal(next.tracks[0].metadata.coverDataUrl, "jackbird-cover:a.jpg");
+    assert.equal(next.metaSnapshot.tracks["Jazz/so-what.mp3"].metadata.coverDataUrl, "jackbird-cover:a.jpg");
+    assert.equal(next.tracks[1], saved);
+    assert.deepEqual(root, copy);
+  });
+
+  it("leaves a cover a save gave meanwhile, and a track gone", () => {
+    assert.equal(applyCovers(root, [{ path: "Jazz/hunter.mp3", cover: "jackbird-cover:old.jpg" }, { path: "gone.mp3", cover: "jackbird-cover:x.jpg" }]), root);
+  });
+
+  it("gives a track without a record its cover alone", () => {
+    const next = applyCovers({ ...root, metaSnapshot: { version: 1, tracks: {} } as MetaSnapshot }, [{ path: "Jazz/so-what.mp3", cover: "jackbird-cover:a.jpg" }]);
+    assert.equal(next.tracks[0].metadata.coverDataUrl, "jackbird-cover:a.jpg");
+    assert.deepEqual(next.metaSnapshot.tracks, {});
   });
 });

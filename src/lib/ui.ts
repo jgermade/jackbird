@@ -32,5 +32,7 @@ export const ui = $reactive({
   /** Bumped when a track is shown in the library (lib/workspace.ts `revealTrack`): the list scrolls to its row. */
   revealed: 0,
   /** The active root's duplicates dialog (views/duplicates-dialog.html). */
-  duplicatesOpen: false
+  duplicatesOpen: false,
+  /** The track of the active root whose own info dialog is open (views/track-info-dialog.html), from its length in Details. */
+  trackInfo: null as string | null
 });

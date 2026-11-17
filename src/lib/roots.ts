@@ -8,7 +8,7 @@ import { emptyMetadata, readsEveryField, withEveryField } from "../helpers/metad
 import { inferredMetadata } from "../helpers/rename";
 import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
-import { applyScanResults, checksumOf, omitRecords, type ScanResult } from "../helpers/snapshot";
+import { applyCovers, applyScanResults, checksumOf, omitRecords, type Covered, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths, sameTrackFiles } from "../helpers/tracks";
 import type { GroupingMode, LibraryView, RootSource, RootWorkspace, Track } from "../types";
 import { coversIn, internSnapshot, namesIn, withCovers } from "./covers";
@@ -236,6 +236,7 @@ export async function hydrateRoot(
       // since its file was read (applyScanResults), and `.meta/` is written
       // through the queue every writer uses (flushMeta).
       const pendingUpdates: ScanResult[] = [];
+      const pendingCovers: Covered[] = [];
       // Counted against the walk, as the root's own count above: what is
       // already known, then one per file read, ending at the total (when the
       // last batch is flushed).
@@ -246,11 +247,13 @@ export async function hydrateRoot(
       function flush(): void {
         const updates = [...pendingUpdates];
         pendingUpdates.length = 0;
+        const covered = [...pendingCovers];
+        pendingCovers.length = 0;
 
         updateRoots((currentRoots) =>
           currentRoots.map((root) =>
             root.id === rootId
-              ? { ...applyScanResults(root, updates), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
+              ? { ...applyCovers(applyScanResults(root, updates), covered), loadedCount, loadingMetadata: loadedCount < totalAfterWalk }
               : root
           )
         );
@@ -365,10 +368,12 @@ export async function hydrateRoot(
                 }
               });
             }
+            // The second pass's covers (the desktop scan's tags come first, without them).
+            if (batch.covered?.length) pendingCovers.push(...batch.covered);
             for (const unread of batch.unread) console.error(`jackbird: could not read ${unread.path}`, unread.message);
             failedCount += batch.unread.length;
             loadedCount += batch.tracks.length + batch.unread.length;
-            snapshotDirty ||= batch.tracks.length > 0;
+            snapshotDirty ||= batch.tracks.length > 0 || !!batch.covered?.length;
             if (batch.done || (!drawn && batch.tracks.length > 0) || Date.now() - flushedAt >= FLUSH_EVERY_MS) {
               drawn ||= batch.tracks.length > 0;
               flushedAt = Date.now();

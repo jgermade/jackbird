@@ -1,0 +1,106 @@
+<script :setup lang="ts">
+  // One track's information, opened from its length in Details (views/album-sheet.html), without
+  // touching the selection: its cover, title, artist and album; then its quality, its tags, where
+  // it is and its file, each under its heading. The facts are the selection dialog's Info tab's
+  // (helpers/track-facts.ts). A view over lib/ui.ts and lib/workspace.ts. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-17).
+
+  const CodecMark = await import("../../theme/default/components/codec-mark.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const Stripes = await import("../../theme/default/components/stripes.html")
+
+  const { t } = await import("../lib/i18n")
+  const { coverSrc } = await import("../lib/covers")
+  const { onTrackMenu } = await import("../lib/menus")
+  const { preferences } = await import("../lib/preferences")
+  const { ui } = await import("../lib/ui")
+  const { activeRoot } = await import("../lib/workspace")
+  const { codecLabel } = await import("../helpers/formats")
+  const { trackFacts } = await import("../helpers/track-facts")
+
+  type Track = { id: string; name: string; relativePath: string; metadata: { title: string; artist: string; album: string; coverDataUrl: string | null }; audio?: { bitrate?: number; kind?: string } | null }
+
+  // Read through functions: the root is boxed (see Opaque in lib/workspace.ts).
+  const root = () => activeRoot.value.data
+  const track = (): Track | null => (ui.trackInfo ? root()?.tracks.find((one: Track) => one.id === ui.trackInfo) ?? null : null)
+  const facts = () => trackFacts(track() as never, t, preferences.language)
+  const folderOf = (path: string): string => path.split("/").slice(0, -1).join("/") || t("trackInfo.root")
+  const sections = () => {
+    const found = facts()
+    const shown = track() as Track
+    return [
+      { key: "quality", title: t("trackInfo.quality"), facts: found.quality },
+      { key: "tags", title: t("trackInfo.tags"), facts: found.tags },
+      { key: "where", title: t("trackInfo.where"), facts: [{ label: t("trackInfo.source"), text: root()?.label ?? "" }, { label: t("trackInfo.folder"), text: folderOf(shown.relativePath), mono: true }, ...found.where] },
+      { key: "file", title: t("trackInfo.file"), facts: found.file }
+    ]
+  }
+  const close = () => (ui.trackInfo = null)
+  const showInLibrary = () => {
+    const id = ui.trackInfo
+    close()
+    if (id) onTrackMenu(id, "show")
+  }
+</script>
+
+<div class="track-info">
+  <Modal :open="!!track()" :eyebrow="t('trackInfo.eyebrow')" :title="track() ? track().metadata.title || track().name : ''" :close-label="t('trackInfo.close')" @close="close()">
+    <div :if="track()" class="body">
+      <header class="hero">
+        <div class="cover">
+          <img :if="coverSrc(track().metadata.coverDataUrl)" :src="coverSrc(track().metadata.coverDataUrl)" :alt="t('album.coverOf', { title: track().metadata.album || track().name })" />
+          <div :else class="no-cover" aria-hidden="true"><span class="band"><Stripes variant="band" /></span></div>
+        </div>
+        <div class="who">
+          <p class="artist">{{ track().metadata.artist || t("album.unknownArtist") }}</p>
+          <p :if="track().metadata.album" class="album">{{ track().metadata.album }}</p>
+          <span :if="codecLabel(track().relativePath, track().audio)" class="codec"><CodecMark tinted :format="codecLabel(track().relativePath, track().audio)" /></span>
+        </div>
+      </header>
+      <section :each="section in sections()" :key="section.key" class="group">
+        <h4 class="mm-legend">{{ section.title }}</h4>
+        <dl class="facts">
+          <div :each="fact in section.facts" :key="fact.label">
+            <dt>{{ fact.label }}</dt>
+            <dd :class.mono="!!fact.mono" :class.long="!!fact.long">{{ fact.text }}</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+    <template :slot.foot>
+      <span class="keys">
+        <Key variant="ghost" @click="showInLibrary()">{{ t("menu.showInLibrary") }}</Key>
+        <Key variant="primary" @click="close()">{{ t("trackInfo.close") }}</Key>
+      </span>
+    </template>
+  </Modal>
+</div>
+
+<style scoped>
+  .track-info { display: contents; }
+  .body { display: grid; gap: var(--mm-space-5); }
+  .hero { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); align-items: center; gap: var(--mm-space-4); }
+  .cover { width: 5.5rem; aspect-ratio: 1; overflow: hidden; border-radius: var(--mm-radius-key); box-shadow: var(--mm-shadow-md); }
+  .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .no-cover { position: relative; height: 100%; background: var(--mm-display-bezel); }
+  .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
+  .who { display: grid; gap: var(--mm-space-1); min-width: 0; }
+  .who p { margin: 0; overflow-wrap: anywhere; }
+  .artist { font-size: var(--mm-text-lg); }
+  .album { color: var(--mm-fg-muted); }
+  /* Its codec as the lists show it: small, in its colour, no glow. */
+  .codec { justify-self: start; margin-top: var(--mm-space-1); font-size: .75rem; line-height: 1; --mm-display-glow: none; --codec-size: 1.4em; }
+  .group { display: grid; gap: var(--mm-space-2); }
+  .group h4 { margin: 0; }
+  .facts { display: grid; gap: var(--mm-space-2); margin: 0; }
+  .facts div { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: var(--mm-space-3); }
+  .facts dt { color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .facts dd.mono { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); }
+  .facts dd.long { white-space: pre-wrap; }
+  .keys { display: flex; justify-content: flex-end; gap: var(--mm-space-2); width: 100%; }
+  @media (max-width: 720px) {
+    .facts div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  }
+</style>

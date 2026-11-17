@@ -232,10 +232,12 @@ export type MediaHandle = {
 /** A file the bulk reads could not read, and why. */
 export type Unread = { path: string; message: string };
 
-/** Tags read in bulk: the files (covers by reference), the covers met for the first time (base64), the files not read. */
+/** Tags read in bulk: the files (covers by reference, or after them in `covered`), the covers met for the first time (base64), the files not read. */
 export type TagsBatch = {
   done: boolean;
   tracks: { path: string; size: number; lastModified: number; metadata: TrackMetadata; audio?: AudioProps | null }[];
+  /** The desktop scan's second pass: each file's cover by reference (its tags came without one). */
+  covered?: { path: string; cover: string }[];
   /** Each cover's bytes come as base64 (`data`), or as they are (`bytes`, the web's iPod: no round trip through text). */
   covers: { name: string; data: string; bytes?: Uint8Array }[];
   unread: Unread[];

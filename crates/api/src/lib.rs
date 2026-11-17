@@ -259,6 +259,28 @@ pub struct CoverJson {
     pub data: String,
 }
 
+/// A file's cover, by reference, as a scan's second pass gives it (the tags came in its first).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoveredJson {
+    /// Its path under the root.
+    pub path: String,
+    /// Its cover, as the tracks hold it ([`cover_ref`]).
+    pub cover: String,
+}
+
+/// A file's tags as a scan's first pass gives them: no cover (its second pass names it).
+pub fn scanned_tags(path: String, tagged: Tagged) -> ScannedJson {
+    let (fields, _) = tagged.tags;
+    ScannedJson {
+        path,
+        size: tagged.stat.size,
+        last_modified: tagged.stat.mtime,
+        metadata: metadata_of(fields, None),
+        audio: tagged.audio.map(AudioJson::from),
+    }
+}
+
 /// A file's tags as the scan gives them, and its cover's name and the cover itself.
 pub fn scanned(path: String, tagged: Tagged) -> (ScannedJson, Option<(String, Cover)>) {
     let (fields, cover) = tagged.tags;
