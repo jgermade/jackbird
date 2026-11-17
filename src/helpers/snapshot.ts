@@ -203,6 +203,30 @@ export function applyScanResults<Root extends WithSnapshot>(root: Root, results:
   };
 }
 
+/** A file's cover by reference, as a scan's second pass gives it (`jackbird-cover:<name>`). */
+export type Covered = { path: string; cover: string };
+
+/**
+ * A root after a scan's second pass named its files' covers, as new objects (nothing given is
+ * changed): each track, and its `.meta` record, takes its cover where it has none (one a save
+ * gave it meanwhile stands). The root itself when none applies.
+ */
+export function applyCovers<Root extends WithSnapshot>(root: Root, covered: readonly Covered[]): Root {
+  const coverOf = new Map(covered.map(({ path, cover }) => [path, cover]));
+  const records: Record<string, MetaRecord> = {};
+  let changed = false;
+  const tracks = root.tracks.map((track) => {
+    const cover = coverOf.get(track.id);
+    if (!cover || track.metadata.coverDataUrl) return track;
+    changed = true;
+    const record = root.metaSnapshot.tracks[track.relativePath];
+    if (record && !record.metadata.coverDataUrl) records[track.relativePath] = { ...record, metadata: { ...record.metadata, coverDataUrl: cover } };
+    return { ...track, metadata: { ...track.metadata, coverDataUrl: cover } };
+  });
+  if (!changed) return root;
+  return { ...root, tracks, metaSnapshot: { ...root.metaSnapshot, tracks: { ...root.metaSnapshot.tracks, ...records } } };
+}
+
 /** A snapshot without the records of `paths` (files gone from disk); the snapshot itself when it has none of them. */
 export function omitRecords(snapshot: MetaSnapshot, paths: readonly string[]): MetaSnapshot {
   if (!paths.some((path) => path in snapshot.tracks)) {

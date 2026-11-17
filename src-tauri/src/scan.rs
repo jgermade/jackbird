@@ -4,7 +4,8 @@
 //!
 //! - `scan`: each file's tags, from its head only (no checksum, the audio not read), several files
 //!   at a time, sent to the interface in batches over a channel: one call for the whole folder,
-//!   not one per file. The tracks hold their cover by reference (`cover_name`); the picture itself
+//!   not one per file; then, in a second pass, each file's cover. The tracks hold their cover by
+//!   reference (`cover_name`), sent in that second pass (`covered`); the picture itself
 //!   is written into the folder's `.meta/covers/` the first time the scan meets it (unless it is
 //!   there), where the interface reads it when it shows it: no picture crosses in the batches, but
 //!   one that could not be written there, which goes once.
@@ -18,7 +19,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use jackbird_api::{CoverJson, ScannedJson, SumsJson, UnreadJson, scanned};
+use jackbird_api::{CoverJson, CoveredJson, ScannedJson, SumsJson, UnreadJson, cover_name, cover_ref, scanned_tags};
 use jackbird_core::Root;
 use serde::Serialize;
 use tauri::State;
@@ -31,14 +32,16 @@ const EVERY: Duration = Duration::from_millis(150);
 /// How many files a batch holds at most.
 const BATCH: usize = 256;
 
-/// Tags read: the files, the covers that could not be written into `.meta/covers/` (once each),
-/// the files that could not be read.
+/// Tags read: the files (the first pass), their covers by reference (the second), the covers that
+/// could not be written into `.meta/covers/` (once each), the files that could not be read.
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TagsBatch {
     /// The last batch: the interface waits for it, not for the command's answer (which can come first).
     done: bool,
     tracks: Vec<ScannedJson>,
+    /// The second pass's: each file's cover, by reference.
+    covered: Vec<CoveredJson>,
     covers: Vec<CoverJson>,
     unread: Vec<UnreadJson>,
 }
@@ -115,6 +118,10 @@ pub fn scan_tags(root: &Root, paths: Vec<String>, known_covers: Vec<String>, cha
 /// [`scan_tags`], each new cover written into `covers_dir` (`.meta/covers/` for a folder; an iPod's
 /// Rockbox library keeps its own under `iPod_Control/jackbird/covers/`). One that cannot be written
 /// is sent whole.
+///
+/// In two passes (RECORD/2026-11-14.ipod-sync.WIP.md, 2026-11-17): the tags first, every file's,
+/// with no cover; then the covers, each file's by reference (`covered`), each picture named,
+/// written or sent once. The last batch (`done`) is the second pass's.
 pub fn scan_tags_with(
     root: &Root,
     paths: Vec<String>,
@@ -122,34 +129,52 @@ pub fn scan_tags_with(
     channel: &Channel<TagsBatch>,
     covers_dir: &str,
 ) {
-    let mut sent: HashSet<String> = known_covers.into_iter().collect();
     let mut batch = TagsBatch::default();
     in_parallel(
-        paths,
+        paths.clone(),
         threads(),
         |path| jackbird_core::read_tags(root, path),
         &mut batch,
         |batch, path, result| match result {
-            Ok(tagged) => {
-                let (json, cover) = scanned(path, tagged);
-                if let Some((name, cover)) = cover
-                    && sent.insert(name.clone())
-                {
-                    let at = format!("{covers_dir}/{name}");
-                    let kept = matches!(root.stat(&at), Ok(Some(_))) || root.write(&at, &cover.data).is_ok();
-                    if !kept {
-                        batch.covers.push(CoverJson {
-                            name,
-                            data: jackbird_core::base64_encode(&cover.data),
-                        });
-                    }
-                }
-                batch.tracks.push(json);
-            }
+            Ok(tagged) => batch.tracks.push(scanned_tags(path, tagged)),
             Err(error) => batch.unread.push(UnreadJson {
                 path,
                 message: error.to_string(),
             }),
+        },
+        // Not the last batch: the covers' pass comes after. An empty one at the end is not sent.
+        |batch, done| {
+            if !(done && batch.tracks.is_empty() && batch.unread.is_empty()) {
+                let _ = channel.send(std::mem::take(batch));
+            }
+        },
+    );
+    let mut sent: HashSet<String> = known_covers.into_iter().collect();
+    in_parallel(
+        paths,
+        threads(),
+        // The picture named where it is read, on the reading threads; a file not read has none.
+        |path| {
+            let (_, cover) = jackbird_core::read_tags(root, path).ok()?.tags;
+            cover.map(|cover| (cover_name(&cover), cover))
+        },
+        &mut batch,
+        |batch, path, named| {
+            let Some((name, cover)) = named else { return };
+            if sent.insert(name.clone()) {
+                let at = format!("{covers_dir}/{name}");
+                let kept = matches!(root.stat(&at), Ok(Some(_))) || root.write(&at, &cover.data).is_ok();
+                if !kept {
+                    batch.covers.push(CoverJson {
+                        name: name.clone(),
+                        data: jackbird_core::base64_encode(&cover.data),
+                    });
+                }
+            }
+            batch.covered.push(CoveredJson {
+                path,
+                cover: cover_ref(&name),
+            });
         },
         |batch, done| {
             batch.done = done;
@@ -267,12 +292,18 @@ mod tests {
             .collect()
     }
 
-    /// The covers' names the tracks refer to.
-    fn names(tracks: &[Value]) -> HashSet<String> {
-        tracks
+    /// The covers' names the second pass refers to.
+    fn names(covered: &[Value]) -> HashSet<String> {
+        covered
             .iter()
-            .filter_map(|track| track["metadata"]["coverDataUrl"].as_str())
-            .map(|cover| cover.strip_prefix("jackbird-cover:").unwrap().to_string())
+            .map(|one| {
+                one["cover"]
+                    .as_str()
+                    .unwrap()
+                    .strip_prefix("jackbird-cover:")
+                    .unwrap()
+                    .to_string()
+            })
             .collect()
     }
 
@@ -286,10 +317,29 @@ mod tests {
         assert_eq!(sent.iter().filter(|batch| batch["done"] == true).count(), 1);
         let tracks = all(&sent, "tracks");
         assert_eq!(tracks.len(), 4);
-        let untagged = tracks.iter().find(|track| track["path"] == "mp3-no-tag.mp3").unwrap();
-        assert_eq!(untagged["metadata"]["coverDataUrl"], Value::Null);
-        // Two files share a picture, another has its own: two pictures, written, none sent.
-        let names = names(&tracks);
+        // The tags first, with no cover; every batch of tags before any of covers.
+        assert!(
+            tracks
+                .iter()
+                .all(|track| track["metadata"]["coverDataUrl"] == Value::Null)
+        );
+        let first_covered = sent
+            .iter()
+            .position(|batch| !batch["covered"].as_array().unwrap().is_empty())
+            .unwrap();
+        assert!(
+            sent[first_covered..]
+                .iter()
+                .all(|batch| batch["tracks"].as_array().unwrap().is_empty())
+        );
+        // Then the covers: three files with one, two sharing a picture; two pictures, written, none sent.
+        let covered = all(&sent, "covered");
+        let paths: HashSet<&str> = covered.iter().map(|one| one["path"].as_str().unwrap()).collect();
+        assert_eq!(
+            paths,
+            HashSet::from(["mp3-v23-padded.mp3", "mp3-v24-padded.mp3", "mp3-v22.mp3"])
+        );
+        let names = names(&covered);
         assert_eq!(names.len(), 2);
         assert!(all(&sent, "covers").is_empty());
         for name in &names {
@@ -305,11 +355,14 @@ mod tests {
     fn scan_neither_writes_nor_sends_a_cover_the_interface_has() {
         let (channel, sent) = kept::<TagsBatch>();
         scan_tags(&fixtures(), PATHS.map(String::from).to_vec(), Vec::new(), &channel);
-        let known: Vec<String> = names(&all(&sent.lock().unwrap(), "tracks")).into_iter().collect();
+        let known: Vec<String> = names(&all(&sent.lock().unwrap(), "covered")).into_iter().collect();
         let fresh = fixtures();
         let (channel, sent) = kept::<TagsBatch>();
         scan_tags(&fresh, PATHS.map(String::from).to_vec(), known.clone(), &channel);
-        assert!(all(&sent.lock().unwrap(), "covers").is_empty());
+        let sent = sent.lock().unwrap();
+        assert!(all(&sent, "covers").is_empty());
+        // Still named for the tracks: the interface has the pictures, not the references.
+        assert_eq!(all(&sent, "covered").len(), 3);
         for name in &known {
             assert_eq!(fresh.stat(&format!("{COVERS_DIR}/{name}")).unwrap(), None);
         }
@@ -333,7 +386,7 @@ mod tests {
                 .map(|one| one["name"].as_str().unwrap().to_string())
                 .collect();
             assert_eq!(covers.len(), 2);
-            assert_eq!(names(&all(&sent, "tracks")), covers);
+            assert_eq!(names(&all(&sent, "covered")), covers);
         }
     }
 
