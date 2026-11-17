@@ -6,12 +6,12 @@
   // rest of a disc played; a little dimmed). Each row: the
   // title, "artist - album" under it, and its length in its codec's colour (as
   // Details shows it; the bars in its place on the one playing). A click (or
-  // Enter) plays a track, the current one pauses or resumes. An upcoming
-  // track's grip (⠿) drags it to another place (mouse, pen or touch): dropped
-  // among the queued ones it is queued, among the suggested ones suggested; the
-  // played ones and the one playing have none. × removes a track (not the
+  // Enter) plays a track, the current one pauses or resumes. A track's grip
+  // (⠿) drags it to another place (mouse, pen or touch): dropped among the
+  // queued ones it is queued, among the suggested ones suggested; a played one
+  // may also go elsewhere among the played. The one playing has none. × removes a track (not the
   // current one). Up, Down, Home and End move between tracks, Alt with Up or
-  // Down moves an upcoming track (across the queued and the suggested parts'
+  // Down moves a track (a played one among the played; an upcoming one across the queued and the suggested parts'
   // edge it changes part first, where it is), Delete removes it.
   // A view over the queue's actions in lib/player.ts. See
   // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3;
@@ -87,10 +87,13 @@
     focused = entry.index
     playAt(entry.index)
   }
-  // Only upcoming tracks move, and only among the upcoming ones; `queued`: the part it lands in.
+  // A track moves among the upcoming ones (a played one too), or a played one among the played;
+  // `queued`: the part it lands in. The one playing does not move.
+  const lands = (from: Entry | undefined, to: Entry | undefined): boolean =>
+    !!from && from.state !== "current" && (upcoming(to) || (from.state === "played" && to?.state === "played"))
   const move = (from: number, to: number, queued: boolean) => {
     const list = entries()
-    if (!upcoming(list[from]) || !upcoming(list[to])) return
+    if (!lands(list[from], list[to])) return
     moveInQueue(from, to, queued)
     focusOn(to)
   }
@@ -100,6 +103,10 @@
     const list = entries()
     const entry = list[at]
     const neighbour = list[at + by]
+    if (entry?.state === "played") {
+      if (neighbour?.state === "played") move(at, at + by, false)
+      return
+    }
     if (!upcoming(entry)) return
     if (by < 0 && entry.state === "suggested" && neighbour?.state !== "suggested") markInQueue(at, true)
     else if (by > 0 && entry.state === "queued" && neighbour?.state !== "queued") markInQueue(at, false)
@@ -157,7 +164,8 @@
     }
     const unmark = () => $self(".queue")?.querySelectorAll(".drop-before, .drop-after").forEach((row) => row.classList.remove("drop-before", "drop-after"))
     // Where the track would land, from the row under the pointer: a queued or suggested one (it
-    // takes that row's place and part). Over the played ones or the one playing: nowhere.
+    // takes that row's place and part), or, for a played one, another played one. Over the one
+    // playing: nowhere.
     const aim = (): typeof target => {
       const lifted = rowAt(from)
       const hit = document.elementsFromPoint(pointX, lastY).find((element) => !lifted?.contains(element) && element.closest("[data-index]"))
@@ -165,7 +173,7 @@
       if (!node) return null
       const at = Number(node.dataset.index)
       const entry = entries()[at]
-      if (!upcoming(entry)) return null
+      if (!lands(entries()[from], entry)) return null
       return { to: at, queued: entry.state === "queued", mark: at, before: at < from }
     }
     const update = () => {
@@ -258,12 +266,11 @@
             :class.played="entry.state === 'played'" :class.suggested="entry.state === 'suggested'" :class.current="entry.state === 'current'"
             :class.missing="entry.missing" :class.focused="entry.index === focused"
             :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
-          <!-- Only upcoming tracks are dragged; the one playing's larger cover takes the grip's place. -->
-          <span :if="upcoming(entry)" class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
+          <!-- Every track but the one playing is dragged; its larger cover takes the grip's place. -->
+          <span :if="entry.state !== 'current'" class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
                 @pointerdown="drag.start(entry.index, $event)" @click.stop="null">
             <svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="8" r="1.2" /><circle cx="7" cy="8" r="1.2" /><circle cx="3" cy="13" r="1.2" /><circle cx="7" cy="13" r="1.2" /></svg>
           </span>
-          <span :elseif="entry.state !== 'current'" class="grip-space" aria-hidden="true"></span>
           <span class="art" aria-hidden="true">
             <img :if="coverSrc(entry.cover)" :src="coverSrc(entry.cover)" alt="" />
             <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
