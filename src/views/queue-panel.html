@@ -3,32 +3,91 @@
   // the deck's footer, which stays in view and in use: its list key closes
   // the panel, its transport plays, and its first key clears what comes next
   // while the panel is open (see DeckKeys). Its head says where the queue
-  // comes from, with a key to save it as a playlist (W8) and one to close
-  // it; the queue's list (QueueList) fills the rest and scrolls. See RECORD/2026-11-04.github-actions-workflows.WIP.md
-  // (the footers after W4).
+  // comes from, with a key to save it as a playlist (W8); it is closed by
+  // dragging its head down (its handle says so), as a sheet is: past a
+  // quarter of its height, or with a flick, it slides out; short of that it
+  // springs back. The list key and Escape close it too. The queue's list
+  // (QueueList) fills the rest and scrolls. See RECORD/2026-11-04.github-actions-workflows.WIP.md
+  // (the footers after W4) and RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-17).
 
   const Key = await import("../../theme/default/components/key.html")
   const QueueList = await import("./queue-list.html")
 
   const { t } = await import("../lib/i18n")
-  const { queueEntries, queueEyebrow, queueIsAlbum, queueTitle } = await import("../lib/player")
+  const { queueEntries, queueEyebrow, queueTitle } = await import("../lib/player")
   const { openPlaylistDialog } = await import("../lib/playlists")
   const { ui } = await import("../lib/ui")
+
+  // Dragging the panel down by its head. The state lives in this closure, not in the store: a
+  // top-level `let` would be a reactive field written on every move.
+  const drag = (() => {
+    let start: { y: number; t: number; id: number } | null = null
+    let moved = 0
+    let dragging = false
+    const panel = () => $self(".queue-panel") as HTMLElement | null
+    // A press that became a drag does not also click what it started on (the save key).
+    const swallowClick = () => {
+      const stop = (event: Event) => {
+        event.stopPropagation()
+        event.preventDefault()
+      }
+      window.addEventListener("click", stop, { capture: true, once: true })
+      window.setTimeout(() => window.removeEventListener("click", stop, { capture: true }), 0)
+    }
+    const down = (event: PointerEvent) => {
+      if (event.button !== 0) return
+      start = { y: event.clientY, t: event.timeStamp, id: event.pointerId }
+      moved = 0
+      dragging = false
+    }
+    const move = (event: PointerEvent) => {
+      const element = panel()
+      if (!start || !element || event.pointerId !== start.id) return
+      moved = Math.max(0, event.clientY - start.y)
+      if (!dragging && moved > 6) {
+        dragging = true
+        ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+      }
+      if (dragging) element.style.transform = `translateY(${moved}px)`
+    }
+    const up = (event: PointerEvent) => {
+      const element = panel()
+      if (!start || !element || event.pointerId !== start.id) return
+      const speed = moved / Math.max(1, event.timeStamp - start.t)
+      start = null
+      if (!dragging) return
+      dragging = false
+      swallowClick()
+      const from = element.style.transform
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches
+      if (moved > element.offsetHeight / 4 || speed > 0.6) {
+        // It goes on down from where it was let go, then closes.
+        const close = () => {
+          ui.queueOpen = false
+        }
+        const slide = still ? null : element.animate?.([{ transform: from }, { transform: "translateY(100%)" }], { duration: 180, easing: "cubic-bezier(.4, 0, 1, 1)", fill: "forwards" })
+        if (slide) slide.onfinish = close
+        else close()
+      } else {
+        // It springs back.
+        element.style.transform = ""
+        if (!still) element.animate?.([{ transform: from }, { transform: "translateY(0)" }], { duration: 200, easing: "cubic-bezier(.2, .8, .2, 1)" })
+      }
+    }
+    return { down, move, up }
+  })()
 </script>
 
 <section class="queue-panel" :aria-label="t('queue.title')">
-  <header class="head">
+  <header class="head" @pointerdown="drag.down($event)" @pointermove="drag.move($event)" @pointerup="drag.up($event)" @pointercancel="drag.up($event)">
+    <span class="grab" aria-hidden="true"></span>
     <div class="heading">
       <span class="mm-legend">{{ queueEyebrow() }}</span>
       <h2 class="title">{{ queueTitle() }}</h2>
     </div>
     <span class="keys">
-      <!-- Lists are saved, not discs. -->
-      <Key :if="!queueIsAlbum.value" square size="sm" variant="ghost" :label="t('queue.saveAsPlaylist')" :title="t('queue.saveAsPlaylist')" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue' })">
+      <Key square size="sm" variant="ghost" :label="t('queue.saveAsPlaylist')" :title="t('queue.saveAsPlaylist')" :disabled="queueEntries.value.data.length === 0" @click="openPlaylistDialog({ mode: 'queue' })">
         <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4h8M2 7.5h8M2 11h5M12 9.5v5M9.5 12h5" /></svg>
-      </Key>
-      <Key square size="sm" variant="ghost" :label="t('queue.close')" :title="t('queue.close')" @click="ui.queueOpen = false">
-        <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
       </Key>
     </span>
   </header>
@@ -45,15 +104,29 @@
     background: var(--mm-surface);
     color: var(--mm-fg);
   }
+  /* The head is where the panel is dragged down from: its handle says so (as a sheet's, theme/default/components/modal.html). */
   .head {
+    position: relative;
+    touch-action: none;
     display: flex;
     flex: none;
     align-items: center;
     justify-content: space-between;
     gap: var(--mm-space-3);
-    padding: var(--mm-space-3) var(--mm-space-3) var(--mm-space-3) var(--mm-space-4);
+    padding: var(--mm-space-4) var(--mm-space-3) var(--mm-space-3) var(--mm-space-4);
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
+  }
+  .grab {
+    position: absolute;
+    top: var(--mm-space-2);
+    left: 50%;
+    display: block;
+    width: 2.25rem;
+    height: .25rem;
+    border-radius: var(--mm-radius-full);
+    background: var(--mm-border-strong);
+    transform: translateX(-50%);
   }
   .heading { display: grid; gap: var(--mm-space-1); min-width: 0; }
   .title {

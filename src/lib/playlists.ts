@@ -27,6 +27,7 @@ import type { Playlist, PlaylistEntry, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
 import { playback } from "./playback";
+import { queueNotSaved, queueSaved } from "./player";
 import { updateRoots } from "./roots";
 import { ui, type PlaylistDialog } from "./ui";
 
@@ -260,6 +261,7 @@ export function openPlaylistDialog(dialog: PlaylistDialog): void {
 }
 
 export function closePlaylistDialog(): void {
+  if ($toRaw(ui).playlist?.mode === "queue") queueNotSaved();
   ui.playlist = null;
 }
 
@@ -320,7 +322,13 @@ export function submitPlaylistDialog(): Promise<void> {
     return run(async () => ((await deletePlaylist(dialog.rootId, dialog.path)) ? null : library.errorMessage ?? ""));
   }
   if (dialog.mode === "queue") {
-    return run(() => saveQueueAsPlaylist(rootId, name));
+    // Saved, a disc waiting for it replaces the queue (lib/player.ts playTracks); before the dialog
+    // closes, which would drop it.
+    return run(async () => {
+      const problem = await saveQueueAsPlaylist(rootId, name);
+      if (!problem) queueSaved();
+      return problem;
+    });
   }
   return run(() => createPlaylist(dialog.rootId, name, dialog.trackIds));
 }

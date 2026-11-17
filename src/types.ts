@@ -198,9 +198,15 @@ export type RootWorkspace = {
 export type QueueItem = {
   rootId: string;
   trackId: string;
+  /** Put in the queue on purpose (Play next, Add to queue), not suggested by a disc played. */
+  queued?: boolean;
 };
 
-/** What is playing: tracks of any open roots, in order, and where they came from. */
+/**
+ * What is playing: tracks of any open roots, in order, and where they came from. Before the
+ * current one, the tracks played; right after it, the ones queued on purpose (`queued`), then the
+ * ones suggested (helpers/queue.ts keeps that order).
+ */
 export type PlaybackQueue = {
   items: QueueItem[];
   sourceLabel: string;

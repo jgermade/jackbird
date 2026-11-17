@@ -34,5 +34,7 @@ export const ui = $reactive({
   /** The active root's duplicates dialog (views/duplicates-dialog.html). */
   duplicatesOpen: false,
   /** The track of the active root whose own info dialog is open (views/track-info-dialog.html), from its length in Details. */
-  trackInfo: null as string | null
+  trackInfo: null as string | null,
+  /** Asking whether a disc played replaces a queue holding tracks put there on purpose (views/replace-queue-dialog.html, lib/player.ts playTracks). */
+  replaceQueue: false
 });

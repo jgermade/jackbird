@@ -15,16 +15,23 @@ import {
   clearPlayed as clearBeforeCurrent,
   clearUpcoming as clearAfterCurrent,
   dropItems,
-  isOneAlbum,
+  hasQueued,
+  jumpTo,
+  markQueued,
   moveTo,
+  playFrom,
   playNextIn,
+  queuedCount,
   removeAt,
+  replaceWith,
   restoreQueue,
   type QueuePosition
 } from "../helpers/queue";
 import { bufferedTo, rangesOf } from "../helpers/buffered";
 import { isOrderOf, nextIndex, nextRepeat, previousIndex, shuffledOrder, upcoming as upcomingIndices, type PlayMode } from "../helpers/order";
 import { fileUrl } from "../helpers/output";
+import { formatDuration } from "../helpers/format";
+import { codecFamily, codecLabel, type CodecFamily } from "../helpers/formats";
 import { countsAsPlayed } from "../helpers/plays";
 import { parsePlaybackState } from "../helpers/session";
 import { DISPLAY_BANDS, SPECTRUM_DECIBELS, SPECTRUM_FFT, SPECTRUM_RANGE, SPECTRUM_SMOOTHING, SPECTRUM_TILT, foldBands, spectrumBands } from "../helpers/spectrum";
@@ -40,6 +47,7 @@ import { t } from "./i18n";
 import { library } from "./library";
 import { Opaque } from "./opaque";
 import { playback } from "./playback";
+import { ui } from "./ui";
 import { SESSION_KEYS, readSession, writeSession } from "./storage";
 
 /** The current track of the queue, as the display shows it; null when nothing is queued. */
@@ -109,11 +117,16 @@ export type QueueEntry = {
   index: number;
   title: string;
   artist: string;
+  album: string;
+  /** Its length ("3:41"), and the family of its codec, whose colour the length takes. */
+  duration: string;
+  codec: CodecFamily;
   /** The open root it is in. */
   rootLabel: string;
   /** Its cover, as the library holds it (lib/covers.ts's coverSrc draws it); null without one. */
   cover: string | null;
-  state: "played" | "current" | "upcoming";
+  /** Its part of the queue: played, playing, queued on purpose, or suggested. */
+  state: "played" | "current" | "queued" | "suggested";
   /** No longer in the library (removed from it since it was queued). */
   missing: boolean;
 };
@@ -145,26 +158,14 @@ export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
         index: at,
         title: track ? track.metadata.title || track.name : item.trackId.split("/").pop() || item.trackId,
         artist: track?.metadata.artist ?? "",
+        album: track?.metadata.album ?? "",
+        duration: track ? formatDuration(track.audio?.durationMs) : "",
+        codec: track ? codecFamily(codecLabel(track.relativePath, track.audio)) : "other",
         rootLabel: root?.label ?? "",
         cover: track?.metadata.coverDataUrl ?? null,
-        state: at < index ? "played" : at === index ? "current" : "upcoming",
+        state: at < index ? "played" : at === index ? "current" : item.queued ? "queued" : "suggested",
         missing: !track
       };
-    })
-  );
-});
-
-/** Whether the queue is one disc (its played tracks are then not dimmed), from the queue and the library. */
-export const queueIsAlbum = $computed((): boolean => {
-  const queue = playback.queue;
-  if (!queue) return false;
-  const roots = new Map(library.roots.map((root) => [root.id, root]));
-  return isOneAlbum(
-    queue.items.map((item) => {
-      const track = trackIn(roots.get(item.rootId), item.trackId);
-      if (!track) return null;
-      const folder = `${item.rootId}/${track.relativePath.split("/").slice(0, -1).join("/")}`;
-      return { album: track.metadata.album, artist: track.metadata.artist, folder };
     })
   );
 });
@@ -485,7 +486,7 @@ function songOf(opened: MediaHandle, key: string): PhoneSong {
 async function openAhead(count: number): Promise<Ahead[] | null> {
   const { queue, index } = $toRaw(playback);
   const roots = $toRaw(library).roots;
-  const items = queue ? upcomingIndices(index, queue.items.length, playMode()).slice(0, count).map((at) => queue.items[at]) : [];
+  const items = queue ? upcomingIndices(index, queue.items.length, playMode(), queuedCount({ queue, index })).slice(0, count).map((at) => queue.items[at]) : [];
   const opened = await Promise.all(
     items.map(async (item): Promise<Ahead | null> => {
       const root = roots.find((one) => one.id === item.rootId);
@@ -516,7 +517,7 @@ async function sendNext(): Promise<void> {
   }
   if (!native) return;
   const { queue, index } = $toRaw(playback);
-  const after = queue ? upcomingIndices(index, queue.items.length, playMode())[0] : undefined;
+  const after = queue ? upcomingIndices(index, queue.items.length, playMode(), queuedCount({ queue, index }))[0] : undefined;
   const item = after === undefined ? undefined : queue?.items[after];
   const root = item ? $toRaw(library).roots.find((one) => one.id === item.rootId) : undefined;
   const track = item ? trackIn(root, item.trackId) : undefined;
@@ -626,14 +627,14 @@ function wire(element: HTMLAudioElement | NativeAudio | PhoneAudio): void {
     if (element !== audio) return;
     // Repeating one (or the whole of a queue of one): the same track again, from its start.
     const total = $toRaw(playback).queue?.items.length ?? 0;
-    const after = nextIndex(playback.index, total, playMode());
+    const after = nextIndex(playback.index, total, playMode(), queuedCount(position()));
     if (after === playback.index && (playback.repeat === "one" || (playback.repeat === "all" && total > 0))) {
       element.currentTime = 0;
       void element.play().catch(() => undefined);
       return;
     }
     playback.playing = false;
-    if (after !== playback.index) playback.index = after;
+    if (after !== playback.index) goTo(after);
   });
   element.addEventListener("timeupdate", () => {
     if (element !== audio) return;
@@ -688,7 +689,7 @@ function wireNative(element: NativeAudio | PhoneAudio): void {
   element.addEventListener("advance", (event) => {
     const key = (event as CustomEvent<string>).detail;
     const { queue, index } = $toRaw(playback);
-    const at = queue ? (upcomingIndices(index, queue.items.length, playMode()).find((place) => keyOf(queue.items[place]) === key) ?? -1) : -1;
+    const at = queue ? (upcomingIndices(index, queue.items.length, playMode(), queuedCount({ queue, index })).find((place) => keyOf(queue.items[place]) === key) ?? -1) : -1;
     const taken = upcoming.findIndex((one) => one.key === key);
     if (element !== audio || taken < 0 || at < 0) return;
     const next = upcoming[taken];
@@ -698,7 +699,7 @@ function wireNative(element: NativeAudio | PhoneAudio): void {
     loadedKey = key;
     loaded = { rootId: next.rootId, relativePath: next.relativePath, lastModified: next.lastModified };
     playback.position = 0;
-    playback.index = at;
+    goTo(at);
     // The desktop's player has only the next one: it is given the one after. The phone's has the
     // rest, topped up once half of them are played (if the page can reach the instance now).
     if (element === native || upcoming.length < PHONE_AHEAD / 2) void sendNext();
@@ -836,9 +837,90 @@ export function removeFromQueue(at: number): void {
   apply(removeAt(position(), at));
 }
 
-/** Moves the queue's `from`-th track to `to`; the current one keeps playing. */
-export function moveInQueue(from: number, to: number): void {
-  apply(moveTo(position(), from, to));
+/**
+ * Moves the queue's `from`-th track to `to`; the current one keeps playing. `queued`, when given:
+ * it is queued on purpose there, or suggested.
+ */
+export function moveInQueue(from: number, to: number, queued?: boolean): void {
+  apply(moveTo(position(), from, to, queued));
+}
+
+/** The queue's `at`-th track (one after the current) queued on purpose, or suggested, where it is. */
+export function markInQueue(at: number, queued: boolean): void {
+  apply(markQueued(position(), at, queued));
+}
+
+/**
+ * The queue's `at`-th track current, the queue put in order around it (helpers/queue.ts jumpTo):
+ * the queue and the index written together, the queue only when it changed.
+ */
+function goTo(at: number): void {
+  const was = position();
+  const next = jumpTo(was, at);
+  $batch(() => {
+    if (next.queue !== was.queue) playback.queue = next.queue;
+    if (next.index !== playback.index) playback.index = next.index;
+  });
+}
+
+/**
+ * A disc (a folder, a playlist) to play from its `at`-th track, waiting for the person's answer:
+ * the queue holds tracks put there on purpose, and starting the disc would replace it.
+ */
+let waiting: { items: QueueItem[]; at: number; label: string } | null = null;
+/** Saving the queue as a playlist, to replace it with the disc waiting once saved. */
+let replaceOnSave = false;
+
+/**
+ * Plays `items` (a disc, a folder, a playlist) from the `at`-th, in place of the queue: that track
+ * plays, the ones after it are suggested, the ones before it are left out. A queue holding tracks
+ * put there on purpose is not replaced at once: the person is asked (views/replace-queue-dialog.html).
+ */
+export function playTracks(items: QueueItem[], at: number, label: string): void {
+  if (at < 0 || at >= items.length) return;
+  if (hasQueued(position())) {
+    waiting = { items, at, label };
+    replaceOnSave = false;
+    ui.replaceQueue = true;
+    return;
+  }
+  const next = replaceWith(items, at, label);
+  if (next.queue) playQueue(next.queue, next.index);
+}
+
+/** The person's answer about the disc waiting: keep the queue, or replace it (once saved, or now); `null` changes nothing. */
+export function answerReplace(choice: "keep" | "save" | "replace" | null): void {
+  ui.replaceQueue = false;
+  const disc = waiting;
+  if (!disc || choice === null) {
+    waiting = null;
+    return;
+  }
+  if (choice === "save") {
+    // Kept until the playlist is saved (queueSaved), or its dialog closed unsaved (queueNotSaved).
+    replaceOnSave = true;
+    return;
+  }
+  waiting = null;
+  const next = choice === "keep" ? playFrom(position(), disc.items, disc.at, disc.label) : replaceWith(disc.items, disc.at, disc.label);
+  if (next.queue) playQueue(next.queue, next.index);
+}
+
+/** The queue was saved as a playlist (lib/playlists.ts): a disc waiting for it now replaces it. */
+export function queueSaved(): void {
+  const disc = replaceOnSave ? waiting : null;
+  replaceOnSave = false;
+  waiting = null;
+  if (!disc) return;
+  const next = replaceWith(disc.items, disc.at, disc.label);
+  if (next.queue) playQueue(next.queue, next.index);
+}
+
+/** The playlist dialog closed without saving: a disc waiting for it does not play. */
+export function queueNotSaved(): void {
+  if (!replaceOnSave) return;
+  replaceOnSave = false;
+  waiting = null;
 }
 
 /** Removes every track after the current one. */
@@ -893,7 +975,7 @@ export function playAt(at: number): void {
     return;
   }
   startPaused = null;
-  playback.index = at;
+  goTo(at);
 }
 
 /**
@@ -968,18 +1050,18 @@ function keyMode(): PlayMode {
 
 export function next(): void {
   const total = $toRaw(playback).queue?.items.length ?? 0;
-  playback.index = nextIndex(playback.index, total, keyMode());
+  goTo(nextIndex(playback.index, total, keyMode(), queuedCount(position())));
 }
 
 export function previous(): void {
   const total = $toRaw(playback).queue?.items.length ?? 0;
-  playback.index = previousIndex(playback.index, total, keyMode());
+  goTo(previousIndex(playback.index, total, keyMode()));
 }
 
 /** Whether the next key has a track to go to, and the previous one. */
 export function hasNext(): boolean {
   const total = playback.queue?.items.length ?? 0;
-  return total > 0 && nextIndex(playback.index, total, keyMode()) !== playback.index;
+  return total > 0 && nextIndex(playback.index, total, keyMode(), queuedCount(position())) !== playback.index;
 }
 export function hasPrevious(): boolean {
   const total = playback.queue?.items.length ?? 0;

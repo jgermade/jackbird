@@ -32,21 +32,24 @@ function sequence(total: number, mode: PlayMode): number[] {
 /**
  * The tracks after `index`, in the order they play: to the end, and round again from the start
  * with repeat on (each once, the current one last). Repeating one, none: the same plays again,
- * which the player does itself.
+ * which the player does itself. The `queued` tracks right after `index` (queued on purpose, see
+ * helpers/queue.ts) play first, in their order, shuffled or not; the rest after them.
  */
-export function upcoming(index: number, total: number, mode: PlayMode): number[] {
+export function upcoming(index: number, total: number, mode: PlayMode, queued = 0): number[] {
   if (total <= 0 || mode.repeat === "one") return [];
+  const first = Array.from({ length: Math.max(0, Math.min(queued, total - index - 1)) }, (_, place) => index + 1 + place);
   const order = sequence(total, mode);
   const at = order.indexOf(index);
   const after = order.slice(at + 1);
-  return mode.repeat === "all" ? [...after, ...order.slice(0, at + 1)].filter((one, place, all) => all.indexOf(one) === place && (one !== index || place === all.length - 1)) : after;
+  const rest = mode.repeat === "all" ? [...after, ...order.slice(0, at + 1)].filter((one, place, all) => all.indexOf(one) === place && (one !== index || place === all.length - 1)) : after;
+  return [...first, ...rest.filter((one) => !first.includes(one))];
 }
 
 /** The track after `index` (the next key, or the end of one): the same one past the end with repeat off. */
-export function nextIndex(index: number, total: number, mode: PlayMode): number {
+export function nextIndex(index: number, total: number, mode: PlayMode, queued = 0): number {
   if (total <= 0) return 0;
   if (mode.repeat === "one") return index;
-  return upcoming(index, total, mode)[0] ?? index;
+  return upcoming(index, total, mode, queued)[0] ?? index;
 }
 
 /** The track before `index` (the previous key): round to the last with repeat on; the same one at the start with it off. */

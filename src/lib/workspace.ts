@@ -18,10 +18,11 @@ import { albumKey, artistKey, buildViewRows, trackPlace, type ViewLabels } from 
 import type { LibraryView, Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
-import { addToQueue, dropFromQueue, nowPlaying, playNext, playQueue, togglePlay } from "./player";
+import { addToQueue, dropFromQueue, nowPlaying, playNext, playTracks, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
 import { ui } from "./ui";
+import { showToast } from "./toast";
 
 import { Opaque } from "./opaque";
 
@@ -353,7 +354,7 @@ export function playFromDetail(trackId: string): void {
   const trackIds = playOrder(scope).map((track) => track.id);
   const index = trackIds.indexOf(trackId);
   if (index !== -1) {
-    playQueue(queueOf(root.id, trackIds, scope.label), index);
+    playTracks(queueOf(root.id, trackIds, scope.label).items, index, scope.label);
   }
 }
 
@@ -377,7 +378,7 @@ export function playFromTree(rowKey: string): void {
   const trackIds = playOrder(scope).map((track) => track.id);
   const index = row.kind === "track" && row.trackId ? placeOf(row, rows, trackIds) : 0;
   if (trackIds.length > 0 && index !== -1) {
-    playQueue(queueOf(root.id, trackIds, scope.label), index);
+    playTracks(queueOf(root.id, trackIds, scope.label).items, index, scope.label);
   }
 }
 
@@ -420,10 +421,10 @@ function queue(tracks: Track[], label: string, where: "next" | "end"): void {
   const items = tracks.map((track) => ({ rootId: root.id, trackId: track.id }));
   if (where === "next") {
     playNext(items, label);
-    library.infoMessage = tn("message.playNext", items.length, { title: label });
+    showToast(tn("message.playNext", items.length, { title: label }));
   } else {
     addToQueue(items, label);
-    library.infoMessage = tn("message.queued", items.length, { title: label });
+    showToast(tn("message.queued", items.length, { title: label }));
   }
 }
 
