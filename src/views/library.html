@@ -14,7 +14,6 @@
   const IpodFoot = await import("./ipod-foot.html")
 
   const { rowHeights, rowPixels } = await import("../helpers/density")
-  const { formatLabel } = await import("../helpers/formats")
   const { coverSrc } = await import("../lib/covers")
   // Whether the stylesheet rounds the rows' heights to whole pixels (tokens.css).
   const ROUNDS: boolean = typeof CSS !== "undefined" && CSS.supports("width", "round(1rem, 2px)")
@@ -41,7 +40,7 @@
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean }
+  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; format?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
@@ -268,7 +267,7 @@
              :depth="phone ? 0 : row.depth"
              :label="rowLabel(row)"
              :meta="rowMeta(row)"
-             :format="row.kind === 'track' && row.relativePath ? formatLabel(row.relativePath) : ''"
+             :format="row.kind === 'track' ? (row.format ?? '') : ''"
              :sub="rowSub(row)"
              :cover="rowCover(row)"
              :framed="!!row.framed"

@@ -21,7 +21,7 @@
   const { onTrackMenu, trackMenu } = await import("../lib/menus")
   const { openFolder } = await import("../lib/roots")
   const { artistName, artistOfKey } = await import("../helpers/views")
-  const { formatLabel } = await import("../helpers/formats")
+  const { codecLabel } = await import("../helpers/formats")
   const { openPicture } = await import("../lib/picture")
   const { setArtistPicture } = await import("../lib/artists")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
@@ -214,7 +214,7 @@
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-box" :class.numbered="discNumbered(disc)"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span></td>
-                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="formatLabel(track.relativePath)" class="format"><CodecMark tinted :format="formatLabel(track.relativePath)" /></span></span></td>
+                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="codecLabel(track.relativePath, track.audio?.bitrate)" class="format"><CodecMark tinted :format="codecLabel(track.relativePath, track.audio?.bitrate)" /></span></span></td>
                     <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
@@ -346,7 +346,7 @@
   .title-line { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
   /* The track's format as the display prints it (codec-mark.html), small and in a light grey
      (the owner, 2026-11-16); never its glow, which is the display's. */
-  .format { flex: none; font-size: .5625rem; line-height: 1; color: color-mix(in srgb, var(--mm-fg-subtle) 70%, transparent); --mm-display-glow: none; --codec-size: 1.4em; }
+  .format { flex: none; font-size: .5625rem; line-height: 1; color: color-mix(in srgb, var(--mm-fg-subtle) 70%, transparent); --mm-display-glow: none; --codec-size: 1.2em; }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   /* Room after the length, before the menu's key. */
   /* The length and the menu's key up to the row's end (the owner, 2026-11-16). */

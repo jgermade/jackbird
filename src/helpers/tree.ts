@@ -1,3 +1,4 @@
+import { codecLabel } from "./formats.ts";
 import type { Track, WizardTreeRow } from "../types.ts";
 import { compareText } from "./compare.ts";
 
@@ -54,6 +55,7 @@ export function buildWizardRows(tracks: Track[], expandedFolders: readonly strin
         trackNumber: track.metadata.trackNumber,
         artist: track.metadata.artist,
         relativePath: track.relativePath,
+        format: codecLabel(track.relativePath, track.audio?.bitrate),
         ...(track.pending ? { pending: true } : {}),
         parentKey,
         depth

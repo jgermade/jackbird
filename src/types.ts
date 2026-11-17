@@ -61,6 +61,8 @@ export type WizardTreeRow = {
   trackNumber?: string;
   artist?: string;
   relativePath?: string;
+  /** A track's codec, as its mark shows it (`codecLabel`). */
+  format?: string;
   /** Small text at the row's end; else a track's artist. */
   meta?: string;
   /** An album's line under its name (who it is by, its year), drawn there in place of `meta`. */

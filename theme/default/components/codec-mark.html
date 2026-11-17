@@ -1,6 +1,7 @@
 <script :setup="{ format = '', tinted = false }: Props" lang="ts">
-  // A codec as the display prints it: FLAC in the heavy lower case of its own lettering, MP3 and
-  // Ogg (Vorbis too) by their marks, any other as a framed DisplayIcon ("M4A"). All in the colour
+  // A codec as the display prints it: MP3 and Ogg (Vorbis too) by their marks; FLAC in the heavy
+  // lower case of its own lettering, and AAC, ALAC, WAV, AIFF and Opus lettered the same way (ours,
+  // no format's logo); any other as a framed DisplayIcon ("WMA"). All in the colour
   // around it, at a size that follows the font size around it: the marks 1.9em tall, or
   // `--codec-size` (a list's smaller marks).
   //
@@ -32,7 +33,10 @@
   }
   const name = (): string => String(format ?? "").trim().toUpperCase()
   const markOf = () => MARKS[name()] ?? null
-  const codec = (): string => (name() === "FLAC" ? "flac" : name() === "MP3" ? "mp3" : markOf() ? "ogg" : "other")
+  // The codecs lettered as FLAC's is, and the family whose colour each takes (`--mm-codec-*`).
+  const LETTERED: Record<string, string> = { FLAC: "flac", AAC: "aac", ALAC: "alac", WAV: "pcm", AIFF: "pcm", OPUS: "ogg" }
+  const lettered = (): boolean => name() in LETTERED
+  const codec = (): string => LETTERED[name()] ?? (name() === "MP3" ? "mp3" : markOf() ? "ogg" : "other")
   // The URL quoted: a small mark comes inlined by Vite as a data URL with single quotes in it,
   // which an unquoted url() does not take (the mask is dropped, and the mark shows as a block).
   const markStyle = (): string => {
@@ -41,17 +45,22 @@
   }
 </script>
 
-<span class="codec" :class.tinted="flag(tinted)" :data-codec="codec()"><span :if="name() === 'FLAC'" class="flac" role="img" aria-label="FLAC">flac</span><span :elseif="markOf()" class="mark" role="img" :aria-label="name()" :style="markStyle()"></span><DisplayIcon :elseif="name()">{{ name() }}</DisplayIcon></span>
+<span class="codec" :class.tinted="flag(tinted)" :data-codec="codec()"><span :if="lettered()" class="lettered" role="img" :aria-label="name()">{{ name().toLowerCase() }}</span><span :elseif="markOf()" class="mark" role="img" :aria-label="name()" :style="markStyle()"></span><span :elseif="name()" class="framed"><DisplayIcon>{{ name() }}</DisplayIcon></span></span>
 
 <style scoped>
   .codec { display: inline-flex; align-items: center; }
   .tinted[data-codec="flac"] { color: var(--mm-codec-flac); }
   .tinted[data-codec="mp3"] { color: var(--mm-codec-mp3); }
   .tinted[data-codec="ogg"] { color: var(--mm-codec-ogg); }
+  .tinted[data-codec="aac"] { color: var(--mm-codec-aac); }
+  .tinted[data-codec="alac"] { color: var(--mm-codec-alac); }
+  .tinted[data-codec="pcm"] { color: var(--mm-codec-pcm); }
   .tinted[data-codec="other"] { color: var(--mm-codec-other); }
-  /* In a list its lettering a little smaller than the marks (the owner, 2026-11-16): at the same
-     height it weighed more than MP3's. */
-  .tinted .flac { font-size: calc(var(--codec-size, 1.9em) * .85); }
+  /* In a list the lettering a little smaller than the marks (the owner, 2026-11-16): at the same
+     height FLAC weighed more than MP3's. */
+  /* In a list the framed icon as small as the lettering beside it. */
+  .tinted .framed { font-size: .8em; }
+  .tinted .lettered { font-size: calc(var(--codec-size, 1.9em) * .85); }
   /* A codec's mark, its shape in the ink around it. */
   .mark {
     display: block;
@@ -61,8 +70,9 @@
     -webkit-mask: var(--codec) center / contain no-repeat;
     mask: var(--codec) center / contain no-repeat;
   }
-  /* FLAC as its lettering is: lower case, at the label face's heaviest and its normal width, tight. */
-  .flac {
+  /* FLAC as its lettering is, and the others lettered alike: lower case, at the label face's
+     heaviest and its normal width, tight. */
+  .lettered {
     display: block;
     font-family: var(--mm-font-label);
     font-stretch: 100%;

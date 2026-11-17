@@ -7,6 +7,7 @@
  * RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and W6's plan).
  */
 
+import { codecLabel } from "./formats.ts";
 import type { LibraryView, Track, Playlist, WizardTreeRow } from "../types.ts";
 import { isCompilation } from "./metadata.ts";
 import { compareText } from "./compare.ts";
@@ -201,6 +202,7 @@ export function buildViewRows(
       trackNumber: track.metadata.trackNumber,
       artist: track.metadata.artist,
       relativePath: track.relativePath,
+      format: codecLabel(track.relativePath, track.audio?.bitrate),
       ...(track.pending ? { pending: true } : {}),
       meta,
       parentKey,
@@ -270,7 +272,7 @@ export function buildViewRows(
         const track = found[index];
         const base = { key: `@pl:${playlist.path}#${index}`, kind: "track" as const, album: "", parentKey: key, depth: 1, inView: view, playlist: playlist.path, playlistIndex: index };
         if (track) {
-          rows.push({ ...base, label: track.metadata.title || track.name, trackId: track.id, trackNumber: track.metadata.trackNumber, artist: track.metadata.artist, relativePath: track.relativePath, meta: track.metadata.artist, ...(track.metadata.artist ? { sub: track.metadata.artist } : {}) });
+          rows.push({ ...base, label: track.metadata.title || track.name, trackId: track.id, trackNumber: track.metadata.trackNumber, artist: track.metadata.artist, relativePath: track.relativePath, format: codecLabel(track.relativePath, track.audio?.bitrate), meta: track.metadata.artist, ...(track.metadata.artist ? { sub: track.metadata.artist } : {}) });
         } else {
           rows.push({ ...base, label: entry.title || entry.raw.split(/[\\/]/).pop() || entry.raw, meta: labels.missing, missing: true });
         }

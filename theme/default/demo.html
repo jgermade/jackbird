@@ -5,6 +5,7 @@
   // See RECORD/2026-11-03.deck-design-system.WIP.md.
 
   const Checkbox = await import("./components/checkbox.html")
+  const CodecMark = await import("./components/codec-mark.html")
   const Counter = await import("./components/counter.html")
   const Display = await import("./components/display.html")
   const DisplayIcon = await import("./components/display-icon.html")
@@ -561,6 +562,14 @@
           <p>The reel turns while work runs; the bars mark the track that is playing. Both stop under reduced motion.</p>
         </div>
       </Panel>
+      <Panel title="Codecs">
+        <div class="ind">
+          <div class="items codecs">
+            <span :each="codec in ['MP3', 'FLAC', 'AAC', 'ALAC', 'WAV', 'AIFF', 'OGG', 'OPUS', 'WMA']"><CodecMark tinted :format="codec" /></span>
+          </div>
+          <p>A track's codec as a list shows it: its mark or its lettering, in its family's colour. The display lights the same marks in its ink.</p>
+        </div>
+      </Panel>
     </div>
   </section>
 
@@ -940,4 +949,5 @@
     .fp-right { grid-auto-flow: row; justify-items: start; }
     .c2, .c3 { grid-column: span 6; }
   }
+  .codecs { font-size: .5625rem; --mm-display-glow: none; --codec-size: 1.2em; }
 </style>

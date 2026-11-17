@@ -98,12 +98,16 @@
   --mm-stripe-2: #f2a900;
   --mm-stripe-3: #f05a1a;
 
-  /* A codec's colour, where a list tints its mark (CodecMark's `tinted`; the owner, 2026-11-16):
-     FLAC in the stripes' teal, MP3 in their amber, Ogg in a violet, any other in the info blue. */
-  --mm-codec-flac: #1f9c8a;
-  --mm-codec-mp3: #c98c00;
-  --mm-codec-ogg: #7d5bc4;
-  --mm-codec-other: #2f78d0;
+  /* A codec's colour, where a list tints its mark (CodecMark's `tinted`; the owner, 2026-11-16,
+     then less saturated): FLAC a teal, MP3 an amber (the stripes', greyed), AAC a blue, ALAC a
+     plum, WAV and AIFF a clay, Ogg and Opus a violet, any other a slate. */
+  --mm-codec-flac: #4f9990;
+  --mm-codec-mp3: #ad8c45;
+  --mm-codec-aac: #5f84ad;
+  --mm-codec-alac: #96708e;
+  --mm-codec-pcm: #a5776a;
+  --mm-codec-ogg: #8579a8;
+  --mm-codec-other: #7c8890;
 
   /* What a modal lays over the page. */
   --mm-overlay: rgba(27, 29, 29, .42);
@@ -249,10 +253,13 @@
   --mm-display-glow: 0 0 6px rgba(95, 242, 214, .55);
   --mm-display-bezel: #000000;
 
-  --mm-codec-flac: #45c9b5;
-  --mm-codec-mp3: #e8b432;
-  --mm-codec-ogg: #a98be8;
-  --mm-codec-other: #5ea4f2;
+  --mm-codec-flac: #6fb0a7;
+  --mm-codec-mp3: #c6a764;
+  --mm-codec-aac: #7d9fc6;
+  --mm-codec-alac: #b190aa;
+  --mm-codec-pcm: #c29589;
+  --mm-codec-ogg: #a197c2;
+  --mm-codec-other: #98a3ab;
 
   /* A white veil: on a dark page, a darker one would hide the modal's edges. */
   --mm-overlay: rgba(255, 255, 255, .2);

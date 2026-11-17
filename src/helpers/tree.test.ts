@@ -43,6 +43,7 @@ describe("buildWizardRows", () => {
       trackNumber: "1",
       artist: "Miles Davis",
       relativePath: "Jazz/Miles/01 - So What.mp3",
+      format: "MP3",
       parentKey: "folder:Jazz/Miles",
       depth: 2
     });

@@ -40,3 +40,27 @@ export function formatLabel(path: string): string {
   const dot = name.lastIndexOf(".");
   return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toUpperCase() : "";
 }
+
+/** Above this bitrate (kbit/s) an MPEG-4 song is Apple Lossless: AAC rarely passes 320, ALAC rarely falls below 500. */
+const LOSSLESS_KBPS = 400;
+
+/**
+ * The codec a track's mark shows (CodecMark): MP3 and FLAC by their extension; an MPEG-4 song
+ * (`.m4a`) Apple Lossless ("ALAC") above 400 kbit/s, else "AAC", as `.m4p`, `.m4b` and `.aac`;
+ * "WAV", "AIFF", "OGG", "OPUS"; any other its extension in capitals; "" with none. `bitrate` is
+ * the track's (`Track.audio`), 0 when unknown.
+ */
+export function codecLabel(path: string, bitrate = 0): string {
+  const label = formatLabel(path);
+  switch (label) {
+    case "M4A": return bitrate > LOSSLESS_KBPS ? "ALAC" : "AAC";
+    case "M4P":
+    case "M4B":
+    case "AAC": return "AAC";
+    case "AIF":
+    case "AIFF": return "AIFF";
+    case "OGG":
+    case "OGA": return "OGG";
+    default: return label;
+  }
+}
