@@ -25,6 +25,7 @@
   const Toast = await import("./toast.html")
   const PictureDialog = await import("./picture-dialog.html")
   const DuplicatesDialog = await import("./duplicates-dialog.html")
+  const TrackInfoDialog = await import("./track-info-dialog.html")
   const { t } = await import("../lib/i18n")
   const { compact, compactMarker } = await import("../lib/compact")
   const { embedKind } = await import("../lib/platform")
@@ -116,6 +117,7 @@
   <SourcesDialog />
   <PictureDialog />
   <DuplicatesDialog />
+  <TrackInfoDialog />
   <Toast :if="!small" />
 </main>
 <!-- Embedded: the compact player, outside the window (which turns and clips what it holds). -->

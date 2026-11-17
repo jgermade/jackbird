@@ -4,7 +4,6 @@
   // tab bar (faceplate). A view over lib/workspace.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
 
-  const CodecMark = await import("../../theme/default/components/codec-mark.html")
   const EqBars = await import("../../theme/default/components/eq-bars.html")
   const Key = await import("../../theme/default/components/key.html")
   const Menu = await import("../../theme/default/components/menu.html")
@@ -21,7 +20,7 @@
   const { onTrackMenu, trackMenu } = await import("../lib/menus")
   const { openFolder } = await import("../lib/roots")
   const { artistName, artistOfKey } = await import("../helpers/views")
-  const { codecLabel } = await import("../helpers/formats")
+  const { codecFamily, codecLabel } = await import("../helpers/formats")
   const { openPicture } = await import("../lib/picture")
   const { setArtistPicture } = await import("../lib/artists")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
@@ -49,6 +48,17 @@
   // The number alone ("2/6", "2 de 6" give "2"), and the length where the ▶ was (helpers/format.ts).
   const numberOf = (track: Track): string => cleanTrackNumber(track.metadata.trackNumber)
   const durationOf = (track: Track): string => formatDuration(track.audio?.durationMs)
+  // Its length's colour, its codec's (`--mm-codec-<family>`), and its click: the track's own info
+  // dialog (views/track-info-dialog.html), not playing it.
+  const familyOf = (track: Track): string => codecFamily(codecLabel(track.relativePath, track.audio))
+  const openInfo = (track: Track, event: MouseEvent) => {
+    event.stopPropagation()
+    ui.trackInfo = track.id
+  }
+  // Its own Enter and Space, not the row's (play, select).
+  const infoKey = (event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " ") event.stopPropagation()
+  }
   // A disc's number column, only when one of its tracks has a number; a track without one leaves it blank.
   const discNumbered = (disc: { tracks: Track[] }): boolean => disc.tracks.some((track) => !!track.metadata.trackNumber?.trim())
 
@@ -214,11 +224,13 @@
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-box" :class.numbered="discNumbered(disc)"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span></td>
-                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="codecLabel(track.relativePath, track.audio)" class="format"><CodecMark tinted :format="codecLabel(track.relativePath, track.audio)" /></span></span></td>
-                    <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
-                    <td class="cue-cell" aria-hidden="true">
-                      <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
-                      <span :else class="cue-stack"><span class="duration">{{ durationOf(track) }}</span><svg class="cue-play" viewBox="0 0 16 16"><path d="M4.5 3v10L13 8z" fill="currentColor" /></svg></span>
+                    <td><span class="mm-title">{{ titleOf(track) }}</span></td>
+                    <!-- Its length in its codec's colour, or the bars on the track playing: a key that opens its info. -->
+                    <td class="cue-cell">
+                      <button type="button" class="cue" :data-codec="familyOf(track)" :aria-label="t('trackInfo.open', { title: titleOf(track) })" :title="codecLabel(track.relativePath, track.audio)" @click="openInfo(track, $event)" @keydown="infoKey($event)">
+                        <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
+                        <span :else class="duration">{{ durationOf(track) }}</span>
+                      </button>
                     </td>
                     <td class="menu-cell">
                       <Menu :label="t('menu.track', { title: titleOf(track) })" :items="() => trackMenu(track.id, 'sheet')" @select="onTrackMenu(track.id, $event.detail)" />
@@ -343,31 +355,43 @@
     .pick-box:not(.numbered) { visibility: hidden; }
     .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-visible .pick-box, .mm-table tr:has(:focus-visible) .pick-box { visibility: visible; }
   }
-  .title-line { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
-  /* The track's format as the display prints it (codec-mark.html), small and in a light grey
-     (the owner, 2026-11-16); never its glow, which is the display's. */
-  .format { flex: none; font-size: .5625rem; line-height: 1; color: color-mix(in srgb, var(--mm-fg-subtle) 70%, transparent); --mm-display-glow: none; --codec-size: 1.2em; }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   /* Room after the length, before the menu's key. */
   /* The length and the menu's key up to the row's end (the owner, 2026-11-16). */
   .mm-table .cue-cell { width: 1%; padding-left: 0; padding-right: 0; text-align: right; line-height: 0; }
   .mm-table .menu-cell { width: 1%; padding-block: 0; padding-inline: 0; line-height: 0; }
   /* The menu's key shows on every track, always (the owner, 2026-11-16). */
-  /* The length, and the ▶ over it: the ▶ in its place on a computer's hover and on focus; on a
-     touch screen the length alone. */
-  .cue-stack { display: inline-grid; place-items: center end; min-width: 2.5rem; line-height: 1; }
-  .cue-stack > * { grid-area: 1 / 1; }
-  .duration { color: var(--mm-fg-muted); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); visibility: hidden; }
-  .mm-table tr:focus-visible .cue-play { visibility: visible; }
-  .mm-table tr:focus-visible .duration { visibility: hidden; }
-  @media (hover: hover) {
-    .mm-table tr:hover .cue-play { visibility: visible; }
-    .mm-table tr:hover .duration { visibility: hidden; }
+  /* The length, in its codec's colour (the owner, 2026-11-17), a key that opens the track's info.
+     Its box is one "m:ss" wide (4ch of its face), right-aligned, and the bars of the track playing
+     are centred in that box, so they sit under the lengths, not under their last digit; a length
+     of an hour or more widens its own box only. */
+  .cue {
+    display: inline-grid;
+    place-items: center;
+    min-width: 4ch;
+    min-height: 1.75rem;
+    margin: 0;
+    padding: 0 var(--mm-space-1);
+    border: 0;
+    border-radius: var(--mm-radius-key);
+    background: none;
+    color: var(--mm-codec-other);
+    font-family: var(--mm-font-mono);
+    font-size: var(--mm-text-xs);
+    line-height: 1;
+    cursor: pointer;
+    box-sizing: content-box;
   }
-  @media (hover: none) {
-    .cue-play { display: none; }
-  }
+  .cue[data-codec="flac"] { color: var(--mm-codec-flac); }
+  .cue[data-codec="mp3"] { color: var(--mm-codec-mp3); }
+  .cue[data-codec="aac"] { color: var(--mm-codec-aac); }
+  .cue[data-codec="alac"] { color: var(--mm-codec-alac); }
+  .cue[data-codec="pcm"] { color: var(--mm-codec-pcm); }
+  .cue[data-codec="ogg"] { color: var(--mm-codec-ogg); }
+  .cue:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  @media (hover: hover) { .cue:hover { background: var(--mm-hover); } }
+  .cue:active { background: var(--mm-sunken); }
+  .duration { justify-self: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
   .prompt p { margin: 0; color: var(--mm-fg-muted); }

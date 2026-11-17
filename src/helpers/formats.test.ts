@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { AUDIO_FORMATS, audioFormatOf, audioMimeType, codecLabel, formatLabel, isAudioFile } from "./formats.ts";
+import { AUDIO_FORMATS, audioFormatOf, audioMimeType, codecFamily, codecLabel, formatLabel, isAudioFile } from "./formats.ts";
 
 describe("audio formats", () => {
   it("are MP3 and FLAC", () => {
@@ -65,5 +65,23 @@ describe("codecLabel", () => {
   });
   it("names the other MPEG-4 audio AAC, and PCM and Ogg by their family", () => {
     assert.deepEqual(["x.m4p", "x.m4b", "x.aac", "x.wav", "x.aif", "x.aiff", "x.oga", "x.ogg", "x.opus", "x", "x.wma"].map((path) => codecLabel(path)), ["AAC", "AAC", "AAC", "WAV", "AIFF", "AIFF", "OGG", "OGG", "OPUS", "", "WMA"]);
+  });
+});
+
+describe("codecFamily", () => {
+  it("gives each codec CodecMark's family, in any case", () => {
+    assert.equal(codecFamily("FLAC"), "flac");
+    assert.equal(codecFamily("mp3"), "mp3");
+    assert.equal(codecFamily("AAC"), "aac");
+    assert.equal(codecFamily("ALAC"), "alac");
+    assert.equal(codecFamily("WAV"), "pcm");
+    assert.equal(codecFamily("AIFF"), "pcm");
+    assert.equal(codecFamily(" opus "), "ogg");
+    assert.equal(codecFamily("VORBIS"), "ogg");
+  });
+
+  it("any other is other", () => {
+    assert.equal(codecFamily("WMA"), "other");
+    assert.equal(codecFamily(""), "other");
   });
 });

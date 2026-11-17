@@ -81,3 +81,13 @@ export function codecLabel(path: string, audio?: { bitrate?: number; kind?: stri
     default: return label;
   }
 }
+
+/** The families whose colours codecs take (`--mm-codec-<family>`, theme/default/tokens.css). */
+export type CodecFamily = "flac" | "mp3" | "aac" | "alac" | "pcm" | "ogg" | "other";
+
+const FAMILIES: Record<string, CodecFamily> = { FLAC: "flac", MP3: "mp3", AAC: "aac", ALAC: "alac", WAV: "pcm", AIFF: "pcm", OGG: "ogg", VORBIS: "ogg", OPUS: "ogg" };
+
+/** The family a codec (`codecLabel`'s) takes its colour from, as CodecMark tints it; "other" for any other. */
+export function codecFamily(label: string): CodecFamily {
+  return FAMILIES[label.trim().toUpperCase()] ?? "other";
+}
