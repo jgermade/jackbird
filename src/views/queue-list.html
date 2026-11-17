@@ -1,8 +1,9 @@
 <script :setup lang="ts">
   // The queue as a list, in the queue's dialog (computers) and its panel
-  // (phones), in four parts, each under a small heading: the tracks played
-  // (dimmed), the one playing (its cover larger, its bars), the ones queued on
-  // purpose, and the ones suggested (the rest of a disc played). Each row: the
+  // (phones), in four parts, one after another (their headings for screen
+  // readers only): the tracks played (dimmed), the one playing (its cover
+  // larger, its bars), the ones queued on purpose, and the ones suggested (the
+  // rest of a disc played; a little dimmed). Each row: the
   // title, "artist - album" under it, and its length in its codec's colour (as
   // Details shows it; the bars in its place on the one playing). A click (or
   // Enter) plays a track, the current one pauses or resumes. An upcoming
@@ -132,8 +133,8 @@
   // Dragging a track by its grip. Its state lives in this closure, not in the
   // component's store: it changes on every pointer move, and the rows are
   // moved and marked straight on the page; the queue changes once, on release.
-  // Where it lands is the row (or the part's heading) under the pointer: the
-  // headings stand between the parts, so rows cannot be counted by height.
+  // Where it lands is the row under the pointer: each part is a list of its
+  // own, drawn a window at a time, so rows are not counted across them.
   const drag = (() => {
     const EDGE = 40
     let from = -1
@@ -155,24 +156,15 @@
       return null
     }
     const unmark = () => $self(".queue")?.querySelectorAll(".drop-before, .drop-after").forEach((row) => row.classList.remove("drop-before", "drop-after"))
-    // Where the track would land, from what is under the pointer: a queued or suggested row (it
-    // takes that row's place and part), or the heading of one of those parts (it becomes the
-    // part's first). Over the played ones or the one playing: nowhere.
+    // Where the track would land, from the row under the pointer: a queued or suggested one (it
+    // takes that row's place and part). Over the played ones or the one playing: nowhere.
     const aim = (): typeof target => {
-      const list = entries()
       const lifted = rowAt(from)
-      const hit = document.elementsFromPoint(pointX, lastY).find((element) => !lifted?.contains(element) && element.closest("[data-index], [data-head]"))
-      const node = hit?.closest<HTMLElement>("[data-index], [data-head]")
+      const hit = document.elementsFromPoint(pointX, lastY).find((element) => !lifted?.contains(element) && element.closest("[data-index]"))
+      const node = hit?.closest<HTMLElement>("[data-index]")
       if (!node) return null
-      if (node.dataset.head) {
-        const part = node.dataset.head as State
-        const first = list.find((entry) => entry.state === part)
-        if (!first || (part !== "queued" && part !== "suggested")) return null
-        const to = from < first.index ? first.index - 1 : first.index
-        return { to, queued: part === "queued", mark: first.index, before: true }
-      }
       const at = Number(node.dataset.index)
-      const entry = list[at]
+      const entry = entries()[at]
       if (!upcoming(entry)) return null
       return { to: at, queued: entry.state === "queued", mark: at, before: at < from }
     }
@@ -187,7 +179,7 @@
       unmark()
       const still = !target || (target.to === from && target.queued === (entries()[from]?.state === "queued"))
       if (still || !target) return
-      // The line goes before the track it lands on (moving up, or onto a heading), or after it (moving down).
+      // The line goes before the track it lands on (moving up), or after it (moving down).
       rowAt(target.mark)?.classList.add(target.before ? "drop-before" : "drop-after")
     }
     // Near the list's top or bottom edge, it scrolls.
@@ -237,7 +229,7 @@
       from = index
       target = null
       startY = lastY = event.clientY
-      // Across the list's middle: what is under the pointer there is a row or a heading.
+      // Across the list's middle: what is under the pointer there is a row.
       const box = list.getBoundingClientRect()
       pointX = box.left + box.width / 2
       scroller = scrollParent(list as HTMLElement)
@@ -258,12 +250,12 @@
   <p :if="entries().length === 0" class="none">{{ t("queue.empty") }}</p>
   <div :else class="queue" role="listbox" tabindex="0" :aria-label="t('queue.title')"
        :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
-    <!-- The four parts, each under its heading (the one playing needs none); each drawn a window at a time. -->
+    <!-- The four parts, their headings for screen readers only; each drawn a window at a time. -->
     <div :each="part in parts()" :key="part.id" class="part" role="group" :aria-labelledby="`queue-head-${part.id}`">
-      <h3 class="head mm-legend" :class.unseen="part.id === 'current'" :id="`queue-head-${part.id}`" :data-head="part.id">{{ t(part.label) }}</h3>
+      <h3 class="head" :id="`queue-head-${part.id}`">{{ t(part.label) }}</h3>
       <ol class="rows" role="none" :data-part="part.id">
         <li :each="entry in inPart(part.id)" :key="entry.index" :window="rowPx()" :id="itemId(entry.index)" :data-index="entry.index" role="option" class="item"
-            :class.played="entry.state === 'played'" :class.current="entry.state === 'current'"
+            :class.played="entry.state === 'played'" :class.suggested="entry.state === 'suggested'" :class.current="entry.state === 'current'"
             :class.missing="entry.missing" :class.focused="entry.index === focused"
             :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
           <!-- Only upcoming tracks are dragged; the one playing's larger cover takes the grip's place. -->
@@ -303,15 +295,8 @@
   .queue { margin: 0; padding: 0; outline: none; }
   .queue:focus-visible .focused { box-shadow: inset 0 0 0 2px var(--mm-accent); }
   .rows { margin: 0; padding: 0; list-style: none; }
-  /* Each part's heading: a small legend over its tracks; the one playing's is for screen readers only. */
+  /* Each part's heading names its group for screen readers; on screen the parts follow one another. */
   .head {
-    margin: 0;
-    padding: var(--mm-space-3) var(--mm-space-3) var(--mm-space-1);
-    border-bottom: var(--mm-border-width) solid var(--mm-border);
-    background: var(--mm-surface);
-    color: var(--mm-fg-muted);
-  }
-  .head.unseen {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -340,6 +325,8 @@
   .item:active { background: var(--mm-sunken); }
   .item.current { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
   .item.played .text, .item.played .art, .item.played .cue { opacity: .55; }
+  /* The suggested ones, a little dimmed: the queue's own tracks stand out. */
+  .item.suggested .text, .item.suggested .art, .item.suggested .cue { opacity: .8; }
   .item.missing .sub { color: var(--mm-bad); }
 
   /* The grip: the one place a drag starts, and where a touch does not scroll. */
