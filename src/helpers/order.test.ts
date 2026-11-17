@@ -52,3 +52,11 @@ test("nextRepeat turns off, the whole queue, this track, off", () => {
   assert.equal(nextRepeat("all"), "one");
   assert.equal(nextRepeat("one"), "off");
 });
+
+test("the tracks queued on purpose play first, in their order, shuffled or not", () => {
+  assert.deepEqual(upcoming(1, 6, mode(), 2), [2, 3, 4, 5]);
+  assert.deepEqual(upcoming(1, 6, mode({ shuffle: true, order: [5, 1, 4, 0, 3, 2] }), 2), [2, 3, 4, 0]);
+  assert.equal(nextIndex(1, 6, mode({ shuffle: true, order: [1, 5, 4, 0, 3, 2] }), 2), 2);
+  assert.deepEqual(upcoming(4, 6, mode({ repeat: "all" }), 9), [5, 0, 1, 2, 3, 4]);
+  assert.deepEqual(upcoming(1, 6, mode({ repeat: "one" }), 2), []);
+});

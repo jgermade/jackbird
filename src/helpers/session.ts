@@ -96,7 +96,9 @@ function queueFrom(value: unknown): PlaybackQueue | null {
   if (Array.isArray(value.items)) {
     const items = value.items;
     const valid = items.length > 0 && items.every((item) => isRecord(item) && typeof item.rootId === "string" && typeof item.trackId === "string");
-    return valid ? { items: items.map((item) => ({ rootId: item.rootId as string, trackId: item.trackId as string })), sourceLabel } : null;
+    return valid
+      ? { items: items.map((item) => ({ rootId: item.rootId as string, trackId: item.trackId as string, ...(item.queued === true ? { queued: true } : {}) })), sourceLabel }
+      : null;
   }
   const { rootId, trackIds } = value;
   if (typeof rootId !== "string" || !Array.isArray(trackIds) || trackIds.length === 0 || !trackIds.every((id) => typeof id === "string")) {

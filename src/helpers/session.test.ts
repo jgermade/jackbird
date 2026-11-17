@@ -77,6 +77,11 @@ describe("parsePlaybackState", () => {
     assert.deepEqual(parsePlaybackState(JSON.stringify(saved)), saved);
   });
 
+  it("keeps which tracks were queued on purpose", () => {
+    const marked = { ...saved, queue: { ...queue, items: [{ rootId: "1", trackId: "a.mp3", queued: true }, { rootId: "2", trackId: "b.mp3", queued: "yes" }] } };
+    assert.deepEqual(parsePlaybackState(JSON.stringify(marked))?.queue.items, [{ rootId: "1", trackId: "a.mp3", queued: true }, { rootId: "2", trackId: "b.mp3" }]);
+  });
+
   it("reads a queue saved before queues spanned roots, as that root's tracks", () => {
     const old = { queue: { rootId: "1", trackIds: ["a.mp3", "b.mp3"], sourceLabel: "Jazz" }, index: 1, position: 3, playing: false };
     assert.deepEqual(parsePlaybackState(JSON.stringify(old)), {

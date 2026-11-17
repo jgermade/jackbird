@@ -1,0 +1,39 @@
+<script :setup lang="ts">
+  // Asked when a disc (a folder, a playlist) starts playing while the queue holds tracks put there
+  // on purpose (lib/player.ts playTracks): keep them, the disc coming in as the track playing and
+  // the suggested ones; save the queue as a playlist and then replace it (the playlist dialog, and
+  // the disc plays once saved); or replace it now. Closed, nothing changes. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-17 12:40, the owner's answers).
+
+  const Key = await import("../../theme/default/components/key.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+
+  const { t } = await import("../lib/i18n")
+  const { answerReplace } = await import("../lib/player")
+  const { openPlaylistDialog } = await import("../lib/playlists")
+  const { ui } = await import("../lib/ui")
+
+  const save = () => {
+    answerReplace("save")
+    openPlaylistDialog({ mode: "queue" })
+  }
+</script>
+
+<div class="replace-queue-dialog">
+  <Modal :open="ui.replaceQueue" :eyebrow="t('queue.title')" :title="t('replaceQueue.title')" size="sm" :close-label="t('queue.close')" @close="answerReplace(null)">
+    <p class="text">{{ t("replaceQueue.text") }}</p>
+    <template :slot.foot>
+      <span class="keys">
+        <Key variant="ghost" @click="answerReplace('replace')">{{ t("replaceQueue.replace") }}</Key>
+        <Key variant="ghost" @click="save()">{{ t("replaceQueue.save") }}</Key>
+        <Key variant="primary" @click="answerReplace('keep')">{{ t("replaceQueue.keep") }}</Key>
+      </span>
+    </template>
+  </Modal>
+</div>
+
+<style scoped>
+  .replace-queue-dialog { display: contents; }
+  .text { margin: 0; color: var(--mm-fg-muted); }
+  .keys { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); width: 100%; }
+</style>

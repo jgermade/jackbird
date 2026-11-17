@@ -2,8 +2,15 @@
  * The play queue as a list: tracks of any open roots, and which one is
  * current. Every change gives a new position (queue and index) and leaves
  * the one given untouched; an empty queue is `null`. The current track keeps
- * being the current one through every change but its own removal. See
- * RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3).
+ * being the current one through every change but its own removal.
+ *
+ * Four parts: the tracks before the current one (played), the current one,
+ * the ones queued on purpose (`queued`, by Play next and Add to queue), and
+ * the ones suggested (the rest of a disc played). The queued ones come right
+ * after the current one, before the suggested ones, after every change (see
+ * settle), so the list reads in the order it plays. See
+ * RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3) and
+ * RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-17 12:40).
  */
 
 import type { PlaybackQueue, QueueItem } from "../types.ts";
@@ -33,31 +40,131 @@ function withItems(position: QueuePosition, items: QueueItem[], index: number): 
   return { queue: { ...position.queue, items }, index: Math.max(0, Math.min(index, items.length - 1)) };
 }
 
+/** An item as queued on purpose, or as suggested: only its root, its track and that mark. */
+const marked = (item: QueueItem): QueueItem => ({ rootId: item.rootId, trackId: item.trackId, queued: true });
+const plain = (item: QueueItem): QueueItem => ({ rootId: item.rootId, trackId: item.trackId });
+
+/** How many tracks right after the current one were queued on purpose. */
+export function queuedCount(position: QueuePosition): number {
+  const { queue, index } = position;
+  if (!queue) {
+    return 0;
+  }
+  let count = 0;
+  while (queue.items[index + 1 + count]?.queued) {
+    count += 1;
+  }
+  return count;
+}
+
+/** Whether any of the queue's tracks, played ones included, was put there on purpose. */
+export function hasQueued(position: QueuePosition): boolean {
+  return !!position.queue?.items.some((item) => item.queued);
+}
+
 /**
- * `items` right after the current track, in their order. With no queue,
- * they become one, labelled `sourceLabel`, the first of them current.
+ * The rule restored: after the current track, the queued ones first, then the
+ * suggested ones, each in their order. The position given when it holds.
+ */
+export function settle(position: QueuePosition): QueuePosition {
+  const { queue, index } = position;
+  if (!queue) {
+    return position;
+  }
+  const after = queue.items.slice(index + 1);
+  const sorted = [...after.filter((item) => item.queued), ...after.filter((item) => !item.queued)];
+  if (sorted.every((item, at) => item === after[at])) {
+    return position;
+  }
+  return { queue: { ...queue, items: [...queue.items.slice(0, index + 1), ...sorted] }, index };
+}
+
+/**
+ * The `at`-th track current: forward, the tracks it jumps over count as
+ * played (queued ones too); back, the tracks that come after it again are
+ * put in order (see settle).
+ */
+export function jumpTo(position: QueuePosition, at: number): QueuePosition {
+  const { queue } = position;
+  if (!queue || at < 0 || at >= queue.items.length) {
+    return position;
+  }
+  return settle({ queue, index: at });
+}
+
+/**
+ * `items`, queued on purpose, right after the current track, in their order.
+ * With no queue, they become one, labelled `sourceLabel`, the first of them
+ * current.
  */
 export function playNextIn(position: QueuePosition, items: readonly QueueItem[], sourceLabel: string): QueuePosition {
   if (items.length === 0) {
     return position;
   }
   if (!position.queue) {
-    return { queue: { items: [...items], sourceLabel }, index: 0 };
+    return { queue: { items: items.map(marked), sourceLabel }, index: 0 };
   }
   const list = [...position.queue.items];
-  list.splice(position.index + 1, 0, ...items);
+  list.splice(position.index + 1, 0, ...items.map(marked));
   return withItems(position, list, position.index);
 }
 
-/** `items` at the end of the queue; with no queue, as `playNextIn`. */
+/** `items`, queued on purpose, after the ones queued before them (and before the suggested ones); with no queue, as `playNextIn`. */
 export function addTo(position: QueuePosition, items: readonly QueueItem[], sourceLabel: string): QueuePosition {
   if (items.length === 0) {
     return position;
   }
   if (!position.queue) {
-    return { queue: { items: [...items], sourceLabel }, index: 0 };
+    return { queue: { items: items.map(marked), sourceLabel }, index: 0 };
   }
-  return withItems(position, [...position.queue.items, ...items], position.index);
+  const list = [...position.queue.items];
+  list.splice(position.index + 1 + queuedCount(position), 0, ...items.map(marked));
+  return withItems(position, list, position.index);
+}
+
+/**
+ * A disc (or a folder, a playlist) played from its `at`-th track, in place of
+ * the queue: that track current, the ones after it suggested; the ones before
+ * it left out.
+ */
+export function replaceWith(items: readonly QueueItem[], at: number, sourceLabel: string): QueuePosition {
+  if (at < 0 || at >= items.length) {
+    return EMPTY;
+  }
+  return { queue: { items: items.slice(at).map(plain), sourceLabel }, index: 0 };
+}
+
+/**
+ * A disc played from its `at`-th track, keeping the queue: what was played
+ * and the track that was playing stay as played; the disc's track plays, the
+ * tracks queued on purpose come right after it, and the disc's next tracks
+ * are the suggested ones (the suggested ones before go). With no queue, as
+ * `replaceWith`.
+ */
+export function playFrom(position: QueuePosition, items: readonly QueueItem[], at: number, sourceLabel: string): QueuePosition {
+  const { queue, index } = position;
+  if (!queue) {
+    return replaceWith(items, at, sourceLabel);
+  }
+  if (at < 0 || at >= items.length) {
+    return position;
+  }
+  const queued = queue.items.slice(index + 1, index + 1 + queuedCount(position));
+  return {
+    queue: { items: [...queue.items.slice(0, index + 1), plain(items[at]), ...queued, ...items.slice(at + 1).map(plain)], sourceLabel },
+    index: index + 1
+  };
+}
+
+/** The `at`-th track queued on purpose (`queued`) or suggested, where it is, the order kept (see settle). */
+export function markQueued(position: QueuePosition, at: number, queued: boolean): QueuePosition {
+  const { queue, index } = position;
+  if (!queue || at <= index || at >= queue.items.length || !!queue.items[at].queued === queued) {
+    return position;
+  }
+  const list = [...queue.items];
+  list[at] = queued ? marked(list[at]) : plain(list[at]);
+  return settle(withItems(position, list, index));
 }
 
 /** The queue without its `at`-th track; the current track cannot be removed this way. */
@@ -70,14 +177,22 @@ export function removeAt(position: QueuePosition, at: number): QueuePosition {
   return withItems(position, list, at < index ? index - 1 : index);
 }
 
-/** The `from`-th track moved to `to`; the current track stays current wherever it ends up. */
-export function moveTo(position: QueuePosition, from: number, to: number): QueuePosition {
+/**
+ * The `from`-th track moved to `to`; the current track stays current wherever
+ * it ends up. `queued`, when given: the track is queued on purpose there, or
+ * suggested (the order then kept, see settle).
+ */
+export function moveTo(position: QueuePosition, from: number, to: number, queued?: boolean): QueuePosition {
   const { queue, index } = position;
-  if (!queue || from === to || from < 0 || to < 0 || from >= queue.items.length || to >= queue.items.length) {
+  if (!queue || from < 0 || to < 0 || from >= queue.items.length || to >= queue.items.length) {
     return position;
   }
+  if (from === to) {
+    return queued === undefined ? position : markQueued(position, from, queued);
+  }
   const list = [...queue.items];
-  const [moved] = list.splice(from, 1);
+  const [taken] = list.splice(from, 1);
+  const moved = queued === undefined ? taken : queued ? marked(taken) : plain(taken);
   list.splice(to, 0, moved);
   let current = index;
   if (from === index) {
@@ -87,7 +202,8 @@ export function moveTo(position: QueuePosition, from: number, to: number): Queue
   } else if (from > index && to <= index) {
     current = index + 1;
   }
-  return withItems(position, list, current);
+  const next = withItems(position, list, current);
+  return queued === undefined ? next : settle(next);
 }
 
 /** The queue up to the current track, without what comes after it. */
@@ -144,21 +260,4 @@ export function restoreQueue(saved: QueuePosition, openRoots: ReadonlySet<string
   }
   const dropped = dropItems(saved, (item) => !openRoots.has(item.rootId));
   return { queue: dropped.queue, index: dropped.index };
-}
-
-/** What `isOneAlbum` looks at in each queued track (null for one no longer in the library). */
-export type AlbumPart = { album: string; artist: string; folder: string } | null;
-
-/**
- * Whether a queue is one disc rather than a list: every track there, of the same album (named), and
- * either by the same artist or in the same folder (a compilation keeps its tracks together). Its
- * tracks played are not dimmed then: a disc plays through, a list is worked through. See
- * RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 15:00).
- */
-export function isOneAlbum(parts: readonly AlbumPart[]): boolean {
-  if (parts.length < 2 || parts.some((part) => !part)) return false;
-  const [first, ...rest] = parts as { album: string; artist: string; folder: string }[];
-  const album = first.album.trim().toLowerCase();
-  if (!album || rest.some((part) => part.album.trim().toLowerCase() !== album)) return false;
-  return rest.every((part) => part.artist === first.artist) || rest.every((part) => part.folder === first.folder);
 }

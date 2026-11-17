@@ -1,16 +1,21 @@
 <script :setup lang="ts">
   // The queue as a list, in the queue's dialog (computers) and its panel
-  // (phones): the tracks queued from any open roots with their covers (the
-  // one playing larger), the played ones dimmed (not in a disc: queueIsAlbum), the current one with its
-  // bars. A click (or Enter) plays a track, the current one pauses or
-  // resumes. A track's grip (⠿) drags it to another place (mouse, pen or
-  // touch), but not the current one, which has no grip (its larger cover takes
-  // the grip's place, its right edge on the others'); × removes it (not the current one).
-  // A disc (queueIsAlbum) plays whole, in its order: no grips, no ×, and no keys move or remove. Up, Down, Home and End move
-  // between tracks, Alt with Up or Down moves the track, Delete removes it.
+  // (phones), in four parts, each under a small heading: the tracks played
+  // (dimmed), the one playing (its cover larger, its bars), the ones queued on
+  // purpose, and the ones suggested (the rest of a disc played). Each row: the
+  // title, "artist - album" under it, and its length in its codec's colour (as
+  // Details shows it; the bars in its place on the one playing). A click (or
+  // Enter) plays a track, the current one pauses or resumes. An upcoming
+  // track's grip (⠿) drags it to another place (mouse, pen or touch): dropped
+  // among the queued ones it is queued, among the suggested ones suggested; the
+  // played ones and the one playing have none. × removes a track (not the
+  // current one). Up, Down, Home and End move between tracks, Alt with Up or
+  // Down moves an upcoming track (across the queued and the suggested parts'
+  // edge it changes part first, where it is), Delete removes it.
   // A view over the queue's actions in lib/player.ts. See
   // RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and 23:10, W3;
-  // the drag, the covers and the footers after W4).
+  // the drag, the covers and the footers after W4) and
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-17 12:40).
 
   const EqBars = await import("../../theme/default/components/eq-bars.html")
   const Key = await import("../../theme/default/components/key.html")
@@ -19,35 +24,48 @@
   const { t } = await import("../lib/i18n")
   const { coverSrc } = await import("../lib/covers")
   const { playback } = await import("../lib/playback")
-  const { moveInQueue, playAt, queueEntries, queueIsAlbum, readRowSpectrum, removeFromQueue } = await import("../lib/player")
+  const { markInQueue, moveInQueue, playAt, queueEntries, readRowSpectrum, removeFromQueue } = await import("../lib/player")
   const { ui } = await import("../lib/ui")
   const { preferences } = await import("../lib/preferences")
   const { rowHeights, rowPixels } = await import("../helpers/density")
 
-  type Entry = { index: number; title: string; artist: string; rootLabel: string; cover: string | null; state: "played" | "current" | "upcoming"; missing: boolean }
+  type State = "played" | "current" | "queued" | "suggested"
+  type Entry = { index: number; title: string; artist: string; album: string; duration: string; codec: string; rootLabel: string; cover: string | null; state: State; missing: boolean }
 
   // Read through functions, not `$:` copies: the entries are boxed (see Opaque).
   const entries = (): Entry[] => queueEntries.value.data
   const current = (): number => entries().findIndex((entry) => entry.state === "current")
+  // The four parts, always in this order; a part with no tracks is not drawn.
+  const PARTS: { id: State; label: string }[] = [
+    { id: "played", label: "queue.played" },
+    { id: "current", label: "queue.playing" },
+    { id: "queued", label: "queue.queued" },
+    { id: "suggested", label: "queue.suggested" }
+  ]
+  const inPart = (part: State): Entry[] => entries().filter((entry) => entry.state === part)
+  const parts = () => PARTS.filter((part) => entries().some((entry) => entry.state === part.id))
+  const upcoming = (entry: Entry | undefined): boolean => entry?.state === "queued" || entry?.state === "suggested"
   const severalRoots = (): boolean => new Set(entries().map((entry) => entry.rootLabel)).size > 1
+  // "artist - album" (the artist alone without an album), and the root when the queue spans several.
   const subtitle = (entry: Entry): string => {
     if (entry.missing) return t("queue.missing")
-    const parts = [entry.artist || t("album.unknownArtist")]
-    if (severalRoots() && entry.rootLabel) parts.push(entry.rootLabel)
-    return parts.join(" · ")
+    const line = [entry.artist || t("album.unknownArtist"), entry.album].filter(Boolean).join(" - ")
+    return severalRoots() && entry.rootLabel ? `${line} · ${entry.rootLabel}` : line
   }
   const itemId = (index: number): string => `queue-item-${index}`
 
-  // The list is drawn a window at a time (jq79's `:window`): only the tracks in view, and a few
-  // around them. Its rows are all one height (the one playing too), as the density says
-  // (helpers/density.ts, `--mm-row-queue`), which `:window` takes in pixels; the list's
-  // `$scrollTo(index)` brings a track into view, drawing it.
+  // Each part's tracks are drawn a window at a time (jq79's `:window`): only the tracks in view,
+  // and a few around them. Its rows are all one height (the one playing too), as the density says
+  // (helpers/density.ts, `--mm-row-queue`), which `:window` takes in pixels; a part's list's
+  // `$scrollTo(place)` brings a track into view, drawing it.
   const rootPx = (): number => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
   // A whole number of pixels where the stylesheet rounds the rows too (tokens.css).
   const rowPx = (): number => rowPixels(rowHeights(preferences.density).queue, rootPx(), typeof CSS !== "undefined" && CSS.supports("width", "round(1rem, 2px)"))
   const reveal = (index: number, block: "nearest" | "center") => {
-    const list = $self("ol.queue") as (HTMLElement & { $scrollTo?: (index: number, options?: { block?: string }) => void }) | null
-    list?.$scrollTo?.(index, { block })
+    const entry = entries()[index]
+    if (!entry) return
+    const list = $self(`ol[data-part="${entry.state}"]`) as (HTMLElement & { $scrollTo?: (index: number, options?: { block?: string }) => void }) | null
+    list?.$scrollTo?.(inPart(entry.state).findIndex((one) => one.index === index), { block })
   }
 
   // The track the keyboard is on.
@@ -68,17 +86,26 @@
     focused = entry.index
     playAt(entry.index)
   }
-  const move = (from: number, to: number) => {
-    // A disc plays in its own order, whole: nothing in it moves.
-    if (queueIsAlbum.value) return
-    if (to < 0 || to >= entries().length || from === to) return
-    // The track playing is not moved (the others move around it).
-    if (entries()[from]?.state === "current") return
-    moveInQueue(from, to)
+  // Only upcoming tracks move, and only among the upcoming ones; `queued`: the part it lands in.
+  const move = (from: number, to: number, queued: boolean) => {
+    const list = entries()
+    if (!upcoming(list[from]) || !upcoming(list[to])) return
+    moveInQueue(from, to, queued)
     focusOn(to)
   }
+  // Alt with Up or Down: one place, or, at the edge between the queued and the suggested parts,
+  // into the other part where it is.
+  const step = (at: number, by: -1 | 1) => {
+    const list = entries()
+    const entry = list[at]
+    const neighbour = list[at + by]
+    if (!upcoming(entry)) return
+    if (by < 0 && entry.state === "suggested" && neighbour?.state !== "suggested") markInQueue(at, true)
+    else if (by > 0 && entry.state === "queued" && neighbour?.state !== "queued") markInQueue(at, false)
+    else if (upcoming(neighbour)) move(at, at + by, entry.state === "queued")
+  }
   const remove = (entry: Entry) => {
-    if (entry.state === "current" || queueIsAlbum.value) return
+    if (entry.state === "current") return
     removeFromQueue(entry.index)
     focusOn(entry.index)
   }
@@ -87,7 +114,7 @@
     if (count === 0) return
     const at = focused < 0 ? Math.max(0, current()) : focused
     if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
-      move(at, at + (event.key === "ArrowUp" ? -1 : 1))
+      step(at, event.key === "ArrowUp" ? -1 : 1)
     } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       focusOn(at + (event.key === "ArrowUp" ? -1 : 1))
     } else if (event.key === "Home" || event.key === "End") {
@@ -105,17 +132,16 @@
   // Dragging a track by its grip. Its state lives in this closure, not in the
   // component's store: it changes on every pointer move, and the rows are
   // moved and marked straight on the page; the queue changes once, on release.
-  // Where it lands is worked out from how far it went, in rows (they are all one
-  // height): the list draws only the rows in view, so they cannot be counted.
+  // Where it lands is the row (or the part's heading) under the pointer: the
+  // headings stand between the parts, so rows cannot be counted by height.
   const drag = (() => {
     const EDGE = 40
     let from = -1
-    let to = -1
+    let target: { to: number; queued: boolean; mark: number; before: boolean } | null = null
     let startY = 0
     let lastY = 0
+    let pointX = 0
     let startScroll = 0
-    let total = 0
-    let height = 0
     let scroller: HTMLElement | null = null
     let frame = 0
     // A row as drawn now, if it is (by its index in the queue).
@@ -128,20 +154,41 @@
       }
       return null
     }
-    const unmark = () => $self("ol.queue")?.querySelectorAll(".drop-before, .drop-after").forEach((row) => row.classList.remove("drop-before", "drop-after"))
-    // Where the track would land: as many rows from where it was as the pointer went.
+    const unmark = () => $self(".queue")?.querySelectorAll(".drop-before, .drop-after").forEach((row) => row.classList.remove("drop-before", "drop-after"))
+    // Where the track would land, from what is under the pointer: a queued or suggested row (it
+    // takes that row's place and part), or the heading of one of those parts (it becomes the
+    // part's first). Over the played ones or the one playing: nowhere.
+    const aim = (): typeof target => {
+      const list = entries()
+      const lifted = rowAt(from)
+      const hit = document.elementsFromPoint(pointX, lastY).find((element) => !lifted?.contains(element) && element.closest("[data-index], [data-head]"))
+      const node = hit?.closest<HTMLElement>("[data-index], [data-head]")
+      if (!node) return null
+      if (node.dataset.head) {
+        const part = node.dataset.head as State
+        const first = list.find((entry) => entry.state === part)
+        if (!first || (part !== "queued" && part !== "suggested")) return null
+        const to = from < first.index ? first.index - 1 : first.index
+        return { to, queued: part === "queued", mark: first.index, before: true }
+      }
+      const at = Number(node.dataset.index)
+      const entry = list[at]
+      if (!upcoming(entry)) return null
+      return { to: at, queued: entry.state === "queued", mark: at, before: at < from }
+    }
     const update = () => {
       const moved = lastY - startY + (scroller ? scroller.scrollTop - startScroll : 0)
-      to = Math.max(0, Math.min(total - 1, from + Math.round(moved / height)))
       const lifted = rowAt(from)
       if (lifted) {
         lifted.classList.add("dragging")
         lifted.style.transform = `translateY(${moved}px)`
       }
+      target = aim()
       unmark()
-      if (to === from) return
-      // The line goes before the track it lands on (moving up), or after it (moving down).
-      rowAt(to)?.classList.add(to < from ? "drop-before" : "drop-after")
+      const still = !target || (target.to === from && target.queued === (entries()[from]?.state === "queued"))
+      if (still || !target) return
+      // The line goes before the track it lands on (moving up, or onto a heading), or after it (moving down).
+      rowAt(target.mark)?.classList.add(target.before ? "drop-before" : "drop-after")
     }
     // Near the list's top or bottom edge, it scrolls.
     const tick = () => {
@@ -173,9 +220,10 @@
         lifted.classList.remove("dragging")
       }
       unmark()
-      const [moved, target] = [from, to]
+      const [moved, landing] = [from, target]
       from = -1
-      if (drop && target >= 0 && target !== moved) move(moved, target)
+      target = null
+      if (drop && landing) move(moved, landing.to, landing.queued)
     }
     const release = (event: PointerEvent) => end(event, true)
     const cancel = (event: PointerEvent) => end(event, false)
@@ -186,11 +234,12 @@
       const list = grip.closest(".queue")
       if (!list) return
       event.preventDefault()
-      total = entries().length
-      height = rowPx()
       from = index
-      to = index
+      target = null
       startY = lastY = event.clientY
+      // Across the list's middle: what is under the pointer there is a row or a heading.
+      const box = list.getBoundingClientRect()
+      pointX = box.left + box.width / 2
       scroller = scrollParent(list as HTMLElement)
       startScroll = scroller?.scrollTop ?? 0
       rowAt(from)?.classList.add("dragging")
@@ -207,48 +256,77 @@
 
 <div class="queue-list">
   <p :if="entries().length === 0" class="none">{{ t("queue.empty") }}</p>
-  <ol :else class="queue" :class.album="queueIsAlbum.value" role="listbox" tabindex="0" :aria-label="t('queue.title')"
-      :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
-    <li :each="entry in entries()" :key="entry.index" :window="rowPx()" :id="itemId(entry.index)" role="option" class="item"
-        :class.played="entry.state === 'played' && !queueIsAlbum.value" :class.current="entry.state === 'current'"
-        :class.missing="entry.missing" :class.focused="entry.index === focused"
-        :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
-      <!-- The one playing stays where it is: no grip; its larger cover takes the grip's place. -->
-      <span :if="entry.state !== 'current' && !queueIsAlbum.value" class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
-            @pointerdown="drag.start(entry.index, $event)" @click.stop="null">
-        <svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="8" r="1.2" /><circle cx="7" cy="8" r="1.2" /><circle cx="3" cy="13" r="1.2" /><circle cx="7" cy="13" r="1.2" /></svg>
-      </span>
-      <span class="art" aria-hidden="true">
-        <img :if="coverSrc(entry.cover)" :src="coverSrc(entry.cover)" alt="" />
-        <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
-      </span>
-      <span class="text">
-        <span class="name">{{ entry.title }}</span>
-        <span class="sub">{{ subtitle(entry) }}</span>
-      </span>
-      <span class="cue"><EqBars :if="entry.state === 'current'" :active="playback.playing" :source="readRowSpectrum" /></span>
-      <span :if="!queueIsAlbum.value" class="keys" @click.stop="null">
-        <Key square size="sm" variant="ghost" :label="t('queue.remove', { title: entry.title })" :title="t('queue.remove', { title: entry.title })"
-             :disabled="entry.state === 'current'" @click="remove(entry)">
-          <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
-        </Key>
-      </span>
-    </li>
-  </ol>
+  <div :else class="queue" role="listbox" tabindex="0" :aria-label="t('queue.title')"
+       :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
+    <!-- The four parts, each under its heading (the one playing needs none); each drawn a window at a time. -->
+    <div :each="part in parts()" :key="part.id" class="part" role="group" :aria-labelledby="`queue-head-${part.id}`">
+      <h3 class="head mm-legend" :class.unseen="part.id === 'current'" :id="`queue-head-${part.id}`" :data-head="part.id">{{ t(part.label) }}</h3>
+      <ol class="rows" role="none" :data-part="part.id">
+        <li :each="entry in inPart(part.id)" :key="entry.index" :window="rowPx()" :id="itemId(entry.index)" :data-index="entry.index" role="option" class="item"
+            :class.played="entry.state === 'played'" :class.current="entry.state === 'current'"
+            :class.missing="entry.missing" :class.focused="entry.index === focused"
+            :aria-selected="entry.state === 'current' ? 'true' : 'false'" @click="play(entry)">
+          <!-- Only upcoming tracks are dragged; the one playing's larger cover takes the grip's place. -->
+          <span :if="upcoming(entry)" class="grip" :title="t('queue.drag', { title: entry.title })" aria-hidden="true"
+                @pointerdown="drag.start(entry.index, $event)" @click.stop="null">
+            <svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="8" r="1.2" /><circle cx="7" cy="8" r="1.2" /><circle cx="3" cy="13" r="1.2" /><circle cx="7" cy="13" r="1.2" /></svg>
+          </span>
+          <span :elseif="entry.state !== 'current'" class="grip-space" aria-hidden="true"></span>
+          <span class="art" aria-hidden="true">
+            <img :if="coverSrc(entry.cover)" :src="coverSrc(entry.cover)" alt="" />
+            <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
+          </span>
+          <span class="text">
+            <span class="name">{{ entry.title }}</span>
+            <span class="sub">{{ subtitle(entry) }}</span>
+          </span>
+          <!-- Its length in its codec's colour, or the bars on the track playing. -->
+          <span class="cue" :data-codec="entry.codec">
+            <EqBars :if="entry.state === 'current'" :active="playback.playing" :source="readRowSpectrum" />
+            <span :else class="duration">{{ entry.duration }}</span>
+          </span>
+          <span class="keys" @click.stop="null">
+            <Key square size="sm" variant="ghost" :label="t('queue.remove', { title: entry.title })" :title="t('queue.remove', { title: entry.title })"
+                 :disabled="entry.state === 'current'" @click="remove(entry)">
+              <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+            </Key>
+          </span>
+        </li>
+      </ol>
+    </div>
+  </div>
 </div>
 
 <style scoped>
   .queue-list { display: contents; }
   .none { margin: 0; color: var(--mm-fg-muted); }
-  .queue { margin: 0; padding: 0; list-style: none; outline: none; }
+  .queue { margin: 0; padding: 0; outline: none; }
   .queue:focus-visible .focused { box-shadow: inset 0 0 0 2px var(--mm-accent); }
+  .rows { margin: 0; padding: 0; list-style: none; }
+  /* Each part's heading: a small legend over its tracks; the one playing's is for screen readers only. */
+  .head {
+    margin: 0;
+    padding: var(--mm-space-3) var(--mm-space-3) var(--mm-space-1);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-surface);
+    color: var(--mm-fg-muted);
+  }
+  .head.unseen {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .item {
     position: relative;
     display: grid;
-    grid-template-columns: 1.25rem 2.25rem minmax(0, 1fr) 1.25rem auto;
+    grid-template-columns: 1.25rem 2.25rem minmax(0, 1fr) auto auto;
     align-items: center;
     gap: var(--mm-space-3);
-    /* One height for every row, the one playing too (see rowPx): the list is drawn a window at a time. */
+    /* One height for every row, the one playing too (see rowPx): the parts are drawn a window at a time. */
     box-sizing: border-box;
     height: var(--mm-row-queue);
     padding: var(--mm-space-1) var(--mm-space-2) var(--mm-space-1) var(--mm-space-1);
@@ -261,13 +339,13 @@
   @media (hover: hover) { .item:hover { background: var(--mm-hover); } }
   .item:active { background: var(--mm-sunken); }
   .item.current { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
-  .item.played .text, .item.played .art { opacity: .55; }
+  .item.played .text, .item.played .art, .item.played .cue { opacity: .55; }
   .item.missing .sub { color: var(--mm-bad); }
 
   /* The grip: the one place a drag starts, and where a touch does not scroll. */
   .grip { display: grid; place-items: center; align-self: stretch; color: var(--mm-fg-subtle); cursor: grab; touch-action: none; }
   .grip svg { width: .625rem; height: 1rem; }
-  .item.dragging { z-index: 1; box-shadow: var(--mm-shadow-md); cursor: grabbing; opacity: .95; }
+  .item.dragging { z-index: 1; box-shadow: var(--mm-shadow-md); cursor: grabbing; opacity: .95; pointer-events: none; }
   .item.dragging .grip { cursor: grabbing; }
   .item.drop-before::before, .item.drop-after::after {
     content: "";
@@ -283,21 +361,35 @@
   .art { display: block; width: 2.25rem; aspect-ratio: 1; overflow: hidden; border-radius: 3px; box-shadow: var(--mm-shadow-sm, 0 1px 2px rgb(0 0 0 / .15)); }
   /* The one playing, larger, in the grip's column and the cover's, its right edge on the others'. */
   .current .art { grid-column: 1 / 3; justify-self: end; width: 3rem; }
-  /* A disc: no grips and no keys to remove; the covers in one column as wide as the larger one,
-     their right edges together, and nothing at the row's end but the bars. */
-  .album .item { grid-template-columns: 3rem minmax(0, 1fr) 1.25rem; }
-  .album .art { justify-self: end; }
-  .album .current .art { grid-column: auto; }
   .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .no-cover { position: relative; display: block; height: 100%; background: var(--mm-display-bezel); }
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 16%; }
 
-  .text { display: grid; min-width: 0; }
+  .text { display: grid; gap: .125rem; min-width: 0; }
   .name, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .name { color: var(--mm-fg); font-size: var(--mm-text-sm); }
   .current .name { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); font-size: var(--mm-text-md); }
   .sub { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
-  .cue { display: grid; place-items: center; }
+  /* The length, in its codec's colour for text (`--mm-codec-*-ink`), as Details shows it: a box one
+     "m:ss" wide, right-aligned, the bars of the track playing centred in it. */
+  .cue {
+    display: grid;
+    place-items: center end;
+    min-width: 4ch;
+    color: var(--mm-codec-other-ink);
+    font-family: var(--mm-font-mono);
+    font-weight: var(--mm-weight-medium);
+    font-size: var(--mm-text-xs);
+    line-height: 1;
+  }
+  .current .cue { place-items: center; }
+  .cue[data-codec="flac"] { color: var(--mm-codec-flac-ink); }
+  .cue[data-codec="mp3"] { color: var(--mm-codec-mp3-ink); }
+  .cue[data-codec="aac"] { color: var(--mm-codec-aac-ink); }
+  .cue[data-codec="alac"] { color: var(--mm-codec-alac-ink); }
+  .cue[data-codec="pcm"] { color: var(--mm-codec-pcm-ink); }
+  .cue[data-codec="ogg"] { color: var(--mm-codec-ogg-ink); }
+  .duration { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .keys { display: flex; gap: var(--mm-space-1); }
   .icon { width: .75rem; height: .75rem; }
 </style>

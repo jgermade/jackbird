@@ -14,6 +14,7 @@
   const SelectionDialog = await import("./selection-dialog.html")
   const QueueDialog = await import("./queue-dialog.html")
   const PlaylistDialog = await import("./playlist-dialog.html")
+  const ReplaceQueueDialog = await import("./replace-queue-dialog.html")
   const PreferencesDialog = await import("./preferences-dialog.html")
   const FolderDialog = await import("./folder-dialog.html")
   const SigninDialog = await import("./signin-dialog.html")
@@ -107,6 +108,7 @@
   <div id="compact-slot" class="slot" hidden><Compact :if="compact.mode === 'pip'" /></div>
   <SelectionDialog />
   <QueueDialog />
+  <ReplaceQueueDialog />
   <PlaylistDialog />
   <PreferencesDialog />
   <FolderDialog />
