@@ -361,7 +361,7 @@
   .mm-table .cue-cell { width: 1%; padding-left: 0; padding-right: 0; text-align: right; line-height: 0; }
   .mm-table .menu-cell { width: 1%; padding-block: 0; padding-inline: 0; line-height: 0; }
   /* The menu's key shows on every track, always (the owner, 2026-11-16). */
-  /* The length, in its codec's colour (the owner, 2026-11-17), a key that opens the track's info.
+  /* The length, in its codec's colour for text (`--mm-codec-*-ink`, the owner, 2026-11-17), a key that opens the track's info.
      Its box is one "m:ss" wide (4ch of its face), right-aligned, and the bars of the track playing
      are centred in that box, so they sit under the lengths, not under their last digit; a length
      of an hour or more widens its own box only. */
@@ -375,19 +375,20 @@
     border: 0;
     border-radius: var(--mm-radius-key);
     background: none;
-    color: var(--mm-codec-other);
+    color: var(--mm-codec-other-ink);
     font-family: var(--mm-font-mono);
+    font-weight: var(--mm-weight-medium);
     font-size: var(--mm-text-xs);
     line-height: 1;
     cursor: pointer;
     box-sizing: content-box;
   }
-  .cue[data-codec="flac"] { color: var(--mm-codec-flac); }
-  .cue[data-codec="mp3"] { color: var(--mm-codec-mp3); }
-  .cue[data-codec="aac"] { color: var(--mm-codec-aac); }
-  .cue[data-codec="alac"] { color: var(--mm-codec-alac); }
-  .cue[data-codec="pcm"] { color: var(--mm-codec-pcm); }
-  .cue[data-codec="ogg"] { color: var(--mm-codec-ogg); }
+  .cue[data-codec="flac"] { color: var(--mm-codec-flac-ink); }
+  .cue[data-codec="mp3"] { color: var(--mm-codec-mp3-ink); }
+  .cue[data-codec="aac"] { color: var(--mm-codec-aac-ink); }
+  .cue[data-codec="alac"] { color: var(--mm-codec-alac-ink); }
+  .cue[data-codec="pcm"] { color: var(--mm-codec-pcm-ink); }
+  .cue[data-codec="ogg"] { color: var(--mm-codec-ogg-ink); }
   .cue:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   @media (hover: hover) { .cue:hover { background: var(--mm-hover); } }
   .cue:active { background: var(--mm-sunken); }
