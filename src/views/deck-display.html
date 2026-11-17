@@ -33,8 +33,7 @@
   $: current = nowPlaying.value
   // The display's left, while the music plays: the song's format (the file's), the spectrum, and
   // while the music goes to a DAC, the DAC (its name, and the depth and rate it runs at). A click or
-  // a tap turns from one to the next; each song starts on its format for a second, then turns to
-  // the spectrum.
+  // a tap turns from one to the next; each song starts on the spectrum, at once.
   type MarkView = "format" | "spectrum" | "dac"
   let markView: MarkView = "spectrum"
   const markViews = (): MarkView[] => (soundingDac() ? ["format", "spectrum", "dac"] : ["format", "spectrum"])
@@ -45,34 +44,24 @@
   const MARK_LABELS: Record<MarkView, string> = { format: "faceplate.showFormat", spectrum: "faceplate.showSpectrum", dac: "faceplate.showDac" }
   const markParts = () => soundingParts(stream.key === current?.key ? stream.info : null, current?.relativePath)
   const mark = (() => {
-    const FORMAT_FIRST = 1000
-    let timer = 0
     let song: string | null = null
     return {
       song(key: string | null) {
         if (key === song) return
         song = key
-        window.clearTimeout(timer)
-        if (!key) return
-        markView = "format"
-        timer = window.setTimeout(() => {
-          markView = "spectrum"
-        }, FORMAT_FIRST)
+        if (key) markView = "spectrum"
       },
       toggle() {
-        window.clearTimeout(timer)
         markView = nextMarkView()
         // Turned while the spectrum fell after a pause: nothing left to wait for.
         if (!playback.playing) falling = false
-      },
-      stop: () => window.clearTimeout(timer)
+      }
     }
   })()
   $: mark.song(current?.key ?? null)
-  $destroyed(() => mark.stop())
-  // On a pause, the spectrum stays until its columns have fallen (it says so: `settled`; a moment,
-  // the peaks left out), and only then the logo takes its place; the format and the DAC give way at once. Played again meanwhile,
-  // it just goes on.
+  // On a pause, the spectrum stays while its columns fall, slowly (it says when they are down:
+  // `settled`; the peaks left out), and only then the logo takes its place; the format and the DAC
+  // give way at once. Played again meanwhile, it just goes on.
   let falling = false
   const fall = (() => {
     let was = false

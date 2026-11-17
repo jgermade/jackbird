@@ -17,7 +17,8 @@
   // `source(bands)` returns the levels, from 0 to 1, low frequencies first
   // (or `null` when there are none yet). While `active`, it is read and drawn
   // on every animation frame, and four times a second under reduced motion;
-  // when not, the columns fall to nothing and the drawing stops. It draws
+  // when not, the columns fall slowly to nothing (half the height a second)
+  // and the drawing stops. It draws
   // only while it is shown (a canvas with no width costs nothing). It fills
   // the box it is put in and adds no height of its own. `settled()`, if given,
   // is called once the columns have fallen after it stops being active (at
@@ -49,6 +50,9 @@
     const lineOf = (ratio: number) => ({ size: Math.max(1, Math.round(ratio)), gap: Math.max(1, Math.round(ratio)) })
     // The bars: up at once, down by this much a frame, as a meter's needle falls.
     const FALL = 0.06
+    // Once not active (the music paused or stopped), slowly, by the clock: this much of the height
+    // a second, a full column in two seconds.
+    const REST_FALL = 0.5
     let shown: number[] = []
     let tops: { level: number; held: number }[] = []
     let last = 0
@@ -85,7 +89,8 @@
       const elapsed = last ? Math.min(250, now - last) : 16
       last = now
       const read = flag(active) && typeof source === "function" ? source(count) : null
-      shown = Array.from({ length: count }, (_, band) => Math.max(read?.[band] ?? 0, (shown[band] ?? 0) - FALL))
+      const drop = flag(active) ? FALL : (REST_FALL * elapsed) / 1000
+      shown = Array.from({ length: count }, (_, band) => Math.max(read?.[band] ?? 0, (shown[band] ?? 0) - drop))
       // A peak rises with its column and is held; then it falls, never below the column. None
       // drawn, none kept.
       const motion = peakMotion()
