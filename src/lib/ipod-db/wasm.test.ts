@@ -28,6 +28,7 @@ describe("the iPod module as wasm, on the fixture", () => {
       path: "iPod_Control/Music/F00/AAAA.mp3",
       size: 4000000,
       lengthMs: 197000,
+      fileType: "MPEG audio file",
       bpm: 0,
       title: "First song",
       artist: "The Fixtures",
@@ -42,6 +43,8 @@ describe("the iPod module as wasm, on the fixture", () => {
       artwork: 100
     });
     assert.equal(listing.songs[2].compilation, true);
+    // The database's type of each song: what an `.m4a` holds.
+    assert.equal(listing.songs[2].fileType, "AAC audio file");
   });
 
   it("gives the images and a cover as a PNG", () => {

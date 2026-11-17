@@ -45,12 +45,23 @@ describe("the format a track's row shows", () => {
 describe("codecLabel", () => {
   it("names MP3 and FLAC by their extension", () => {
     assert.equal(codecLabel("a/b.mp3"), "MP3");
-    assert.equal(codecLabel("a/b.FLAC", 900), "FLAC");
+    assert.equal(codecLabel("a/b.FLAC", { bitrate: 900 }), "FLAC");
   });
   it("tells an iPod's Apple Lossless from its AAC by the bitrate", () => {
-    assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a", 256), "AAC");
-    assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a", 401), "ALAC");
+    assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a", { bitrate: 256 }), "AAC");
+    assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a", { bitrate: 401 }), "ALAC");
     assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a"), "AAC");
+    assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a", null), "AAC");
+  });
+  it("takes what the iPod's database names first, in any language", () => {
+    assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a", { bitrate: 1000, kind: "AAC audio file" }), "AAC");
+    assert.equal(codecLabel("iPod_Control/Music/F00/ABCD.m4a", { bitrate: 128, kind: "Apple Lossless audio file" }), "ALAC");
+    assert.equal(codecLabel("x.m4a", { kind: "Archivo de audio AAC adquirido" }), "AAC");
+    assert.equal(codecLabel("x.mp3", { kind: "Archivo de audio MPEG" }), "MP3");
+    assert.equal(codecLabel("x.wav", { kind: "WAV audio file" }), "WAV");
+    assert.equal(codecLabel("x.aif", { kind: "AIFF audio file" }), "AIFF");
+    // A type it does not know: the path decides.
+    assert.equal(codecLabel("x.m4a", { bitrate: 900, kind: "Audiobook" }), "ALAC");
   });
   it("names the other MPEG-4 audio AAC, and PCM and Ogg by their family", () => {
     assert.deepEqual(["x.m4p", "x.m4b", "x.aac", "x.wav", "x.aif", "x.aiff", "x.oga", "x.ogg", "x.opus", "x", "x.wma"].map((path) => codecLabel(path)), ["AAC", "AAC", "AAC", "WAV", "AIFF", "AIFF", "OGG", "OGG", "OPUS", "", "WMA"]);

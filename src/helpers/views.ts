@@ -202,7 +202,7 @@ export function buildViewRows(
       trackNumber: track.metadata.trackNumber,
       artist: track.metadata.artist,
       relativePath: track.relativePath,
-      format: codecLabel(track.relativePath, track.audio?.bitrate),
+      format: codecLabel(track.relativePath, track.audio),
       ...(track.pending ? { pending: true } : {}),
       meta,
       parentKey,
@@ -272,7 +272,7 @@ export function buildViewRows(
         const track = found[index];
         const base = { key: `@pl:${playlist.path}#${index}`, kind: "track" as const, album: "", parentKey: key, depth: 1, inView: view, playlist: playlist.path, playlistIndex: index };
         if (track) {
-          rows.push({ ...base, label: track.metadata.title || track.name, trackId: track.id, trackNumber: track.metadata.trackNumber, artist: track.metadata.artist, relativePath: track.relativePath, format: codecLabel(track.relativePath, track.audio?.bitrate), meta: track.metadata.artist, ...(track.metadata.artist ? { sub: track.metadata.artist } : {}) });
+          rows.push({ ...base, label: track.metadata.title || track.name, trackId: track.id, trackNumber: track.metadata.trackNumber, artist: track.metadata.artist, relativePath: track.relativePath, format: codecLabel(track.relativePath, track.audio), meta: track.metadata.artist, ...(track.metadata.artist ? { sub: track.metadata.artist } : {}) });
         } else {
           rows.push({ ...base, label: entry.title || entry.raw.split(/[\\/]/).pop() || entry.raw, meta: labels.missing, missing: true });
         }

@@ -45,15 +45,32 @@ export function formatLabel(path: string): string {
 const LOSSLESS_KBPS = 400;
 
 /**
- * The codec a track's mark shows (CodecMark): MP3 and FLAC by their extension; an MPEG-4 song
- * (`.m4a`) Apple Lossless ("ALAC") above 400 kbit/s, else "AAC", as `.m4p`, `.m4b` and `.aac`;
- * "WAV", "AIFF", "OGG", "OPUS"; any other its extension in capitals; "" with none. `bitrate` is
- * the track's (`Track.audio`), 0 when unknown.
+ * The codec an iPod's database names (`AudioProps.kind`), in any of iTunes' languages: the
+ * codec's own name is never translated ("Apple Lossless audio file", "Archivo de audio AAC").
+ * "" when it names none of them.
  */
-export function codecLabel(path: string, bitrate = 0): string {
+export function codecOfKind(kind: string): string {
+  const text = kind.toLowerCase();
+  if (text.includes("lossless") || text.includes("alac")) return "ALAC";
+  if (text.includes("aac")) return "AAC";
+  if (text.includes("mpeg") || text.includes("mp3")) return "MP3";
+  if (text.includes("aiff")) return "AIFF";
+  if (text.includes("wav")) return "WAV";
+  return "";
+}
+
+/**
+ * The codec a track's mark shows (CodecMark): what an iPod's database names (`audio.kind`),
+ * first; else MP3 and FLAC by their extension; an MPEG-4 song (`.m4a`) Apple Lossless ("ALAC")
+ * above 400 kbit/s, else "AAC", as `.m4p`, `.m4b` and `.aac`; "WAV", "AIFF", "OGG", "OPUS"; any
+ * other its extension in capitals; "" with none. `audio` is the track's (`Track.audio`).
+ */
+export function codecLabel(path: string, audio?: { bitrate?: number; kind?: string } | null): string {
+  const named = audio?.kind ? codecOfKind(audio.kind) : "";
+  if (named) return named;
   const label = formatLabel(path);
   switch (label) {
-    case "M4A": return bitrate > LOSSLESS_KBPS ? "ALAC" : "AAC";
+    case "M4A": return (audio?.bitrate ?? 0) > LOSSLESS_KBPS ? "ALAC" : "AAC";
     case "M4P":
     case "M4B":
     case "AAC": return "AAC";

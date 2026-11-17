@@ -121,6 +121,9 @@ export type AudioProps = {
   /** Bits per sample; 0 for MP3. */
   bits: number;
   vbr: boolean;
+  /** Its type as an iPod's database names it ("Apple Lossless audio file"), where one does: the
+   * codec an `.m4a` holds, which its name does not tell. */
+  kind?: string;
 };
 
 export type MetaRecord = {

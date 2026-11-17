@@ -263,7 +263,7 @@ fn tracks_of(root: &Path) -> Answer<IpodTracks> {
                     bpm: if t.bpm == 0 { String::new() } else { t.bpm.to_string() },
                     cover_data_url: cover,
                 },
-                // Its length and bit rate as its database keeps them; no sample rate there.
+                // Its length, bit rate and type as its database keeps them; no sample rate there.
                 audio: (t.length_ms > 0).then_some(AudioJson {
                     duration_ms: t.length_ms,
                     bitrate: t.bitrate,
@@ -271,6 +271,7 @@ fn tracks_of(root: &Path) -> Answer<IpodTracks> {
                     channels: 0,
                     bits: 0,
                     vbr: false,
+                    kind: t.file_type.clone().filter(|kind| !kind.trim().is_empty()),
                 }),
             });
         }

@@ -214,7 +214,7 @@ pub struct ScannedJson {
 }
 
 /// A file's audio (`AudioProps` in `src/types.ts`): its length, rates, channels and depth.
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioJson {
     /// Its length, in milliseconds.
@@ -229,6 +229,10 @@ pub struct AudioJson {
     pub bits: u8,
     /// Whether its bit rate varies.
     pub vbr: bool,
+    /// Its type as an iPod's database names it ("Apple Lossless audio file"), where one does:
+    /// the codec an `.m4a` holds, which its name does not tell.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
 }
 
 impl From<jackbird_tags::Audio> for AudioJson {
@@ -240,6 +244,7 @@ impl From<jackbird_tags::Audio> for AudioJson {
             channels: audio.channels,
             bits: audio.bits,
             vbr: audio.vbr,
+            kind: None,
         }
     }
 }

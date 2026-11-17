@@ -159,10 +159,11 @@ export function rockboxWebSource(drive: DriveFiles, apple: RootSource): RootSour
   };
 }
 
-/** A listed song's length, as its database keeps it (no rates there): its bit rate worked out from its size. */
+/** A listed song's length and type, as its database keeps them (no rates there): its bit rate worked out from its size. */
 function songAudio(song: IpodSong): AudioProps | null {
   if (!(song.lengthMs > 0)) return null;
-  return { durationMs: song.lengthMs, bitrate: Math.round((song.size * 8) / song.lengthMs), sampleRate: 0, channels: 0, bits: 0, vbr: false };
+  const kind = song.fileType?.trim();
+  return { durationMs: song.lengthMs, bitrate: Math.round((song.size * 8) / song.lengthMs), sampleRate: 0, channels: 0, bits: 0, vbr: false, ...(kind ? { kind } : {}) };
 }
 
 /** An iPod's root over a drive that holds a database (`database`, found by ipodDatabase). */

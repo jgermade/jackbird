@@ -55,7 +55,7 @@ export function buildWizardRows(tracks: Track[], expandedFolders: readonly strin
         trackNumber: track.metadata.trackNumber,
         artist: track.metadata.artist,
         relativePath: track.relativePath,
-        format: codecLabel(track.relativePath, track.audio?.bitrate),
+        format: codecLabel(track.relativePath, track.audio),
         ...(track.pending ? { pending: true } : {}),
         parentKey,
         depth
