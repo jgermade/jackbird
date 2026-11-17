@@ -24,6 +24,8 @@ export type IpodSong = {
   path: string;
   size: number;
   lengthMs: number;
+  /** Its type as the database names it ("Apple Lossless audio file"); "" for none. */
+  fileType: string;
   /** Beats per minute, 0 for none. */
   bpm: number;
   title: string;

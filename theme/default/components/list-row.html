@@ -87,7 +87,7 @@
     lead?: string | number
     label?: string
     meta?: string | number
-    /** A track's format ("MP3", "FLAC"), framed before its meta. */
+    /** A track's format ("MP3", "FLAC"): its mark (CodecMark) in its glyph's place. */
     format?: string
     /** A folder's picture in place of its glyph (an album's cover), as a URL; null for its glyph. */
     cover?: string | null
@@ -99,6 +99,7 @@
     round?: boolean | ""
   }
 
+  const CodecMark = await import("./codec-mark.html")
   const EqBars = await import("./eq-bars.html")
   const SelectBox = await import("./select-box.html")
 
@@ -131,6 +132,7 @@
      :aria-busy="flag(loading) ? 'true' : null"
      :class.two="!!sub"
      :class.covered="roomy"
+     :class.marked="isPickable && !roomy && !!format"
      :class.round="roomy && flag(round)"
      :class.keyed="!!$slots.action"
      :class.numbered="isPickable && hasLead"
@@ -154,10 +156,13 @@
     <svg :elseif="!roomy" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.2" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /></svg>
     <img :if="covered && !isFolder" class="cover track-cover" :src="cover" alt="" draggable="false" />
     <span :elseif="roomy && !isFolder" class="track-frame" aria-hidden="true"></span>
-    <span :if="isPickable && hasLead" class="slot-lead">{{ lead }}</span>
+    <!-- A track's glyph under its box, shown while the box is not (the owner, 2026-11-16): its
+         format's mark, or a note without one (a row with no file). -->
+    <span :if="isPickable && !roomy && format" class="glyph mark"><CodecMark tinted :format="format" /></span>
+    <svg :elseif="isPickable && !roomy" class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.25 12.25V3.5l6.5-1.5v2.75L6.25 6.25" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" /><circle cx="4.5" cy="12.25" r="1.85" fill="currentColor" /></svg>
   </span>
   <span class="label" :class.led="hasLead"><span :if="hasLead" class="lead">{{ lead }}</span><span class="title">{{ label }}</span><span :if="sub" class="sub">{{ sub }}</span></span>
-  <span class="end"><span :if="format" class="format">{{ format }}</span><span class="meta">{{ meta }}</span></span>
+  <span class="end"><span class="meta">{{ meta }}</span></span>
   <span :if="$slots.action" class="action"><slot.action /></span>
   <span :if="isCued" class="cue" aria-hidden="true">
     <EqBars :if="flag(playing)" :active="flag(playingActive)" :source="playingSource" />
@@ -178,8 +183,7 @@
     min-height: var(--mm-row);
     /* Each folder one step in from the one that holds it; an item one step less, so its number
        (or its box) sits under its folder's icon and its title under the folder's name. */
-    padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + var(--indent, var(--depth)) * 1rem);
-    border-left: .1875rem solid transparent;
+    padding: 0 var(--mm-space-3) 0 calc(var(--mm-space-3) + .1875rem + var(--indent, var(--depth)) * 1rem);
     color: var(--mm-fg);
     font: var(--mm-text-sm) / var(--mm-leading-tight) var(--mm-font-sans);
     cursor: pointer;
@@ -192,11 +196,14 @@
      to the right of its last glyph is about the room to the left of its own. A track's cue (its ▶
      or its bars) goes before its keys, where a folder has its ❯, so every row's ⋮ is in one column. */
   .row.folder, .row.keyed { padding-right: calc(1.125rem - .5rem); }
+  /* A track's format mark in its glyph's place: a wider first column. */
+  .row.marked { grid-template-columns: 1.75rem minmax(0, 1fr) auto; }
   .cue { order: 1; }
   .action { order: 2; }
   @media (hover: hover) { .row:hover { background: var(--mm-hover); } }
   .row:active { background: var(--mm-sunken); }
-  .row[aria-selected="true"] { background: var(--mm-accent-soft); border-left-color: var(--mm-accent); }
+  /* Chosen: the soft accent, with no bar on its left (the owner, 2026-11-16). */
+  .row[aria-selected="true"] { background: var(--mm-accent-soft); }
   .row:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   /* Something the row stands for that is not there (a playlist's entry missing from the library). */
   .row.muted .label, .row.muted .meta { color: var(--mm-fg-subtle); font-style: italic; }
@@ -246,7 +253,6 @@
      glyph's place. */
   .track-frame { display: block; width: var(--cover); height: var(--cover); border-radius: var(--mm-radius-key); background: var(--mm-sunken); box-shadow: inset 0 0 0 1px var(--mm-border); }
   .covered .icon .box { position: relative; z-index: 1; }
-  .covered.numbered .slot-lead { display: none; }
   .covered.numbered .label .lead { display: block; }
   .covered.numbered .label.led { grid-template-columns: auto minmax(0, 1fr); }
   .covered.numbered .label.led .title, .covered.numbered .label.led .sub { grid-column: 2; }
@@ -263,59 +269,38 @@
   .icon .box { display: grid; place-items: center; transform: scale(.75); opacity: .55; }
   .row[aria-selected="true"] .icon .box, .row.current .icon .box { opacity: 1; }
   @media (hover: hover) { .row:hover .icon .box { opacity: 1; } }
-  /* With a pointer (a computer) the box shows only on the row pointed at (and on a chosen one,
-     and where the keyboard's focus is), and the number, if the row has one, sits in its place
-     otherwise. On a touch screen the box is always there and the number beside it, in the label. */
-  .slot-lead { display: none; }
-  /* On a touch screen the number is inside the box (SelectBox's `number`), not beside it: the box
-     whole (not shrunk nor faded) in a column as wide as it. A row with a cover keeps the number
-     beside its title, the box over the cover. */
-  @media (hover: none), (max-width: 720px) {
-    .numbered:not(.covered) { grid-template-columns: 2rem minmax(0, 1fr) auto; }
-    .numbered:not(.covered) .icon .box { transform: none; opacity: 1; }
-    .numbered:not(.covered) .label .lead { display: none; }
-    .numbered:not(.covered) .label.led { grid-template-columns: minmax(0, 1fr); }
-    .numbered:not(.covered) .label.led .title, .numbered:not(.covered) .label.led .sub { grid-column: 1; }
-  }
+  /* A track's number is inside its box (SelectBox's `number`), not beside it: the box whole (not
+     shrunk nor faded) and always shown, in a column as wide as it (the owner, 2026-11-16). A row
+     with a cover keeps the number beside its title, the box over the cover. */
+  .numbered:not(.covered) { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+  .numbered:not(.covered) .icon .box { transform: none; opacity: 1; }
+  .numbered:not(.covered) .label .lead { display: none; }
+  .numbered:not(.covered) .label.led { grid-template-columns: minmax(0, 1fr); }
+  .numbered:not(.covered) .label.led .title, .numbered:not(.covered) .label.led .sub { grid-column: 1; }
+  /* With a pointer (a computer) any other box shows only on the row pointed at, chosen, or where
+     the keyboard's focus is. */
   @media (hover: hover) and (min-width: 721px) {
-    .numbered .slot-lead { display: block; font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-variant-numeric: tabular-nums; line-height: 1; color: var(--mm-fg-subtle); }
-    .numbered .label .lead { display: none; }
-    .numbered .label.led { grid-template-columns: minmax(0, 1fr); }
-    .numbered .label.led .title, .numbered .label.led .sub { grid-column: 1; }
     .icon .box { visibility: hidden; }
-    .row:hover .icon .box, .row[aria-selected="true"] .icon .box, .row:focus-visible .icon .box, .row:has(:focus-visible) .icon .box { visibility: visible; }
-    .numbered:hover .slot-lead, .numbered[aria-selected="true"] .slot-lead, .numbered:focus-visible .slot-lead, .numbered:has(:focus-visible) .slot-lead { visibility: hidden; }
+    .numbered:not(.covered) .icon .box, .row:hover .icon .box, .row[aria-selected="true"] .icon .box, .row:focus-visible .icon .box, .row:has(:focus-visible) .icon .box { visibility: visible; }
+    .row:hover .glyph, .row[aria-selected="true"] .glyph, .row:focus-visible .glyph, .row:has(:focus-visible) .glyph { visibility: hidden; }
   }
+  /* A track's glyph (its format's mark, or a note) holds the box's place until the box
+     shows (the owner, 2026-11-16). On a touch screen or the phone layout the box is always there,
+     so no glyph. */
+  .glyph { display: grid; place-items: center; color: var(--mm-fg-subtle); }
+  .glyph.mark { font-size: .5625rem; line-height: 1; color: color-mix(in srgb, var(--mm-fg-subtle) 70%, transparent); --mm-display-glow: none; --codec-size: 1.2em; }
+  @media (hover: none), (max-width: 720px) { .glyph { display: none; } }
   .title, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The second line: smaller and lighter than the label, in the subtle ink. */
   .sub { font-size: var(--mm-text-xs); font-weight: var(--mm-weight-light); line-height: var(--mm-leading-tight); color: var(--mm-fg-muted); }
   .lead { grid-column: 1; grid-row: 1; min-width: 1.5em; margin-right: var(--mm-space-2); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); font-weight: var(--mm-weight-regular); line-height: normal; font-variant-numeric: tabular-nums; color: var(--mm-fg-subtle); }
-  .action { display: flex; align-items: center; min-width: 1.5rem; opacity: 0; }
-  .row:focus-within .action, .row.current .action, .row.playing .action, .row[aria-selected="true"] .action { opacity: 1; }
-  @media (hover: hover) { .row:hover .action { opacity: 1; } }
+  /* The row's keys (its ⋮) always shown (the owner, 2026-11-16). */
+  .action { display: flex; align-items: center; min-width: 1.5rem; }
   .folder .label { font-weight: var(--mm-weight-bold); }
   .playing .label { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
   /* A folder (an artist, an album) that holds the track playing: its name in the accent too. */
   .holds .title { color: var(--mm-accent-ink); }
   .end { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--mm-space-2); }
-  /* A track's format, framed as the display prints one (display-icon.html), in the row's subtle
-     ink; one width for all, so the lengths after it stay in a column. */
-  .format {
-    box-sizing: border-box;
-    min-width: 3.4em;
-    padding: .18em .35em .14em;
-    border: 1px solid currentColor;
-    border-radius: .22em;
-    font-family: var(--mm-font-label);
-    font-stretch: var(--mm-stretch-label);
-    font-size: .625rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: .06em;
-    text-align: center;
-    text-transform: uppercase;
-    color: var(--mm-fg-subtle);
-  }
   .cue { display: grid; place-items: center; width: 1.5rem; }
   .cue-play { width: .75rem; height: .75rem; color: var(--mm-fg-muted); opacity: 0; }
   @media (hover: hover) { .row:hover .cue-play { opacity: 1; } }
@@ -323,5 +308,5 @@
   /* A key revealed on hover cannot be found without one: on a touch screen the
      keys and the ▶ are always there, and nothing has a hover state (W2).
      Last, so it wins over the rules that hide them. */
-  @media (hover: none) { .action, .cue-play { opacity: 1; } }
+  @media (hover: none) { .cue-play { opacity: 1; } }
 </style>

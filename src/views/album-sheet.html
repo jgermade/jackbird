@@ -4,6 +4,7 @@
   // tab bar (faceplate). A view over lib/workspace.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 5).
 
+  const CodecMark = await import("../../theme/default/components/codec-mark.html")
   const EqBars = await import("../../theme/default/components/eq-bars.html")
   const Key = await import("../../theme/default/components/key.html")
   const Menu = await import("../../theme/default/components/menu.html")
@@ -20,6 +21,7 @@
   const { onTrackMenu, trackMenu } = await import("../lib/menus")
   const { openFolder } = await import("../lib/roots")
   const { artistName, artistOfKey } = await import("../helpers/views")
+  const { codecLabel } = await import("../helpers/formats")
   const { openPicture } = await import("../lib/picture")
   const { setArtistPicture } = await import("../lib/artists")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
@@ -211,9 +213,8 @@
                       :data-playing="String(track.id === playingId())"
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
-                    <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-stack"><span class="pick-box"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span><span :if="discNumbered(disc)" class="pick-num mm-num">{{ numberOf(track) }}</span></span></td>
-                    <td :if="discNumbered(disc)" class="mm-num num-cell">{{ numberOf(track) }}</td>
-                    <td><span class="mm-title">{{ titleOf(track) }}</span></td>
+                    <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-box" :class.numbered="discNumbered(disc)"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span></td>
+                    <td><span class="title-line"><span class="mm-title">{{ titleOf(track) }}</span><span :if="codecLabel(track.relativePath, track.audio)" class="format"><CodecMark tinted :format="codecLabel(track.relativePath, track.audio)" /></span></span></td>
                     <!-- Its length; the bars on the track playing; on a computer, ▶ in its place on hover and focus. -->
                     <td class="cue-cell" aria-hidden="true">
                       <EqBars :if="track.id === playingId()" :active="playback.playing" :source="readRowSpectrum" />
@@ -333,30 +334,25 @@
   .mm-table td { box-sizing: border-box; height: var(--mm-row); padding-block: 0; }
   /* No line under a disc's last track. */
   .mm-table tbody tr:last-child td { border-bottom: 0; }
-  .mm-table .pick-cell { width: 1%; padding-right: 0; }
-  /* With a pointer (a computer) the box shows only on the row pointed at, chosen or with the
-     keyboard's focus, in the number's place where the disc has numbers; on a touch screen both,
-     side by side. */
-  .pick-stack { display: grid; align-items: center; justify-items: start; }
-  .pick-stack > * { grid-area: 1 / 1; }
+  /* A little room before the box (the owner, 2026-11-16). A numbered disc's box holds its
+     track's number and always shows (SelectBox's `number`); with a pointer (a computer) a disc
+     without numbers shows its box only on the row pointed at, chosen or with the keyboard's focus. */
+  .mm-table .pick-cell { width: 1%; padding-left: var(--mm-space-2); padding-right: 0; }
   .pick-box { display: grid; }
-  .pick-num { display: none; }
   @media (hover: hover) and (min-width: 721px) {
-    .num-cell { display: none; }
-    .mm-table .pick-cell:has(.pick-num) { padding-right: .5rem; }
-    .pick-num { display: block; }
-    .pick-box { visibility: hidden; }
+    .pick-box:not(.numbered) { visibility: hidden; }
     .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-visible .pick-box, .mm-table tr:has(:focus-visible) .pick-box { visibility: visible; }
-    .mm-table tr:hover .pick-num, .mm-table tr[aria-selected="true"] .pick-num, .mm-table tr:focus-visible .pick-num, .mm-table tr:has(:focus-visible) .pick-num { visibility: hidden; }
   }
+  .title-line { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
+  /* The track's format as the display prints it (codec-mark.html), small and in a light grey
+     (the owner, 2026-11-16); never its glow, which is the display's. */
+  .format { flex: none; font-size: .5625rem; line-height: 1; color: color-mix(in srgb, var(--mm-fg-subtle) 70%, transparent); --mm-display-glow: none; --codec-size: 1.2em; }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
   /* Room after the length, before the menu's key. */
-  .mm-table .cue-cell { width: 1%; padding-left: 0; padding-right: var(--mm-space-3); text-align: right; line-height: 0; }
-  .mm-table .menu-cell { width: 1%; padding-block: 0; padding-left: 0; line-height: 0; }
-  /* The menu shows as the cue does: on hover, focus, the selected and playing rows; always on a touch screen. */
-  .menu-cell > * { opacity: 0; transition: opacity var(--mm-duration) var(--mm-ease); }
-  .mm-table tr:focus-within .menu-cell > *, .mm-table tr[aria-selected="true"] .menu-cell > *, .mm-table tr[data-playing="true"] .menu-cell > * { opacity: 1; }
-  @media (hover: hover) { .mm-table tr:hover .menu-cell > * { opacity: 1; } }
+  /* The length and the menu's key up to the row's end (the owner, 2026-11-16). */
+  .mm-table .cue-cell { width: 1%; padding-left: 0; padding-right: 0; text-align: right; line-height: 0; }
+  .mm-table .menu-cell { width: 1%; padding-block: 0; padding-inline: 0; line-height: 0; }
+  /* The menu's key shows on every track, always (the owner, 2026-11-16). */
   /* The length, and the ▶ over it: the ▶ in its place on a computer's hover and on focus; on a
      touch screen the length alone. */
   .cue-stack { display: inline-grid; place-items: center end; min-width: 2.5rem; line-height: 1; }
@@ -371,14 +367,7 @@
   }
   @media (hover: none) {
     .cue-play { display: none; }
-    .menu-cell > * { opacity: 1; }
   }
-  /* A touch screen: the track's number is drawn inside its box (SelectBox's `number`), so no
-     column of its own. */
-  @media (hover: none), (max-width: 720px) {
-    .num-cell { display: none; }
-  }
-
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
   .prompt p { margin: 0; color: var(--mm-fg-muted); }

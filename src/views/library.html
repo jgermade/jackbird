@@ -13,8 +13,6 @@
   const Reel = await import("../../theme/default/components/reel.html")
   const IpodFoot = await import("./ipod-foot.html")
 
-  const { formatTrackNumber, trackLead } = await import("../helpers/format")
-  const { formatLabel } = await import("../helpers/formats")
   const { rowHeights, rowPixels } = await import("../helpers/density")
   const { coverSrc } = await import("../lib/covers")
   // Whether the stylesheet rounds the rows' heights to whole pixels (tokens.css).
@@ -42,7 +40,7 @@
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean }
+  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; format?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
@@ -83,18 +81,13 @@
   const windowed = (): boolean => view() === "songs"
   // A whole number of pixels where the stylesheet rounds the rows too (tokens.css, list-row.html).
   const rowPx = (): number => (windowed() ? rowPixels(songRow(), parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, ROUNDS) : 0)
-  // A track's artist goes under its title (`sub`), not at the row's end.
-  // In Songs, the line under the title is the song's "Artist - Album" (its meta, helpers/views.ts),
-  // and the row's end is left empty: in a narrow library the title keeps the room.
-  // An album's row: its line of who it is by and its year (helpers/views.ts), in place of its meta;
-  // and its cover in place of its glyph, once its picture is in (lib/covers.ts).
+  // The line under a row's name is the one its view gives it (`sub`, helpers/views.ts): a song's
+  // "Artist - Album", an album's artist or year. A track's row ends with its menu alone (the owner,
+  // 2026-11-16); a group's meta shows where it has no line under its name. A cover goes in place of
+  // the glyph once its picture is in (lib/covers.ts).
   const rowCover = (row: Row): string | null => (row.cover ? coverSrc(row.cover) : null)
-  const rowSub = (row: Row): string => {
-    if (row.sub) return row.sub
-    if (row.kind !== "track" || !row.trackId) return ""
-    return row.inView === "songs" ? (row.meta || row.artist || "") : (row.artist ?? "")
-  }
-  const rowMeta = (row: Row): string => (row.sub || (row.inView === "songs" && row.kind === "track") ? "" : rowSub(row) && row.meta === row.artist ? "" : (row.meta ?? ""))
+  const rowSub = (row: Row): string => row.sub ?? ""
+  const rowMeta = (row: Row): string => (row.missing ? (row.meta ?? "") : row.kind === "track" || row.sub ? "" : (row.meta ?? ""))
   const emptyText = (): string => {
     if (isLoading()) return t("tree.loadingLibrary")
     if (view() === "playlists") return t("views.empty.playlists")
@@ -103,8 +96,6 @@
   }
 
   const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
-  // A track's number before its title; nothing without one, and no column when no track has one.
-  $: numbered = rows().some((row: Row) => row.kind === "track" && formatTrackNumber(row.trackNumber) !== "")
   // A group's icon by what it is: in Artists an artist, in Albums and Compilations an album, in
   // Albums by artist an artist and under it its albums, in Playlists a playlist; else a folder.
   const glyphOf = (row: Row): "folder" | "artist" | "album" | "playlist" => {
@@ -117,7 +108,6 @@
       default: return "folder"
     }
   }
-  const rowLead = (row: Row): string => (row.kind === "track" ? trackLead(row.trackNumber, isLoading(), numbered) : "")
   const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
   const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey
 
@@ -276,9 +266,8 @@
              :glyph="glyphOf(row)"
              :depth="phone ? 0 : row.depth"
              :label="rowLabel(row)"
-             :lead="rowLead(row)"
              :meta="rowMeta(row)"
-             :format="row.kind === 'track' && row.relativePath ? formatLabel(row.relativePath) : ''"
+             :format="row.kind === 'track' ? (row.format ?? '') : ''"
              :sub="rowSub(row)"
              :cover="rowCover(row)"
              :framed="!!row.framed"

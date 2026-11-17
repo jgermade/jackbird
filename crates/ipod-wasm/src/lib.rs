@@ -80,6 +80,7 @@ pub fn list(data: &[u8]) -> Result<String, String> {
             .text("path", &path)
             .number("size", track.size)
             .number("lengthMs", track.length_ms)
+            .text("fileType", &text(&track.file_type))
             .number("bpm", track.bpm)
             .text("title", &text(&track.title))
             .text("artist", &text(&track.artist))
@@ -285,7 +286,7 @@ mod tests {
         let (status, out) = call(&files.cdb, ipod_list);
         assert_eq!(status, 0);
         let text = String::from_utf8(out).unwrap();
-        assert!(text.starts_with(r#"{"name":"Test nano","checksum":3,"songs":[{"path":"iPod_Control/Music/F00/AAAA.mp3","size":4000000,"lengthMs":197000,"bpm":0,"title":"First song","artist":"The Fixtures""#), "{text}");
+        assert!(text.starts_with(r#"{"name":"Test nano","checksum":3,"songs":[{"path":"iPod_Control/Music/F00/AAAA.mp3","size":4000000,"lengthMs":197000,"fileType":"MPEG audio file","bpm":0,"title":"First song","artist":"The Fixtures""#), "{text}");
         assert!(text.contains(r#""trackNumber":"1/2","discNumber":"1/1","compilation":false,"pid":"-6450187065278421731","artwork":100}"#), "{text}");
         assert!(text.contains(r#""title":"Sin carátula \"ni año\"""#), "{text}");
         assert!(

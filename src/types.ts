@@ -61,6 +61,8 @@ export type WizardTreeRow = {
   trackNumber?: string;
   artist?: string;
   relativePath?: string;
+  /** A track's codec, as its mark shows it (`codecLabel`). */
+  format?: string;
   /** Small text at the row's end; else a track's artist. */
   meta?: string;
   /** An album's line under its name (who it is by, its year), drawn there in place of `meta`. */
@@ -119,6 +121,9 @@ export type AudioProps = {
   /** Bits per sample; 0 for MP3. */
   bits: number;
   vbr: boolean;
+  /** Its type as an iPod's database names it ("Apple Lossless audio file"), where one does: the
+   * codec an `.m4a` holds, which its name does not tell. */
+  kind?: string;
 };
 
 export type MetaRecord = {
