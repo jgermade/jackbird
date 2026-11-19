@@ -10,20 +10,19 @@
   type Props = { sheet?: boolean | "" }
 
   const Key = await import("../../theme/default/components/key.html")
-  const Tabs = await import("../../theme/default/components/tabs.html")
+  const Choice = await import("../../theme/default/components/choice.html")
   const UsageBar = await import("../../theme/default/components/usage-bar.html")
   const PeoplePanels = await import("./people-panels.html")
 
   const { t, tn } = await import("../lib/i18n")
   const { preferences } = await import("../lib/preferences")
   const { can } = await import("../lib/account")
-  const { serverName } = await import("../lib/adding")
   const { importing } = await import("../lib/importing")
   const { loadServerUpdate, serverUpdate, updateServer } = await import("../lib/server-update")
   const { loadUsage, usage } = await import("../lib/usage")
   const { machine, watchMachine } = await import("../lib/machine")
   const { hidePeople, loadBackups, loadLog, loadTrash, people, showPeople } = await import("../lib/people")
-  const { leaveServerSheet, serverView } = await import("../lib/server-details")
+  const { leaveServerSheet, serverHost, serverView } = await import("../lib/server-details")
   const { clampPercent, formatCelsius, formatPercent, machineTone, shownSensors } = await import("../helpers/machine")
   const { formatDriveSize } = await import("../helpers/ipod")
 
@@ -41,14 +40,14 @@
 
   type Tab = "summary" | "people" | "signin" | "log" | "trash" | "backups"
   const tabs = () => [
-    { id: "summary", label: t("server.tabSummary") },
+    { value: "summary", label: t("server.tabSummary") },
     ...(can("admin")
       ? [
-          { id: "people", label: t("people.tabPeople") },
-          { id: "signin", label: t("people.tabSignin") },
-          { id: "log", label: t("people.tabLog") },
-          ...(importing.available ? [{ id: "trash", label: t("people.tabTrash") }] : []),
-          ...(importing.available && can("owner") ? [{ id: "backups", label: t("people.tabBackups") }] : [])
+          { value: "people", label: t("people.tabPeople") },
+          { value: "signin", label: t("people.tabSignin") },
+          { value: "log", label: t("people.tabLog") },
+          ...(importing.available ? [{ value: "trash", label: t("people.tabTrash") }] : []),
+          ...(importing.available && can("owner") ? [{ value: "backups", label: t("people.tabBackups") }] : [])
         ]
       : [])
   ]
@@ -95,17 +94,19 @@
 </script>
 
 <article class="server" :class.is-sheet="asSheet()">
-  <header :if="asSheet()" class="top">
-    <Key size="sm" variant="ghost" @click="leaveServerSheet()">
+  <!-- Back (in Details), and on the right which server: its host name. -->
+  <header class="top">
+    <Key :if="asSheet()" size="sm" variant="ghost" @click="leaveServerSheet()">
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
       {{ t("server.back") }}
     </Key>
+    <div class="head">
+      <h3 class="mm-legend is-ink">{{ t("preferences.section.server") }}</h3>
+      <p class="host">{{ serverHost() }}</p>
+    </div>
   </header>
-  <div class="head">
-    <h3 class="mm-legend is-ink">{{ t("preferences.section.server") }}</h3>
-    <p class="state">{{ t("server.at", { name: serverName() }) }}</p>
-  </div>
-  <Tabs :if="tabs().length > 1" plain :label="t('server.tabs')" :items="tabs()" :model="serverView.tab" @change="choose($event.detail)" />
+  <!-- Its sections, as the rename tab's directions (a Choice). -->
+  <Choice :if="tabs().length > 1" :label="t('server.tabs')" :options="tabs()" :model="serverView.tab" @change="choose($event.detail)" />
 
   <div :if="serverView.tab === 'summary'" class="summary">
     <!-- The space one's music takes, against one's quota; the disk's, for owners. -->
@@ -157,11 +158,13 @@
   .server { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-4); min-width: 0; }
   /* In Details: the sheet's own room, as an iPod's. */
   .server.is-sheet { padding: var(--mm-space-5); }
-  .top { display: flex; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-3); min-width: 0; }
   .icon { width: .875rem; height: .875rem; }
-  .head { display: grid; gap: var(--mm-space-1); }
+  /* Which server, on the right (on its own page, with no Back, alone on the left). */
+  .head { display: grid; gap: var(--mm-space-1); min-width: 0; margin-left: auto; text-align: right; }
+  .server:not(.is-sheet) .head { margin-left: 0; text-align: left; }
   .head h3 { margin: 0; }
-  .state { margin: 0; color: var(--mm-fg); font-size: var(--mm-text-sm); }
+  .host { overflow: hidden; margin: 0; color: var(--mm-fg); font-family: var(--mm-font-mono); font-size: var(--mm-text-sm); text-overflow: ellipsis; white-space: nowrap; }
   .summary { display: grid; gap: var(--mm-space-5); }
   .sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
   .sub h4 { margin: 0; }

@@ -21,6 +21,17 @@ export const serverView = $reactive({ tab: "summary" as ServerTab });
 /** Whether the server spoken to is the page's own: the web a server serves is that server. */
 export const onOwnServer = (): boolean => currentServer().address === "";
 
+/** The server's host name, as its address says (`casa.example.com:4646`); on its own page, the page's. */
+export function serverHost(): string {
+  const address = currentServer().address;
+  if (!address) return typeof location === "undefined" ? "" : location.host;
+  try {
+    return new URL(address).host;
+  } catch {
+    return address.replace(/^https?:\/\//, "");
+  }
+}
+
 /** Whether Details shows the server's details for this root. */
 export const showsServerSheet = (root: RootWorkspace | null): boolean => root?.source.kind === "library" && root.activeRowKey === SERVER_ROW;
 

@@ -533,7 +533,7 @@ export const es: Record<MessageKey, string> = {
   "server.cannot.readonly": "No se puede escribir en su carpeta: actualízalo en su máquina (jackbird-service update).",
   "server.tabs": "Detalles del servidor",
   "server.tabSummary": "Resumen",
-  "server.back": "Volver a las canciones",
+  "server.back": "Volver",
   "drop.here": "Suelta para añadir a {name}",
   "drop.hereHint": "Canciones y carpetas de canciones (MP3, FLAC): eliges dónde va cada una antes de copiar nada.",
   "drop.cannot": "Aquí no se puede soltar nada",

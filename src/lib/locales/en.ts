@@ -532,7 +532,7 @@ export const en = {
   "server.cannot.readonly": "Its folder cannot be written: update it on its machine (jackbird-service update).",
   "server.tabs": "The server's details",
   "server.tabSummary": "Summary",
-  "server.back": "Back to the songs",
+  "server.back": "Back",
   "drop.here": "Drop to add to {name}",
   "drop.hereHint": "Songs and folders of songs (MP3, FLAC): you choose where each goes before anything is copied.",
   "drop.cannot": "Nothing can be dropped here",
