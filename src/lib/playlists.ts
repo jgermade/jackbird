@@ -342,10 +342,19 @@ export function addToChosenPlaylist(path: string): Promise<void> {
   return run(async () => ((await addToPlaylist(dialog.rootId, path, dialog.trackIds)) ? null : library.errorMessage ?? ""));
 }
 
+/**
+ * A library's "Recently played": the server makes it from one's plays, kept by song, not by path, so
+ * it follows a rename on its own, and it takes no writing (the server refuses one).
+ */
+const RECENTLY_PLAYED = "My playlists/Recently played.m3u";
+const madeByTheServer = (root: RootWorkspace, playlist: Playlist): boolean => root.source.kind === "library" && playlist.path === RECENTLY_PLAYED;
+
 /** A root's playlists follow its renamed tracks (old path to new), and are written. */
 export function followRenameInPlaylists(rootId: string, renames: ReadonlyMap<string, string>): void {
   const root = rootOf(rootId);
-  for (const playlist of root?.playlists ?? []) {
+  if (!root) return;
+  for (const playlist of root.playlists ?? []) {
+    if (madeByTheServer(root, playlist)) continue;
     const entries = renamedEntries(playlist.entries, renames);
     if (entries) {
       void change(rootId, playlist.path, () => entries);
