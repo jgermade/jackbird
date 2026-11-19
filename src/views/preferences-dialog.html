@@ -34,6 +34,20 @@
   const { serverName } = await import("../lib/adding")
   const { loadServerUpdate, serverUpdate, updateServer } = await import("../lib/server-update")
   const { loadUsage, usage } = await import("../lib/usage")
+  const { machine, watchMachine } = await import("../lib/machine")
+  const { clampPercent, formatCelsius, formatPercent, machineTone, shownSensors } = await import("../helpers/machine")
+  const percent = (value: number): string => formatPercent(value, preferences.language)
+  const celsius = (value: number): string => formatCelsius(value, preferences.language)
+  const cpuLine = (): string => {
+    const cpu = machine.reading?.cpu
+    return cpu ? [percent(cpu.percent), tn("machine.cores", cpu.cores), cpu.name].filter(Boolean).join(" · ") : ""
+  }
+  const cpuParts = () => [{ label: t("machine.cpu"), amount: clampPercent(machine.reading?.cpu.percent ?? 0), caption: percent(machine.reading?.cpu.percent ?? 0), tone: machineTone(machine.reading?.cpu.percent) }]
+  const gpuLine = (gpu: { percent?: number; celsius?: number }): string =>
+    [gpu.percent === undefined ? "" : percent(gpu.percent), gpu.celsius === undefined ? "" : celsius(gpu.celsius)].filter(Boolean).join(" · ")
+  const gpuParts = (gpu: { name: string; percent?: number; celsius?: number }) => [{ label: gpu.name, amount: clampPercent(gpu.percent ?? 0), caption: percent(gpu.percent ?? 0), tone: machineTone(gpu.percent, gpu.celsius) }]
+  const sensors = () => shownSensors(machine.reading?.temperatures ?? [])
+  const gpus = () => machine.reading?.gpus ?? []
   const UsageBar = await import("../../theme/default/components/usage-bar.html")
   const { formatDriveSize } = await import("../helpers/ipod")
   const driveSize = (bytes: number): string => formatDriveSize(bytes, preferences.language)
@@ -51,6 +65,8 @@
       seen = now
       if (now === "server") void loadUsage()
       if (now === "server" && can("owner")) void loadServerUpdate()
+      // The machine's load and temperatures, asked while the section is open (owners).
+      watchMachine(now === "server" && can("owner"))
     }
   })()
   const versionLine = (): string =>
@@ -322,6 +338,25 @@
             <UsageBar :parts="diskParts()" :max="usage.disk.total" :label="t('usage.diskMeter')" />
           </div>
         </div>
+        <!-- The machine: its CPU's load, its GPUs', its temperatures (owners). -->
+        <div :if="can('owner') && machine.reading" class="sub machine">
+          <h4 class="mm-legend">{{ t("machine.title") }}</h4>
+          <div class="gauge">
+            <p class="hint"><span class="what">{{ t("machine.cpu") }}</span> {{ cpuLine() }}</p>
+            <UsageBar :parts="cpuParts()" :max="100" :label="t('machine.cpuMeter')" />
+          </div>
+          <div :each="gpu in gpus()" :key="gpu.name" class="gauge">
+            <p class="hint"><span class="what">{{ gpu.name }}</span> {{ gpuLine(gpu) }}</p>
+            <UsageBar :if="gpu.percent !== undefined" :parts="gpuParts(gpu)" :max="100" :label="t('machine.gpuMeter', { name: gpu.name })" />
+          </div>
+          <dl :if="sensors().length" class="sensors" :aria-label="t('machine.temperatures')">
+            <div :each="sensor in sensors()" :key="sensor.label" class="sensor">
+              <dt>{{ sensor.label }}</dt>
+              <dd :class.hot="machineTone(0, sensor.celsius) === 'accent'">{{ celsius(sensor.celsius) }}</dd>
+            </div>
+          </dl>
+          <p :if="!sensors().length" class="hint">{{ t("machine.noTemperatures") }}</p>
+        </div>
         <!-- Its version, and updating it (owners). -->
         <div :if="can('owner')" class="sub">
           <h4 class="mm-legend">{{ t("server.versionTitle") }}</h4>
@@ -411,6 +446,13 @@
   .account .state { color: var(--mm-fg); }
   .sub h4 { margin: 0; }
   .disk { display: grid; gap: var(--mm-space-2); }
+  .machine .gauge { display: grid; gap: var(--mm-space-2); }
+  .machine .what { color: var(--mm-fg); }
+  .sensors { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: var(--mm-space-1) var(--mm-space-4); margin: 0; }
+  .sensor { display: flex; justify-content: space-between; gap: var(--mm-space-2); min-width: 0; font-size: var(--mm-text-sm); }
+  .sensor dt { overflow: hidden; color: var(--mm-fg-muted); text-overflow: ellipsis; white-space: nowrap; }
+  .sensor dd { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sensor dd.hot { color: var(--mm-accent); }
   /* The people one may share one's music with, a box each. */
   .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--mm-space-2); margin: 0; padding: 0; list-style: none; }
   .secret { overflow-wrap: anywhere; user-select: all; }

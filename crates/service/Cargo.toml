@@ -38,6 +38,9 @@ jackbird-store = { path = "../store" }
 serde_urlencoded = "=0.7.1"
 tokio-util = { version = "=0.7.20", features = ["io"] }
 futures-util = { version = "=0.3.34", default-features = false }
+# The machine's load and temperatures (Preferences, Server; owners): CPU everywhere, sensors where the
+# system tells them (Linux hwmon, macOS SMC, Windows WMI). Its unsafe code is its own.
+sysinfo = { version = "=0.38.4", default-features = false, features = ["system", "component"] }
 
 # Running under Windows' Service Control Manager, installed with the system (S2).
 [target.'cfg(windows)'.dependencies]

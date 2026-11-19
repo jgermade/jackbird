@@ -27,6 +27,7 @@ pub mod auth;
 pub mod config;
 pub mod install;
 mod library_api;
+mod machine;
 pub mod mail;
 mod opensubsonic;
 mod passkeys;
@@ -724,7 +725,8 @@ pub fn router(service: Arc<Service>) -> Router {
         .route("/folders", get(folders))
         .merge(people_api::owners())
         .merge(library_api::owners())
-        .merge(update::owners());
+        .merge(update::owners())
+        .merge(machine::owners());
     let api = Router::new()
         .route("/info", get(info))
         .merge(people_api::open())

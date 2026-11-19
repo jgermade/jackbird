@@ -472,6 +472,7 @@ async fn the_desktop_apps_page_is_answered_with_cors_for_itself_alone() {
 }
 
 mod library;
+mod machine;
 mod opensubsonic;
 mod passkeys;
 mod people;
