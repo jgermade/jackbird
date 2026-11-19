@@ -385,7 +385,10 @@
     .marquee-run > span + span { display: none; }
   }
   .title-row, .artist-row { position: relative; }
-  .lcd-text .mm-display-title.line-sizer { position: absolute; top: 0; left: 0; visibility: hidden; white-space: nowrap; overflow: visible; text-overflow: clip; pointer-events: none; }
+  /* Held at the row's right: a long line runs out to the left, which adds no width to the page (out
+     to the right it made the page wider than a phone, and Android's webview then widened what the
+     sheets and anything fixed are laid out in). */
+  .lcd-text .mm-display-title.line-sizer { position: absolute; top: 0; right: 0; visibility: hidden; white-space: nowrap; overflow: visible; text-overflow: clip; pointer-events: none; }
   /* The display's second line: the artist, under the title. */
   .artist { font-weight: var(--mm-weight-regular); opacity: .7; }
   /* The display: the mark at the left, the title row and the meter beside it. */

@@ -110,7 +110,10 @@
   <form :if="shownTab() === 'server'" class="tab form" @submit="submit($event)">
     <p class="hint">{{ t("sources.serverHint") }}</p>
     <Field :label="t('instance.address')" control="server-address" :hint="t('instance.addressHint')">
-      <TextInput id="server-address" type="url" inputmode="url" autocomplete="url" :model="address" @input="address = $event.detail" />
+      <!-- Text, not `url`: the browser's own check would want a scheme ("Enter a URL", in its own
+           language), and "musica.ejemplo.org" is enough (normaliseAddress adds https://). The
+           phone's keyboard is still the address one. -->
+      <TextInput id="server-address" inputmode="url" autocomplete="url" :model="address" @input="address = $event.detail" />
     </Field>
     <p :if="adding.error" class="failure">{{ adding.error }}</p>
     <div class="keys">

@@ -314,12 +314,17 @@ fn run(
         (Mode::Exclusive, true) => Fidelity::BitPerfect,
         (Mode::Shared, true) => Fidelity::Mixer,
     };
+    #[cfg(target_os = "macos")]
+    let dac = macos::is_dac(settings.device.as_ref().map(|_| name.as_str()));
+    #[cfg(not(target_os = "macos"))]
+    let dac = false;
     let _ = ready.send(Ok(Route {
         device: name,
         mode: settings.mode,
         rate: format.rate,
         sample,
         fidelity,
+        dac,
     }));
     let _ = stopped.recv();
     drop(stream);
@@ -334,7 +339,7 @@ mod macos {
     //! Hog mode: the device for this process alone, given back when the stream closes.
 
     use coreaudio::audio_unit::macos_helpers::{
-        get_default_device_id, get_device_id_from_name, get_hogging_pid, toggle_hog_mode,
+        get_default_device_id, get_device_id_from_name, get_device_transport_type, get_hogging_pid, toggle_hog_mode,
     };
 
     /// No process holds the device.
@@ -363,6 +368,30 @@ mod macos {
             return Err("the device could not be taken for this app alone".to_string());
         }
         Ok(id)
+    }
+
+    /// A transport type, from its four letters (as CoreAudio's `kAudioDeviceTransportType*` are).
+    const fn four(code: &[u8; 4]) -> u32 {
+        u32::from_be_bytes(*code)
+    }
+
+    /// The ways a DAC of one's own is reached: USB, Thunderbolt, FireWire, PCI (a card), AVB.
+    const DAC_TRANSPORTS: [u32; 5] = [
+        four(b"usb "),
+        four(b"thun"),
+        four(b"1394"),
+        four(b"pci "),
+        four(b"eavb"),
+    ];
+
+    /// Whether the device (by name; the default output when none) is a DAC of one's own.
+    pub fn is_dac(name: Option<&str>) -> bool {
+        let id = match name {
+            Some(name) => get_device_id_from_name(name, false),
+            None => get_default_device_id(false),
+        };
+        id.and_then(|id| get_device_transport_type(id).ok())
+            .is_some_and(|transport| DAC_TRANSPORTS.contains(&transport))
     }
 
     /// Gives the device back, if this process still holds it.
@@ -500,6 +529,7 @@ mod windows {
             } else {
                 Fidelity::Converted
             },
+            dac: false,
         }));
         loop {
             match stopped.try_recv() {

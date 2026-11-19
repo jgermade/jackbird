@@ -20,9 +20,10 @@
 //! Like `jackbird-core`, it touches the file system (`AGENTS.md`); it adds SQLite
 //! (`catalogue.db`, in the library's folder, so the folder is the whole library).
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 use jackbird_core::{Entry, Error, Inspection, Root, Stat, examine, head_of};
 use jackbird_tags::{Cover, CoverEdit, Edit, Fields};
@@ -468,6 +469,38 @@ pub struct Library {
     dir: PathBuf,
     files: Root,
     db: Mutex<Connection>,
+    /// What each blob's head says, once read (`Library::head`): a blob's bytes never change.
+    heads: Mutex<HashMap<String, Head>>,
+    /// The names of the covers set in layers, by their hash, once read.
+    named: Mutex<HashMap<String, String>>,
+}
+
+/// What a blob's head says, kept so the songs listed again read no file: its audio, and the name
+/// of its own cover ([`Cover::name`]; none: it has no picture).
+#[derive(Clone, Debug, Default)]
+struct Head {
+    audio: Option<jackbird_tags::Audio>,
+    cover: Option<String>,
+}
+
+/// A song as [`Library::tracks_as`] lists it for someone: as [`Library::inspect_as`] finds it,
+/// its cover by name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Listed {
+    /// Its place in the library.
+    pub path: String,
+    /// Its size and date.
+    pub stat: Stat,
+    /// Its blob's name and its layers' versions, as `inspect_as` gives it.
+    pub full_checksum: String,
+    /// Its blob's name.
+    pub audio_checksum: String,
+    /// Its tags as the person sees them.
+    pub fields: Fields,
+    /// The name of the cover it shows ([`Cover::name`]); none: no picture.
+    pub cover: Option<String>,
+    /// Its audio's length and rates, when they can be told.
+    pub audio: Option<jackbird_tags::Audio>,
 }
 
 impl Library {
@@ -494,6 +527,8 @@ impl Library {
             dir: dir.to_owned(),
             files,
             db: Mutex::new(db),
+            heads: Mutex::new(HashMap::new()),
+            named: Mutex::new(HashMap::new()),
         })
     }
 
@@ -1040,6 +1075,88 @@ impl Library {
                 }
             }
         }
+    }
+
+    /// What a song's blob's head says, read once and kept.
+    fn head(&self, song: &Song) -> Head {
+        if let Some(found) = self
+            .heads
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&song.blob)
+        {
+            return found.clone();
+        }
+        let head = match head_of(&self.blob_path(&song.blob, &song.format)) {
+            Ok((layout, head)) => Head {
+                audio: jackbird_tags::audio(&head, &layout),
+                cover: jackbird_tags::read_head(&head, &layout)
+                    .ok()
+                    .and_then(|tags| tags.cover)
+                    .map(|cover| cover.name()),
+            },
+            // A blob that cannot be read is listed untagged, and read again next time.
+            Err(_) => return Head::default(),
+        };
+        self.heads
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(song.blob.clone(), head.clone());
+        head
+    }
+
+    /// The name of a cover a layer sets, read once and kept.
+    fn named_cover(&self, hash: &str, mime: &str) -> Option<String> {
+        if let Some(found) = self.named.lock().unwrap_or_else(PoisonError::into_inner).get(hash) {
+            return Some(found.clone());
+        }
+        let data = fs::read(self.cover_path(hash)).ok()?;
+        let name = Cover {
+            data,
+            mime: mime.to_owned(),
+        }
+        .name();
+        self.named
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(hash.to_owned(), name.clone());
+        Some(name)
+    }
+
+    /// Every song as `viewer` sees it, in one go: what [`Library::inspect_as`] gives of each, its
+    /// cover by name. Only a layer that removes the file's cover reads a song's file again.
+    pub fn tracks_as(&self, viewer: Viewer) -> Result<Vec<Listed>, Error> {
+        Ok(self
+            .songs()?
+            .into_iter()
+            .map(|song| {
+                let (layer, version) = self.seen(&song, viewer);
+                let head = self.head(&song);
+                let cover = match &layer.cover {
+                    None => head.cover,
+                    Some(CoverLayer::Set { hash, mime }) => self.named_cover(hash, mime),
+                    Some(CoverLayer::Remove) => {
+                        self.cover_under(&song, &layer).ok().flatten().map(|cover| cover.name())
+                    }
+                };
+                Listed {
+                    stat: Library::stat_of(&song),
+                    full_checksum: format!("{}-{version}", song.blob),
+                    audio_checksum: song.blob.clone(),
+                    fields: Fields::from(&layer.over(&song.file)),
+                    cover,
+                    audio: head.audio,
+                    path: song.path,
+                }
+            })
+            .collect())
+    }
+
+    /// The cover a song shows as `viewer` sees it (`None`: no picture).
+    pub fn cover_as(&self, relative: &str, viewer: Viewer) -> Result<Option<Cover>, Error> {
+        let song = self.song_or_not_found(&clean(relative)?)?;
+        let (layer, _) = self.seen(&song, viewer);
+        self.cover_under(&song, &layer)
     }
 
     /// The edit that writes a layer into its song's file as it leaves.

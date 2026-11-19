@@ -41,6 +41,13 @@ export const dropping = $reactive({
   readPattern: readStored(STORAGE_KEYS.dropReadPattern) || DEFAULT_READ_PATTERN,
   busy: false,
   done: 0,
+  /** The name of the file being added, while the songs are added. */
+  current: "",
+  /** The bytes of the songs added so far (each as it is done), and of them all: the progress bar. */
+  bytesDone: 0,
+  bytesTotal: 0,
+  /** The bytes of the song being uploaded that have gone so far (to a server; 0 elsewhere). */
+  bytesSent: 0,
   report: null as DropReport | null,
   error: ""
 });
@@ -234,13 +241,18 @@ export async function confirmDrop(): Promise<void> {
   const report: DropReport = { added: 0, existing: 0, failed: [], leftOut: dropping.leftOut };
   dropping.busy = true;
   dropping.done = 0;
+  dropping.bytesDone = 0;
+  dropping.bytesSent = 0;
+  dropping.bytesTotal = songs.reduce((sum, song) => sum + song.file.size, 0);
   dropping.error = "";
   const failed = (song: DroppedSong, error: unknown) => report.failed.push([song.from, error instanceof Error ? error.message : String(error)]);
   try {
     if (target.kind === "server") {
       for (const song of songs) {
+        dropping.current = song.file.name;
         try {
-          const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]));
+          const sent = (bytes: number) => (dropping.bytesSent = Math.min(bytes, song.file.size));
+          const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]), undefined, sent);
           if (answer.result === "added" || answer.result === "suggested") report.added += 1;
           else if (answer.result === "existing") report.existing += 1;
           else report.failed.push([song.from, answer.why ?? ""]);
@@ -248,10 +260,13 @@ export async function confirmDrop(): Promise<void> {
           failed(song, error);
         }
         dropping.done += 1;
+        dropping.bytesDone += song.file.size;
+        dropping.bytesSent = 0;
       }
     } else if (target.kind === "folder") {
       const taken = new Set(root.tracks.map((track) => track.relativePath.toLowerCase()));
       for (const song of songs) {
+        dropping.current = song.file.name;
         try {
           const path = freePath(pathOf(song), taken);
           await root.source.vfs.write(path, await copyOf(song));
@@ -261,6 +276,7 @@ export async function confirmDrop(): Promise<void> {
           failed(song, error);
         }
         dropping.done += 1;
+        dropping.bytesDone += song.file.size;
       }
     } else {
       const ipod = root.source.ipod?.path;
@@ -271,6 +287,7 @@ export async function confirmDrop(): Promise<void> {
         const staged: { root: string; path: string }[] = [];
         const taken = new Set<string>();
         for (const song of songs) {
+          dropping.current = song.file.name;
           try {
             const path = freePath(pathOf(song), taken);
             await staging.vfs.write(path, await copyOf(song));
@@ -280,6 +297,7 @@ export async function confirmDrop(): Promise<void> {
             failed(song, error);
           }
           dropping.done += 1;
+          dropping.bytesDone += song.file.size;
         }
         if (ipod && staged.length > 0) {
           const sent = await sendFiles(ipod, staged);
@@ -296,5 +314,6 @@ export async function confirmDrop(): Promise<void> {
     dropping.error = error instanceof Error ? error.message : String(error);
   } finally {
     dropping.busy = false;
+    dropping.current = "";
   }
 }

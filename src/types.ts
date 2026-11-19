@@ -224,6 +224,12 @@ export type Inspection = {
   audio?: AudioProps | null;
 };
 
+/**
+ * A song as a server's library lists it (`/library/tracks`, `TrackJson` in crates/service): what
+ * `inspect` gives of it, with its path; its cover by reference (`jackbird-cover:<name>`).
+ */
+export type ListedTrack = Inspection & { path: string };
+
 /** What the player's <audio> element plays a track from. */
 export type MediaHandle = {
   url: string;
@@ -307,6 +313,13 @@ export type RootSource = {
   scanSums?(paths: string[], take: (batch: SumsBatch) => void): Promise<void>;
   /** One file's checksums, size and date; its tags too, unless its full checksum is still `known`. */
   inspect(path: string, known?: string): Promise<Inspection>;
+  /**
+   * A server's library: every song as the person sees it, in one answer, opened from it instead
+   * of an `inspect` each; its covers by reference, read with `cover` when shown.
+   */
+  tracks?(): Promise<ListedTrack[]>;
+  /** A song's picture as the person sees it (`name`, the one `tracks` gave); null when it cannot be had. */
+  cover?(path: string, name: string): Promise<Uint8Array | null>;
   /** Writes `metadata` over the tags the library held (`previous`); the file as it is after. In the family library (F3), for everyone (`family`) or for oneself (`mine`), refused (`stale`, F4) when it changed since its full checksum was `expected`. */
   save(path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine", expected?: string): Promise<Inspection>;
   /** Opens a track's file for playing, without reading it into memory. */

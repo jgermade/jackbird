@@ -68,6 +68,9 @@ jobs:
       - name: The app for Android
         run: |
           npx tauri android init --ci
+          # buildSrc's plugins from Maven Central and Google too, not the plugin portal alone, which
+          # sometimes fails to hand Kotlin on (src-tauri/android/buildSrc.settings.gradle.kts).
+          cp src-tauri/android/buildSrc.settings.gradle.kts src-tauri/gen/android/buildSrc/settings.gradle.kts
           # jackbird's logo instead of Tauri's (src-tauri/icons/android, made by scripts/app-icons.mjs).
           cp -r src-tauri/icons/android/. src-tauri/gen/android/app/src/main/res/
           gradle=src-tauri/gen/android/app/build.gradle.kts

@@ -10,8 +10,8 @@ import { isAudioFile } from "../helpers/formats";
 import { isPlaylistFile } from "../helpers/playlists";
 import { applyCovers, applyScanResults, checksumOf, omitRecords, type Covered, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths, sameTrackFiles } from "../helpers/tracks";
-import type { GroupingMode, LibraryView, RootSource, RootWorkspace, Track } from "../types";
-import { coversIn, internSnapshot, namesIn, withCovers } from "./covers";
+import type { GroupingMode, LibraryView, ListedTrack, RootSource, RootWorkspace, Track } from "../types";
+import { coverFrom, coversIn, internSnapshot, namesIn, withCovers } from "./covers";
 import { refName } from "../helpers/cover";
 import { t, tn } from "./i18n";
 import { library } from "./library";
@@ -139,7 +139,25 @@ export async function hydrateRoot(
     try {
       // The covers the snapshot names, looked for in `.meta/covers/`: a track whose picture is not
       // there has its tags read again.
-      const [walked, missingCovers] = await Promise.all([source.walk(), coversIn(vfs, namesIn(snapshot))]);
+      // A server's library gives every song at once (its tags as one sees them): none is
+      // inspected on its own. The walk still gives the playlists.
+      const [walked, missingCovers, listed] = await Promise.all([
+        source.walk(),
+        coversIn(vfs, namesIn(snapshot)),
+        source.tracks?.().catch((error: unknown) => {
+          console.error(`jackbird: could not list the songs of ${rootLabel}; each is read instead`, error);
+          return null;
+        }) ?? null
+      ]);
+      const listedAt = listed ? new Map(listed.map((song): [string, ListedTrack] => [song.path, song])) : null;
+      // Their pictures, fetched from the server when shown.
+      const fetchCover = source.cover;
+      if (listed && fetchCover) {
+        for (const song of listed) {
+          const name = refName(song.metadata?.coverDataUrl);
+          if (name) coverFrom(name, () => fetchCover(song.path, name));
+        }
+      }
       // The playlists are read beside the tracks, and do not hold them up.
       void loadPlaylists(rootId, walked.map((entry) => entry.path)).catch((error: unknown) =>
         console.error(`jackbird: could not read the playlists of ${rootLabel}`, error)
@@ -170,7 +188,10 @@ export async function hydrateRoot(
         if (!stored) return false;
         const cover = refName(stored.metadata.coverDataUrl);
         // So too a record kept before the audio's length and rates were read (none: not even null).
+        // Listed by the server with another version (a layer of one's own, an edit elsewhere).
+        const listedNow = listedAt?.get(f.relativePath);
         return (
+          (listedAt !== null && listedNow?.fullChecksum !== (stored.fullChecksum || stored.checksum)) ||
           stored.size !== f.size ||
           stored.lastModified !== f.lastModified ||
           !readsEveryField(stored.metadata) ||
@@ -285,7 +306,7 @@ export async function hydrateRoot(
         // too when its cover is missing from `.meta/covers/`.
         const coverGone = missingCovers.has(refName(stored?.metadata.coverDataUrl) ?? "");
         const known = stored && readsEveryField(stored.metadata) && !coverGone ? stored.fullChecksum || stored.checksum : undefined;
-        const found = await source.inspect(file.relativePath, known);
+        const found = listedAt?.get(file.relativePath) ?? (await source.inspect(file.relativePath, known));
         const { fullChecksum, audioChecksum } = found;
         const metadata = withEveryField(found.metadata ?? stored?.metadata ?? emptyMetadata());
 

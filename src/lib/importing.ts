@@ -44,8 +44,22 @@ export const importing = $reactive({
   report: null as ImportReport | null,
   error: "",
   /** Whether the songs go over the server's home network now, not by its usual address. */
-  home: false
+  home: false,
+  /** The bytes of the songs uploaded so far, of the one going (as it goes), and of them all; 0 in
+   *  all when the sizes are not known (a folder of the server's machine, or a provider of the
+   *  Android app's folder that tells none): then the bar goes by songs. */
+  bytesDone: 0,
+  bytesSent: 0,
+  bytesTotal: 0,
+  /** The name of the song being uploaded, while they are. */
+  current: ""
 });
+
+/** How much of it is done, 0 to 100: by the bytes when they are known, else by the songs. */
+export function importShare(): number {
+  const share = importing.bytesTotal > 0 ? (importing.bytesDone + importing.bytesSent) / importing.bytesTotal : importing.total > 0 ? importing.done / importing.total : 0;
+  return Math.min(100, Math.round(share * 100));
+}
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -84,8 +98,11 @@ export function uploadPath(relative: string): string {
   return relative.replace(/^\/+/, "");
 }
 
-/** One song to upload: its name, for the report, and how it is sent, to a home address or (null) the usual one. */
-type Song = { name: string; send(at: string | null): Promise<Uploaded> };
+/**
+ * One song to upload: its name, for the report, its size when known, and how it is sent, to a home
+ * address or (null) the usual one, telling the bytes sent as they go when it can.
+ */
+type Song = { name: string; size?: number; send(at: string | null, sent: (bytes: number) => void): Promise<Uploaded> };
 
 /** A song's `send` throws this when the server could not be reached at all (not when it answered). */
 class Unreached extends Error {}
@@ -120,20 +137,27 @@ async function uploadSongs(songs: Song[]): Promise<void> {
   importing.total = songs.length;
   importing.report = null;
   importing.home = false;
+  const sized = songs.every((song) => song.size !== undefined);
+  importing.bytesDone = 0;
+  importing.bytesSent = 0;
+  importing.bytesTotal = sized ? songs.reduce((sum, song) => sum + (song.size ?? 0), 0) : 0;
   try {
     let at = songs.length > 0 ? await homeRoute() : null;
     importing.home = at !== null;
     for (const song of songs) {
       let answer: Uploaded;
+      const sent = (bytes: number) => (importing.bytesSent = Math.min(bytes, song.size ?? bytes));
+      importing.current = song.name;
       try {
-        answer = await song.send(at);
+        answer = await song.send(at, sent);
       } catch (error) {
         if (error instanceof Unreached && at !== null) {
           // The home address stopped answering (the phone left its Wi-Fi): this one and the rest
           // go by the usual address.
           at = null;
           importing.home = false;
-          answer = await song.send(null).catch(failed);
+          importing.bytesSent = 0;
+          answer = await song.send(null, sent).catch(failed);
         } else {
           answer = failed(error);
         }
@@ -141,12 +165,15 @@ async function uploadSongs(songs: Song[]): Promise<void> {
       if (answer.result === "unreadable") report.unreadable.push([song.name, answer.why ?? ""]);
       else report[answer.result] += 1;
       importing.done += 1;
+      importing.bytesDone += song.size ?? 0;
+      importing.bytesSent = 0;
     }
     importing.report = report;
     refreshLibrary();
   } finally {
     importing.busy = false;
     importing.home = false;
+    importing.current = "";
   }
 }
 
@@ -158,9 +185,10 @@ export function uploadFiles(files: File[]): Promise<void> {
       const relative = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
       return {
         name: file.name,
-        async send(at) {
+        size: file.size,
+        async send(at, sent) {
           try {
-            return await uploadToLibrary(uploadPath(relative), file, at ?? undefined);
+            return await uploadToLibrary(uploadPath(relative), file, at ?? undefined, sent);
           } catch (error) {
             // `fetch` fails with a TypeError only when the server was not reached.
             throw error instanceof TypeError ? new Unreached(error.message) : error;
@@ -186,15 +214,16 @@ export async function uploadPhoneFolder(): Promise<void> {
   if (!picked) return;
   const { tree, name } = picked;
   const songs = picked.files
-    .filter((path) => isAudioFile(path))
-    .sort()
-    .map((path): Song => ({
+    .filter((file) => isAudioFile(file.path))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .map(({ path, size }): Song => ({
       name: path.slice(path.lastIndexOf("/") + 1),
-      async send(at) {
+      size,
+      async send(at, sent) {
         const target = uploadTarget(uploadPath(`${name}/${path}`), at ?? undefined);
         let reply: { status: number; body: string };
         try {
-          reply = await uploadPhoneFile(tree, path, target.url, target.authorization);
+          reply = await uploadPhoneFile(tree, path, target.url, target.authorization, sent);
         } catch (error) {
           throw new Unreached(error instanceof Error ? error.message : String(error));
         }
@@ -207,6 +236,7 @@ export async function uploadPhoneFolder(): Promise<void> {
 /** Imports a folder of the service's machine (owners), following it until it ends. */
 export async function importMachineFolder(path: string): Promise<void> {
   importing.busy = true;
+  importing.bytesTotal = 0;
   importing.error = "";
   importing.report = null;
   try {

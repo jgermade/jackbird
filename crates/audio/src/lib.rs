@@ -126,6 +126,11 @@ pub struct Route {
     pub sample: DeviceSample,
     /// How faithful it is.
     pub fidelity: Fidelity,
+    /// Whether the device is a DAC of one's own, as the system says: on macOS, one reached by USB,
+    /// Thunderbolt, FireWire, PCI or AVB (not the built-in output, Bluetooth, AirPlay, HDMI or a
+    /// virtual device). Elsewhere the system does not say, and it is false.
+    #[serde(default)]
+    pub dac: bool,
 }
 
 /// A device that can be chosen.

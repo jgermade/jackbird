@@ -30,6 +30,7 @@ import androidx.media3.common.Tracks
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
+import app.tauri.plugin.Channel
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
@@ -105,6 +106,8 @@ class TreeUploadArgs {
   var url: String = ""
   /** The session's `Authorization` header, if there is one. */
   var authorization: String? = null
+  /** Hears `{ sent }`, the bytes sent so far, as they go (now and then, not at every piece). */
+  var progress: Channel? = null
 }
 
 @InvokeArg
@@ -441,7 +444,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
   /**
    * Sends one of the folder's files to the service (an upload to the family library): `POST`, its
-   * bytes as they are read, never all at once in memory, with the session's `Authorization`.
+   * bytes as they are read, never all at once in memory, with the session's `Authorization`; the
+   * bytes sent told on `progress` as they go.
    * Resolves with the service's answer, whatever it is (`{ status, body }`); rejects when the
    * service could not be reached or the file not sent, so the page can try another address.
    */
@@ -462,7 +466,24 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         // Its length when the provider knows it; in pieces when it does not.
         if (size > 0) connection.setFixedLengthStreamingMode(size) else connection.setChunkedStreamingMode(64 * 1024)
         folders.input(tree, args.path).use { input ->
-          connection.outputStream.use { output -> input.copyTo(output, 64 * 1024) }
+          connection.outputStream.use { output ->
+            // Told to the page every 256 KB or so and at the end, not at every 64 KB piece.
+            val buffer = ByteArray(64 * 1024)
+            var sent = 0L
+            var told = 0L
+            while (true) {
+              val read = input.read(buffer)
+              if (read < 0) break
+              output.write(buffer, 0, read)
+              sent += read
+              if (sent - told >= 256 * 1024) {
+                told = sent
+                args.progress?.send(JSObject().apply { put("sent", sent) })
+              }
+            }
+            output.flush()
+            if (sent != told) args.progress?.send(JSObject().apply { put("sent", sent) })
+          }
         }
         val status = connection.responseCode
         val body = (if (status >= 400) connection.errorStream else connection.inputStream)

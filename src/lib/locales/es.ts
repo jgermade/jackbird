@@ -562,6 +562,7 @@ export const es: Record<MessageKey, string> = {
   "drop.add.other": "Añadir {count} canciones",
   "drop.addAnyway": "Añadirlas tal cual",
   "drop.adding": "Añadiendo {done} de {total}…",
+  "drop.progress": "Lo añadido, por tamaño",
   "drop.added.one": "{count} canción añadida.",
   "drop.added.other": "{count} canciones añadidas.",
   "drop.existing.one": "{count} ya estaba.",

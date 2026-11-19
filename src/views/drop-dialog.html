@@ -2,7 +2,9 @@
   // Songs dropped on the library, before they land (plan H): where they go (the active root), the
   // pattern their paths are made by, each song from its dropped path to its new one, the tags it
   // lacks for its place (typed, or read from its dropped name by a pattern, as the rename tab
-  // does), then the progress and what was done. A view over lib/dropping.ts. See
+  // does), then the progress (in the foot) and what was done. The songs ready for their place come
+  // first, then what the others lack and the pattern to read it by, then those songs. A view over
+  // lib/dropping.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, plan H).
 
   const Field = await import("../../theme/default/components/field.html")
@@ -15,7 +17,10 @@
 
   type Tag = ReturnType<typeof missingOf>[number]
   const tagLabel = (tag: Tag): string => t(`drop.tag.${tag}` as "drop.tag.title")
-  const lacking = (): number => dropping.songs.filter((song) => missingOf(song).length > 0).length
+  type Song = (typeof dropping.songs)[number]
+  const complete = (): Song[] => dropping.songs.filter((song) => missingOf(song).length === 0)
+  const incomplete = (): Song[] => dropping.songs.filter((song) => missingOf(song).length > 0)
+  const lacking = (): number => incomplete().length
   let readNote: string = ""
   const read = () => {
     const filled = readFromNames()
@@ -23,6 +28,9 @@
   }
   const title = (): string => (dropping.reading ? t("drop.reading") : tn("drop.title", dropping.songs.length))
   const finished = (): boolean => dropping.report !== null
+  // How much of the songs' bytes is in, the one being uploaded's as it goes: a large file counts
+  // for more than a small one.
+  const share = (): number => (dropping.bytesTotal > 0 ? Math.min(100, Math.round(((dropping.bytesDone + dropping.bytesSent) / dropping.bytesTotal) * 100)) : 0)
 </script>
 
 <Modal :open="dropping.open" :eyebrow="t('drop.eyebrow', { name: dropping.target?.label ?? '' })" :title="title()" size="lg" :close-label="t('drop.close')" @close="closeDrop()">
@@ -49,6 +57,14 @@
         </Field>
       </div>
 
+      <!-- The songs ready for their place, then what the others lack and how to read it, then them. -->
+      <ol :if="complete().length" class="songs">
+        <li :each="song in complete()" :key="song.from">
+          <span class="from">{{ song.from }}</span>
+          <span class="to">{{ pathOf(song) }}</span>
+        </li>
+      </ol>
+
       <p :if="lacking()" class="notice">{{ tn("drop.missing", lacking()) }}</p>
       <div :if="lacking()" class="read">
         <Field :label="t('drop.readPattern')" control="drop-read" :hint="t('drop.readHint')">
@@ -60,26 +76,29 @@
         </div>
       </div>
 
-      <ol :if="dropping.songs.length" class="songs">
-        <li :each="(song, index) in dropping.songs" :key="song.from" :class.lacks="missingOf(song).length > 0">
+      <ol :if="lacking()" class="songs">
+        <li :each="song in incomplete()" :key="song.from" class="lacks">
           <span class="from">{{ song.from }}</span>
           <span class="to">{{ pathOf(song) }}</span>
-          <div :if="missingOf(song).length" class="tags">
+          <div class="tags">
             <label :each="tag in missingOf(song)" :key="tag" class="tag">
               <span>{{ tagLabel(tag) }}</span>
-              <input :value="song.tags[tag]" :disabled="dropping.busy" @change="setTag(index, tag, $event.target.value)" />
+              <input :value="song.tags[tag]" :disabled="dropping.busy" @change="setTag(dropping.songs.indexOf(song), tag, $event.target.value)" />
             </label>
           </div>
         </li>
       </ol>
     </div>
-
-    <p :if="dropping.busy" class="state">{{ t("drop.adding", { done: dropping.done, total: dropping.songs.length }) }}</p>
   </div>
 
   <template :slot.foot>
     <Key :if="finished() || dropping.songs.length === 0" variant="primary" @click="closeDrop()">{{ t("drop.close") }}</Key>
     <span :else class="foot">
+      <span :if="dropping.busy" class="progress" role="status">
+        <span>{{ t("drop.adding", { done: dropping.done, total: dropping.songs.length }) }}</span>
+        <span :if="dropping.current" class="current" :title="dropping.current">{{ dropping.current }}</span>
+        <span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="share()" :aria-label="t('drop.progress')"><span class="fill" :style="`width: ${share()}%`"></span></span>
+      </span>
       <Key :if="lacking()" :disabled="dropping.busy || dropping.reading" @click="confirmDrop()">{{ t("drop.addAnyway") }}</Key>
       <Key variant="primary" :disabled="dropping.busy || dropping.reading || lacking() > 0" @click="confirmDrop()">{{ tn("drop.add", dropping.songs.length) }}</Key>
     </span>
@@ -89,12 +108,16 @@
 <style scoped>
   .drop, .body { display: grid; gap: var(--mm-space-4); min-width: 0; }
   .foot { display: contents; }
+  .progress { display: grid; flex: 1 1 0; min-width: 0; margin-right: auto; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .bar { display: block; height: .375rem; margin-top: var(--mm-space-1); overflow: hidden; border-radius: var(--mm-radius-full); background: var(--mm-sunken); box-shadow: inset 0 0 0 var(--mm-border-width) var(--mm-border); }
+  .fill { display: block; height: 100%; border-radius: inherit; background: var(--mm-accent); transition: width var(--mm-duration) var(--mm-ease); }
+  .current { overflow: hidden; color: var(--mm-fg-subtle); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); text-overflow: ellipsis; white-space: nowrap; }
   .patterns, .read { display: grid; gap: var(--mm-space-2); }
   .keys { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-3); }
   .songs { display: grid; margin: 0; padding: 0; border: var(--mm-border-width) solid var(--mm-border); border-radius: var(--mm-radius-key); list-style: none; }
   .songs li { display: grid; gap: var(--mm-space-1); min-width: 0; padding: var(--mm-space-2) var(--mm-space-3); }
   .songs li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
-  .songs li.lacks { background: var(--mm-sunken); }
+  .lacks { background: var(--mm-sunken); }
   .from { overflow: hidden; color: var(--mm-fg-subtle); font-size: var(--mm-text-xs); text-overflow: ellipsis; white-space: nowrap; }
   .to { font-family: var(--mm-font-mono); font-size: var(--mm-text-sm); overflow-wrap: anywhere; }
   .lacks .to { color: var(--mm-fg-muted); }

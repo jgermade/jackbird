@@ -13,7 +13,7 @@
   const { t } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { chooseMachineFolder } = await import("../lib/folders")
-  const { folderUploadHere, importMachineFolder, importing, uploadFiles, uploadPhoneFolder } = await import("../lib/importing")
+  const { folderUploadHere, importMachineFolder, importShare, importing, uploadFiles, uploadPhoneFolder } = await import("../lib/importing")
   // A folder: a folder input on a computer, Android's own picker in the Android app, none on a
   // phone's browser or the iOS app (the input would choose files there).
   const folderWay = folderUploadHere()
@@ -28,7 +28,6 @@
     const path = await chooseMachineFolder()
     if (path !== null) await importMachineFolder(path)
   }
-  const percent = (): number => (importing.total > 0 ? Math.round((importing.done / importing.total) * 100) : 0)
 </script>
 
 <div class="import-dialog">
@@ -50,8 +49,10 @@
         <Key :if="can('owner')" variant="ghost" :disabled="importing.busy" @click="fromMachine()">{{ t("import.machine") }}</Key>
       </div>
       <div :if="importing.busy" class="progress" role="status">
-        <progress :value="importing.done" :max="importing.total || 1"></progress>
-        <span>{{ t("import.progress", { done: importing.done, total: importing.total, percent: percent() }) }}</span>
+        <!-- By the songs' sizes, and within the one going, when they are known; else by the songs. -->
+        <span>{{ t("import.progress", { done: importing.done, total: importing.total, percent: importShare() }) }}</span>
+        <span :if="importing.current" class="current" :title="importing.current">{{ importing.current }}</span>
+        <span class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="importShare()" :aria-label="t('drop.progress')"><span class="fill" :style="`width: ${importShare()}%`"></span></span>
         <span :if="importing.home">{{ t("import.home") }}</span>
       </div>
       <p :if="importing.error" class="failure">{{ importing.error }}</p>
@@ -96,6 +97,9 @@
   .pick:active:not(.disabled) { background: var(--mm-sunken); }
   .pick.disabled { opacity: .45; cursor: default; }
   .progress { display: grid; gap: var(--mm-space-1); font-size: var(--mm-text-sm); color: var(--mm-fg-muted); }
-  .progress progress { width: 100%; }
+  /* The drop dialog's bar (drop-dialog.html): the accent on the sunken track, not the browser's own. */
+  .bar { display: block; height: .375rem; margin-top: var(--mm-space-1); overflow: hidden; border-radius: var(--mm-radius-full); background: var(--mm-sunken); box-shadow: inset 0 0 0 var(--mm-border-width) var(--mm-border); }
+  .fill { display: block; height: 100%; border-radius: inherit; background: var(--mm-accent); transition: width var(--mm-duration) var(--mm-ease); }
+  .current { overflow: hidden; color: var(--mm-fg-subtle); font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); text-overflow: ellipsis; white-space: nowrap; }
   .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
 </style>
