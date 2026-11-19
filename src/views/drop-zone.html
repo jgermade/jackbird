@@ -10,10 +10,12 @@
 
 <div :if="dropping.over" class="drop-zone" :class.refused="!dropping.target" aria-hidden="true">
   <div class="frame">
-    <svg :if="dropping.target" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3" /></svg>
-    <svg :else class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" /><path d="M6 18 18 6" /></svg>
-    <p class="title">{{ dropping.target ? t("drop.here", { name: dropping.target.label }) : t("drop.cannot") }}</p>
-    <p class="hint">{{ dropping.target ? t("drop.hereHint") : dropping.refusal }}</p>
+    <div class="plate">
+      <svg :if="dropping.target" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3" /></svg>
+      <svg :else class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" /><path d="M6 18 18 6" /></svg>
+      <p class="title">{{ dropping.target ? t("drop.here", { name: dropping.target.label }) : t("drop.cannot") }}</p>
+      <p class="hint">{{ dropping.target ? t("drop.hereHint") : dropping.refusal }}</p>
+    </div>
   </div>
 </div>
 
@@ -25,7 +27,8 @@
     z-index: 5;
     display: grid;
     padding: var(--mm-space-4);
-    background: color-mix(in srgb, var(--mm-bg) 82%, transparent);
+    /* Translucent: the library shows through (the owner, 2026-11-19). */
+    background: color-mix(in srgb, var(--mm-bg) 35%, transparent);
     pointer-events: none;
   }
   .frame {
@@ -36,10 +39,21 @@
     padding: var(--mm-space-6);
     border: 2px dashed var(--mm-accent);
     border-radius: var(--mm-radius-lg);
-    background: color-mix(in srgb, var(--mm-accent) 6%, var(--mm-surface));
+    background: color-mix(in srgb, var(--mm-accent) 8%, transparent);
     text-align: center;
   }
-  .refused .frame { border-color: var(--mm-border); background: var(--mm-surface); }
+  .refused .frame { border-color: var(--mm-border); background: color-mix(in srgb, var(--mm-surface) 30%, transparent); }
+  /* What it says, on a plate of its own: legible over whatever shows through. */
+  .plate {
+    display: grid;
+    justify-items: center;
+    gap: var(--mm-space-2);
+    padding: var(--mm-space-4) var(--mm-space-5);
+    border-radius: var(--mm-radius-md);
+    background: color-mix(in srgb, var(--mm-surface) 85%, transparent);
+    box-shadow: var(--mm-shadow-md);
+    backdrop-filter: blur(6px);
+  }
   .icon { width: 2.5rem; height: 2.5rem; color: var(--mm-accent); }
   .refused .icon { color: var(--mm-fg-muted); }
   .title { margin: 0; font-size: var(--mm-text-lg); font-weight: var(--mm-weight-medium); color: var(--mm-fg); }
