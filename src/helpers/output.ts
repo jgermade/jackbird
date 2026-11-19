@@ -16,7 +16,8 @@ export type Fidelity = "bit-perfect" | "mixer" | "converted" | "volume";
 export type PcmFormat = { rate: number; channels: number; bits: number };
 
 /** Where a song plays, and how (crates/audio's Route). */
-export type Route = { device: string; mode: OutputMode; rate: number; sample: string; fidelity: Fidelity };
+/** `dac`: the system says the device is a DAC of one's own (macOS: by USB, Thunderbolt…); absent before. */
+export type Route = { device: string; mode: OutputMode; rate: number; sample: string; fidelity: Fidelity; dac?: boolean };
 
 /** A device the native player can use. */
 export type DeviceInfo = { id: string; name: string; default: boolean; modes: OutputMode[] };

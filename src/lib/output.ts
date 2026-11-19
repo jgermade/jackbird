@@ -136,15 +136,16 @@ export function soundingParts(
 
 /**
  * Whether the music goes to a DAC of the person's, for the display's DAC mark: on a phone, a USB
- * DAC (the route goes to a device other than Android's own); on a desktop, a device chosen in the
- * preferences instead of the system's default (the system does not say which devices are DACs).
- * Never in the browser's embedded output, which cannot tell.
+ * DAC (the route goes to a device other than Android's own); on a desktop, one the system says is
+ * a DAC (macOS: reached by USB, Thunderbolt, FireWire, PCI or AVB; the system's default included),
+ * or else a device chosen in the preferences instead of the system's default (Windows and Linux do
+ * not say which devices are DACs). Never in the browser's embedded output, which cannot tell.
  */
 export function soundingDac(): boolean {
   const sounding = output.sounding;
   if (!sounding) return false;
   if (output.phone) return sounding.route.device !== "Android";
-  return output.device !== null;
+  return sounding.route.dac === true || output.device !== null;
 }
 
 /**

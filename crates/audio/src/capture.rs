@@ -60,6 +60,7 @@ impl Output for CaptureOutput {
             } else {
                 Fidelity::Converted
             },
+            dac: false,
         };
         let open = {
             let mut capture = self.capture.lock().unwrap_or_else(PoisonError::into_inner);
