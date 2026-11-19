@@ -136,7 +136,7 @@ export async function openIpodRoot(info: IpodInfo): Promise<void> {
 }
 
 /** Reads an open iPod's songs again, after its databases changed. */
-async function reloadIpod(path: string): Promise<void> {
+export async function reloadIpod(path: string): Promise<void> {
   const open = ipodRoots().find((root) => root.source.ipod?.path === path);
   const info = ipods.found.find((one) => one.path === path);
   if (!open || !info) return;

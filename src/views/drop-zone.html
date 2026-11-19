@@ -1,0 +1,47 @@
+<script :setup lang="ts">
+  // The placeholder over the library and Details while files are dragged in from outside (plan H):
+  // where a drop would add them (the active root), or why it cannot. It catches nothing itself
+  // (views/workspace.html's panes do); a view over lib/dropping.ts. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, plan H).
+
+  const { t } = await import("../lib/i18n")
+  const { dropping } = await import("../lib/dropping")
+</script>
+
+<div :if="dropping.over" class="drop-zone" :class.refused="!dropping.target" aria-hidden="true">
+  <div class="frame">
+    <svg :if="dropping.target" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3" /></svg>
+    <svg :else class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5" /><path d="M6 18 18 6" /></svg>
+    <p class="title">{{ dropping.target ? t("drop.here", { name: dropping.target.label }) : t("drop.cannot") }}</p>
+    <p class="hint">{{ dropping.target ? t("drop.hereHint") : dropping.refusal }}</p>
+  </div>
+</div>
+
+<style scoped>
+  /* Over both panes, the splitter's too; the drag's events go to the panes under it. */
+  .drop-zone {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    padding: var(--mm-space-4);
+    background: color-mix(in srgb, var(--mm-bg) 82%, transparent);
+    pointer-events: none;
+  }
+  .frame {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--mm-space-2);
+    padding: var(--mm-space-6);
+    border: 2px dashed var(--mm-accent);
+    border-radius: var(--mm-radius-lg);
+    background: color-mix(in srgb, var(--mm-accent) 6%, var(--mm-surface));
+    text-align: center;
+  }
+  .refused .frame { border-color: var(--mm-border); background: var(--mm-surface); }
+  .icon { width: 2.5rem; height: 2.5rem; color: var(--mm-accent); }
+  .refused .icon { color: var(--mm-fg-muted); }
+  .title { margin: 0; font-size: var(--mm-text-lg); font-weight: var(--mm-weight-medium); color: var(--mm-fg); }
+  .hint { max-width: 28rem; margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+</style>

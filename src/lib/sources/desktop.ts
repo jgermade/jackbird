@@ -97,6 +97,15 @@ function desktopSource(root: string, name: string): RootSource {
 type Opened = { path: string; name: string };
 
 /** Asks for a folder in the system's dialog; null when the person cancels. */
+/** A folder of the system's temporary space, opened as a root, for songs dropped on an iPod (plan H); `releaseStaging` lets it go. */
+export async function stageDrop(): Promise<{ root: string; vfs: VFSAdapter }> {
+  const opened = await call<Opened>("drop_staging");
+  return { root: opened.path, vfs: desktopVfs(opened.path, opened.name) };
+}
+
+/** A staging folder let go: closed and removed. */
+export const releaseStaging = (root: string): Promise<void> => call<void>("drop_staging_done", { root });
+
 export async function pickDesktopSource(): Promise<RootSource | null> {
   const opened = await call<Opened | null>("pick_folder");
   return opened ? desktopSource(opened.path, opened.name) : null;

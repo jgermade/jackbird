@@ -17,6 +17,8 @@
   const DeckKeys = await import("./deck-keys.html")
   const QueuePanel = await import("./queue-panel.html")
   const SourcesPanel = await import("./sources-panel.html")
+  const DropZone = await import("./drop-zone.html")
+  const { dragEntered, dragExited, dragMoved, dropped } = await import("../lib/dropping")
   const { t } = await import("../lib/i18n")
   const { tabsHere } = await import("../lib/adding")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
@@ -193,7 +195,9 @@
         <SourcesPanel />
       </div>
     </section>
-    <div :else class="panes" :class.splitting="splitting" :style="`grid-template-columns: ${splitColumns(splitWidth)}`" @scrollend="settle($event)">
+    <!-- Files dropped on the panes are added to the active root (lib/dropping.ts, plan H). -->
+    <div :else class="panes" :class.splitting="splitting" :style="`grid-template-columns: ${splitColumns(splitWidth)}`" @scrollend="settle($event)"
+         @dragenter="dragEntered($event)" @dragover="dragMoved($event)" @dragleave="dragExited($event)" @drop="dropped($event)">
       <div class="pane tree-pane"><Library /></div>
       <div class="pane sheet-pane"><AlbumSheet /></div>
       <!-- The separator between them, wider screens only: drag it, or move it with its keys. -->
@@ -204,6 +208,7 @@
            @keydown="split.key($event)" @dblclick="split.reset()">
         <span class="grip" aria-hidden="true"></span>
       </div>
+      <DropZone />
     </div>
     <QueuePanel :if="narrow && ui.queueOpen" />
   </div>

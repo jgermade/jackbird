@@ -1,0 +1,121 @@
+<script :setup lang="ts">
+  // Songs dropped on the library, before they land (plan H): where they go (the active root), the
+  // pattern their paths are made by, each song from its dropped path to its new one, the tags it
+  // lacks for its place (typed, or read from its dropped name by a pattern, as the rename tab
+  // does), then the progress and what was done. A view over lib/dropping.ts. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, plan H).
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+
+  const { t, tn } = await import("../lib/i18n")
+  const { closeDrop, confirmDrop, dropping, missingOf, pathOf, readFromNames, setDropPattern, setReadPattern, setTag } = await import("../lib/dropping")
+
+  type Tag = ReturnType<typeof missingOf>[number]
+  const tagLabel = (tag: Tag): string => t(`drop.tag.${tag}` as "drop.tag.title")
+  const lacking = (): number => dropping.songs.filter((song) => missingOf(song).length > 0).length
+  let readNote: string = ""
+  const read = () => {
+    const filled = readFromNames()
+    readNote = filled === 0 ? t("drop.readNone") : tn("drop.readSome", filled)
+  }
+  const title = (): string => (dropping.reading ? t("drop.reading") : tn("drop.title", dropping.songs.length))
+  const finished = (): boolean => dropping.report !== null
+</script>
+
+<Modal :open="dropping.open" :eyebrow="t('drop.eyebrow', { name: dropping.target?.label ?? '' })" :title="title()" size="lg" :close-label="t('drop.close')" @close="closeDrop()">
+  <div class="drop">
+    <p :if="dropping.error" class="failure">{{ dropping.error }}</p>
+
+    <!-- What was done. -->
+    <div :if="finished()" class="report">
+      <p class="state">{{ tn("drop.added", dropping.report.added) }}<span :if="dropping.report.existing"> {{ tn("drop.existing", dropping.report.existing) }}</span></p>
+      <p :if="dropping.report.leftOut" class="hint">{{ tn("drop.leftOut", dropping.report.leftOut) }}</p>
+      <div :if="dropping.report.failed.length" class="failure">
+        <p>{{ t("drop.failed") }}</p>
+        <ul><li :each="item in dropping.report.failed" :key="item[0]"><span class="path">{{ item[0] }}</span> — {{ item[1] }}</li></ul>
+      </div>
+    </div>
+
+    <div :elseif="!dropping.reading" class="body">
+      <p :if="dropping.songs.length === 0" class="hint">{{ t("drop.none") }}</p>
+      <p :if="dropping.leftOut" class="hint">{{ tn("drop.leftOut", dropping.leftOut) }}</p>
+
+      <div :if="dropping.songs.length" class="patterns">
+        <Field :label="t('drop.pattern')" control="drop-pattern" :hint="t('drop.patternHint')">
+          <TextInput id="drop-pattern" :model="dropping.pattern" :disabled="dropping.busy" @input="setDropPattern($event.detail)" />
+        </Field>
+      </div>
+
+      <p :if="lacking()" class="notice">{{ tn("drop.missing", lacking()) }}</p>
+      <div :if="lacking()" class="read">
+        <Field :label="t('drop.readPattern')" control="drop-read" :hint="t('drop.readHint')">
+          <TextInput id="drop-read" :model="dropping.readPattern" :disabled="dropping.busy" @input="setReadPattern($event.detail)" />
+        </Field>
+        <div class="keys">
+          <Key size="sm" :disabled="dropping.busy || !dropping.readPattern.trim()" @click="read()">{{ t("drop.read") }}</Key>
+          <span :if="readNote" class="hint">{{ readNote }}</span>
+        </div>
+      </div>
+
+      <ol :if="dropping.songs.length" class="songs">
+        <li :each="(song, index) in dropping.songs" :key="song.from" :class.lacks="missingOf(song).length > 0">
+          <span class="from">{{ song.from }}</span>
+          <span class="to">{{ pathOf(song) }}</span>
+          <div :if="missingOf(song).length" class="tags">
+            <label :each="tag in missingOf(song)" :key="tag" class="tag">
+              <span>{{ tagLabel(tag) }}</span>
+              <input :value="song.tags[tag]" :disabled="dropping.busy" @change="setTag(index, tag, $event.target.value)" />
+            </label>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <p :if="dropping.busy" class="state">{{ t("drop.adding", { done: dropping.done, total: dropping.songs.length }) }}</p>
+  </div>
+
+  <template :slot.foot>
+    <Key :if="finished() || dropping.songs.length === 0" variant="primary" @click="closeDrop()">{{ t("drop.close") }}</Key>
+    <span :else class="foot">
+      <Key :if="lacking()" :disabled="dropping.busy || dropping.reading" @click="confirmDrop()">{{ t("drop.addAnyway") }}</Key>
+      <Key variant="primary" :disabled="dropping.busy || dropping.reading || lacking() > 0" @click="confirmDrop()">{{ tn("drop.add", dropping.songs.length) }}</Key>
+    </span>
+  </template>
+</Modal>
+
+<style scoped>
+  .drop, .body { display: grid; gap: var(--mm-space-4); min-width: 0; }
+  .foot { display: contents; }
+  .patterns, .read { display: grid; gap: var(--mm-space-2); }
+  .keys { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-3); }
+  .songs { display: grid; margin: 0; padding: 0; border: var(--mm-border-width) solid var(--mm-border); border-radius: var(--mm-radius-key); list-style: none; }
+  .songs li { display: grid; gap: var(--mm-space-1); min-width: 0; padding: var(--mm-space-2) var(--mm-space-3); }
+  .songs li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
+  .songs li.lacks { background: var(--mm-sunken); }
+  .from { overflow: hidden; color: var(--mm-fg-subtle); font-size: var(--mm-text-xs); text-overflow: ellipsis; white-space: nowrap; }
+  .to { font-family: var(--mm-font-mono); font-size: var(--mm-text-sm); overflow-wrap: anywhere; }
+  .lacks .to { color: var(--mm-fg-muted); }
+  .tags { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); padding-top: var(--mm-space-1); }
+  .tag { display: grid; gap: .125rem; font-size: var(--mm-text-xs); color: var(--mm-fg-muted); }
+  .tag input {
+    width: 10rem;
+    padding: var(--mm-space-1) var(--mm-space-2);
+    border: var(--mm-border-width) solid var(--mm-border-strong, var(--mm-border));
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-surface);
+    color: var(--mm-fg);
+    font: inherit;
+    font-size: var(--mm-text-sm);
+  }
+  .tag input:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 1px; }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .state { margin: 0; }
+  .path { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); }
+  .report { display: grid; gap: var(--mm-space-2); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+  .failure p, .failure ul { margin: 0; }
+  .notice { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-accent); border-radius: var(--mm-radius-key); background: var(--mm-sunken); font-size: var(--mm-text-sm); }
+</style>
