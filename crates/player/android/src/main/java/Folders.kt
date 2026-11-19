@@ -110,6 +110,10 @@ class Folders(private val resolver: ContentResolver) {
     }
   }
 
+  /** A file opened to be read as it goes (an upload: never all of it at once). */
+  fun input(tree: Uri, path: String): java.io.InputStream =
+    resolver.openInputStream(need(tree, path)) ?: throw FileNotFoundException(path)
+
   /** A small file's bytes. */
   fun read(tree: Uri, path: String): ByteArray =
     resolver.openInputStream(need(tree, path))?.use { it.readBytes() } ?: throw FileNotFoundException(path)

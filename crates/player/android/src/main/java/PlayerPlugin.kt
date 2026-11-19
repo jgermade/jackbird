@@ -64,6 +64,11 @@ class UpcomingArgs {
 class PickArgs {
   /** Where the picker opens (a folder's `content://` address), if anywhere in particular. */
   var initial: String? = null
+  /**
+   * Whether the app keeps the folder's permission across restarts (a folder opened as a root); not
+   * for an upload, whose grant lasts while the app runs, so uploads do not pile up kept grants.
+   */
+  var keep: Boolean = true
 }
 
 @InvokeArg
@@ -93,6 +98,16 @@ class TreeRenameArgs {
 }
 
 @InvokeArg
+class TreeUploadArgs {
+  lateinit var tree: String
+  var path: String = ""
+  /** Where it goes: the service's `…/api/library/upload?path=…` address. */
+  var url: String = ""
+  /** The session's `Authorization` header, if there is one. */
+  var authorization: String? = null
+}
+
+@InvokeArg
 class TreeOpenArgs {
   lateinit var tree: String
   var path: String = ""
@@ -115,6 +130,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   /** The phone's folders (E6b-D9), worked on one call at a time off the main thread. */
   private val folders = Folders(activity.contentResolver)
   private val worker = Executors.newSingleThreadExecutor()
+  /** Uploads, one at a time, on their own thread: a long one does not hold up the folders' work. */
+  private val uploader = Executors.newSingleThreadExecutor()
   private var player: Player? = null
 
   private val listener = object : Player.Listener {
@@ -278,8 +295,10 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   // ─── The phone's folders (E6b-D9) ───────────────────────────────────────────
 
   /** Runs folder work off the main thread; an exception rejects the call with its message. */
-  private fun work(invoke: Invoke, job: () -> Unit) {
-    worker.execute {
+  private fun work(invoke: Invoke, job: () -> Unit) = work(invoke, worker, job)
+
+  private fun work(invoke: Invoke, thread: java.util.concurrent.Executor, job: () -> Unit) {
+    thread.execute {
       try {
         job()
       } catch (error: Exception) {
@@ -322,8 +341,9 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       invoke.resolve(JSObject().apply { put("tree", null as String?) })
       return
     }
+    val keep = invoke.parseArgs(PickArgs::class.java).keep
     work(invoke) {
-      activity.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+      if (keep) activity.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
       invoke.resolve(JSObject().apply {
         put("tree", tree.toString())
         put("name", folders.name(tree))
@@ -416,6 +436,44 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     work(invoke) {
       folders.mkdir(Uri.parse(args.tree), args.path)
       invoke.resolve()
+    }
+  }
+
+  /**
+   * Sends one of the folder's files to the service (an upload to the family library): `POST`, its
+   * bytes as they are read, never all at once in memory, with the session's `Authorization`.
+   * Resolves with the service's answer, whatever it is (`{ status, body }`); rejects when the
+   * service could not be reached or the file not sent, so the page can try another address.
+   */
+  @Command
+  fun folderUpload(invoke: Invoke) {
+    val args = invoke.parseArgs(TreeUploadArgs::class.java)
+    work(invoke, uploader) {
+      val tree = Uri.parse(args.tree)
+      val size = folders.stat(tree, args.path)?.size ?: throw java.io.FileNotFoundException(args.path)
+      val connection = java.net.URL(args.url).openConnection() as java.net.HttpURLConnection
+      try {
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        connection.connectTimeout = 5_000
+        connection.readTimeout = 120_000
+        connection.setRequestProperty("Content-Type", "application/octet-stream")
+        args.authorization?.let { connection.setRequestProperty("Authorization", it) }
+        // Its length when the provider knows it; in pieces when it does not.
+        if (size > 0) connection.setFixedLengthStreamingMode(size) else connection.setChunkedStreamingMode(64 * 1024)
+        folders.input(tree, args.path).use { input ->
+          connection.outputStream.use { output -> input.copyTo(output, 64 * 1024) }
+        }
+        val status = connection.responseCode
+        val body = (if (status >= 400) connection.errorStream else connection.inputStream)
+          ?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
+        invoke.resolve(JSObject().apply {
+          put("status", status)
+          put("body", body)
+        })
+      } finally {
+        connection.disconnect()
+      }
     }
   }
 

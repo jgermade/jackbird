@@ -80,6 +80,12 @@ pub struct Service {
     /// Whether it should listen on the home network too (sign-in on and the network allowed);
     /// `main.rs` follows it.
     pub network: tokio::sync::watch::Sender<bool>,
+    /// The home network's addresses it listens on now (`main.rs` keeps them as it opens and drops
+    /// them): the apps send uploads there when they can reach them (`GET /api/network`).
+    pub home: RwLock<Vec<std::net::SocketAddr>>,
+    /// Which instance this is: a random id kept in its database, of no other use, so an app can
+    /// tell it at another of its addresses (`GET /api/info`).
+    instance: String,
     /// Sends email (SMTP; a fake one in tests).
     pub(crate) mailer: Box<dyn mail::Mailer>,
     /// Networks that count as this machine for an open instance (F5).
@@ -147,6 +153,10 @@ impl Service {
             }
         }
         let (network, _) = tokio::sync::watch::channel(settings.signin && settings.network);
+        let instance = {
+            use base64::Engine;
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&store.secret("instance")[..12])
+        };
         let machine = config::machine_networks(&settings.machine);
         Arc::new(Service {
             roots: RwLock::new(open),
@@ -159,6 +169,8 @@ impl Service {
             ceremonies: Once::default(),
             console_key,
             network,
+            home: RwLock::new(Vec::new()),
+            instance,
             mailer,
             machine,
             library: library.map(Arc::new),
@@ -270,13 +282,28 @@ struct At {
 struct Info {
     name: &'static str,
     version: &'static str,
+    instance: String,
 }
 
-async fn info() -> Json<Info> {
+async fn info(State(service): State<Arc<Service>>) -> Json<Info> {
     Json(Info {
         name: "jackbird-service",
         version: env!("JACKBIRD_VERSION"),
+        instance: service.instance.clone(),
     })
+}
+
+/// The home network's addresses it listens on now, as an app reaches them
+/// (`http://192.168.1.20:4646`); none while the home network is off.
+async fn home_network(State(service): State<Arc<Service>>) -> Json<serde_json::Value> {
+    let addresses: Vec<String> = service
+        .home
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .map(|address| format!("http://{address}"))
+        .collect();
+    Json(serde_json::json!({ "addresses": addresses }))
 }
 
 async fn roots(State(service): State<Arc<Service>>) -> Answer<Json<Vec<Opened>>> {
@@ -679,6 +706,7 @@ pub fn router(service: Arc<Service>) -> Router {
         .route("/stat", get(stat))
         .route("/inspect", post(inspect))
         .route("/media", get(media))
+        .route("/network", get(home_network))
         .merge(people_api::own())
         .merge(passkeys::own())
         .merge(library_api::listeners());

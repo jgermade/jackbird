@@ -8,10 +8,10 @@
   // An item is `{ id, label, meta, closeLabel }`; `meta` is small mono text
   // after the label (a count), `closeLabel` the close key's accessible name.
   // The choice goes up through `:model` and as `change`; a close key emits
-  // `close` with the item's id, and the owner decides what goes. Only the
-  // tabs scroll sideways; the `end` slot sits right after them (a key that
-  // adds one, say) and stays in view, and the `aside` slot is pushed to the
-  // bar's right end. `compact` turns the tabs into one at 720px and below:
+  // `close` with the item's id, and the owner decides what goes. The tabs
+  // scroll sideways, the open one kept in view, and the `end` slot (keys that
+  // add one, say) right after them scrolls with them; the `aside` slot stays
+  // in view at the bar's right end. `compact` turns the tabs into one at 720px and below:
   // the chosen item as the open tab, with a caret, and every item in its
   // drop-down; there the chosen one has its × when `closable` (Delete closes
   // it from the keyboard), and `addLabel` adds a last option that emits `add`
@@ -88,6 +88,22 @@
     $emit("change", id)
   }
 
+  // The open tab, in view in the strip that scrolls sideways: whenever it changes, and when the
+  // strip's width does. By the strip's own scroll, not `scrollIntoView()`, which scrolls every box
+  // around it too. After a frame, so a tab just added is there.
+  const reveal = (_open: string | null, _count: number) => {
+    requestAnimationFrame(() => {
+      const strip = $$self(".strip")[0] as HTMLElement | undefined
+      const index = items.findIndex((item: Item) => item.id === model)
+      const tab = index < 0 ? undefined : ($$self(".list > .tab")[index] as HTMLElement | undefined)
+      if (!strip || !tab || strip.offsetParent === null) return
+      const box = strip.getBoundingClientRect()
+      const place = tab.getBoundingClientRect()
+      if (place.left < box.left) strip.scrollLeft += place.left - box.left
+      else if (place.right > box.right) strip.scrollLeft += Math.min(place.right - box.right, place.left - box.left)
+    })
+  }
+  $: reveal(model, items.length)
   const STEP: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 }
   const key = (event: KeyboardEvent, item: Item) => {
     const index = items.indexOf(item)
@@ -102,10 +118,19 @@
     choose(items[next].id)
     $$self('[role="tab"]')[next]?.focus()
   }
+
+  await $mounted()
+  const strip = $$self(".strip")[0] as HTMLElement | undefined
+  if (strip && typeof ResizeObserver === "function") {
+    const sizes = new ResizeObserver(() => reveal(model, items.length))
+    sizes.observe(strip)
+    $destroyed(() => sizes.disconnect())
+  }
 </script>
 
 <div class="tabs" :class.compact="flag(compact)" :class.plain="flag(plain)" :class.iconic="iconic" :class.bar="flag(bar)">
-  <div class="strip" role="tablist" :aria-label="label || null">
+  <div class="strip">
+  <div class="list" role="tablist" :aria-label="label || null">
   <div :each="item in items" :key="item.id" class="tab" :class.on="item.id === model" :class.toned="!!item.tone"
        :class.tone-go="item.tone === 'go'" :class.tone-edit="item.tone === 'edit'" :class.tone-danger="item.tone === 'danger'">
     <button type="button"
@@ -129,6 +154,8 @@
     </button>
   </div>
   </div>
+  <div :if="$slots.end" class="end"><slot.end /></div>
+  </div>
   <div :if="flag(compact) && items.length > 0" class="picker">
     <div class="tab on picked">
       <select class="pick" :aria-label="label || null" @change="picked($event)" @keydown="pickKey($event)">
@@ -151,7 +178,6 @@
       </select>
     </div>
   </div>
-  <div :if="$slots.end" class="end"><slot.end /></div>
   <div :if="$slots.aside" class="aside"><slot.aside /></div>
 </div>
 
@@ -167,16 +193,23 @@
     background: linear-gradient(var(--mm-chassis), var(--mm-chassis-hi));
   }
   .tabs.plain { background: none; }
+  /* What scrolls sideways: the tabs and the keys after them (the end slot). */
   .strip {
     display: flex;
     flex: 0 1 auto;
     align-items: flex-end;
-    /* Apart, so each reads as a tab of its own. */
-    gap: var(--mm-space-1);
+    gap: var(--mm-space-2);
     min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
+  }
+  .list {
+    display: flex;
+    flex: none;
+    align-items: flex-end;
+    /* Apart, so each reads as a tab of its own. */
+    gap: var(--mm-space-1);
   }
   .picker { display: none; }
   .aside {
@@ -188,8 +221,8 @@
     padding: 0 0 var(--mm-space-1);
   }
   @media (max-width: 720px) {
-    .compact .strip { display: none; }
-    .compact .picker { display: flex; flex: 0 1 18rem; align-items: flex-end; min-width: 0; }
+    .compact .list { display: none; }
+    .compact .picker { display: flex; flex: 0 1 18rem; align-items: flex-end; min-width: 0; order: -1; }
   }
 
   /* The compact picker: the open tab, a customizable select inside it. */
@@ -293,6 +326,7 @@
   .end {
     display: flex;
     flex: none;
+    align-self: stretch;
     align-items: center;
     gap: var(--mm-space-2);
     padding: 0 var(--mm-space-2) var(--mm-space-1);
@@ -359,7 +393,7 @@
   /* A bar of options on a phone: the whole width, shared equally, no tab's look. */
   @media (max-width: 720px) {
     .tabs.bar { padding: 0; box-shadow: none; background: none; }
-    .bar .strip { flex: 1 1 auto; gap: 0; }
+    .bar .strip, .bar .list { flex: 1 1 auto; gap: 0; }
     .bar .tab, .bar .tab.on { flex: 1 1 0; min-width: 0; border-width: 0; border-radius: 0; background: none; box-shadow: none; }
     .bar .tab::before, .bar .tab.on::before { display: none; }
     .bar .main, .bar .on .main { flex-direction: column; justify-content: center; gap: .1875rem; width: 100%; min-width: 0; height: 3.5rem; padding: 0 .125rem; font-size: var(--mm-text-xs); }

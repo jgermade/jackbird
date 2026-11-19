@@ -1,10 +1,11 @@
 <script :setup lang="ts">
   // Adding music to the family library (F1): songs or a whole folder from
-  // this device, uploaded (editors and up), or a folder of the service's
-  // machine, imported there (owners); its progress, and what became of the
-  // files (added, already there, already there with other tags, left out). A
-  // view over lib/importing.ts. See
-  // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-09, 13:46).
+  // this device, uploaded (editors and up), or a folder of the server's
+  // machine, imported there (owners); its progress (and whether it goes over
+  // the server's home network), and what became of the files (added, already
+  // there, already there with other tags, left out). A view over
+  // lib/importing.ts. See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md
+  // (2026-11-09, 13:46) and RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19).
 
   const Key = await import("../../theme/default/components/key.html")
   const Modal = await import("../../theme/default/components/modal.html")
@@ -12,7 +13,10 @@
   const { t } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { chooseMachineFolder } = await import("../lib/folders")
-  const { importMachineFolder, importing, uploadFiles } = await import("../lib/importing")
+  const { folderUploadHere, importMachineFolder, importing, uploadFiles, uploadPhoneFolder } = await import("../lib/importing")
+  // A folder: a folder input on a computer, Android's own picker in the Android app, none on a
+  // phone's browser or the iOS app (the input would choose files there).
+  const folderWay = folderUploadHere()
 
   const picked = (event: Event) => {
     const input = event.target as HTMLInputElement
@@ -36,15 +40,19 @@
           <input type="file" multiple accept=".mp3,.flac,audio/mpeg,audio/flac" :disabled="importing.busy" @change="picked($event)" />
           <span>{{ t("import.files") }}</span>
         </label>
-        <label class="pick" :class.disabled="importing.busy">
+        <label :if="folderWay === 'input'" class="pick" :class.disabled="importing.busy">
           <input type="file" webkitdirectory :disabled="importing.busy" @change="picked($event)" />
           <span>{{ t("import.folder") }}</span>
         </label>
+        <button :elseif="folderWay === 'phone'" type="button" class="pick" :class.disabled="importing.busy" :disabled="importing.busy" @click="uploadPhoneFolder()">
+          <span>{{ t("import.folder") }}</span>
+        </button>
         <Key :if="can('owner')" variant="ghost" :disabled="importing.busy" @click="fromMachine()">{{ t("import.machine") }}</Key>
       </div>
       <div :if="importing.busy" class="progress" role="status">
         <progress :value="importing.done" :max="importing.total || 1"></progress>
         <span>{{ t("import.progress", { done: importing.done, total: importing.total, percent: percent() }) }}</span>
+        <span :if="importing.home">{{ t("import.home") }}</span>
       </div>
       <p :if="importing.error" class="failure">{{ importing.error }}</p>
       <div :if="importing.report" class="report" role="status">
@@ -79,6 +87,7 @@
     font-weight: 600;
     letter-spacing: .08em;
     text-transform: uppercase;
+    font-family: inherit;
     cursor: pointer;
   }
   .pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }

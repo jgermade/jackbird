@@ -21,9 +21,9 @@
   // and the drawing stops. It draws
   // only while it is shown (a canvas with no width costs nothing). It fills
   // the box it is put in and adds no height of its own. `settled()`, if given,
-  // is called once the columns have fallen after it stops being active (at
-  // once if it is not shown; the peaks may still be up), so the place that
-  // shows it can wait for them before putting something else in its place.
+  // is called once the columns and their peaks have fallen after it stops
+  // being active (at once if it is not shown), so the place that shows it can
+  // wait for them before putting something else in its place.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-04.github-actions-workflows.WIP.md`
@@ -134,7 +134,7 @@
       timer = 0
     }
 
-    // Told once each time the columns are down after it stops being active.
+    // Told once each time the columns and their peaks are down after it stops being active.
     let told = false
     const fallen = () => {
       if (told || flag(active)) return
@@ -149,7 +149,7 @@
       const moving = draw()
       if (!moving) last = 0
       if (flag(active)) told = false
-      else if (!moving || !shown.some((level) => level > 0)) fallen()
+      else if (!moving) fallen()
       if (!flag(active) && !moving) return
       if (still()) timer = window.setTimeout(loop, 250)
       else frame = requestAnimationFrame(loop)

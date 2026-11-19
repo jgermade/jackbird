@@ -53,8 +53,14 @@ the console, and is the way back in for an owner whose address changed. Only an 
 sign-in off again; people keep their addresses and become profiles.
 
 **The family library.** The service keeps a library of its own, shown to everyone as the
-**Library** tab. **Add music** puts songs in it: editors and up upload songs or a whole folder
-from their own device, and owners can also import a folder of the machine the service runs on.
+**Library** tab. **Add music** (the **+** and note key) puts songs in it: editors and up upload
+songs or a whole folder from their own device (in the Android app, the folder is chosen in
+Android's own folder picker; a phone's browser uploads songs, not folders), and owners can also
+import a folder of the machine the service runs on (**Import a folder of the server…**). From the
+apps, away from the server's home network address (through a tunnel, say), a batch of songs goes
+straight to its home network address when the phone is on that network and the home network is
+allowed (below), with the same session; otherwise, and if it stops answering, by the usual
+address.
 Each song is kept once, however many times it is brought, and the files you pick are never
 changed. Editing a song's tags changes what everyone sees, not the stored file: the song leaves
 with the family's tags when it is played or downloaded (**Info**, **Download**). When someone
@@ -102,8 +108,8 @@ and start it again. If the catalogue itself is what went wrong, put the newest
 configuration) while the service is stopped.
 
 **Reaching it from elsewhere.** With sign-in on, an owner can let the home network reach it
-(**Sign-in**, **Home network**); over plain HTTP, codes and sessions travel unencrypted there and
-passkeys are not available. For HTTPS, and to reach it from outside home, put a proxy in front
+(**Sign-in**, **Home network**, or the last question of `jackbird-service setup`); over plain
+HTTP, codes and sessions travel unencrypted there and passkeys are not available. For HTTPS, and to reach it from outside home, put a proxy in front
 and set **The instance's address** to the address it serves (passkeys belong to that address).
 With Caddy:
 

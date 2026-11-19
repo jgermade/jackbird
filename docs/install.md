@@ -31,7 +31,7 @@ the port is published on the machine's loopback (`127.0.0.1:4646`). Open it in a
 or from another computer through an SSH tunnel (`ssh -L 4646:localhost:4646 the-server`).
 
 **Music** is mounted read only at the container's `Music` folder: **Add music**, **Import a
-folder of this machine…** copies it into the library, which lives in `./library` (back that up).
+folder of the server…** copies it into the library, which lives in `./library` (back that up).
 `./config` keeps the service's settings, its people and the console's key.
 
 **Sign-in, and the first owner** (by email and a code; a mail server is needed):
@@ -42,6 +42,12 @@ docker compose exec jackbird jackbird-service setup
 
 It asks for your SMTP server and your address, sends a code there, and turns sign-in on once you
 type it back. From then on, owners and admins invite people from **People and sign-in…**.
+
+**The home network**: outside a container, `setup` then asks whether jackbird answers on the home
+network too (over plain HTTP: sign-in codes and sessions travel unencrypted there). In a
+container, publish the port on the machine's every address instead (`"4646:4646"` in place of
+`"127.0.0.1:4646:4646"` in `compose.yaml`). The Android app, reaching the instance from outside
+home, sends uploads straight to its home network address when it is on that network.
 
 **From outside home**, with sign-in on: put HTTPS in front at your own address. Uncomment `caddy`
 in `compose.yaml`, set `JACKBIRD_ADDRESS` in `.env` (a name that points at your home, with ports

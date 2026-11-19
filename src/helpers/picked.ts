@@ -17,6 +17,18 @@ export function folderAccess({ picker, folderInput, handheld }: FolderAbilities)
   return folderInput && !handheld ? "read" : "none";
 }
 
+/** How a folder's songs are uploaded here: Android's folder picker (the app), a folder file input, or not at all. */
+export type FolderUpload = "phone" | "input" | "none";
+
+/**
+ * The Android app picks the folder in Android's own picker; a computer's browser or app, with a
+ * folder file input; a phone's browser or the iOS app not at all (the input would choose files).
+ */
+export function folderUpload({ app, android, folderInput, handheld }: { app: boolean; android: boolean; folderInput: boolean; handheld: boolean }): FolderUpload {
+  if (app && handheld) return android ? "phone" : "none";
+  return folderInput && !handheld ? "input" : "none";
+}
+
 /** Whether a user agent is a phone's or a tablet's (an iPad asks for the desktop site as a Mac: its touch gives it away). */
 export function isHandheld(agent: string, touchPoints: number): boolean {
   return /Android|iPhone|iPad|iPod/i.test(agent) || (/Macintosh/.test(agent) && touchPoints > 1);

@@ -59,20 +59,28 @@
     }
   })()
   $: mark.song(current?.key ?? null)
-  // On a pause, the spectrum stays while its columns fall, slowly (it says when they are down:
-  // `settled`; the peaks left out), and only then the logo takes its place; the format and the DAC
-  // give way at once. Played again meanwhile, it just goes on.
+  // On a pause, the spectrum stays while its columns and their peaks fall, slowly (it says when
+  // they are down: `settled`), and half a second after that the logo takes its place; the format
+  // and the DAC give way at once. Played again meanwhile, it just goes on.
   let falling = false
+  const LOGO_AFTER = 500
   const fall = (() => {
     let was = false
+    let wait = 0
     return {
       playing(on: boolean) {
         if (was && !on && markView === "spectrum") falling = true
-        if (on) falling = false
+        if (on) {
+          window.clearTimeout(wait)
+          falling = false
+        }
         was = on
       },
       settled() {
-        if (!playback.playing) falling = false
+        window.clearTimeout(wait)
+        wait = window.setTimeout(() => {
+          if (!playback.playing) falling = false
+        }, LOGO_AFTER)
       }
     }
   })()

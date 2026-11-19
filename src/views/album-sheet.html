@@ -24,7 +24,6 @@
   const { openPicture } = await import("../lib/picture")
   const { setArtistPicture } = await import("../lib/artists")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
-  const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
   const { chosenState } = await import("../helpers/selection")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
@@ -118,16 +117,17 @@
   }
   const view = (): string => root()?.view ?? "files"
   const VIEW_LABELS: Record<string, string> = { files: "views.files", playlists: "views.playlists", artists: "views.artists", albumsByArtist: "views.albumsByArtist", albums: "views.albums", compilations: "views.compilations", songs: "views.songs" }
-  // Without the songs in the tree (a preference), a phone has no key between the library and
-  // Details: the breadcrumb goes back. Its ‹ to the library as it was; a step to the library in
-  // that folder (the top: the root's first level).
+  // A phone has no key between the library and Details: the breadcrumb's ‹ goes back to the
+  // library as it was, with the songs in the tree or without them (a preference). A step (an
+  // artist in Albums by artist, say) shows that step here, in Details, and the library's levels
+  // follow it, so ‹ then goes back to that step (the top: the root's first level).
   const { watchMedia } = await import("../lib/media")
   // Followed as the window is resized (lib/media.ts).
   let phone: boolean = matchMedia("(max-width: 720px)").matches
   $destroyed(watchMedia("(max-width: 720px)", (matches) => {
     phone = matches
   }))
-  const backToLibrary = (): boolean => phone && !preferences.songsInTree
+  const backToLibrary = (): boolean => phone
   const toLibrary = () => {
     ui.pane = "library"
   }
@@ -137,7 +137,6 @@
     if (key !== null) enterLevel(key)
     else if (top) leaveLevel(top.key)
     else showWhole()
-    toLibrary()
   }
 </script>
 

@@ -2,9 +2,9 @@
   // The app's top bar as a Deck faceplate: the wordmark, the display (the logo lit in it, the title
   // and the artist on two lines, the meter), the keys
   // (DeckKeys: transport, back to the list playing, preferences; on phones
-  // they go to the footer, and a key at the roots' bar's right turns between the library and the
-  // details), and the open roots as
-  // tabs (a dropdown on phones) with the folder key and, while tracks are
+  // they go to the footer, and Details' trail goes back to the library), and the open roots as
+  // tabs, then the keys that add a folder and songs to the family library (all of them scrolling
+  // sideways together, the open tab kept in view) and, while tracks are
   // selected, the selection's key: it opens the selection's dialog on Edit. A view: it reads the
   // lib/ stores and calls lib/ actions, and draws with theme components. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (step 4).
@@ -29,8 +29,6 @@
   const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tabLabel(tab) }))
   const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
-  const { ui } = await import("../lib/ui")
-  const { preferences } = await import("../lib/preferences")
   // The display's spectrum: 24 bands above 640px, 12 below.
   const { watchMedia } = await import("../lib/media")
   // Followed as the window is resized (lib/media.ts).
@@ -43,11 +41,6 @@
   // On a computer the key reads "+ Folder" once a root is open; on a phone, the + alone.
   // Once a folder is open, the key is "+" alone (its label says what it adds): a folder, a server, an iPod.
   $: folderText = library.loading ? t("picker.scanning") : hasRoots ? "" : t("picker.openLibrary")
-  // Choosing a pane on a phone closes the queue's panel over it.
-  const pickPane = (pane: "library" | "details") => {
-    ui.pane = pane
-    ui.queueOpen = false
-  }
 
   // Read through a function: the active root is boxed (see Opaque in lib/workspace.ts).
   const selectedCount = (): number => activeRoot.value.data?.selectedTrackIds.length ?? 0
@@ -77,20 +70,30 @@
        workspace's welcome, views/sources-panel.html), instead of the roots and the key to add one. -->
   <Tabs :if="!hasRoots && !library.restoring && sourceTabs().length > 1" :label="t('sources.tabs')" :items="sourceTabs()" :model="shownTab()" @change="chooseTab($event.detail)" />
   <!-- The roots' bar: hidden while nothing is open, coming back or to import (the welcome is the
-       page then, and the panes' key has no panes to turn between). -->
+       page then). -->
   <Tabs :elseif="hasRoots || library.restoring || (importing.available && can('editor'))" :label="t('faceplate.roots')" :items="tabs" :model="library.activeRootId" :closable="!isEmbed"
         :add-label="folderLabel" :add-disabled="library.loading || !canAdd()" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
-      <!-- Adding another folder, once one is open: before that, the welcome offers it. -->
+      <!-- Adding another folder, once one is open: before that, the welcome offers it. Two keys of
+           glyphs alone, so the tabs keep the bar's room on a phone: + and a folder (a folder, a
+           server, an iPod), + and a note (songs to the family library). -->
       <span :if="hasRoots && canAdd()" class="open-folder" :class.has-roots="hasRoots">
         <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openAdding()">
           <Reel :if="library.loading" :size="12" speed="fast" />
-          <svg :else class="icon" :class.signal="!hasRoots" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          <span :else class="glyphs">
+            <svg class="plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z" /></svg>
+          </span>
           <span :if="folderText" class="folder-text">{{ folderText }}</span>
         </Key>
       </span>
-      <Key :if="importing.available && can('editor')" size="sm" variant="ghost" popup="dialog" :label="t('import.open')" @click="openImport()">{{ t("import.open") }}</Key>
+      <Key :if="importing.available && can('editor')" size="sm" popup="dialog" :label="t('import.open')" :title="t('import.open')" @click="openImport()">
+        <span class="glyphs">
+          <svg class="plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" stroke="none" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" stroke="none" /></svg>
+        </span>
+      </Key>
     </template>
     <template :slot.aside>
       <span :if="selectedCount() > 0" class="selection">
@@ -101,16 +104,6 @@
         </Key>
         <Key size="sm" variant="ghost" square :label="t('actions.clearSelection')" :title="t('actions.clearSelection')" @click="clearSelection()">
           <svg class="icon" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
-        </Key>
-      </span>
-      <!-- Phones: the key that turns between the library and the details, at the bar's right. Not
-           without the songs in the tree: a folder opens in Details, and its breadcrumb goes back. -->
-      <span :if="preferences.songsInTree" class="pane-pick">
-        <Key size="sm" square :label="ui.pane === 'library' ? t('panels.details') : t('library.title')" :title="ui.pane === 'library' ? t('panels.details') : t('library.title')"
-             @click="pickPane(ui.pane === 'library' ? 'details' : 'library')">
-          <!-- The details: a sheet; the library: a list. -->
-          <svg :if="ui.pane === 'library'" class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="1.75" width="10" height="12.5" rx="1" /><path d="M5.5 5.25h5M5.5 8h5M5.5 10.75h3" /></svg>
-          <svg :else class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M6 4h8M6 8h8M6 12h8" /><circle cx="2.75" cy="4" r=".9" fill="currentColor" stroke="none" /><circle cx="2.75" cy="8" r=".9" fill="currentColor" stroke="none" /><circle cx="2.75" cy="12" r=".9" fill="currentColor" stroke="none" /></svg>
         </Key>
       </span>
     </template>
@@ -138,8 +131,6 @@
   .brand-mark { grid-area: brand; display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
   .screen { grid-area: screen; min-width: 0; }
   .controls { grid-area: controls; display: flex; align-items: center; }
-  /* The panel selector, in the keys' place on phones (where the keys go to the footer). */
-  .pane-pick { display: none; }
 
   /* The name in brushed metal, raised, as the lettering on a hi-fi deck's front panel: the text
      itself draws only the shadow it casts (below and to the right), and a copy of it on
@@ -168,6 +159,9 @@
     text-shadow: none;
   }
   .icon { width: .875rem; height: .875rem; }
+  /* A key's + and its glyph, close together: what it adds. */
+  .glyphs { display: inline-flex; align-items: center; gap: .125rem; }
+  .plus { width: .625rem; height: .625rem; }
   /* While no root is open, opening one is the thing to do: its glyph is printed in orange. */
   .icon.signal { color: var(--mm-accent-ink); }
   .selection { display: flex; align-items: center; gap: var(--mm-space-1); }
@@ -205,15 +199,14 @@
     }
     .wordmark { display: none; }
     }
-  /* Phones: the keys go to the footer, and the panes' key goes to the roots' bar;
-     the roots are tabs, as on a computer (the bar scrolls sideways when they do not fit), with the
-     + key after them; and the selection's key is its count. */
+  /* Phones: the keys go to the footer; the roots are tabs, as on a computer (the bar scrolls
+     sideways when they do not fit), with the + keys after them; and the selection's key is its
+     count. */
   @media (max-width: 720px) {
-    /* One row: the display alone (the key that turns between the panes is in the roots' bar). */
+    /* One row: the display alone. */
     .deck { grid-template-columns: minmax(0, 1fr); grid-template-areas: "screen"; }
     .brand-mark { display: none; }
     .controls { display: none; }
-    .pane-pick { display: flex; }
     .count-wide { display: none; }
     .count-narrow { display: inline; }
   }

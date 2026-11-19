@@ -24,6 +24,7 @@ Every command of the phone's player, and its events.
 - `allow-folder-rename`
 - `allow-folder-mkdir`
 - `allow-folder-address`
+- `allow-folder-upload`
 - `allow-safe-area`
 - `allow-spectrum`
 - `allow-register-listener`
@@ -242,6 +243,32 @@ Enables the folder_stat command without any pre-configured scope.
 <td>
 
 Denies the folder_stat command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:allow-folder-upload`
+
+</td>
+<td>
+
+Enables the folder_upload command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-folder-upload`
+
+</td>
+<td>
+
+Denies the folder_upload command without any pre-configured scope.
 
 </td>
 </tr>

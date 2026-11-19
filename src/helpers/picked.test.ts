@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { folderAccess, isHandheld, splitPicked } from "./picked.ts";
+import { folderAccess, folderUpload, isHandheld, splitPicked } from "./picked.ts";
 
 describe("folderAccess", () => {
   it("reads and writes with the picker, whatever else there is", () => {
@@ -13,6 +13,21 @@ describe("folderAccess", () => {
   it("opens nothing on a phone with only the input, or with neither", () => {
     assert.equal(folderAccess({ picker: false, folderInput: true, handheld: true }), "none");
     assert.equal(folderAccess({ picker: false, folderInput: false, handheld: false }), "none");
+  });
+});
+
+describe("folderUpload", () => {
+  it("uses Android's own picker in the Android app", () => {
+    assert.equal(folderUpload({ app: true, android: true, folderInput: true, handheld: true }), "phone");
+  });
+  it("uploads no folder from the iOS app or a phone's browser", () => {
+    assert.equal(folderUpload({ app: true, android: false, folderInput: true, handheld: true }), "none");
+    assert.equal(folderUpload({ app: false, android: true, folderInput: true, handheld: true }), "none");
+  });
+  it("uses the folder input on a computer, in the browser or the desktop app", () => {
+    assert.equal(folderUpload({ app: false, android: false, folderInput: true, handheld: false }), "input");
+    assert.equal(folderUpload({ app: true, android: false, folderInput: true, handheld: false }), "input");
+    assert.equal(folderUpload({ app: false, android: false, folderInput: false, handheld: false }), "none");
   });
 });
 

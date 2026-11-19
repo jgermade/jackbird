@@ -31,6 +31,28 @@ export function isLoopbackAddress(address: string): boolean {
   }
 }
 
+/**
+ * Whether an address is on a home network already (a private IPv4 or IPv6 address, the device
+ * itself, a `.local`, `.lan` or `.home.arpa` name, or a name of one word), so there is no nearer way
+ * to that server than it.
+ */
+export function isHomeAddress(address: string): boolean {
+  let host: string;
+  try {
+    host = new URL(address).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (isLoopbackAddress(address)) return true;
+  const v4 = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(host);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+  }
+  if (host.startsWith("[")) return /^\[f[cd]/.test(host) || /^\[fe[89ab]/.test(host);
+  return !host.includes(".") || /\.(local|lan|home\.arpa)$/.test(host);
+}
+
 /** How the session keeps a root of a server other than the page's home one (E6b-D11). */
 const ON_SERVER = "jackbird-server:";
 

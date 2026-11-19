@@ -252,6 +252,8 @@ async fn run_server(
     // F4: the night's snapshot, the trash's expiry, the weekly scrub.
     jackbird_service::safety_api::spawn_timers(std::sync::Arc::clone(&service));
     let mut network = service.network.subscribe();
+    // The home network's addresses it listens on, as the apps are told them (`GET /api/network`).
+    let shared = std::sync::Arc::clone(&service);
     let app = jackbird_service::router(service).into_make_service_with_connect_info::<SocketAddr>();
     // In a container (F5), `JACKBIRD_LISTEN=0.0.0.0`: every address, the host reaching it through
     // the published port; open, only the networks of `JACKBIRD_MACHINE` count as this machine.
@@ -306,6 +308,8 @@ async fn run_server(
                 } else {
                     serving.drain().for_each(|(_, task)| task.abort());
                 }
+                *shared.home.write().unwrap_or_else(std::sync::PoisonError::into_inner) =
+                    serving.keys().map(|ip| SocketAddr::new(*ip, port)).collect();
                 let changed = tokio::time::timeout(std::time::Duration::from_secs(30), network.changed()).await;
                 if matches!(changed, Ok(Err(_))) {
                     break;
@@ -412,7 +416,8 @@ mod console {
     }
 
     /// SMTP (kept or changed), then an owner's address, confirmed by the code sent there: sign-in
-    /// is on. With sign-in on already, it confirms an owner's new address (a way back in).
+    /// is on. With sign-in on already, it confirms an owner's new address (a way back in). Last,
+    /// whether it also answers on the home network.
     pub fn setup(flags: &[(String, String)]) {
         let service = local(flags);
         let smtp = service.must("GET", "/smtp", None);
@@ -510,6 +515,48 @@ mod console {
             }
         }
         println!("Sign-in is on; {email} signs in as an owner.");
+        home_network(&service);
+    }
+
+    /// Whether it also answers on the home network (S3-D7), asked as People and sign-in… asks it:
+    /// what is now is the default. Not in a container, where the port `compose.yaml` publishes is
+    /// the way in.
+    fn home_network(service: &Local) {
+        let container = std::env::var("JACKBIRD_LISTEN")
+            .ok()
+            .and_then(|listen| listen.parse::<std::net::IpAddr>().ok())
+            .is_some_and(|listen| listen.is_unspecified());
+        if container {
+            println!(
+                "In a container, the home network reaches jackbird by the port compose.yaml publishes: \
+                 \"4646:4646\" for every address of this machine, not \"127.0.0.1:4646:4646\"."
+            );
+            return;
+        }
+        let now = service.must("GET", "/settings", None)["network"]
+            .as_bool()
+            .unwrap_or(false);
+        println!(
+            "On the home network jackbird is reached over plain HTTP: sign-in codes and sessions \
+             travel unencrypted there, and passkeys are not available."
+        );
+        let on = ask(
+            "Reach jackbird from the home network too? (y/n)",
+            if now { "y" } else { "n" },
+        )
+        .to_lowercase()
+        .starts_with('y');
+        if on != now {
+            service.must("POST", "/settings", Some(json!({ "network": on })));
+        }
+        if on {
+            println!(
+                "jackbird answers on the home network too, at this machine's addresses, port {}.",
+                service.port
+            );
+        } else {
+            println!("jackbird answers on this machine only (and through a proxy in front, if there is one).");
+        }
     }
 
     /// Turns sign-in off: people are profiles again, and it answers on the machine only.
