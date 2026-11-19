@@ -73,13 +73,12 @@
         </li>
       </ol>
     </div>
-
-    <p :if="dropping.busy" class="state">{{ t("drop.adding", { done: dropping.done, total: dropping.songs.length }) }}</p>
   </div>
 
   <template :slot.foot>
     <Key :if="finished() || dropping.songs.length === 0" variant="primary" @click="closeDrop()">{{ t("drop.close") }}</Key>
     <span :else class="foot">
+      <span :if="dropping.busy" class="progress" role="status">{{ t("drop.adding", { done: dropping.done, total: dropping.songs.length }) }}</span>
       <Key :if="lacking()" :disabled="dropping.busy || dropping.reading" @click="confirmDrop()">{{ t("drop.addAnyway") }}</Key>
       <Key variant="primary" :disabled="dropping.busy || dropping.reading || lacking() > 0" @click="confirmDrop()">{{ tn("drop.add", dropping.songs.length) }}</Key>
     </span>
@@ -89,6 +88,7 @@
 <style scoped>
   .drop, .body { display: grid; gap: var(--mm-space-4); min-width: 0; }
   .foot { display: contents; }
+  .progress { margin-right: auto; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
   .patterns, .read { display: grid; gap: var(--mm-space-2); }
   .keys { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-3); }
   .songs { display: grid; margin: 0; padding: 0; border: var(--mm-border-width) solid var(--mm-border); border-radius: var(--mm-radius-key); list-style: none; }
