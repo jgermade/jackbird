@@ -28,7 +28,7 @@
     display: grid;
     padding: var(--mm-space-4);
     /* Translucent: the library shows through (the owner, 2026-11-19). */
-    background: color-mix(in srgb, var(--mm-bg) 35%, transparent);
+    background: color-mix(in srgb, var(--mm-bg) 88%, transparent);
     pointer-events: none;
   }
   .frame {
@@ -39,21 +39,12 @@
     padding: var(--mm-space-6);
     border: 2px dashed var(--mm-accent);
     border-radius: var(--mm-radius-lg);
-    background: color-mix(in srgb, var(--mm-accent) 8%, transparent);
+    background: color-mix(in srgb, var(--mm-accent) 6%, transparent);
     text-align: center;
   }
   .refused .frame { border-color: var(--mm-border); background: color-mix(in srgb, var(--mm-surface) 30%, transparent); }
-  /* What it says, on a plate of its own: legible over whatever shows through. */
-  .plate {
-    display: grid;
-    justify-items: center;
-    gap: var(--mm-space-2);
-    padding: var(--mm-space-4) var(--mm-space-5);
-    border-radius: var(--mm-radius-md);
-    background: color-mix(in srgb, var(--mm-surface) 85%, transparent);
-    box-shadow: var(--mm-shadow-md);
-    backdrop-filter: blur(6px);
-  }
+  /* No box behind the words: a halo of the background keeps them legible over what shows through. */
+  .plate { display: grid; justify-items: center; gap: var(--mm-space-2); text-shadow: 0 0 .5rem var(--mm-bg), 0 0 .25rem var(--mm-bg); }
   .icon { width: 2.5rem; height: 2.5rem; color: var(--mm-accent); }
   .refused .icon { color: var(--mm-fg-muted); }
   .title { margin: 0; font-size: var(--mm-text-lg); font-weight: var(--mm-weight-medium); color: var(--mm-fg); }
