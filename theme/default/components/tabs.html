@@ -97,10 +97,14 @@
       const index = items.findIndex((item: Item) => item.id === model)
       const tab = index < 0 ? undefined : ($$self(".list > .tab")[index] as HTMLElement | undefined)
       if (!strip || !tab || strip.offsetParent === null) return
+      // Within the strip's padding, as the first tab sits before any scroll.
       const box = strip.getBoundingClientRect()
+      const style = getComputedStyle(strip)
+      const left = box.left + (parseFloat(style.paddingLeft) || 0)
+      const right = box.right - (parseFloat(style.paddingRight) || 0)
       const place = tab.getBoundingClientRect()
-      if (place.left < box.left) strip.scrollLeft += place.left - box.left
-      else if (place.right > box.right) strip.scrollLeft += Math.min(place.right - box.right, place.left - box.left)
+      if (place.left < left) strip.scrollLeft += place.left - left
+      else if (place.right > right) strip.scrollLeft += Math.min(place.right - right, place.left - left)
     })
   }
   $: reveal(model, items.length)
@@ -188,7 +192,9 @@
     display: flex;
     gap: var(--mm-space-2);
     min-width: 0;
-    padding: var(--mm-space-2) var(--mm-space-3) 0;
+    /* No side padding of its own: the strip that scrolls has it inside, so what scrolls is cut at
+       the bar's edges, not short of them. */
+    padding: var(--mm-space-2) 0 0;
     box-shadow: inset 0 var(--mm-border-width) 0 var(--mm-border);
     background: linear-gradient(var(--mm-chassis), var(--mm-chassis-hi));
   }
@@ -200,6 +206,7 @@
     align-items: flex-end;
     gap: var(--mm-space-2);
     min-width: 0;
+    padding: 0 var(--mm-space-3);
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
@@ -218,11 +225,14 @@
     align-items: center;
     gap: var(--mm-space-2);
     margin-left: auto;
-    padding: 0 0 var(--mm-space-1);
+    padding: 0 var(--mm-space-3) var(--mm-space-1) 0;
   }
+  /* With nothing in it now (a key shown only at times), it takes no room: the strip reaches the edge. */
+  .aside:not(:has(*)) { display: none; }
   @media (max-width: 720px) {
     .compact .list { display: none; }
-    .compact .picker { display: flex; flex: 0 1 18rem; align-items: flex-end; min-width: 0; order: -1; }
+    .compact .picker { display: flex; flex: 0 1 18rem; align-items: flex-end; min-width: 0; order: -1; padding-left: var(--mm-space-3); }
+    .compact .strip { padding-left: 0; }
   }
 
   /* The compact picker: the open tab, a customizable select inside it. */
@@ -329,7 +339,7 @@
     align-self: stretch;
     align-items: center;
     gap: var(--mm-space-2);
-    padding: 0 var(--mm-space-2) var(--mm-space-1);
+    padding: 0 0 var(--mm-space-1) var(--mm-space-2);
   }
   .tab {
     position: relative;
@@ -394,6 +404,7 @@
   @media (max-width: 720px) {
     .tabs.bar { padding: 0; box-shadow: none; background: none; }
     .bar .strip, .bar .list { flex: 1 1 auto; gap: 0; }
+    .bar .strip { padding: 0; }
     .bar .tab, .bar .tab.on { flex: 1 1 0; min-width: 0; border-width: 0; border-radius: 0; background: none; box-shadow: none; }
     .bar .tab::before, .bar .tab.on::before { display: none; }
     .bar .main, .bar .on .main { flex-direction: column; justify-content: center; gap: .1875rem; width: 100%; min-width: 0; height: 3.5rem; padding: 0 .125rem; font-size: var(--mm-text-xs); }
