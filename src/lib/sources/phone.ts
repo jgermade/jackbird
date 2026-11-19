@@ -9,7 +9,7 @@
 // and after).
 
 import type { VFSAdapter, VFSListEntry, VFSStat, WalkedFile } from "@cloudauthn/vfs-sync";
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type { Inspection, MediaHandle, RootSource } from "../../types";
 import { TagError } from "../tags";
 
@@ -109,17 +109,21 @@ export async function restorePhoneFolder(tree: string): Promise<RootSource | nul
  * (it lasts while the app runs). Its address, its name and its files' paths in it; null when the
  * person cancels.
  */
-export async function pickPhoneUpload(): Promise<{ tree: string; name: string; files: string[] } | null> {
+export async function pickPhoneUpload(): Promise<{ tree: string; name: string; files: { path: string; size?: number }[] } | null> {
   const picked = await call<{ tree?: string | null; name?: string }>("pick_folder", { initial: null, keep: false });
   if (!picked.tree) return null;
   const { files } = await call<{ files: WalkedFile[] }>("folder_walk", { tree: picked.tree });
-  return { tree: picked.tree, name: picked.name ?? "", files: files.map((file) => file.path) };
+  return { tree: picked.tree, name: picked.name ?? "", files: files.map((file) => ({ path: file.path, size: file.stat?.size || undefined })) };
 }
 
 /**
  * Sends one of its files to `url` (the service's upload), with the session's `authorization`, read
  * as it goes: the service's answer, whatever it is. It throws only when the service could not be
- * reached or the file not sent.
+ * reached or the file not sent. `sent` hears the bytes sent so far, as they go (a Channel the
+ * plugin tells them on).
  */
-export const uploadPhoneFile = (tree: string, path: string, url: string, authorization: string | null): Promise<{ status: number; body: string }> =>
-  call<{ status: number; body: string }>("folder_upload", { tree, path, url, authorization });
+export function uploadPhoneFile(tree: string, path: string, url: string, authorization: string | null, sent?: (bytes: number) => void): Promise<{ status: number; body: string }> {
+  const progress = new Channel<{ sent: number }>();
+  if (sent) progress.onmessage = (message) => sent(message.sent);
+  return call<{ status: number; body: string }>("folder_upload", { tree, path, url, authorization, progress });
+}

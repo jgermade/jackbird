@@ -46,8 +46,8 @@ export const importing = $reactive({
   /** Whether the songs go over the server's home network now, not by its usual address. */
   home: false,
   /** The bytes of the songs uploaded so far, of the one going (as it goes), and of them all; 0 in
-   *  all when the sizes are not known (the Android app's folder, the machine's): then the bar
-   *  goes by songs. */
+   *  all when the sizes are not known (a folder of the server's machine, or a provider of the
+   *  Android app's folder that tells none): then the bar goes by songs. */
   bytesDone: 0,
   bytesSent: 0,
   bytesTotal: 0
@@ -210,15 +210,16 @@ export async function uploadPhoneFolder(): Promise<void> {
   if (!picked) return;
   const { tree, name } = picked;
   const songs = picked.files
-    .filter((path) => isAudioFile(path))
-    .sort()
-    .map((path): Song => ({
+    .filter((file) => isAudioFile(file.path))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .map(({ path, size }): Song => ({
       name: path.slice(path.lastIndexOf("/") + 1),
-      async send(at) {
+      size,
+      async send(at, sent) {
         const target = uploadTarget(uploadPath(`${name}/${path}`), at ?? undefined);
         let reply: { status: number; body: string };
         try {
-          reply = await uploadPhoneFile(tree, path, target.url, target.authorization);
+          reply = await uploadPhoneFile(tree, path, target.url, target.authorization, sent);
         } catch (error) {
           throw new Unreached(error instanceof Error ? error.message : String(error));
         }
