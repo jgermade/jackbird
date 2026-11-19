@@ -17,10 +17,12 @@ impl mail::Mailer for Outbox {
         &'a self,
         _: &'a Smtp,
         to: &'a str,
-        subject: &'a str,
-        text: &'a str,
+        email: &'a mail::Email,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + 'a>> {
-        self.0.lock().unwrap().push((to.into(), subject.into(), text.into()));
+        self.0
+            .lock()
+            .unwrap()
+            .push((to.into(), email.subject.clone(), email.text.clone()));
         Box::pin(async { Ok(()) })
     }
 }
