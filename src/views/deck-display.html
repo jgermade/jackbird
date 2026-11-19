@@ -19,7 +19,7 @@
   const Meter = await import("../../theme/default/components/meter.html")
   const Spectrum = await import("../../theme/default/components/spectrum.html")
   const { clockParts, formatTime } = await import("../helpers/format")
-  const { nowPlaying, readSpectrum, stream, toggleShuffle, turnRepeat } = await import("../lib/player")
+  const { nowPlaying, readSpectrum, seekTo, stream, toggleShuffle, turnRepeat } = await import("../lib/player")
   const { soundingDac, soundingDevice, soundingParts, soundingText } = await import("../lib/output")
   const { playback } = await import("../lib/playback")
   const { library } = await import("../lib/library")
@@ -241,7 +241,9 @@
           </div>
         </div>
         <Meter :if="readingNow" variant="display" :segments="40" :pitch=".625" :level="readingNow.loaded" :max="readingNow.total" :label="t('faceplate.reading')" :level-text="t('faceplate.readingCount', { loaded: readingNow.loaded, total: readingNow.total })" />
-        <Meter :else variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText" />
+        <!-- The song's place: tapped or dragged, it moves the song there; the arrows by 5 s. -->
+        <Meter :else variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText"
+               :seekable="!!current && playback.duration > 0" :step="5" @seek="seekTo($event.detail)" />
       </div>
     </div>
   </Display>

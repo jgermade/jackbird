@@ -992,6 +992,15 @@ export function dropFromQueue(gone: (item: QueueItem) => boolean): void {
 }
 
 /** Pauses or resumes the loaded track. */
+/** Moves the loaded track to `seconds` (the display's meter: a tap or a drag, its arrows), whatever plays it. */
+export function seekTo(seconds: number): void {
+  const duration = playback.duration;
+  if (!audio || !loadedKey || !(duration > 0)) return;
+  const at = Math.min(duration, Math.max(0, seconds));
+  audio.currentTime = at;
+  playback.position = at;
+}
+
 export function togglePlay(): void {
   if (mirror.following) {
     sendCommand("toggle");
