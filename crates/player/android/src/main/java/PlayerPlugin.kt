@@ -477,6 +477,34 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
+  /**
+   * The picture the clipboard holds (an image copied in another app: Android hands it over as a
+   * `content://` address the app may read while it has the focus), for the picture crop's Paste key:
+   * `{ type, data }` (base64), or nulls when it holds none. The webview itself has no clipboard to read.
+   */
+  @Command
+  fun clipboardImage(invoke: Invoke) {
+    work(invoke) {
+      val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+      val clip = clipboard.primaryClip
+      var found: Pair<String, ByteArray>? = null
+      if (clip != null) {
+        val described = (0 until clip.description.mimeTypeCount).map { clip.description.getMimeType(it) }.firstOrNull { it.startsWith("image/") }
+        for (index in 0 until clip.itemCount) {
+          val uri = clip.getItemAt(index).uri ?: continue
+          val type = activity.contentResolver.getType(uri)?.takeIf { it.startsWith("image/") } ?: described ?: continue
+          val bytes = activity.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: continue
+          found = type to bytes
+          break
+        }
+      }
+      invoke.resolve(JSObject().apply {
+        put("type", found?.first)
+        put("data", found?.second?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
+      })
+    }
+  }
+
   /** A file's `content://` address, which the player plays. */
   @Command
   fun folderAddress(invoke: Invoke) {

@@ -25,6 +25,7 @@ Every command of the phone's player, and its events.
 - `allow-folder-mkdir`
 - `allow-folder-address`
 - `allow-folder-upload`
+- `allow-clipboard-image`
 - `allow-safe-area`
 - `allow-spectrum`
 - `allow-register-listener`
@@ -38,6 +39,32 @@ Every command of the phone's player, and its events.
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`jackbird-player:allow-clipboard-image`
+
+</td>
+<td>
+
+Enables the clipboard_image command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-clipboard-image`
+
+</td>
+<td>
+
+Denies the clipboard_image command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

@@ -172,6 +172,8 @@ export const es: Record<MessageKey, string> = {
   "duplicates.close": "Cerrar",
   "duplicates.delete.one": "Eliminar {count} marcada…",
   "duplicates.delete.other": "Eliminar {count} marcadas…",
+  "picture.paste": "Pegar",
+  "picture.noPaste": "El portapapeles no tiene ninguna imagen (o no se ha podido leer).",
   "picture.remove": "Quitar",
   "picture.save": "Guardar",
   "artist.pictureFailed": "No se ha podido leer esa imagen.",

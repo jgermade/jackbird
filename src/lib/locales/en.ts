@@ -171,6 +171,8 @@ export const en = {
   "duplicates.close": "Close",
   "duplicates.delete.one": "Delete {count} marked…",
   "duplicates.delete.other": "Delete {count} marked…",
+  "picture.paste": "Paste",
+  "picture.noPaste": "The clipboard holds no picture (or it could not be read).",
   "picture.remove": "Remove",
   "picture.save": "Save",
   "artist.pictureFailed": "That picture could not be read.",
