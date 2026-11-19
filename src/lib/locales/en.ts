@@ -561,6 +561,7 @@ export const en = {
   "drop.add.other": "Add {count} songs",
   "drop.addAnyway": "Add them as they are",
   "drop.adding": "Adding {done} of {total}…",
+  "drop.progress": "What has been added, by size",
   "drop.added.one": "{count} song added.",
   "drop.added.other": "{count} songs added.",
   "drop.existing.one": "{count} already there.",

@@ -43,6 +43,9 @@ export const dropping = $reactive({
   done: 0,
   /** The name of the file being added, while the songs are added. */
   current: "",
+  /** The bytes of the songs added so far (each as it is done), and of them all: the progress bar. */
+  bytesDone: 0,
+  bytesTotal: 0,
   report: null as DropReport | null,
   error: ""
 });
@@ -236,6 +239,8 @@ export async function confirmDrop(): Promise<void> {
   const report: DropReport = { added: 0, existing: 0, failed: [], leftOut: dropping.leftOut };
   dropping.busy = true;
   dropping.done = 0;
+  dropping.bytesDone = 0;
+  dropping.bytesTotal = songs.reduce((sum, song) => sum + song.file.size, 0);
   dropping.error = "";
   const failed = (song: DroppedSong, error: unknown) => report.failed.push([song.from, error instanceof Error ? error.message : String(error)]);
   try {
@@ -251,6 +256,7 @@ export async function confirmDrop(): Promise<void> {
           failed(song, error);
         }
         dropping.done += 1;
+        dropping.bytesDone += song.file.size;
       }
     } else if (target.kind === "folder") {
       const taken = new Set(root.tracks.map((track) => track.relativePath.toLowerCase()));
@@ -265,6 +271,7 @@ export async function confirmDrop(): Promise<void> {
           failed(song, error);
         }
         dropping.done += 1;
+        dropping.bytesDone += song.file.size;
       }
     } else {
       const ipod = root.source.ipod?.path;
@@ -285,6 +292,7 @@ export async function confirmDrop(): Promise<void> {
             failed(song, error);
           }
           dropping.done += 1;
+          dropping.bytesDone += song.file.size;
         }
         if (ipod && staged.length > 0) {
           const sent = await sendFiles(ipod, staged);
