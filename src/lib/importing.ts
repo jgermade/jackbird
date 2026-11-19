@@ -50,7 +50,9 @@ export const importing = $reactive({
    *  Android app's folder that tells none): then the bar goes by songs. */
   bytesDone: 0,
   bytesSent: 0,
-  bytesTotal: 0
+  bytesTotal: 0,
+  /** The name of the song being uploaded, while they are. */
+  current: ""
 });
 
 /** How much of it is done, 0 to 100: by the bytes when they are known, else by the songs. */
@@ -145,6 +147,7 @@ async function uploadSongs(songs: Song[]): Promise<void> {
     for (const song of songs) {
       let answer: Uploaded;
       const sent = (bytes: number) => (importing.bytesSent = Math.min(bytes, song.size ?? bytes));
+      importing.current = song.name;
       try {
         answer = await song.send(at, sent);
       } catch (error) {
@@ -170,6 +173,7 @@ async function uploadSongs(songs: Song[]): Promise<void> {
   } finally {
     importing.busy = false;
     importing.home = false;
+    importing.current = "";
   }
 }
 
