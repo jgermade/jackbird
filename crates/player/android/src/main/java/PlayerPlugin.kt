@@ -135,6 +135,8 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   private val worker = Executors.newSingleThreadExecutor()
   /** Uploads, one at a time, on their own thread: a long one does not hold up the folders' work. */
   private val uploader = Executors.newSingleThreadExecutor()
+  /** The spectrum's bins, off the main thread (see `spectrum`). */
+  private val analyser = Executors.newSingleThreadExecutor()
   private var player: Player? = null
 
   private val listener = object : Player.Listener {
@@ -275,18 +277,29 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     ViewCompat.requestApplyInsets(webView)
   }
 
-  /** The spectrum of what plays (Spectrum.kt): bins as Web Audio's analyser gives them, and the rate. */
+  /**
+   * The spectrum of what plays (Spectrum.kt): bins as Web Audio's analyser gives them, and the rate.
+   * Worked out on a thread of its own: a command runs on the main thread, which also draws the
+   * page, and an 8192-sample FFT and its 4096 bins there, many times a second, held the drawing
+   * back (and the answers with it); nor does it wait behind the folders' work (`worker`).
+   */
   @Command
   fun spectrum(invoke: Invoke) {
-    val bins = Spectrum.bins()
-    if (bins == null) {
-      invoke.resolve(JSObject().apply { put("bins", null as String?) })
-      return
+    analyser.execute {
+      try {
+        val bins = Spectrum.bins()
+        if (bins == null) {
+          invoke.resolve(JSObject().apply { put("bins", null as String?) })
+        } else {
+          invoke.resolve(JSObject().apply {
+            put("bins", JSArray().apply { bins.forEach { put(it) } })
+            put("rate", Spectrum.rate)
+          })
+        }
+      } catch (error: Exception) {
+        invoke.reject(error.message ?: error.toString())
+      }
     }
-    invoke.resolve(JSObject().apply {
-      put("bins", JSArray().apply { bins.forEach { put(it) } })
-      put("rate", Spectrum.rate)
-    })
   }
 
   /** What covers the page's edges now (`insets` events follow each change). */
