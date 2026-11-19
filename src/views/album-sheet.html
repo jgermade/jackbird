@@ -11,6 +11,8 @@
   const Stripes = await import("../../theme/default/components/stripes.html")
   const IpodSheet = await import("./ipod-sheet.html")
   const { showsIpodSheet } = await import("../lib/ipod-info")
+  const ServerDetails = await import("./server-details.html")
+  const { showsServerSheet } = await import("../lib/server-details")
 
   const { t, tn } = await import("../lib/i18n")
   const { coverSrc } = await import("../lib/covers")
@@ -154,6 +156,8 @@
 
   <!-- An iPod's sheet, from its foot in the library (W5). -->
   <IpodSheet :elseif="showsIpodSheet(root())" />
+  <!-- A server's details, from the foot of Folders (connected to it by its address). -->
+  <ServerDetails :elseif="showsServerSheet(root())" sheet />
 
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">

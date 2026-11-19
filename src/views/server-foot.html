@@ -1,7 +1,7 @@
 <script :setup lang="ts">
   // The foot of a server's library, in Folders alone (the owner, 2026-11-19): the server's name and
   // what one's music takes there, against one's quota when there is one (a bar then). The whole
-  // foot is a key to its details: Preferences, Server. A view over lib/usage.ts. See
+  // foot is a key to its details (lib/server-details.ts). A view over lib/usage.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, B); views/ipod-foot.html is its model.
 
   const UsageBar = await import("../../theme/default/components/usage-bar.html")
@@ -10,7 +10,7 @@
   const { t, tn } = await import("../lib/i18n")
   const { preferences } = await import("../lib/preferences")
   const { serverName } = await import("../lib/adding")
-  const { ui } = await import("../lib/ui")
+  const { openServerDetails, showsServerSheet } = await import("../lib/server-details")
   const { loadUsage, usage } = await import("../lib/usage")
   const { activeRoot } = await import("../lib/workspace")
 
@@ -28,13 +28,11 @@
   const spaceText = (): string =>
     usage.quota ? t("usage.ofQuota", { used: size(usage.bytes), quota: size(usage.quota) }) : t("usage.used", { used: size(usage.bytes) })
   const parts = () => [{ label: t("usage.music"), amount: usage.bytes, caption: size(usage.bytes), tone: usage.bytes > (usage.quota ?? 0) * 0.9 ? "accent" : "info" }]
-  const details = () => {
-    ui.preferencesSection = "server"
-    ui.preferencesOpen = true
-  }
+  // Its details: Preferences, Server on the server's own page; Details otherwise.
+  const details = () => openServerDetails()
 </script>
 
-<div :if="shown() && usage.loaded" class="server-foot">
+<div :if="shown() && usage.loaded" class="server-foot" :class.is-open="showsServerSheet(root())">
   <button type="button" class="open" :aria-label="t('usage.open', { name: serverName() })" :title="t('usage.open', { name: serverName() })" @click="details()">
     <span class="line">
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.25h10v5.5H3zM8 7.75v3.5M2.5 13.25h11M5.5 5h.01" /></svg>
@@ -72,6 +70,7 @@
   @media (hover: hover) {
     .open:hover { background: var(--mm-sunken); }
   }
+  .is-open .open { background: var(--mm-sunken); }
   .line { display: flex; align-items: baseline; gap: var(--mm-space-2); min-width: 0; }
   .icon { flex: none; align-self: center; width: .875rem; height: .875rem; color: var(--mm-fg-muted); }
   .name { overflow: hidden; font-weight: var(--mm-weight-medium); font-size: var(--mm-text-sm); text-overflow: ellipsis; white-space: nowrap; }

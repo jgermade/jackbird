@@ -276,7 +276,6 @@ async function report(page) {
     if (deleted !== 204) fail(`the delete answered ${deleted}`);
     await owner.getByRole("button", { name: "Open preferences" }).first().click();
     await owner.getByRole("tab", { name: "Server", exact: true }).click();
-    await owner.getByRole("button", { name: "People and sign-in…" }).click();
     await owner.getByRole("tab", { name: "Trash" }).click();
     await owner.getByText("ape.mp3", { exact: true }).waitFor({ timeout: 15000 });
     await owner.getByRole("button", { name: "Restore" }).first().click();

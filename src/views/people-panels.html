@@ -1,5 +1,6 @@
 <script :setup lang="ts">
-  // People and sign-in (S3), for owners and admins, in three tabs: the
+  // People and sign-in (S3), for owners and admins: the tab of the server's details
+  // (views/server-details.html, which chooses it: people.tab) among
   // people (with sign-in off, profiles; with it on, invited by email), their
   // roles as the person may give them; sign-in: email (SMTP) and, for owners,
   // the instance's address, the home network, and turning sign-in on (by a
@@ -9,10 +10,8 @@
 
   const Field = await import("../../theme/default/components/field.html")
   const Key = await import("../../theme/default/components/key.html")
-  const Modal = await import("../../theme/default/components/modal.html")
   const Select = await import("../../theme/default/components/select.html")
   const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
-  const Tabs = await import("../../theme/default/components/tabs.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
 
   const { t } = await import("../lib/i18n")
@@ -20,7 +19,7 @@
   const { account } = await import("../lib/account")
   const { assignable, canManage } = await import("../helpers/roles")
   const {
-    addPerson, cancelSetup, confirmSetupCode, emptyTrash, exportLibrary, loadBackups, loadLog, loadTrash, people, removePerson,
+    addPerson, cancelSetup, confirmSetupCode, emptyTrash, exportLibrary, people, removePerson,
     restoreSong, saveSettings, saveSmtp, sendSetupCode, signinOff, startScrub, takeSnapshot, testSmtp, updatePerson
   } = await import("../lib/people")
 
@@ -29,19 +28,6 @@
   const role = (name: string): string => t(`role.${name}` as "role.owner")
   const action = (name: string): string => t(`log.action.${name}` as "log.action.save")
   const when = (seconds: number): string => new Date(seconds * 1000).toLocaleString(preferences.language)
-  const tabs = () => [
-    { id: "people", label: t("people.tabPeople") },
-    { id: "signin", label: t("people.tabSignin") },
-    { id: "log", label: t("people.tabLog") },
-    ...(importing.available ? [{ id: "trash", label: t("people.tabTrash") }] : []),
-    ...(importing.available && owner() ? [{ id: "backups", label: t("people.tabBackups") }] : [])
-  ]
-  const choose = (tab: "people" | "signin" | "log" | "trash" | "backups") => {
-    people.tab = tab
-    if (tab === "log") void loadLog()
-    if (tab === "trash") void loadTrash()
-    if (tab === "backups") void loadBackups()
-  }
   // The library's safety (F4).
   const { importing } = await import("../lib/importing")
   const { chooseMachineFolder } = await import("../lib/folders")
@@ -168,11 +154,7 @@
   const onNetwork = (): boolean => people.settings?.network ?? false
 </script>
 
-<div class="people-dialog">
-  <Modal :open="people.open" :eyebrow="t('people.eyebrow')" :title="t('people.title')" size="md" :close-label="t('people.close')" @close="people.open = false">
-    <template :slot.nav>
-      <Tabs plain :label="t('people.tabs')" :items="tabs()" :model="people.tab" @change="choose($event.detail)" />
-    </template>
+<div class="people-panels">
 
     <p :if="people.error" class="failure">{{ people.error }}</p>
     <p :if="people.notice" class="notice">{{ people.notice }}</p>
@@ -326,11 +308,10 @@
         </li>
       </ul>
     </section>
-  </Modal>
 </div>
 
 <style scoped>
-  .people-dialog { display: contents; }
+  .people-panels { display: grid; gap: var(--mm-space-3); min-width: 0; }
   .tab, .form, .owner, .turn, .test, .row { display: grid; gap: var(--mm-space-3); }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--mm-space-3); }
   .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }

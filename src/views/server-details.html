@@ -1,0 +1,178 @@
+<script :setup="{ sheet = false }: Props" lang="ts">
+  // The server's details, for anyone signed in to it: its name; then tabs: the summary (the space
+  // one's music takes, against one's quota; for owners the disk, the machine's load and
+  // temperatures, and the version, updating it), and for admins and owners its people and sign-in
+  // (views/people-panels.html). Preferences, Server on the server's own page; in Details, from the
+  // foot of Folders, elsewhere (`sheet`: with a way back to the songs). A view over
+  // lib/server-details.ts, lib/usage.ts, lib/machine.ts, lib/server-update.ts and lib/people.ts.
+  // See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, plan G).
+
+  type Props = { sheet?: boolean | "" }
+
+  const Key = await import("../../theme/default/components/key.html")
+  const Tabs = await import("../../theme/default/components/tabs.html")
+  const UsageBar = await import("../../theme/default/components/usage-bar.html")
+  const PeoplePanels = await import("./people-panels.html")
+
+  const { t, tn } = await import("../lib/i18n")
+  const { preferences } = await import("../lib/preferences")
+  const { can } = await import("../lib/account")
+  const { serverName } = await import("../lib/adding")
+  const { importing } = await import("../lib/importing")
+  const { loadServerUpdate, serverUpdate, updateServer } = await import("../lib/server-update")
+  const { loadUsage, usage } = await import("../lib/usage")
+  const { machine, watchMachine } = await import("../lib/machine")
+  const { hidePeople, loadBackups, loadLog, loadTrash, people, showPeople } = await import("../lib/people")
+  const { leaveServerSheet, serverView } = await import("../lib/server-details")
+  const { clampPercent, formatCelsius, formatPercent, machineTone, shownSensors } = await import("../helpers/machine")
+  const { formatDriveSize } = await import("../helpers/ipod")
+
+  const asSheet = (): boolean => sheet === "" || sheet === true
+
+  // Asked as it shows; the machine every few seconds until it goes.
+  void loadUsage()
+  if (can("owner")) void loadServerUpdate()
+  watchMachine(can("owner"))
+  if (can("admin")) void showPeople(can("owner"))
+  $destroyed(() => {
+    watchMachine(false)
+    hidePeople()
+  })
+
+  type Tab = "summary" | "people" | "signin" | "log" | "trash" | "backups"
+  const tabs = () => [
+    { id: "summary", label: t("server.tabSummary") },
+    ...(can("admin")
+      ? [
+          { id: "people", label: t("people.tabPeople") },
+          { id: "signin", label: t("people.tabSignin") },
+          { id: "log", label: t("people.tabLog") },
+          ...(importing.available ? [{ id: "trash", label: t("people.tabTrash") }] : []),
+          ...(importing.available && can("owner") ? [{ id: "backups", label: t("people.tabBackups") }] : [])
+        ]
+      : [])
+  ]
+  const choose = (tab: Tab) => {
+    serverView.tab = tab
+    if (tab === "summary") return
+    people.tab = tab
+    if (tab === "log") void loadLog()
+    if (tab === "trash") void loadTrash()
+    if (tab === "backups") void loadBackups()
+  }
+
+  // Space.
+  const driveSize = (bytes: number): string => formatDriveSize(bytes, preferences.language)
+  const usageLine = (): string =>
+    usage.quota ? t("usage.ofQuota", { used: driveSize(usage.bytes), quota: driveSize(usage.quota) }) : t("usage.used", { used: driveSize(usage.bytes) })
+  const usageParts = () => [{ label: t("usage.music"), amount: usage.bytes, caption: driveSize(usage.bytes), tone: "info" }]
+  const diskParts = () => (usage.disk ? [{ label: t("usage.diskUsed"), amount: usage.disk.total - usage.disk.free, caption: driveSize(usage.disk.total - usage.disk.free), tone: "muted" }] : [])
+
+  // The machine.
+  const percent = (value: number): string => formatPercent(value, preferences.language)
+  const celsius = (value: number): string => formatCelsius(value, preferences.language)
+  const cpuLine = (): string => {
+    const cpu = machine.reading?.cpu
+    return cpu ? [percent(cpu.percent), tn("machine.cores", cpu.cores), cpu.name].filter(Boolean).join(" · ") : ""
+  }
+  const cpuParts = () => [{ label: t("machine.cpu"), amount: clampPercent(machine.reading?.cpu.percent ?? 0), caption: percent(machine.reading?.cpu.percent ?? 0), tone: machineTone(machine.reading?.cpu.percent) }]
+  const gpuLine = (gpu: { percent?: number; celsius?: number }): string =>
+    [gpu.percent === undefined ? "" : percent(gpu.percent), gpu.celsius === undefined ? "" : celsius(gpu.celsius)].filter(Boolean).join(" · ")
+  const gpuParts = (gpu: { name: string; percent?: number; celsius?: number }) => [{ label: gpu.name, amount: clampPercent(gpu.percent ?? 0), caption: percent(gpu.percent ?? 0), tone: machineTone(gpu.percent, gpu.celsius) }]
+  const sensors = () => shownSensors(machine.reading?.temperatures ?? [])
+  const gpus = () => machine.reading?.gpus ?? []
+
+  // The version.
+  const versionLine = (): string =>
+    !serverUpdate.loaded ? t("server.checking")
+    : serverUpdate.done ? t("server.updated", { version: serverUpdate.done })
+    : serverUpdate.newer ? t("server.newer", { version: serverUpdate.version, latest: serverUpdate.latest })
+    : serverUpdate.latest ? t("server.latest", { version: serverUpdate.version })
+    : t("server.version", { version: serverUpdate.version })
+  // Where it cannot update itself, what to do instead.
+  const updateHint = (): string =>
+    !serverUpdate.newer || serverUpdate.can === "yes" || !serverUpdate.can ? "" : t(`server.cannot.${serverUpdate.can}` as "server.cannot.container")
+</script>
+
+<article class="server" :class.is-sheet="asSheet()">
+  <header :if="asSheet()" class="top">
+    <Key size="sm" variant="ghost" @click="leaveServerSheet()">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+      {{ t("server.back") }}
+    </Key>
+  </header>
+  <div class="head">
+    <h3 class="mm-legend is-ink">{{ t("preferences.section.server") }}</h3>
+    <p class="state">{{ t("server.at", { name: serverName() }) }}</p>
+  </div>
+  <Tabs :if="tabs().length > 1" plain :label="t('server.tabs')" :items="tabs()" :model="serverView.tab" @change="choose($event.detail)" />
+
+  <div :if="serverView.tab === 'summary'" class="summary">
+    <!-- The space one's music takes, against one's quota; the disk's, for owners. -->
+    <div :if="usage.loaded" class="sub">
+      <h4 class="mm-legend">{{ t("usage.title") }}</h4>
+      <p class="hint">{{ usageLine() }} · {{ tn("tracks.count", usage.songs) }}</p>
+      <UsageBar :if="usage.quota" :parts="usageParts()" :max="usage.quota" :label="t('usage.meter')" />
+      <p :if="!usage.quota" class="hint">{{ t("usage.noQuota") }}</p>
+      <div :if="usage.disk" class="gauge">
+        <p class="hint">{{ t("usage.disk", { free: driveSize(usage.disk.free), total: driveSize(usage.disk.total) }) }}</p>
+        <UsageBar :parts="diskParts()" :max="usage.disk.total" :label="t('usage.diskMeter')" />
+      </div>
+    </div>
+    <!-- The machine: its CPU's load, its GPUs', its temperatures (owners). -->
+    <div :if="can('owner') && machine.reading" class="sub">
+      <h4 class="mm-legend">{{ t("machine.title") }}</h4>
+      <div class="gauge">
+        <p class="hint"><span class="what">{{ t("machine.cpu") }}</span> {{ cpuLine() }}</p>
+        <UsageBar :parts="cpuParts()" :max="100" :label="t('machine.cpuMeter')" />
+      </div>
+      <div :each="gpu in gpus()" :key="gpu.name" class="gauge">
+        <p class="hint"><span class="what">{{ gpu.name }}</span> {{ gpuLine(gpu) }}</p>
+        <UsageBar :if="gpu.percent !== undefined" :parts="gpuParts(gpu)" :max="100" :label="t('machine.gpuMeter', { name: gpu.name })" />
+      </div>
+      <dl :if="sensors().length" class="sensors" :aria-label="t('machine.temperatures')">
+        <div :each="sensor in sensors()" :key="sensor.label" class="sensor">
+          <dt>{{ sensor.label }}</dt>
+          <dd :class.hot="machineTone(0, sensor.celsius) === 'accent'">{{ celsius(sensor.celsius) }}</dd>
+        </div>
+      </dl>
+      <p :if="!sensors().length" class="hint">{{ t("machine.noTemperatures") }}</p>
+    </div>
+    <!-- Its version, and updating it (owners). -->
+    <div :if="can('owner')" class="sub">
+      <h4 class="mm-legend">{{ t("server.versionTitle") }}</h4>
+      <p class="hint">{{ versionLine() }}</p>
+      <p :if="updateHint()" class="hint">{{ updateHint() }}</p>
+      <div :if="serverUpdate.newer && serverUpdate.can === 'yes'" class="keys">
+        <Key size="sm" variant="primary" :disabled="serverUpdate.busy" @click="updateServer()">{{ serverUpdate.busy ? t("server.updating") : t("server.update", { version: serverUpdate.latest }) }}</Key>
+      </div>
+      <p :if="serverUpdate.error" class="failure">{{ serverUpdate.error }}</p>
+    </div>
+  </div>
+
+  <PeoplePanels :else />
+</article>
+
+<style scoped>
+  .server { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-4); min-width: 0; }
+  /* In Details: the sheet's own room, as an iPod's. */
+  .server.is-sheet { padding: var(--mm-space-5); }
+  .top { display: flex; }
+  .icon { width: .875rem; height: .875rem; }
+  .head { display: grid; gap: var(--mm-space-1); }
+  .head h3 { margin: 0; }
+  .state { margin: 0; color: var(--mm-fg); font-size: var(--mm-text-sm); }
+  .summary { display: grid; gap: var(--mm-space-5); }
+  .sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
+  .sub h4 { margin: 0; }
+  .gauge { display: grid; gap: var(--mm-space-2); }
+  .what { color: var(--mm-fg); }
+  .sensors { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: var(--mm-space-1) var(--mm-space-4); margin: 0; }
+  .sensor { display: flex; justify-content: space-between; gap: var(--mm-space-2); min-width: 0; font-size: var(--mm-text-sm); }
+  .sensor dt { overflow: hidden; color: var(--mm-fg-muted); text-overflow: ellipsis; white-space: nowrap; }
+  .sensor dd { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sensor dd.hot { color: var(--mm-accent); }
+  .keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); }
+  .hint { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+</style>

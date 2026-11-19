@@ -124,9 +124,8 @@ async function openPreferences(page, section = "Account") {
     await page.getByText("Before").first().waitFor({ timeout: 30000 });
     console.log("owner: the folder is open");
 
-    // People and sign-in are under Preferences, Server.
+    // People and sign-in: tabs of Preferences, Server.
     await openPreferences(page, "Server");
-    await page.getByRole("button", { name: "People and sign-in…" }).click();
     await page.getByRole("tab", { name: "Sign-in" }).click();
     await page.locator("#smtp-host").fill("127.0.0.1");
     await page.locator("#smtp-security").selectOption("none");
@@ -212,9 +211,8 @@ async function openPreferences(page, section = "Account") {
     if (offered !== 0 || refused[0] !== 403 || refused[1] !== 403) fail("the listener could edit");
 
     // ── The owner's log.
-    // People and sign-in are under Preferences, Server.
+    // People and sign-in: tabs of Preferences, Server.
     await openPreferences(page, "Server");
-    await page.getByRole("button", { name: "People and sign-in…" }).click();
     await page.getByRole("tab", { name: "Changes" }).click();
     await page.getByText(/Luis edited the tags of/).first().waitFor({ timeout: 15000 });
     console.log("owner: the log shows Luis's save");
