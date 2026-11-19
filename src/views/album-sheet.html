@@ -305,7 +305,8 @@
   /* Its one column declared, as wide as the sheet and no wider: left implicit, WebKit (the macOS app)
      kept it as wide as before after the separator narrowed the pane, and the albums were cut on
      their right (2026-11-16). */
-  .albums { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-5); padding: var(--mm-space-5); container-type: inline-size; }
+  /* More room under the last album than around them: the list's end, not one more gap. */
+  .albums { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-5); padding: var(--mm-space-5) var(--mm-space-5) calc(var(--mm-space-8) + var(--mm-space-6)); container-type: inline-size; }
 
   /* The cover beside the head and the discs; in a narrow sheet the discs go under both. */
   .album {
