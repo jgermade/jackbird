@@ -46,6 +46,8 @@ export const dropping = $reactive({
   /** The bytes of the songs added so far (each as it is done), and of them all: the progress bar. */
   bytesDone: 0,
   bytesTotal: 0,
+  /** The bytes of the song being uploaded that have gone so far (to a server; 0 elsewhere). */
+  bytesSent: 0,
   report: null as DropReport | null,
   error: ""
 });
@@ -240,6 +242,7 @@ export async function confirmDrop(): Promise<void> {
   dropping.busy = true;
   dropping.done = 0;
   dropping.bytesDone = 0;
+  dropping.bytesSent = 0;
   dropping.bytesTotal = songs.reduce((sum, song) => sum + song.file.size, 0);
   dropping.error = "";
   const failed = (song: DroppedSong, error: unknown) => report.failed.push([song.from, error instanceof Error ? error.message : String(error)]);
@@ -248,7 +251,8 @@ export async function confirmDrop(): Promise<void> {
       for (const song of songs) {
         dropping.current = song.file.name;
         try {
-          const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]));
+          const sent = (bytes: number) => (dropping.bytesSent = Math.min(bytes, song.file.size));
+          const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]), undefined, sent);
           if (answer.result === "added" || answer.result === "suggested") report.added += 1;
           else if (answer.result === "existing") report.existing += 1;
           else report.failed.push([song.from, answer.why ?? ""]);
@@ -257,6 +261,7 @@ export async function confirmDrop(): Promise<void> {
         }
         dropping.done += 1;
         dropping.bytesDone += song.file.size;
+        dropping.bytesSent = 0;
       }
     } else if (target.kind === "folder") {
       const taken = new Set(root.tracks.map((track) => track.relativePath.toLowerCase()));

@@ -28,8 +28,9 @@
   }
   const title = (): string => (dropping.reading ? t("drop.reading") : tn("drop.title", dropping.songs.length))
   const finished = (): boolean => dropping.report !== null
-  // How much of the songs' bytes is in: a large file counts for more than a small one.
-  const share = (): number => (dropping.bytesTotal > 0 ? Math.round((dropping.bytesDone / dropping.bytesTotal) * 100) : 0)
+  // How much of the songs' bytes is in, the one being uploaded's as it goes: a large file counts
+  // for more than a small one.
+  const share = (): number => (dropping.bytesTotal > 0 ? Math.min(100, Math.round(((dropping.bytesDone + dropping.bytesSent) / dropping.bytesTotal) * 100)) : 0)
 </script>
 
 <Modal :open="dropping.open" :eyebrow="t('drop.eyebrow', { name: dropping.target?.label ?? '' })" :title="title()" size="lg" :close-label="t('drop.close')" @close="closeDrop()">

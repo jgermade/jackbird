@@ -386,11 +386,25 @@ export type Uploaded = { result: "added" | "existing" | "suggested" | "unreadabl
 
 /**
  * One file uploaded to the library as `path`; what became of it. At `at`, another address of the
- * same server (its home network's), with the same session; a failure to reach it is a TypeError.
+ * same server (its home network's), with the same session; a failure to reach it is a TypeError,
+ * as `fetch`'s. `progress` hears the bytes sent so far as they go. Sent by XMLHttpRequest, not
+ * `fetch`: only it tells how much of a request's body has gone, in every engine the app runs in
+ * and over HTTP/1.1 (a streamed `fetch` body needs Chromium and HTTP/2; see
+ * RECORD/2026-11-03.deck-design-system.WIP.md, 2026-11-19).
  */
-export async function uploadToLibrary(path: string, file: Blob, at?: string): Promise<Uploaded> {
-  const response = await current.api(`library/upload?${inShelf(path)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file }, at);
-  return (await response.json()) as Uploaded;
+export function uploadToLibrary(path: string, file: Blob, at?: string, progress?: (sent: number) => void): Promise<Uploaded> {
+  const target = uploadTarget(path, at);
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", target.url);
+    request.setRequestHeader("content-type", "application/octet-stream");
+    if (target.authorization) request.setRequestHeader("authorization", target.authorization);
+    if (progress) request.upload.onprogress = (event) => progress(event.loaded);
+    request.onload = () => resolve(uploadAnswer(request.status, request.responseText));
+    request.onerror = () => reject(new TypeError("Failed to fetch"));
+    request.onabort = () => reject(new TypeError("The upload was stopped"));
+    request.send(file);
+  });
 }
 
 /** Where an upload as `path` goes (at `at`, or the server's own address), and the session's header: the phone's plugin sends it. */
