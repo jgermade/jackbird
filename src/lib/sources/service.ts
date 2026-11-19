@@ -9,7 +9,7 @@
 // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (S1-D5, S3).
 
 import type { VFSAdapter, VFSListEntry, VFSStat } from "@cloudauthn/vfs-sync";
-import type { Inspection, MediaHandle, RootSource, TrackMetadata } from "../../types";
+import type { Inspection, ListedTrack, MediaHandle, RootSource, TrackMetadata } from "../../types";
 import { isLoopbackAddress, savedOnServer } from "../../helpers/instance";
 import { TagError } from "../tags";
 
@@ -306,6 +306,12 @@ export async function librarySource(client: ServiceClient = current, shared?: Sh
     server: client,
     shelf,
     walk: () => json(`library/walk${shelf === undefined ? "" : `?shelf=${shelf}`}`),
+    // Every song in one answer (the server's tags, covers by reference): no inspect each.
+    tracks: () => json<ListedTrack[]>(`library/tracks${shelf === undefined ? "" : `?shelf=${shelf}`}`),
+    async cover(path, name) {
+      const answer = await client.api(`library/cover?${inLibrary(path)}&name=${encodeURIComponent(name)}`).catch(() => null);
+      return answer ? new Uint8Array(await answer.arrayBuffer()) : null;
+    },
     inspect: (path, known) => json<Inspection>("library/inspect", post({ path, known: known ?? null, shelf })),
     // In someone else's music one saves one's own version (SH-D4).
     save: (path: string, previous: TrackMetadata, metadata: TrackMetadata, scope?: "family" | "mine", expected?: string) =>

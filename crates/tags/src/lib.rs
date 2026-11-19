@@ -168,6 +168,33 @@ pub struct Cover {
     pub mime: String,
 }
 
+impl Cover {
+    /// Its name, as `coverName` (`src/helpers/cover.ts`) makes it: two 32-bit FNV-1a hashes of its
+    /// bytes (one from the standard offset, one from another), its length, in hex, and its type's
+    /// extension. The interface keeps each picture once by this name (`src/lib/covers.ts`).
+    pub fn name(&self) -> String {
+        let (mut one, mut two) = (0x811c_9dc5_u32, 0x0100_0193_u32 ^ 0x5bd1_e995);
+        for byte in &self.data {
+            one = (one ^ u32::from(*byte)).wrapping_mul(0x0100_0193);
+            two = (two ^ u32::from(*byte)).wrapping_mul(0x0100_0193);
+        }
+        let mime = if self.mime.is_empty() {
+            "image/jpeg".to_string()
+        } else {
+            self.mime.to_lowercase()
+        };
+        let extension = match mime.as_str() {
+            "image/jpeg" | "image/jpg" => "jpg",
+            "image/png" => "png",
+            "image/gif" => "gif",
+            "image/webp" => "webp",
+            "image/bmp" => "bmp",
+            _ => "img",
+        };
+        format!("{one:08x}{two:08x}-{:x}.{extension}", self.data.len())
+    }
+}
+
 /// What a file's tags say.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tags {

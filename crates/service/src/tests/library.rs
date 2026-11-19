@@ -815,3 +815,124 @@ fn df_is_read_from_its_capacity() {
     assert_eq!(crate::library_api::parse_df(spaced), Some((100 * 1024, 60 * 1024)));
     assert_eq!(crate::library_api::parse_df("Filesystem\n"), None);
 }
+
+/// The owner imports `folder` as "Music", and waits for it.
+async fn import_music(app: &Router, owner: &str, folder: &std::path::Path) {
+    let (status, started) = call(Method::POST, "/api/library/import")
+        .header("cookie", owner)
+        .json(json!({ "path": folder.display().to_string(), "name": "Music" }))
+        .value(app)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{started}");
+    for _ in 0..100 {
+        let state = call(Method::GET, "/api/library/import")
+            .header("cookie", owner)
+            .value(app)
+            .await
+            .1;
+        if state["running"] == false {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("the import did not end");
+}
+
+#[tokio::test]
+async fn the_whole_library_comes_in_one_answer_with_its_covers_by_reference() {
+    let library = jackbird_store::Library::open(&scratch()).unwrap();
+    let (_, app, _, [owner, _, _, listener]) = family_with(Some(library)).await;
+    import_music(&app, &owner, &two_songs()).await;
+
+    let (status, headers, body) = call(Method::GET, "/api/library/tracks")
+        .header("cookie", &owner)
+        .on(&app)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let songs: Value = serde_json::from_slice(&body).unwrap();
+    let songs = songs.as_array().unwrap();
+    let mut paths: Vec<&str> = songs.iter().map(|song| song["path"].as_str().unwrap()).collect();
+    paths.sort_unstable();
+    assert_eq!(paths, ["Music/flac-full.flac", "Music/mp3-v24-padded.mp3"]);
+    // Each as inspect gives it, its cover by reference instead of the picture.
+    let mut pictures = 0;
+    for song in songs {
+        let path = song["path"].as_str().unwrap();
+        let (_, found) = call(Method::POST, "/api/library/inspect")
+            .header("cookie", &owner)
+            .json(json!({ "path": path }))
+            .value(&app)
+            .await;
+        for key in ["size", "lastModified", "fullChecksum", "audioChecksum", "audio"] {
+            assert_eq!(song[key], found[key], "{path}: {key}");
+        }
+        assert_eq!(song["metadata"]["title"], found["metadata"]["title"], "{path}");
+        let shown = found["metadata"]["coverDataUrl"].as_str();
+        let named = song["metadata"]["coverDataUrl"].as_str();
+        assert_eq!(shown.is_some(), named.is_some(), "{path}");
+        if let Some(named) = named {
+            assert!(named.starts_with("jackbird-cover:"), "{named}");
+            // The picture, from its own address.
+            let (status, headers, picture) = call(Method::GET, format!("/api/library/cover?path={}", enc(path)))
+                .header("cookie", &owner)
+                .on(&app)
+                .await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert!(headers[header::CONTENT_TYPE].to_str().unwrap().starts_with("image/"));
+            assert!(headers[header::CACHE_CONTROL].to_str().unwrap().contains("immutable"));
+            assert!(!picture.is_empty());
+            pictures += 1;
+        }
+    }
+    assert!(pictures > 0, "no song with a picture");
+    // Asked again with what it said: nothing changed.
+    let tag = headers[header::ETAG].to_str().unwrap().to_owned();
+    let (status, _, body) = call(Method::GET, "/api/library/tracks")
+        .header("cookie", &owner)
+        .header("if-none-match", &tag)
+        .on(&app)
+        .await;
+    assert_eq!((status, body.len()), (StatusCode::NOT_MODIFIED, 0));
+    // A retitle changes it.
+    let (status, saved) = call(Method::POST, "/api/library/save")
+        .header("cookie", &owner)
+        .json(json!({
+            "path": "Music/flac-full.flac",
+            "previous": songs.iter().find(|song| song["path"] == "Music/flac-full.flac").unwrap()["metadata"],
+            "metadata": { "title": "Retitled", "artist": "", "album": "", "year": "", "genre": "", "trackNumber": "", "coverDataUrl": null },
+            "scope": "family"
+        }))
+        .value(&app)
+        .await;
+    assert_eq!(status, StatusCode::OK, "{saved}");
+    let (status, headers, _) = call(Method::GET, "/api/library/tracks")
+        .header("cookie", &owner)
+        .header("if-none-match", &tag)
+        .on(&app)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_ne!(headers[header::ETAG].to_str().unwrap(), tag);
+    // Gzipped for who takes it.
+    let (status, headers, _) = call(Method::GET, "/api/library/tracks")
+        .header("cookie", &owner)
+        .header("accept-encoding", "gzip")
+        .on(&app)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        headers
+            .get(header::CONTENT_ENCODING)
+            .map(|value| value.to_str().unwrap()),
+        Some("gzip")
+    );
+    // Someone's music not shared with one: refused, as the walk is.
+    let shelf = own_shelf(&app, &owner).await;
+    let (status, body) = call(Method::GET, format!("/api/library/tracks?shelf={shelf}"))
+        .header("cookie", &listener)
+        .value(&app)
+        .await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::NOT_FOUND, Some("not-shared"))
+    );
+}

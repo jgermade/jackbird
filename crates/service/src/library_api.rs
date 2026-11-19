@@ -17,10 +17,12 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
-use jackbird_api::{EntryJson, InspectionJson, Metadata, StatJson, edit_for};
+use jackbird_api::{AudioJson, EntryJson, InspectionJson, Metadata, StatJson, cover_ref, edit_for, metadata_of};
 use jackbird_core::Entry;
 use jackbird_core::Error;
-use jackbird_store::{Imported, Library, OWN, Outgoing, Report, Saved, Scope, Viewer, is_own, on_shelf, shelf_path};
+use jackbird_store::{
+    Imported, Library, Listed, OWN, Outgoing, Report, Saved, Scope, Viewer, is_own, on_shelf, shelf_path,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::io::AsyncReadExt;
@@ -238,6 +240,120 @@ async fn inspect(
     let path = Shelf::of(&library, &person, body.shelf)?.inner(&body.path);
     let found = blocking(move || library.inspect_as(&path, body.known.as_deref(), viewer(&person))).await?;
     Ok(Json(found.into()))
+}
+
+/// A song as `/library/tracks` lists it (`TrackJson` in `src/types.ts`): what `inspect` gives of
+/// it, its path, the cover by reference.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TrackJson {
+    path: String,
+    size: u64,
+    last_modified: u64,
+    full_checksum: String,
+    audio_checksum: String,
+    metadata: Metadata,
+    audio: Option<AudioJson>,
+}
+
+impl TrackJson {
+    fn of(song: Listed, path: String) -> TrackJson {
+        TrackJson {
+            path,
+            size: song.stat.size,
+            last_modified: song.stat.mtime,
+            full_checksum: song.full_checksum,
+            audio_checksum: song.audio_checksum,
+            metadata: metadata_of(song.fields, song.cover.map(|name| cover_ref(&name))),
+            audio: song.audio.map(AudioJson::from),
+        }
+    }
+}
+
+/// Every song of a shelf as the person sees it, in one answer: the interface opens the library
+/// from it instead of inspecting each song. Gzipped (the route's layer), with an `ETag` of what it
+/// says, so a library opened again with nothing changed costs a `304`.
+async fn tracks(
+    State(service): Shared,
+    Extension(person): Extension<Person>,
+    Query(at): Query<At>,
+    request: Request,
+) -> Answer<Response> {
+    let library = library(&service)?;
+    let shelf = Shelf::of(&library, &person, at.shelf)?;
+    let seen = viewer(&person);
+    let songs = blocking(move || library.tracks_as(seen)).await?;
+    let listed: Vec<TrackJson> = songs
+        .into_iter()
+        .filter_map(|song| {
+            let path = shelf.outer(&song.path)?;
+            Some(TrackJson::of(song, path))
+        })
+        .collect();
+    let body = serde_json::to_vec(&listed)
+        .map_err(|error| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "io", error.to_string()))?;
+    let tag = etag(&body);
+    let private = HeaderValue::from_static("private, no-cache");
+    let known = request
+        .headers()
+        .get(header::IF_NONE_MATCH)
+        .and_then(|value| value.to_str().ok());
+    if known.is_some_and(|known| known.split(',').any(|one| one.trim() == tag)) {
+        let mut answer = StatusCode::NOT_MODIFIED.into_response();
+        answer.headers_mut().insert(header::CACHE_CONTROL, private);
+        if let Ok(value) = HeaderValue::from_str(&tag) {
+            answer.headers_mut().insert(header::ETAG, value);
+        }
+        return Ok(answer);
+    }
+    let mut answer = Response::new(Body::from(body));
+    let headers = answer.headers_mut();
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(header::CACHE_CONTROL, private);
+    if let Ok(value) = HeaderValue::from_str(&tag) {
+        headers.insert(header::ETAG, value);
+    }
+    Ok(answer)
+}
+
+/// An `ETag` for an answer's bytes: a hash of them, quoted.
+fn etag(body: &[u8]) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    body.hash(&mut hasher);
+    format!("\"{:016x}-{:x}\"", hasher.finish(), body.len())
+}
+
+/// The picture a song shows, as the person sees it: what `/library/tracks` names by reference.
+/// Its address carries the picture's name (`&name=`), so it is kept by the browser as long as it
+/// likes; a song with no picture is not found.
+async fn cover(State(service): Shared, Extension(person): Extension<Person>, Query(at): Query<At>) -> Answer<Response> {
+    let library = library(&service)?;
+    let path = Shelf::of(&library, &person, at.shelf)?.inner(&at.path);
+    let shown = at.path.clone();
+    let found = blocking(move || library.cover_as(&path, viewer(&person))).await?;
+    let Some(picture) = found else {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "not-found",
+            format!("{shown} has no cover"),
+        ));
+    };
+    let mime = if picture.mime.is_empty() {
+        "image/jpeg".to_owned()
+    } else {
+        picture.mime
+    };
+    let mut answer = Response::new(Body::from(picture.data));
+    let headers = answer.headers_mut();
+    if let Ok(value) = HeaderValue::from_str(&mime) {
+        headers.insert(header::CONTENT_TYPE, value);
+    }
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, max-age=31536000, immutable"),
+    );
+    Ok(answer)
 }
 
 async fn suggestions(
@@ -495,6 +611,11 @@ pub fn listeners() -> Router<Arc<Service>> {
         .route("/library/usage", get(usage))
         .route("/library/shares", get(shares).post(set_shares))
         .route("/library/walk", get(walk))
+        .route(
+            "/library/tracks",
+            get(tracks).layer(tower_http::compression::CompressionLayer::new()),
+        )
+        .route("/library/cover", get(cover))
         .route("/library/list", get(list))
         .route("/library/read", get(read))
         .route("/library/stat", get(stat))

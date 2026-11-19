@@ -22,6 +22,8 @@ const kept = new Map<string, Kept>();
 const folders = new Map<string, VFSAdapter[]>();
 /** The pictures being read from a folder, by name. */
 const reading = new Map<string, Promise<Kept | null>>();
+/** Where a picture is fetched from when no folder has it: a server's library (`RootSource.cover`), by name. */
+const fetchers = new Map<string, () => Promise<Uint8Array | null>>();
 /** The pictures each folder has in its `.meta/covers/`, as far as this session knows. */
 const written = new WeakMap<VFSAdapter, Set<string>>();
 
@@ -117,7 +119,12 @@ export function coverAt(name: string, vfs: VFSAdapter): void {
   if (!places.includes(vfs)) folders.set(name, [...places, vfs]);
 }
 
-/** Reads a picture from the first folder that has it; null when none does. */
+/** A picture a server's library names (`/library/tracks`): fetched with `load` when shown, if no folder has it. */
+export function coverFrom(name: string, load: () => Promise<Uint8Array | null>): void {
+  if (!kept.has(name) && !fetchers.has(name)) fetchers.set(name, load);
+}
+
+/** Reads a picture from the first folder that has it, else from where it is fetched; null when none has it. */
 function readCover(name: string): Promise<Kept | null> {
   const under = reading.get(name);
   if (under) return under;
@@ -128,6 +135,11 @@ function readCover(name: string): Promise<Kept | null> {
         keepCover(name, data);
         return kept.get(name) ?? null;
       }
+    }
+    const data = await fetchers.get(name)?.().catch(() => null);
+    if (data && data.length > 0) {
+      keepCover(name, data);
+      return kept.get(name) ?? null;
     }
     return null;
   })();

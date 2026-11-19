@@ -146,29 +146,9 @@ pub struct InspectionJson {
     pub audio: Option<AudioJson>,
 }
 
-/// A cover's name, as `coverName` (`src/helpers/cover.ts`) makes it: two 32-bit FNV-1a hashes of
-/// its bytes (one from the standard offset, one from another), its length, in hex, and its type's
-/// extension. The interface keeps each picture once by this name (`src/lib/covers.ts`).
+/// A cover's name, as the interface keeps it ([`Cover::name`]).
 pub fn cover_name(cover: &Cover) -> String {
-    let (mut one, mut two) = (0x811c_9dc5_u32, 0x0100_0193_u32 ^ 0x5bd1_e995);
-    for byte in &cover.data {
-        one = (one ^ u32::from(*byte)).wrapping_mul(0x0100_0193);
-        two = (two ^ u32::from(*byte)).wrapping_mul(0x0100_0193);
-    }
-    let mime = if cover.mime.is_empty() {
-        "image/jpeg".to_string()
-    } else {
-        cover.mime.to_lowercase()
-    };
-    let extension = match mime.as_str() {
-        "image/jpeg" | "image/jpg" => "jpg",
-        "image/png" => "png",
-        "image/gif" => "gif",
-        "image/webp" => "webp",
-        "image/bmp" => "bmp",
-        _ => "img",
-    };
-    format!("{one:08x}{two:08x}-{:x}.{extension}", cover.data.len())
+    cover.name()
 }
 
 /// A reference to a cover by its name, as the library holds it in place of the picture.
@@ -176,8 +156,9 @@ pub fn cover_ref(name: &str) -> String {
     format!("jackbird-cover:{name}")
 }
 
-/// The tags as the interface keeps them, the cover a data URL (`with_cover`) or none.
-fn metadata_of(fields: jackbird_tags::Fields, cover_data_url: Option<String>) -> Metadata {
+/// The tags as the interface keeps them, the cover a data URL (`with_cover`), a reference
+/// (`cover_ref`) or none.
+pub fn metadata_of(fields: jackbird_tags::Fields, cover_data_url: Option<String>) -> Metadata {
     Metadata {
         title: fields.title,
         artist: fields.artist,
