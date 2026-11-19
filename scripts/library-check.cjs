@@ -275,7 +275,7 @@ async function report(page) {
     const deleted = await editor.evaluate(async () => (await fetch("/api/library/delete?path=Uploads%2FLuis%2Fape.mp3", { method: "POST" })).status);
     if (deleted !== 204) fail(`the delete answered ${deleted}`);
     await owner.getByRole("button", { name: "Open preferences" }).first().click();
-    await owner.getByRole("tab", { name: "Account", exact: true }).click();
+    await owner.getByRole("tab", { name: "Server", exact: true }).click();
     await owner.getByRole("button", { name: "People and sign-in…" }).click();
     await owner.getByRole("tab", { name: "Trash" }).click();
     await owner.getByText("Uploads/Luis/ape.mp3").waitFor({ timeout: 15000 });
