@@ -13,7 +13,7 @@
   const { t } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { chooseMachineFolder } = await import("../lib/folders")
-  const { folderUploadHere, importMachineFolder, importing, uploadFiles, uploadPhoneFolder } = await import("../lib/importing")
+  const { folderUploadHere, importMachineFolder, importShare, importing, uploadFiles, uploadPhoneFolder } = await import("../lib/importing")
   // A folder: a folder input on a computer, Android's own picker in the Android app, none on a
   // phone's browser or the iOS app (the input would choose files there).
   const folderWay = folderUploadHere()
@@ -28,7 +28,6 @@
     const path = await chooseMachineFolder()
     if (path !== null) await importMachineFolder(path)
   }
-  const percent = (): number => (importing.total > 0 ? Math.round((importing.done / importing.total) * 100) : 0)
 </script>
 
 <div class="import-dialog">
@@ -50,8 +49,9 @@
         <Key :if="can('owner')" variant="ghost" :disabled="importing.busy" @click="fromMachine()">{{ t("import.machine") }}</Key>
       </div>
       <div :if="importing.busy" class="progress" role="status">
-        <progress :value="importing.done" :max="importing.total || 1"></progress>
-        <span>{{ t("import.progress", { done: importing.done, total: importing.total, percent: percent() }) }}</span>
+        <!-- By the songs' sizes, and within the one going, when they are known; else by the songs. -->
+        <progress :value="importShare()" max="100"></progress>
+        <span>{{ t("import.progress", { done: importing.done, total: importing.total, percent: importShare() }) }}</span>
         <span :if="importing.home">{{ t("import.home") }}</span>
       </div>
       <p :if="importing.error" class="failure">{{ importing.error }}</p>
