@@ -149,7 +149,7 @@ async function report(page) {
     // ── The owner imports Music from the machine.
     const owner = await person(browser, "owner@example.com");
     await addMusic(owner);
-    await owner.getByRole("button", { name: "Import a folder of this machine…" }).click();
+    await owner.getByRole("button", { name: "Import a folder of the server…" }).click();
     await owner.getByRole("button", { name: /^Music/ }).click();
     await owner.getByRole("button", { name: "Open this folder" }).click();
     const imported = await report(owner);
