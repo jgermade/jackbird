@@ -41,6 +41,8 @@ export const dropping = $reactive({
   readPattern: readStored(STORAGE_KEYS.dropReadPattern) || DEFAULT_READ_PATTERN,
   busy: false,
   done: 0,
+  /** The name of the file being added, while the songs are added. */
+  current: "",
   report: null as DropReport | null,
   error: ""
 });
@@ -239,6 +241,7 @@ export async function confirmDrop(): Promise<void> {
   try {
     if (target.kind === "server") {
       for (const song of songs) {
+        dropping.current = song.file.name;
         try {
           const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]));
           if (answer.result === "added" || answer.result === "suggested") report.added += 1;
@@ -252,6 +255,7 @@ export async function confirmDrop(): Promise<void> {
     } else if (target.kind === "folder") {
       const taken = new Set(root.tracks.map((track) => track.relativePath.toLowerCase()));
       for (const song of songs) {
+        dropping.current = song.file.name;
         try {
           const path = freePath(pathOf(song), taken);
           await root.source.vfs.write(path, await copyOf(song));
@@ -271,6 +275,7 @@ export async function confirmDrop(): Promise<void> {
         const staged: { root: string; path: string }[] = [];
         const taken = new Set<string>();
         for (const song of songs) {
+          dropping.current = song.file.name;
           try {
             const path = freePath(pathOf(song), taken);
             await staging.vfs.write(path, await copyOf(song));
@@ -296,5 +301,6 @@ export async function confirmDrop(): Promise<void> {
     dropping.error = error instanceof Error ? error.message : String(error);
   } finally {
     dropping.busy = false;
+    dropping.current = "";
   }
 }
