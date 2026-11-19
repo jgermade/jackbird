@@ -126,7 +126,7 @@ async function openPreferences(page, section = "Account") {
 
     // People and sign-in: tabs of Preferences, Server.
     await openPreferences(page, "Server");
-    await page.getByRole("tab", { name: "Sign-in" }).click();
+    await page.getByRole("radio", { name: "Sign-in" }).click();
     await page.locator("#smtp-host").fill("127.0.0.1");
     await page.locator("#smtp-security").selectOption("none");
     await page.locator("#smtp-port").fill(String(smtpPort));
@@ -136,7 +136,7 @@ async function openPreferences(page, section = "Account") {
     await page.screenshot({ path: path.join(home, "people-signin.png") });
     console.log("owner: email set up");
 
-    await page.getByRole("tab", { name: "People" }).click();
+    await page.getByRole("radio", { name: "People" }).click();
     for (const [name, email, role] of [["Luis", "editor@example.com", "editor"], ["Kids", "kids@example.com", "listener"]]) {
       await page.getByRole("button", { name: "Add someone" }).click();
       await page.locator("#person-name").fill(name);
@@ -148,7 +148,7 @@ async function openPreferences(page, section = "Account") {
     console.log("owner: an editor and a listener added, as profiles");
     await page.screenshot({ path: path.join(home, "people.png") });
 
-    await page.getByRole("tab", { name: "Sign-in" }).click();
+    await page.getByRole("radio", { name: "Sign-in" }).click();
     const before = mails().length;
     await page.locator("#setup-email").fill("owner@example.com");
     await page.getByRole("button", { name: "Send the code" }).click();
@@ -213,7 +213,7 @@ async function openPreferences(page, section = "Account") {
     // ── The owner's log.
     // People and sign-in: tabs of Preferences, Server.
     await openPreferences(page, "Server");
-    await page.getByRole("tab", { name: "Changes" }).click();
+    await page.getByRole("radio", { name: "Changes" }).click();
     await page.getByText(/Luis edited the tags of/).first().waitFor({ timeout: 15000 });
     console.log("owner: the log shows Luis's save");
 

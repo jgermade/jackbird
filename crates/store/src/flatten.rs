@@ -271,7 +271,7 @@ fn merge_into(from: &Path, to: &Path) -> std::io::Result<()> {
             fs::remove_file(&source)?;
         } else {
             let name = entry.file_name().to_string_lossy().into_owned();
-            let (stem, extension) = name.rsplit_once('.').map_or((name.as_str(), ""), |pair| pair);
+            let (stem, extension) = name.rsplit_once('.').unwrap_or((name.as_str(), ""));
             let free = (2..)
                 .map(|n| {
                     to.join(if extension.is_empty() {
