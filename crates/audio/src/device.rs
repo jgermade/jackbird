@@ -339,8 +339,7 @@ mod macos {
     //! Hog mode: the device for this process alone, given back when the stream closes.
 
     use coreaudio::audio_unit::macos_helpers::{
-        get_default_device_id, get_device_id_from_name, get_device_transport_type, get_hogging_pid,
-        toggle_hog_mode,
+        get_default_device_id, get_device_id_from_name, get_device_transport_type, get_hogging_pid, toggle_hog_mode,
     };
 
     /// No process holds the device.
@@ -377,7 +376,13 @@ mod macos {
     }
 
     /// The ways a DAC of one's own is reached: USB, Thunderbolt, FireWire, PCI (a card), AVB.
-    const DAC_TRANSPORTS: [u32; 5] = [four(b"usb "), four(b"thun"), four(b"1394"), four(b"pci "), four(b"eavb")];
+    const DAC_TRANSPORTS: [u32; 5] = [
+        four(b"usb "),
+        four(b"thun"),
+        four(b"1394"),
+        four(b"pci "),
+        four(b"eavb"),
+    ];
 
     /// Whether the device (by name; the default output when none) is a DAC of one's own.
     pub fn is_dac(name: Option<&str>) -> bool {
