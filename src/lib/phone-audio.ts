@@ -43,6 +43,8 @@ export class PhoneAudio extends EventTarget {
   #bins: Uint8Array<ArrayBuffer> | null = null;
   #rate = 44100;
   #asked = 0;
+  /** Whether a spectrum call is on its way. */
+  #asking = false;
   /** The calls, one after the other: a queue set before it is played, a seek before the play. */
   #calls: Promise<unknown> = Promise.resolve();
 
@@ -64,18 +66,24 @@ export class PhoneAudio extends EventTarget {
   /**
    * The spectrum of what plays (the player's Spectrum.kt) and its rate, as the desktop's native
    * player gives it (lib/native-audio.ts): the last answer, and the next asked for, at most every
-   * 25 ms, outside the queue of calls (it changes nothing).
+   * 25 ms, outside the queue of calls (it changes nothing). One at a time: on a phone an answer can
+   * take longer than 25 ms, and calls asked while one is on its way would queue up behind it, each
+   * answer older than the one before (the spectrum lagging further and further behind the sound).
    */
   spectrum(): { bins: Uint8Array<ArrayBuffer>; rate: number } | null {
     const now = Date.now();
-    if (!this.paused && now - this.#asked > 25) {
+    if (!this.paused && !this.#asking && now - this.#asked > 25) {
       this.#asked = now;
+      this.#asking = true;
       void invoke<{ bins: number[] | null; rate?: number }>(`plugin:${PLUGIN}|spectrum`)
         .then((answer) => {
           this.#bins = answer.bins ? new Uint8Array(answer.bins) : null;
           if (answer.rate) this.#rate = answer.rate;
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          this.#asking = false;
+        });
     }
     return this.#bins ? { bins: this.#bins, rate: this.#rate } : null;
   }

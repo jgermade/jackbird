@@ -41,6 +41,8 @@ export class NativeAudio extends EventTarget {
   #bins: Uint8Array<ArrayBuffer> | null = null;
   #rate = 0;
   #asked = 0;
+  /** Whether a spectrum call is on its way. */
+  #asking = false;
 
   constructor() {
     super();
@@ -114,11 +116,12 @@ export class NativeAudio extends EventTarget {
     );
   }
 
-  /** The spectrum of what the device took last, and its rate; asks for the next one. */
+  /** The spectrum of what the device took last, and its rate; asks for the next one, one call at a time (as lib/phone-audio.ts). */
   spectrum(): { bins: Uint8Array<ArrayBuffer>; rate: number } | null {
     const now = Date.now();
-    if (!this.paused && now - this.#asked > 25) {
+    if (!this.paused && !this.#asking && now - this.#asked > 25) {
       this.#asked = now;
+      this.#asking = true;
       void invoke<{ bins: number[]; rate: number } | null>("audio_spectrum")
         .then((answer) => {
           if (answer) {
@@ -126,7 +129,10 @@ export class NativeAudio extends EventTarget {
             this.#rate = answer.rate;
           }
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          this.#asking = false;
+        });
     }
     return this.#bins ? { bins: this.#bins, rate: this.#rate } : null;
   }
