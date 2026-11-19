@@ -550,6 +550,8 @@ export const es: Record<MessageKey, string> = {
   "drop.leftOut.other": "{count} archivos fuera: no son MP3 ni FLAC, o no se pueden leer.",
   "drop.pattern": "Dónde va cada una",
   "drop.patternHint": "Campos entre % (%artist%, %album%, %year%, %track%, %title%, %disc%, %genre%), carpetas con /. Si falta un campo, la parte que queda vacía se omite.",
+  "drop.compilationPattern": "Dónde va cada recopilación",
+  "drop.compilationPatternHint": "Para las canciones que sus etiquetas marcan como parte de una recopilación, como el patrón de arriba.",
   "drop.readPattern": "Leer del nombre soltado",
   "drop.readHint": "Cómo están formados los nombres soltados, para rellenar las etiquetas que le falten a una canción.",
   "drop.read": "Leer las etiquetas que faltan",

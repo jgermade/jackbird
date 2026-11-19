@@ -6,7 +6,8 @@
 // iPod (staged on the machine and sent as the send to iPod does; the desktop app).
 
 import { $reactive, $toRaw } from "jq79";
-import { DEFAULT_DROP_PATTERN, DEFAULT_READ_PATTERN, dropPath, freePath, missingTags, recoverTags, tagsChanged, tidyTags, type DropTag } from "../helpers/drop";
+import { isCompilation } from "../helpers/metadata";
+import { DEFAULT_COMPILATION_PATTERN, DEFAULT_DROP_PATTERN, DEFAULT_READ_PATTERN, dropPath, freePath, missingTags, patternFor, recoverTags, tagsChanged, tidyTags, type DropTag } from "../helpers/drop";
 import { isAudioFile } from "../helpers/formats";
 import type { RootWorkspace, TrackMetadata } from "../types";
 import { t } from "./i18n";
@@ -39,6 +40,8 @@ export const dropping = $reactive({
   leftOut: 0,
   pattern: readStored(STORAGE_KEYS.dropPattern) || DEFAULT_DROP_PATTERN,
   readPattern: readStored(STORAGE_KEYS.dropReadPattern) || DEFAULT_READ_PATTERN,
+  /** The pattern a compilation's path is made by (`_compilations/%album%/…`). */
+  compilationPattern: readStored(STORAGE_KEYS.dropCompilationPattern) || DEFAULT_COMPILATION_PATTERN,
   busy: false,
   done: 0,
   /** The name of the file being added, while the songs are added. */
@@ -189,14 +192,24 @@ export function setDropPattern(pattern: string): void {
   writeStored(STORAGE_KEYS.dropPattern, pattern);
 }
 
+/** The pattern the compilations' paths are made by, kept for the next time. */
+export function setCompilationPattern(pattern: string): void {
+  dropping.compilationPattern = pattern;
+  writeStored(STORAGE_KEYS.dropCompilationPattern, pattern);
+}
+
 export function setReadPattern(pattern: string): void {
   dropping.readPattern = pattern;
   writeStored(STORAGE_KEYS.dropReadPattern, pattern);
 }
 
 /** What a song lacks, and where it would land. */
-export const missingOf = (song: DroppedSong): DropTag[] => missingTags(dropping.pattern, song.tags);
-export const pathOf = (song: DroppedSong): string => dropPath(dropping.pattern, song.file.name, song.tags);
+/** The pattern a song goes by: the compilations' for one its tags mark so, else everyone's. */
+const patternOf = (song: DroppedSong): string => patternFor(song.tags, dropping.pattern, dropping.compilationPattern);
+export const missingOf = (song: DroppedSong): DropTag[] => missingTags(patternOf(song), song.tags);
+export const pathOf = (song: DroppedSong): string => dropPath(patternOf(song), song.file.name, song.tags);
+/** Whether any dropped song is a compilation: the dialog then shows their pattern too. */
+export const hasCompilations = (): boolean => dropping.songs.some((song) => isCompilation({ compilation: String(song.tags.compilation ?? "") }));
 
 /** A tag typed for a song. */
 export function setTag(index: number, tag: DropTag, value: string): void {

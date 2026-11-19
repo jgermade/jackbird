@@ -549,6 +549,8 @@ export const en = {
   "drop.leftOut.other": "{count} files left out: not MP3s or FLACs, or unreadable.",
   "drop.pattern": "Where each goes",
   "drop.patternHint": "Fields between % (%artist%, %album%, %year%, %track%, %title%, %disc%, %genre%), folders with /. A part a missing field leaves empty is left out.",
+  "drop.compilationPattern": "Where each compilation goes",
+  "drop.compilationPatternHint": "For songs their tags mark as part of a compilation, as the pattern above.",
   "drop.readPattern": "Read from the dropped name",
   "drop.readHint": "How the dropped names are laid out, to fill in the tags a song lacks.",
   "drop.read": "Read the missing tags",

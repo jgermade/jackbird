@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   renameDirection: "mp3-manager.renameDirection",
   dropPattern: "mp3-manager.dropPattern",
   dropReadPattern: "mp3-manager.dropReadPattern",
+  dropCompilationPattern: "mp3-manager.dropCompilationPattern",
   output: "mp3-manager.output",
   outputDevice: "mp3-manager.outputDevice",
   /** An Android phone's "Bit-perfect to a USB DAC" (E6b-D10). */

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { emptyMetadata } from "./metadata.ts";
-import { DEFAULT_DROP_PATTERN, dropPath, freePath, missingTags, patternTags, recoverTags, tagsChanged, tidyTags } from "./drop.ts";
+import { DEFAULT_COMPILATION_PATTERN, DEFAULT_DROP_PATTERN, dropPath, freePath, missingTags, patternFor, patternTags, recoverTags, tagsChanged, tidyTags } from "./drop.ts";
 
 const song = (tags: Partial<ReturnType<typeof emptyMetadata>>) => ({ ...emptyMetadata(), ...tags });
 
@@ -50,6 +50,22 @@ describe("dropPath", () => {
   it("makes each part safe, and falls back on the name with nothing left", () => {
     assert.equal(dropPath("%artist%/%title%", "a.mp3", song({ artist: "AC/DC", title: "What? Now" })), "AC_DC/What_ Now.mp3");
     assert.equal(dropPath("%title%", "orig.mp3", song({})), "orig.mp3");
+  });
+});
+
+describe("patternFor", () => {
+  it("takes the compilations' pattern for a song its tags mark as one", () => {
+    const tags = song({ artist: "Various", album: "Now 1", trackNumber: "7", title: "Hit", compilation: "1" });
+    const pattern = patternFor(tags, DEFAULT_DROP_PATTERN, DEFAULT_COMPILATION_PATTERN);
+    assert.equal(pattern, DEFAULT_COMPILATION_PATTERN);
+    // The folder's own name keeps its underscore.
+    assert.equal(dropPath(pattern, "x.mp3", tags), "_compilations/Now 1/07 Hit.mp3");
+  });
+
+  it("keeps everyone's pattern for any other song, or with no compilations' pattern", () => {
+    assert.equal(patternFor(song({ compilation: "0" }), DEFAULT_DROP_PATTERN, DEFAULT_COMPILATION_PATTERN), DEFAULT_DROP_PATTERN);
+    assert.equal(patternFor(song({}), DEFAULT_DROP_PATTERN, DEFAULT_COMPILATION_PATTERN), DEFAULT_DROP_PATTERN);
+    assert.equal(patternFor(song({ compilation: "1" }), DEFAULT_DROP_PATTERN, "  "), DEFAULT_DROP_PATTERN);
   });
 });
 

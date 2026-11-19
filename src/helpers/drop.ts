@@ -3,10 +3,19 @@
 // helpers/rename.ts), the tags it needs that it lacks, and its tags tidied before it lands.
 
 import type { TrackMetadata } from "../types.ts";
+import { isCompilation } from "./metadata.ts";
 import { fillPattern, readTags, safeName, type ReadTags } from "./rename.ts";
 
 /** The pattern a dropped song's path is made by, unless the person chose another. */
 export const DEFAULT_DROP_PATTERN = "%artist%/%year% - %album%/%track% %title%";
+
+/** The pattern a dropped compilation's path is made by (the owner's, 2026-11-19), unless the person chose another. */
+export const DEFAULT_COMPILATION_PATTERN = "_compilations/%album%/%track% %title%";
+
+/** The pattern a song goes by: a compilation's (its tags say so: `isCompilation`), or everyone's. */
+export function patternFor(metadata: TrackMetadata, pattern: string, compilationPattern: string): string {
+  return compilationPattern.trim() && isCompilation({ compilation: String(metadata.compilation ?? "") }) ? compilationPattern : pattern;
+}
 
 /** The pattern names are read from, for a song missing tags, unless the person chose another. */
 export const DEFAULT_READ_PATTERN = "%artist% - %album%/%track% %title%";
@@ -78,8 +87,9 @@ function tidyPart(part: string): string {
 }
 
 /**
- * Where a dropped song lands, by `pattern`: each part filled from its tags, tidied and made safe
- * for any file system, empty ones left out; its extension kept. With no name left, its own.
+ * Where a dropped song lands, by `pattern`: each part filled from its tags, tidied (a part with
+ * fields: what an empty one leaves; a part of plain text, `_compilations`, stays as written) and
+ * made safe for any file system, empty ones left out; its extension kept. With no name left, its own.
  */
 export function dropPath(pattern: string, name: string, metadata: TrackMetadata): string {
   const dot = name.lastIndexOf(".");
@@ -87,7 +97,7 @@ export function dropPath(pattern: string, name: string, metadata: TrackMetadata)
   const track = { id: "", name, relativePath: name, metadata };
   const parts = pattern
     .split("/")
-    .map((part) => safeName(tidyPart(fillPattern(part, track))))
+    .map((part) => safeName(/%\w+%/.test(part) ? tidyPart(fillPattern(part, track)) : part.trim()))
     .filter((part) => part.length > 0);
   const file = parts.pop();
   if (!file) return name;
