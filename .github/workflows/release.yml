@@ -155,6 +155,11 @@ jobs:
           name: phone-apk
           path: phone
 
+      # Each of the service's binaries' SHA-256, which a server updating itself from the app checks
+      # before it uses one (crates/service/src/update.rs).
+      - name: The service's checksums
+        run: (cd service && sha256sum jackbird-service-* > SHA256SUMS && cat SHA256SUMS)
+
       # The desktop bundles come in their bundler's folders (deb/, appimage/, dmg/, nsis/): every
       # file is attached, never a folder.
       - name: Create the release

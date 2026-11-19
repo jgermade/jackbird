@@ -33,6 +33,7 @@ mod passkeys;
 pub mod people;
 mod people_api;
 pub mod safety_api;
+pub mod update;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -722,7 +723,8 @@ pub fn router(service: Arc<Service>) -> Router {
         .route("/roots/close", post(close_root))
         .route("/folders", get(folders))
         .merge(people_api::owners())
-        .merge(library_api::owners());
+        .merge(library_api::owners())
+        .merge(update::owners());
     let api = Router::new()
         .route("/info", get(info))
         .merge(people_api::open())

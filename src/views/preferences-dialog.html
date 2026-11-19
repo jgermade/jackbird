@@ -32,6 +32,27 @@
   const { account, addKey, addPasskey, can, endSession, loadMine, passkeysHere, removeKey, removePasskey, renameMe, signOut } = await import("../lib/account")
   const { openPeople } = await import("../lib/people")
   const { serverName } = await import("../lib/adding")
+  const { loadServerUpdate, serverUpdate, updateServer } = await import("../lib/server-update")
+  // The server's version, asked as its section opens (owners: they may update it); once each time
+  // it is shown, not again as what the effect reads changes (an update's failure would be cleared).
+  const onSection = (() => {
+    let seen = ""
+    return (open: string, shown: boolean) => {
+      const now = shown ? open : ""
+      if (now === seen) return
+      seen = now
+      if (now === "server" && can("owner")) void loadServerUpdate()
+    }
+  })()
+  const versionLine = (): string =>
+    !serverUpdate.loaded ? t("server.checking")
+    : serverUpdate.done ? t("server.updated", { version: serverUpdate.done })
+    : serverUpdate.newer ? t("server.newer", { version: serverUpdate.version, latest: serverUpdate.latest })
+    : serverUpdate.latest ? t("server.latest", { version: serverUpdate.version })
+    : t("server.version", { version: serverUpdate.version })
+  // Where it cannot update itself, what to do instead.
+  const updateHint = (): string =>
+    !serverUpdate.newer || serverUpdate.can === "yes" || !serverUpdate.can ? "" : t(`server.cannot.${serverUpdate.can}` as "server.cannot.container")
   const { describeAgent } = await import("../helpers/agent")
   const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
   const { importing } = await import("../lib/importing")
@@ -121,6 +142,7 @@
     const open = ui.preferencesSection as Section
     return shown().includes(open) ? open : "general"
   }
+  $: onSection(section(), ui.preferencesOpen)
   const sections = () => shown().map((id) => ({ id, label: t(`preferences.section.${id}` as "preferences.section.general"), icon: ICONS[id] }))
   const densities = () => DENSITIES.map((density) => ({ value: density, label: t(`preferences.density.${density}` as "preferences.density.compact") }))
   const looks = () => SPECTRUM_LOOKS.map((look) => ({ value: look, label: t(`preferences.spectrumLook.${look}` as "preferences.spectrumLook.segments") }))
@@ -278,6 +300,16 @@
         </div>
         <div class="keys">
           <Key variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
+        </div>
+        <!-- Its version, and updating it (owners). -->
+        <div :if="can('owner')" class="sub">
+          <h4 class="mm-legend">{{ t("server.versionTitle") }}</h4>
+          <p class="hint">{{ versionLine() }}</p>
+          <p :if="updateHint()" class="hint">{{ updateHint() }}</p>
+          <div :if="serverUpdate.newer && serverUpdate.can === 'yes'" class="keys">
+            <Key size="sm" variant="primary" :disabled="serverUpdate.busy" @click="updateServer()">{{ serverUpdate.busy ? t("server.updating") : t("server.update", { version: serverUpdate.latest }) }}</Key>
+          </div>
+          <p :if="serverUpdate.error" class="failure">{{ serverUpdate.error }}</p>
         </div>
       </section>
     </div>

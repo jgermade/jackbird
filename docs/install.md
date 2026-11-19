@@ -116,7 +116,11 @@ The library lives in `~/.local/share/jackbird/library` on Linux and `~/Library/A
 Support/jackbird/library` on macOS (or `service.json`'s `library`). From outside home, as with
 Docker: a proxy with HTTPS in front (Caddy: `caddy reverse-proxy --from music.example.com --to
 localhost:4646`) and the instance's address set in **Sign-in**. **Updating**: the one-line
-setup's **update**, `jackbird-service update` with the new binary, or the desktop app's **Update**.
+setup's **update**, `jackbird-service update` with the new binary, the desktop app's **Update**,
+or, for an owner, from any of the apps or the page: **Preferences**, **Server**, **Update to …**
+(installed at logon; the service checks the release's `SHA256SUMS`, puts the new binary in place
+and is started again by its service manager; installed with the system, or in a container, it
+says what to run instead).
 
 ## The desktop app
 
