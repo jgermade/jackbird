@@ -214,6 +214,10 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
   /** A buffer the inner sink is taking as it is, for the same reason. */
   private var passing: ByteBuffer? = null
 
+  /** The buffer the spectrum was last fed from, and where it began: its time is its first sample's. */
+  private var fedFrom: ByteBuffer? = null
+  private var fedStart = 0
+
   override fun configure(inputFormat: Format, specifiedBufferSize: Int, outputChannels: IntArray?) {
     input = inputFormat
     channels = outputChannels
@@ -244,9 +248,17 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
       else -> passThrough(buffer, presentationTimeUs, encodedAccessUnitCount)
     }
     // The bytes the sink took this time go to the spectrum, read through a copy of the buffer's
-    // position: what is played is not touched.
+    // position: what is played is not touched. With the song's time just after them: the buffer's
+    // is its first sample's, and a buffer can be taken in several calls.
     try {
-      Spectrum.feed(buffer, from, buffer.position())
+      if (fedFrom !== buffer) {
+        fedFrom = buffer
+        fedStart = from
+      }
+      val frameBytes = Pcm.bytes(encoding) * channelCount
+      val rate = input?.sampleRate ?: 0
+      val endUs = if (frameBytes > 0 && rate > 0) presentationTimeUs + (buffer.position() - fedStart).toLong() / frameBytes * 1_000_000 / rate else presentationTimeUs
+      Spectrum.feed(buffer, from, buffer.position(), endUs)
     } catch (error: Exception) {
       // The spectrum is decoration: a buffer it cannot read leaves it as it was.
     }
@@ -310,7 +322,17 @@ class BitPerfectSink(private val context: Context, private val inner: AudioSink)
     converted = null
     convertedFrom = null
     passing = null
+    fedFrom = null
     applied = Float.NaN
+  }
+
+  // What is heard now, by the sink's own clock (which counts what Android's output still holds):
+  // the spectrum shows what is heard, not what was just handed over. The player asks it every few
+  // milliseconds while it plays.
+  override fun getCurrentPositionUs(sourceEnded: Boolean): Long {
+    val position = super.getCurrentPositionUs(sourceEnded)
+    if (position != AudioSink.CURRENT_POSITION_NOT_SET) Spectrum.heard(position)
+    return position
   }
 
   // A flush lets the AudioTrack go, and the next one is made with the mixer as it then is: the
