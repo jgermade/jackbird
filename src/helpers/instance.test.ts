@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isLoopbackAddress, normaliseAddress, parseSaved, savedOnServer } from "./instance.ts";
+import { isHomeAddress, isLoopbackAddress, normaliseAddress, parseSaved, savedOnServer } from "./instance.ts";
 
 describe("instance", () => {
   it("reads an address as typed", () => {
@@ -23,6 +23,28 @@ describe("instance", () => {
     assert.ok(isLoopbackAddress("http://[::1]:4646"));
     assert.ok(!isLoopbackAddress("https://music.example.org"));
     assert.ok(!isLoopbackAddress("not an address"));
+  });
+
+  it("tells a home network's address", () => {
+    for (const home of [
+      "http://192.168.1.20:4646",
+      "http://10.0.0.5:4646",
+      "http://172.16.0.2",
+      "http://172.31.255.1",
+      "http://169.254.3.4",
+      "http://localhost:4646",
+      "http://[fd12:3456::1]:4646",
+      "http://[fe80::1]:4646",
+      "http://nas:4646",
+      "http://music.local:4646",
+      "http://music.lan",
+      "http://music.home.arpa"
+    ]) {
+      assert.ok(isHomeAddress(home), home);
+    }
+    for (const away of ["https://music.example.org", "http://172.32.0.1", "http://8.8.8.8", "https://[2001:db8::1]", "not an address"]) {
+      assert.ok(!isHomeAddress(away), away);
+    }
   });
 
   it("keeps a server's roots with its address, and the home server's by their path alone", () => {

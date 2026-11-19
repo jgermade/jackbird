@@ -17,7 +17,7 @@ use crate::access::{
 };
 use crate::auth::{CODE_SECONDS, Checked, attempt_id, six_digits};
 use crate::config::Smtp;
-use crate::mail::{Kind, compose};
+use crate::mail::{self, Kind, compose};
 use crate::people::{Person, Refusal, Role, normalize_email};
 use crate::{Answer, ApiError, Service};
 
@@ -45,6 +45,7 @@ fn shown(service: &Service, person: &Person) -> Value {
         "confirmed": person.confirmed,
         "role": person.role,
         "enabled": enabled(service, person),
+        "quota": person.quota,
     })
 }
 
@@ -81,12 +82,12 @@ pub(crate) fn signed_in(
 }
 
 /// Sends an email through the instance's SMTP.
-async fn send(service: &Service, to: &str, (subject, text): (String, String)) -> Answer<()> {
+async fn send(service: &Service, to: &str, email: mail::Email) -> Answer<()> {
     let smtp = service
         .settings()
         .smtp
         .ok_or_else(|| ApiError::new(StatusCode::CONFLICT, "smtp", "email is not set up yet"))?;
-    service.mailer.send(&smtp, to, &subject, &text).await.map_err(|why| {
+    service.mailer.send(&smtp, to, &email).await.map_err(|why| {
         ApiError::new(
             StatusCode::BAD_GATEWAY,
             "smtp",
@@ -509,6 +510,14 @@ struct Change {
     email: Option<String>,
     role: Option<String>,
     lang: Option<String>,
+    /// A quota in bytes; `null` takes it away; left out, it stays.
+    #[serde(default, deserialize_with = "present")]
+    quota: Option<Value>,
+}
+
+/// A field that is there, even as `null` (which serde would read as not there).
+fn present<'de, D: serde::Deserializer<'de>>(field: D) -> Result<Option<Value>, D::Error> {
+    <Value as Deserialize>::deserialize(field).map(Some)
 }
 
 async fn change_person(
@@ -564,6 +573,19 @@ async fn change_person(
             return Err(not_allowed());
         }
         service.store.set_role(target.id, role).map_err(refused)?;
+    }
+    if let Some(quota) = &body.quota {
+        let bytes = match quota {
+            Value::Null => None,
+            other => Some(other.as_u64().filter(|bytes| *bytes > 0).ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "quota",
+                    "a quota is a number of bytes",
+                )
+            })?),
+        };
+        service.store.set_quota(target.id, bytes).map_err(refused)?;
     }
     let person = service
         .store
@@ -667,9 +689,9 @@ async fn test_smtp(State(service): Shared, Json(body): Json<TestEmail>) -> Answe
     send(
         &service,
         &normalize_email(&body.to),
-        (
-            "jackbird: a test email".to_owned(),
-            format!("Email from jackbird at {} works.", site(&service)),
+        mail::note(
+            "jackbird: a test email",
+            &format!("Email from jackbird at {} works.", site(&service)),
         ),
     )
     .await?;

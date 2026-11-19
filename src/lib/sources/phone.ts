@@ -103,3 +103,23 @@ export async function restorePhoneFolder(tree: string): Promise<RootSource | nul
   const found = await call<{ name: string }>("folder_check", { tree }).catch(() => null);
   return found ? phoneSource(tree, found.name) : null;
 }
+
+/**
+ * A folder of the phone to upload to the family library: Android's folder picker, the grant not kept
+ * (it lasts while the app runs). Its address, its name and its files' paths in it; null when the
+ * person cancels.
+ */
+export async function pickPhoneUpload(): Promise<{ tree: string; name: string; files: string[] } | null> {
+  const picked = await call<{ tree?: string | null; name?: string }>("pick_folder", { initial: null, keep: false });
+  if (!picked.tree) return null;
+  const { files } = await call<{ files: WalkedFile[] }>("folder_walk", { tree: picked.tree });
+  return { tree: picked.tree, name: picked.name ?? "", files: files.map((file) => file.path) };
+}
+
+/**
+ * Sends one of its files to `url` (the service's upload), with the session's `authorization`, read
+ * as it goes: the service's answer, whatever it is. It throws only when the service could not be
+ * reached or the file not sent.
+ */
+export const uploadPhoneFile = (tree: string, path: string, url: string, authorization: string | null): Promise<{ status: number; body: string }> =>
+  call<{ status: number; body: string }>("folder_upload", { tree, path, url, authorization });

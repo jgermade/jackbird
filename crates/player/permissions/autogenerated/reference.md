@@ -24,6 +24,8 @@ Every command of the phone's player, and its events.
 - `allow-folder-rename`
 - `allow-folder-mkdir`
 - `allow-folder-address`
+- `allow-folder-upload`
+- `allow-clipboard-image`
 - `allow-safe-area`
 - `allow-spectrum`
 - `allow-register-listener`
@@ -37,6 +39,32 @@ Every command of the phone's player, and its events.
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`jackbird-player:allow-clipboard-image`
+
+</td>
+<td>
+
+Enables the clipboard_image command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-clipboard-image`
+
+</td>
+<td>
+
+Denies the clipboard_image command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -242,6 +270,32 @@ Enables the folder_stat command without any pre-configured scope.
 <td>
 
 Denies the folder_stat command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:allow-folder-upload`
+
+</td>
+<td>
+
+Enables the folder_upload command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-folder-upload`
+
+</td>
+<td>
+
+Denies the folder_upload command without any pre-configured scope.
 
 </td>
 </tr>

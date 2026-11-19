@@ -26,6 +26,11 @@ sha2 = "=0.11.1"
 getrandom = "=0.4.3"
 base64 = "=0.23.1"
 lettre = { version = "=0.11.23", default-features = false, features = ["smtp-transport", "builder", "tokio1", "tokio1-rustls", "rustls-native-certs", "ring", "hostname"] }
+# Updating itself from a release (update.rs): HTTPS on the TLS that email already builds, with the
+# same features (ring, not aws-lc-rs), so no crate is added.
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio-rustls = { version = "=0.26.6", default-features = false, features = ["logging", "tls12"] }
+rustls-native-certs = "=0.8.5"
 webauthn-rs = { version = "=0.5.5", features = ["danger-allow-state-serialisation", "conditional-ui"] }
 openssl = { version = "=0.10.82", features = ["vendored"] }
 if-addrs = "=0.15.0"
@@ -33,6 +38,9 @@ jackbird-store = { path = "../store" }
 serde_urlencoded = "=0.7.1"
 tokio-util = { version = "=0.7.20", features = ["io"] }
 futures-util = { version = "=0.3.34", default-features = false }
+# The machine's load and temperatures (Preferences, Server; owners): CPU everywhere, sensors where the
+# system tells them (Linux hwmon, macOS SMC, Windows WMI). Its unsafe code is its own.
+sysinfo = { version = "=0.38.4", default-features = false, features = ["system", "component"] }
 
 # Running under Windows' Service Control Manager, installed with the system (S2).
 [target.'cfg(windows)'.dependencies]

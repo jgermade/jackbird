@@ -11,6 +11,8 @@
   const Stripes = await import("../../theme/default/components/stripes.html")
   const IpodSheet = await import("./ipod-sheet.html")
   const { showsIpodSheet } = await import("../lib/ipod-info")
+  const ServerDetails = await import("./server-details.html")
+  const { showsServerSheet } = await import("../lib/server-details")
 
   const { t, tn } = await import("../lib/i18n")
   const { coverSrc } = await import("../lib/covers")
@@ -24,7 +26,6 @@
   const { openPicture } = await import("../lib/picture")
   const { setArtistPicture } = await import("../lib/artists")
   const { activeRoot, detail, detailAlbums, detailCrumbs, enterLevel, leaveLevel, playFromDetail, selectTrack, selectTracks, setCurrentRow, showWhole, treeLevels } = await import("../lib/workspace")
-  const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
   const { chosenState } = await import("../helpers/selection")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
@@ -118,16 +119,17 @@
   }
   const view = (): string => root()?.view ?? "files"
   const VIEW_LABELS: Record<string, string> = { files: "views.files", playlists: "views.playlists", artists: "views.artists", albumsByArtist: "views.albumsByArtist", albums: "views.albums", compilations: "views.compilations", songs: "views.songs" }
-  // Without the songs in the tree (a preference), a phone has no key between the library and
-  // Details: the breadcrumb goes back. Its ‹ to the library as it was; a step to the library in
-  // that folder (the top: the root's first level).
+  // A phone has no key between the library and Details: the breadcrumb's ‹ goes back to the
+  // library as it was, with the songs in the tree or without them (a preference). A step (an
+  // artist in Albums by artist, say) shows that step here, in Details, and the library's levels
+  // follow it, so ‹ then goes back to that step (the top: the root's first level).
   const { watchMedia } = await import("../lib/media")
   // Followed as the window is resized (lib/media.ts).
   let phone: boolean = matchMedia("(max-width: 720px)").matches
   $destroyed(watchMedia("(max-width: 720px)", (matches) => {
     phone = matches
   }))
-  const backToLibrary = (): boolean => phone && !preferences.songsInTree
+  const backToLibrary = (): boolean => phone
   const toLibrary = () => {
     ui.pane = "library"
   }
@@ -137,7 +139,6 @@
     if (key !== null) enterLevel(key)
     else if (top) leaveLevel(top.key)
     else showWhole()
-    toLibrary()
   }
 </script>
 
@@ -155,6 +156,8 @@
 
   <!-- An iPod's sheet, from its foot in the library (W5). -->
   <IpodSheet :elseif="showsIpodSheet(root())" />
+  <!-- A server's details, from the foot of Folders (connected to it by its address). -->
+  <ServerDetails :elseif="showsServerSheet(root())" sheet />
 
   <div :else class="scoped">
     <div :if="scope().tracks.length > 0" class="albums">
@@ -313,7 +316,8 @@
       "cover head"
       "cover discs";
     gap: var(--mm-space-2) var(--mm-space-5);
-    padding: var(--mm-space-4);
+    /* Twice the room below (the owner, 2026-11-19). */
+    padding: var(--mm-space-4) var(--mm-space-4) calc(var(--mm-space-4) * 2);
     border: var(--mm-border-width) solid var(--mm-border);
     border-radius: var(--mm-radius-md);
     background: var(--mm-surface);
@@ -412,7 +416,7 @@
         "cover head"
         "discs discs";
       gap: var(--mm-space-3);
-      padding: var(--mm-space-3);
+      padding: var(--mm-space-3) var(--mm-space-3) calc(var(--mm-space-3) * 2);
     }
     .album-head { align-self: center; }
     .cover { position: static; width: 5.5rem; }

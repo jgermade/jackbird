@@ -395,5 +395,6 @@ fn an_upload_is_moved_in() {
     assert_eq!(clean("a//b/./c").unwrap(), "a/b/c");
 }
 
+mod flatten;
 mod own;
 mod safety;

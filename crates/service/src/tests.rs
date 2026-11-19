@@ -116,6 +116,25 @@ fn app() -> Router {
 }
 
 #[tokio::test]
+async fn it_names_its_instance_and_its_home_networks_addresses() {
+    let service = Service::new(config::Config::default(), None, crate::people::Store::memory());
+    let app = router(Arc::clone(&service));
+    let instance = call(Method::GET, "/api/info").value(&app).await.1["instance"].clone();
+    assert!(instance.as_str().is_some_and(|id| id.len() == 16));
+    assert_eq!(call(Method::GET, "/api/info").value(&app).await.1["instance"], instance);
+    // None while it does not listen on the home network; then each, as an app reaches it.
+    assert_eq!(
+        call(Method::GET, "/api/network").value(&app).await.1["addresses"],
+        json!([])
+    );
+    *service.home.write().unwrap() = vec!["192.168.1.20:4646".parse().unwrap(), "[fd00::2]:4646".parse().unwrap()];
+    assert_eq!(
+        call(Method::GET, "/api/network").value(&app).await.1["addresses"],
+        json!(["http://192.168.1.20:4646", "http://[fd00::2]:4646"])
+    );
+}
+
+#[tokio::test]
 async fn the_guards_keep_other_sites_and_other_names_out() {
     let app = app();
     assert_eq!(
@@ -453,6 +472,7 @@ async fn the_desktop_apps_page_is_answered_with_cors_for_itself_alone() {
 }
 
 mod library;
+mod machine;
 mod opensubsonic;
 mod passkeys;
 mod people;

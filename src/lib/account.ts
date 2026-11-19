@@ -25,7 +25,7 @@ import {
   type ServiceClient
 } from "./sources/service";
 
-export type Me = { id: number; name: string; email: string | null; confirmed: boolean; role: Role; enabled: boolean };
+export type Me = { id: number; name: string; email: string | null; confirmed: boolean; role: Role; enabled: boolean; quota?: number | null };
 export type Profile = { id: number; name: string; role: Role };
 export type SessionInfo = { id: number; agent: string; created: number; seen: number };
 export type PasskeyInfo = { id: number; name: string; created: number; used: number | null };

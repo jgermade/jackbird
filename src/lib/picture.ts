@@ -7,6 +7,7 @@
 
 import { $reactive } from "jq79";
 import { clampView, coverScale, sourceRect, zoomView, MAX_ZOOM, MIN_ZOOM, type CropView, type Size } from "../helpers/crop";
+import { isPhone } from "./platform";
 
 /** The frame's side, in CSS pixels. */
 export const FRAME = 256;
@@ -32,6 +33,8 @@ export const picture = $reactive({
   size: null as Size | null,
   view: { zoom: 1, x: 0, y: 0 } as CropView,
   failed: false,
+  /** The paste key found no picture in the clipboard (or could not read it). */
+  noPaste: false,
   saving: false
 });
 
@@ -45,6 +48,7 @@ function show(url: string | null, own: boolean): void {
   made = own ? url : null;
   image = null;
   picture.failed = false;
+  picture.noPaste = false;
   picture.size = null;
   picture.view = { zoom: 1, x: 0, y: 0 };
   picture.src = url;
@@ -66,7 +70,36 @@ function show(url: string | null, own: boolean): void {
 /** Brings a picture in (dropped, pasted, chosen): an image file; anything else is left. */
 export function bringPicture(blob: Blob | null | undefined): void {
   if (!blob || !blob.type.startsWith("image/")) return;
+  picture.noPaste = false;
   show(URL.createObjectURL(blob), true);
+}
+
+/**
+ * The picture the clipboard holds: in the Android app, Android's own clipboard, read by the app's
+ * plugin (its webview has no clipboard to read); elsewhere the browser's, which may ask first
+ * (a phone's browser shows its own "Paste"). Null when it holds none.
+ */
+async function clipboardPicture(): Promise<Blob | null> {
+  if (isPhone && /Android/.test(navigator.userAgent)) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const got = await invoke<{ type?: string | null; data?: string | null }>("plugin:jackbird-player|clipboard_image");
+    if (!got.data || !got.type) return null;
+    return new Blob([Uint8Array.from(atob(got.data), (char) => char.charCodeAt(0))], { type: got.type });
+  }
+  if (!navigator.clipboard?.read) return null;
+  for (const item of await navigator.clipboard.read()) {
+    const type = item.types.find((one) => one.startsWith("image/"));
+    if (type) return item.getType(type);
+  }
+  return null;
+}
+
+/** The paste key (a phone has no ⌘V): the clipboard's picture, or why there is none. */
+export async function pastePicture(): Promise<void> {
+  picture.noPaste = false;
+  const found = await clipboardPicture().catch(() => null);
+  if (found) bringPicture(found);
+  else picture.noPaste = true;
 }
 
 /** Opens the crop for `ask`, from `from` (the picture there is, as a URL, or a file dropped); resolves to the crop, `null` (removed) or `undefined` (closed). */

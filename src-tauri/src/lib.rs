@@ -112,6 +112,39 @@ fn open_root(app: AppHandle, path: String) -> Answer<Opened> {
     register(&app, &path)
 }
 
+/// A new folder in the system's temporary space, opened as a root, for songs dropped on an iPod
+/// (RECORD/2026-11-03.deck-design-system.WIP.md, 2026-11-19, plan H): the page writes their
+/// copies there, sends them as the send to iPod does (from a root the app opened), then lets it go.
+#[tauri::command]
+fn drop_staging(app: AppHandle) -> Answer<Opened> {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let next = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let dir = std::env::temp_dir().join(format!("{STAGING}{}-{next}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|error| failure("io", error.to_string()))?;
+    register(&app, &dir.to_string_lossy())
+}
+
+/// Where staged drops are named from.
+const STAGING: &str = "jackbird-drop-";
+
+/// A staging folder let go: closed, and removed (only one of the app's own, in the temporary space).
+#[tauri::command]
+fn drop_staging_done(roots: State<'_, Roots>, root: String) {
+    if let Ok(mut open) = roots.0.lock() {
+        open.remove(&root);
+    }
+    let dir = std::path::PathBuf::from(&root);
+    let ours = dir.parent() == Some(std::env::temp_dir().as_path())
+        && dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(STAGING));
+    if ours {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}
+
 /// Closes a root: nothing under it can be reached any more.
 #[tauri::command]
 fn close_root(roots: State<'_, Roots>, root: String) {
@@ -376,6 +409,8 @@ macro_rules! commands {
             pick_folder,
             open_root,
             close_root,
+            drop_staging,
+            drop_staging_done,
             walk,
             list,
             read,
@@ -456,7 +491,10 @@ pub fn run() {
                 let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                     .title("jackbird")
                     .inner_size(1280.0, 800.0)
-                    .min_inner_size(360.0, 480.0);
+                    .min_inner_size(360.0, 480.0)
+                    // Files dropped on the window reach the page, as in a browser (plan H: dropping
+                    // songs on the library), not Tauri's own handler.
+                    .disable_drag_drop_handler();
                 // On macOS the title bar is see-through and its title hidden: the window's own
                 // keys sit on the faceplate, whose bare metal drags the window
                 // (src/views/faceplate.html).

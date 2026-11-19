@@ -23,6 +23,8 @@ permissions = [
   "allow-folder-rename",
   "allow-folder-mkdir",
   "allow-folder-address",
+  "allow-folder-upload",
+  "allow-clipboard-image",
   "allow-safe-area",
   "allow-spectrum",
   "allow-register-listener",

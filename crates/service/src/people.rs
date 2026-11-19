@@ -69,6 +69,9 @@ pub struct Person {
     /// What follows it from device to device (F3).
     #[serde(skip)]
     pub settings: Settings,
+    /// How much its music may take on the server, in bytes (uploads past it are refused); none: no
+    /// limit. Set by owners, and by admins for those they manage.
+    pub quota: Option<u64>,
 }
 
 /// A person's settings, kept with them on the service (F3): applied wherever they sign in.
@@ -269,10 +272,13 @@ fn person_of(row: &rusqlite::Row<'_>) -> rusqlite::Result<Person> {
         role: Role::parse(&role).unwrap_or(Role::Listener),
         handle: row.get(5)?,
         settings: serde_json::from_str(&row.get::<_, String>(6)?).unwrap_or_default(),
+        quota: row
+            .get::<_, Option<i64>>(7)?
+            .and_then(|bytes| u64::try_from(bytes).ok()),
     })
 }
 
-const PERSON: &str = "select id, name, email, confirmed, role, handle, settings from people";
+const PERSON: &str = "select id, name, email, confirmed, role, handle, settings, quota from people";
 
 impl Store {
     /// Opens the database at `path`, making it and its first person (the owner) if it is new.
@@ -306,6 +312,8 @@ impl Store {
             .map_err(|error| error.to_string())?;
         // F3: settings that follow a person (added to S3's table).
         let _ = db.execute_batch("alter table people add column settings text not null default '{}'");
+        // Quotas (2026-11-19): how much a person's music may take; none by default.
+        let _ = db.execute_batch("alter table people add column quota integer");
         let store = Store { db: Mutex::new(db) };
         if store.people().map_err(|error| format!("{error:?}"))?.is_empty() {
             store
@@ -453,6 +461,15 @@ impl Store {
             .iter()
             .filter(|person| person.role == Role::Owner)
             .count())
+    }
+
+    /// Sets a person's quota (bytes), or takes it away.
+    pub fn set_quota(&self, id: i64, quota: Option<u64>) -> Result<(), Refusal> {
+        self.person(id).ok_or(Refusal::NotFound)?;
+        let quota = quota.map(|bytes| i64::try_from(bytes).unwrap_or(i64::MAX));
+        self.db()
+            .execute("update people set quota = ?1 where id = ?2", params![quota, id])?;
+        Ok(())
     }
 
     /// Changes a person's role; the last owner stays one.

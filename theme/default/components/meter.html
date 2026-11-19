@@ -1,4 +1,4 @@
-<script :setup="{ level = 0, ahead = 0, max = 1, segments = 32, pitch = 0, variant = 'chassis', label = '', levelText = '' }: Props" lang="ts">
+<script :setup="{ level = 0, ahead = 0, max = 1, segments = 32, pitch = 0, variant = 'chassis', label = '', levelText = '', seekable = false, step = 0 }: Props" lang="ts">
   // A segmented meter: progress as lit segments, like a level meter. Inside a
   // Display (`variant="display"`) it lights in the window's ink; anywhere
   // else (`chassis`) it is a row of LEDs in a well.
@@ -11,6 +11,11 @@
   // With `pitch` (a segment's width, in rem) the segments keep that width and
   // their count follows the meter's: more on a wide screen, fewer on a narrow
   // one (`segments` is the count until it is measured).
+  //
+  // `seekable` makes it a slider: a tap or a drag (the lit segments follow the
+  // finger) emits `seek` with the level chosen, on the same scale, once let go;
+  // the arrows move it by `step` (a twentieth of `max` if not given), Home and
+  // End to its ends. Its hit area is taller than its segments.
   //
   // Not `value` nor `valueText`: jq79 keeps `:value` for an element's own
   // value, and ignores it on a component tag.
@@ -27,16 +32,57 @@
     variant?: "display" | "chassis"
     label?: string
     levelText?: string
+    seekable?: boolean | ""
+    step?: number
   }
 
   // The count the width gives, with `pitch`; 0 until measured.
   let fitted = 0
   $: count = fitted || Math.max(1, Math.round(Number(segments)) || 32)
   $: top = Number(max)
-  $: fraction = top > 0 ? Math.min(1, Math.max(0, Number(level) / top)) : 0
+  const canSeek = (): boolean => (seekable === "" || seekable === true) && top > 0
+  // While dragged, the level under the finger (shown, not yet asked for).
+  let dragged: number | null = null
+  $: fraction = top > 0 ? Math.min(1, Math.max(0, (dragged ?? Number(level)) / top)) : 0
   $: lit = Math.round(fraction * count)
   $: aheadLit = top > 0 ? Math.round(Math.min(1, Math.max(0, Number(ahead) / top)) * count) : 0
   $: cells = Array.from({ length: count }, (_, index) => index)
+
+  const levelAt = (event: PointerEvent): number => {
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    return box.width > 0 ? Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)) * top : 0
+  }
+  const press = (event: PointerEvent) => {
+    if (!canSeek() || event.button > 0) return
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+    dragged = levelAt(event)
+  }
+  const move = (event: PointerEvent) => {
+    if (dragged !== null) dragged = levelAt(event)
+  }
+  const release = (event: PointerEvent) => {
+    if (dragged === null) return
+    const chosen = levelAt(event)
+    dragged = null
+    $emit("seek", chosen)
+  }
+  const cancel = () => {
+    dragged = null
+  }
+  const key = (event: KeyboardEvent) => {
+    if (!canSeek()) return
+    const by = Number(step) > 0 ? Number(step) : top / 20
+    const now = Number(level)
+    const to =
+      event.key === "ArrowRight" || event.key === "ArrowUp" ? now + by :
+      event.key === "ArrowLeft" || event.key === "ArrowDown" ? now - by :
+      event.key === "Home" ? 0 :
+      event.key === "End" ? top :
+      null
+    if (to === null) return
+    event.preventDefault()
+    $emit("seek", Math.min(top, Math.max(0, to)))
+  }
 
   const GAP_PX = 2
   const fit = (element: HTMLElement) => {
@@ -59,13 +105,16 @@
 <div class="meter"
      :class.display="variant === 'display'"
      :class.chassis="variant !== 'display'"
-     role="progressbar"
+     :class.seekable="canSeek()"
+     :role="canSeek() ? 'slider' : 'progressbar'"
+     :tabindex="canSeek() ? 0 : null"
      :aria-label="label || null"
      aria-valuemin="0"
      :aria-valuemax="String(top)"
      :aria-valuenow="String(level)"
      :aria-valuetext="levelText || null"
-     :style="`--segments: ${count}`">
+     :style="`--segments: ${count}`"
+     @pointerdown="press($event)" @pointermove="move($event)" @pointerup="release($event)" @pointercancel="cancel()" @keydown="key($event)">
   <i :each="cell in cells" :key="cell" :class.on="cell < lit" :class.ahead="cell >= lit && cell < aheadLit"></i>
 </div>
 
@@ -77,10 +126,14 @@
     min-width: 0;
   }
   i { border-radius: 1px; }
+  /* A slider: a taller strip to tap and drag than the segments themselves. */
+  .seekable { position: relative; cursor: pointer; touch-action: none; }
+  .seekable::before { content: ""; position: absolute; inset: -.625rem 0; }
+  .seekable:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 3px; border-radius: 2px; }
 
   .display { height: .375rem; }
   .display i { background: var(--mm-display-dim); }
-  .display i.ahead { background: color-mix(in srgb, var(--mm-display-fg) 35%, var(--mm-display-dim)); }
+  .display i.ahead { background: color-mix(in srgb, var(--mm-display-fg) 22%, var(--mm-display-dim)); }
   .display i.on { background: var(--mm-display-fg); box-shadow: var(--mm-display-glow); }
 
   .chassis {

@@ -22,7 +22,7 @@
   const Choice = await import("../../theme/default/components/choice.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
 
-  const { languageName, t } = await import("../lib/i18n")
+  const { languageName, t, tn } = await import("../lib/i18n")
   const { LANGUAGES, preferences, setDensity, setLanguage, setPeakFall, setSongsInTree, setSpectrumLook, setThemeChoice } = await import("../lib/preferences")
   const { DENSITIES, densityOf } = await import("../helpers/density")
   const { PEAK_FALLS, SPECTRUM_LOOKS, peakFallOf, spectrumLookOf } = await import("../helpers/spectrum")
@@ -30,7 +30,9 @@
   const { isDesktop, isPhone } = await import("../lib/platform")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
   const { account, addKey, addPasskey, can, endSession, loadMine, passkeysHere, removeKey, removePasskey, renameMe, signOut } = await import("../lib/account")
-  const { openPeople } = await import("../lib/people")
+  const { serverName } = await import("../lib/adding")
+  const ServerDetails = await import("./server-details.html")
+  const { onOwnServer } = await import("../lib/server-details")
   const { describeAgent } = await import("../helpers/agent")
   const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
   const { importing } = await import("../lib/importing")
@@ -64,10 +66,6 @@
     passkeyName = ""
   }
   const when = (seconds: number): string => new Date(seconds * 1000).toLocaleString(preferences.language)
-  const people = () => {
-    ui.preferencesOpen = false
-    void openPeople(account.me?.role === "owner")
-  }
   $: opened(ui.preferencesOpen)
   const way = (): string => (serviceState.status?.installed === "system" ? t("service.waySystem") : t("service.wayLogon"))
   const stateText = (): string => {
@@ -101,6 +99,7 @@
     sound: "M2 6h2.5L8 3v10L4.5 10H2zM10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6.25 6.25 0 0 1 0 9",
     account: "M8 2.25a2.75 2.75 0 1 0 0 5.5a2.75 2.75 0 1 0 0-5.5M2.5 13.75c.75-2.75 3-4 5.5-4s4.75 1.25 5.5 4",
     sharing: "M11.5 2.25a1.75 1.75 0 1 0 0 3.5a1.75 1.75 0 1 0 0-3.5M4.5 6.25a1.75 1.75 0 1 0 0 3.5a1.75 1.75 0 1 0 0-3.5M11.5 10.25a1.75 1.75 0 1 0 0 3.5a1.75 1.75 0 1 0 0-3.5M6.1 7.15l3.8-2.2M6.1 8.85l3.8 2.2",
+    server: "M3 2.25h10v5.5H3zM8 7.75v3.5M2.5 13.25h11M5.5 5h.01",
     service: "M2.5 2.5h11V7h-11zM2.5 9h11v4.5h-11zM5 4.75h.01M5 11.25h.01"
   } as const
   type Section = keyof typeof ICONS
@@ -110,6 +109,9 @@
       id === "sound" ? output.available || output.phone :
       id === "account" ? signedIn :
       id === "sharing" ? signedIn && importing.available :
+      // The server's details, on its own page only (the web it serves): connected to one by its
+      // address, they open from the foot of Folders (lib/server-details.ts).
+      id === "server" ? signedIn && onOwnServer() :
       id === "service" ? isDesktop && !isPhone :
       true)
   }
@@ -262,10 +264,13 @@
           </div>
         </div>
         <div class="keys">
-          <Key :if="can('admin')" variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
           <Key :if="account.signin || (account.profiles?.length ?? 0) > 1" variant="ghost" @click="signOut()">{{ account.signin ? t("account.signOut") : t("account.switch") }}</Key>
         </div>
       </section>
+    </div>
+    <!-- The server's details, on its own page (elsewhere, from the foot of Folders: lib/server-details.ts). -->
+    <div :if="section() === 'server'" class="prefs">
+      <ServerDetails />
     </div>
     <div :if="section() === 'sharing'" class="prefs">
       <section class="pref account">

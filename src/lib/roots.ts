@@ -106,7 +106,9 @@ export async function hydrateRoot(
       expandedAlbums: options.expandedAlbums ?? [],
       expandedDiscs: [],
       activeRowKey: options.activeRowKey ?? null,
-      view: options.view ?? "files",
+      // A new source on "Albums by artist"; a server's (its library, or a folder of it) on Folders
+      // (the owner, 2026-11-19). A root opened again keeps its view (below).
+      view: options.view ?? (source.kind === "library" || source.kind === "service" ? "files" : "albumsByArtist"),
       playlists: []
     };
 

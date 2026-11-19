@@ -97,9 +97,9 @@ async function signInByCode(page, email) {
 }
 
 /** Opens the preferences at their Account section (people and sign-in, passkeys, signing out). */
-async function openPreferences(page) {
+async function openPreferences(page, section = "Account") {
   await page.getByRole("button", { name: "Open preferences" }).first().click();
-  await page.getByRole("tab", { name: "Account", exact: true }).click();
+  await page.getByRole("tab", { name: section, exact: true }).click();
 }
 
 (async () => {
@@ -124,9 +124,9 @@ async function openPreferences(page) {
     await page.getByText("Before").first().waitFor({ timeout: 30000 });
     console.log("owner: the folder is open");
 
-    await openPreferences(page);
-    await page.getByRole("button", { name: "People and sign-in…" }).click();
-    await page.getByRole("tab", { name: "Sign-in" }).click();
+    // People and sign-in: tabs of Preferences, Server.
+    await openPreferences(page, "Server");
+    await page.getByRole("radio", { name: "Sign-in" }).click();
     await page.locator("#smtp-host").fill("127.0.0.1");
     await page.locator("#smtp-security").selectOption("none");
     await page.locator("#smtp-port").fill(String(smtpPort));
@@ -136,7 +136,7 @@ async function openPreferences(page) {
     await page.screenshot({ path: path.join(home, "people-signin.png") });
     console.log("owner: email set up");
 
-    await page.getByRole("tab", { name: "People" }).click();
+    await page.getByRole("radio", { name: "People" }).click();
     for (const [name, email, role] of [["Luis", "editor@example.com", "editor"], ["Kids", "kids@example.com", "listener"]]) {
       await page.getByRole("button", { name: "Add someone" }).click();
       await page.locator("#person-name").fill(name);
@@ -148,7 +148,7 @@ async function openPreferences(page) {
     console.log("owner: an editor and a listener added, as profiles");
     await page.screenshot({ path: path.join(home, "people.png") });
 
-    await page.getByRole("tab", { name: "Sign-in" }).click();
+    await page.getByRole("radio", { name: "Sign-in" }).click();
     const before = mails().length;
     await page.locator("#setup-email").fill("owner@example.com");
     await page.getByRole("button", { name: "Send the code" }).click();
@@ -211,9 +211,9 @@ async function openPreferences(page) {
     if (offered !== 0 || refused[0] !== 403 || refused[1] !== 403) fail("the listener could edit");
 
     // ── The owner's log.
-    await openPreferences(page);
-    await page.getByRole("button", { name: "People and sign-in…" }).click();
-    await page.getByRole("tab", { name: "Changes" }).click();
+    // People and sign-in: tabs of Preferences, Server.
+    await openPreferences(page, "Server");
+    await page.getByRole("radio", { name: "Changes" }).click();
     await page.getByText(/Luis edited the tags of/).first().waitFor({ timeout: 15000 });
     console.log("owner: the log shows Luis's save");
 

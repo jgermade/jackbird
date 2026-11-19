@@ -26,7 +26,10 @@ export type ServiceClient = {
   /** Whether sessions travel as a bearer token (any server but the page's own origin). */
   readonly usesToken: boolean;
   setToken(token: string | null): void;
-  api(path: string, init?: RequestInit): Promise<Response>;
+  /** The session's `Authorization` header (`Bearer …`), when it travels as a token. */
+  authorization(): string | null;
+  /** A request to its API: at its address, or at `at`, another of the same server's (its home network's). */
+  api(path: string, init?: RequestInit, at?: string): Promise<Response>;
   json<T>(path: string, init?: RequestInit): Promise<T>;
   mediaToken(): Promise<string>;
 };
@@ -73,19 +76,16 @@ function makeClient(address: string): ServiceClient {
       writeKey(key, token);
       if (address === home) writeKey(TOKEN_KEY, null);
     },
-    async api(path, init) {
+    authorization() {
       const token = client.usesToken ? (readKey(key) ?? (address === home ? readKey(TOKEN_KEY) : null)) : null;
+      return token ? `Bearer ${token}` : null;
+    },
+    async api(path, init, at = address) {
       const headers = new Headers(init?.headers);
-      if (token) headers.set("authorization", `Bearer ${token}`);
-      const response = await fetch(`${address}/api/${path}`, { ...init, headers });
-      if (!response.ok) {
-        const failure: Failure = await response.json().catch(() => ({}));
-        if (response.status === 401 && (failure.code === "signin" || failure.code === "profile")) {
-          unauthorized(failure.code, client);
-        }
-        throw new TagError(failure.code ?? "io", failure.message ?? `${response.status} ${response.statusText}`);
-      }
-      return response;
+      const authorization = client.authorization();
+      if (authorization) headers.set("authorization", authorization);
+      const response = await fetch(`${at}/api/${path}`, { ...init, headers });
+      return answered(response);
     },
     json: <T>(path: string, init?: RequestInit): Promise<T> =>
       client.api(path, init).then(async (response) => (response.status === 204 ? (undefined as T) : ((await response.json()) as T))),
@@ -97,6 +97,17 @@ function makeClient(address: string): ServiceClient {
       return grant.t;
     }
   };
+  /** A response as the app takes it: refused ones become a TagError, and a 401 asks to sign in. */
+  async function answered(response: Response): Promise<Response> {
+    if (!response.ok) {
+      const failure: Failure = await response.json().catch(() => ({}));
+      if (response.status === 401 && (failure.code === "signin" || failure.code === "profile")) {
+        unauthorized(failure.code, client);
+      }
+      throw new TagError(failure.code ?? "io", failure.message ?? `${response.status} ${response.statusText}`);
+    }
+    return response;
+  }
   return client;
 }
 
@@ -370,9 +381,47 @@ export const importFolder = (path: string): Promise<ImportState> => json<ImportS
 /** The import under way, or the last one. */
 export const importState = (): Promise<ImportState> => json<ImportState>("library/import");
 
-/** One file uploaded to the library as `path`; what became of it. */
-export const uploadToLibrary = (path: string, file: Blob): Promise<{ result: "added" | "existing" | "suggested" | "unreadable"; path?: string; why?: string }> =>
-  json(`library/upload?${inShelf(path)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file });
+/** What became of an uploaded file. */
+export type Uploaded = { result: "added" | "existing" | "suggested" | "unreadable"; path?: string; why?: string };
+
+/**
+ * One file uploaded to the library as `path`; what became of it. At `at`, another address of the
+ * same server (its home network's), with the same session; a failure to reach it is a TypeError.
+ */
+export async function uploadToLibrary(path: string, file: Blob, at?: string): Promise<Uploaded> {
+  const response = await current.api(`library/upload?${inShelf(path)}`, { method: "POST", headers: { "content-type": "application/octet-stream" }, body: file }, at);
+  return (await response.json()) as Uploaded;
+}
+
+/** Where an upload as `path` goes (at `at`, or the server's own address), and the session's header: the phone's plugin sends it. */
+export function uploadTarget(path: string, at?: string): { url: string; authorization: string | null } {
+  return { url: `${at ?? current.address}/api/library/upload?${inShelf(path)}`, authorization: current.authorization() };
+}
+
+/** The service's answer to an upload the plugin sent, read as `uploadToLibrary` reads its own. */
+export async function uploadAnswer(status: number, body: string): Promise<Uploaded> {
+  const response = new Response(body || null, { status, headers: { "content-type": "application/json" } });
+  const failure: { code?: string; message?: string } | null = response.ok ? null : await response.clone().json().catch(() => ({}));
+  if (failure) {
+    if (status === 401 && (failure.code === "signin" || failure.code === "profile")) unauthorized(failure.code, current);
+    throw new TagError(failure.code ?? "io", failure.message ?? String(status));
+  }
+  return (await response.json()) as Uploaded;
+}
+
+/** The addresses the server spoken to now listens on in its home network (none while that is off). */
+export const homeAddresses = (): Promise<string[]> => json<{ addresses: string[] }>("network").then((answer) => answer.addresses);
+
+/** Which jackbird answers at `address`, within `ms`: its instance's id; null if none does. */
+export async function instanceAt(address: string, ms = 1500): Promise<string | null> {
+  try {
+    const response = await fetch(`${address}/api/info`, { signal: AbortSignal.timeout(ms) });
+    const info = (await response.json()) as { name?: string; instance?: string };
+    return info.name === "jackbird-service" && info.instance ? info.instance : null;
+  } catch {
+    return null;
+  }
+}
 
 type Opened = { path: string; name: string };
 

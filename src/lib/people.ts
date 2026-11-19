@@ -3,7 +3,7 @@
 // email), the log of changes, SMTP, and for owners the instance's address,
 // the home network, and turning sign-in on (by a code sent to their own
 // address) and off. The service decides what each role may; this only asks.
-// The view is views/people-dialog.html. See
+// Shown as tabs of the server's details (views/server-details.html, views/people-panels.html). See
 // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-09, 10:45 to 11:57).
 
 import { $reactive } from "jq79";
@@ -21,6 +21,7 @@ export type SmtpShown = { host: string; port: number; security: string; username
 export type Settings = { signin: boolean; address: string; network: boolean; proxies: string[] };
 
 export const people = $reactive({
+  /** Whether the server's details show it (its jobs are followed only then). */
   open: false,
   tab: "people" as PeopleTab,
   list: [] as Me[],
@@ -55,8 +56,8 @@ async function busy<T>(work: () => Promise<T>, notice = ""): Promise<T | undefin
   }
 }
 
-/** Opens the dialog, loading what an owner or admin sees. */
-export async function openPeople(owner: boolean): Promise<void> {
+/** Shows it, loading what an owner or admin sees. */
+export async function showPeople(owner: boolean): Promise<void> {
   people.open = true;
   people.error = "";
   people.notice = "";
@@ -65,6 +66,11 @@ export async function openPeople(owner: boolean): Promise<void> {
     serviceJson<SmtpShown | null>("smtp").then((smtp) => (people.smtp = smtp)).catch(() => undefined),
     owner ? serviceJson<Settings>("settings").then((settings) => (people.settings = settings)).catch(() => undefined) : undefined
   ]);
+}
+
+/** No longer shown: its jobs stop being followed. */
+export function hidePeople(): void {
+  people.open = false;
 }
 
 export async function loadPeople(): Promise<void> {
@@ -91,8 +97,8 @@ export async function addPerson(name: string, email: string, role: Role, invited
   return Boolean(saved);
 }
 
-/** Changes someone's name, address or role. */
-export async function updatePerson(id: number, change: { name?: string; email?: string; role?: Role }, invitedNotice: string): Promise<void> {
+/** Changes someone's name, address, role or quota (bytes; null: none). */
+export async function updatePerson(id: number, change: { name?: string; email?: string; role?: Role; quota?: number | null }, invitedNotice: string): Promise<void> {
   const saved = await busy(() => serviceJson<Saved>("people/update", post({ id, ...change, lang: preferences.language })));
   if (saved?.invited) people.notice = invitedNotice;
   await loadPeople();

@@ -149,7 +149,7 @@ async function report(page) {
     // ── The owner imports Music from the machine.
     const owner = await person(browser, "owner@example.com");
     await addMusic(owner);
-    await owner.getByRole("button", { name: "Import a folder of this machine…" }).click();
+    await owner.getByRole("button", { name: "Import a folder of the server…" }).click();
     await owner.getByRole("button", { name: /^Music/ }).click();
     await owner.getByRole("button", { name: "Open this folder" }).click();
     const imported = await report(owner);
@@ -272,20 +272,19 @@ async function report(page) {
     await owner.getByRole("button", { name: "Cancel" }).first().click();
 
     // ── F4: deleted into the trash, restored by the owner.
-    const deleted = await editor.evaluate(async () => (await fetch("/api/library/delete?path=Uploads%2FLuis%2Fape.mp3", { method: "POST" })).status);
+    const deleted = await editor.evaluate(async () => (await fetch("/api/library/delete?path=ape.mp3", { method: "POST" })).status);
     if (deleted !== 204) fail(`the delete answered ${deleted}`);
     await owner.getByRole("button", { name: "Open preferences" }).first().click();
-    await owner.getByRole("tab", { name: "Account", exact: true }).click();
-    await owner.getByRole("button", { name: "People and sign-in…" }).click();
-    await owner.getByRole("tab", { name: "Trash" }).click();
-    await owner.getByText("Uploads/Luis/ape.mp3").waitFor({ timeout: 15000 });
+    await owner.getByRole("tab", { name: "Server", exact: true }).click();
+    await owner.getByRole("radio", { name: "Trash" }).click();
+    await owner.getByText("ape.mp3", { exact: true }).waitFor({ timeout: 15000 });
     await owner.getByRole("button", { name: "Restore" }).first().click();
     await owner.getByText("The trash is empty.").first().waitFor({ timeout: 15000 });
     // Back in the editor's own music, where it was.
-    const back = await editor.evaluate(async () => (await (await fetch("/api/library/walk")).json()).some((entry) => entry.path === "Uploads/Luis/ape.mp3"));
+    const back = await editor.evaluate(async () => (await (await fetch("/api/library/walk")).json()).some((entry) => entry.path === "ape.mp3"));
     if (!back) fail("the song did not come back from the trash");
     console.log("a song deleted into the trash and restored");
-    await owner.getByRole("tab", { name: "Backups" }).click();
+    await owner.getByRole("radio", { name: "Backups" }).click();
     await owner.getByRole("button", { name: "Take one now" }).click();
     await owner.getByText("Snapshot taken.").waitFor({ timeout: 15000 });
     await owner.keyboard.press("Escape");

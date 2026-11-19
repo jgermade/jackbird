@@ -713,3 +713,105 @@ async fn edits_on_old_versions_are_refused_and_the_library_is_kept_safe() {
     assert_eq!(state["export"]["result"]["written"], 2, "{state}");
     assert_eq!(state["scrub"]["result"], json!([]), "{state}");
 }
+
+/// Quotas (2026-11-19): owners and admins set them (admins for those they manage); one's usage and
+/// quota, and the disk for owners; an upload past the quota is refused, under it taken.
+#[tokio::test]
+async fn quotas_are_set_by_owners_and_admins_and_refuse_uploads_past_them() {
+    let library = jackbird_store::Library::open(&scratch()).unwrap();
+    let (service, app, _, [owner, admin, editor, _listener]) = family_with(Some(library)).await;
+    let id_of = |name: &str| {
+        service
+            .store
+            .people()
+            .unwrap()
+            .into_iter()
+            .find(|person| person.name == name)
+            .unwrap()
+            .id
+    };
+    let (editor_id, admin_id) = (id_of("editor"), id_of("admin"));
+    let set = |cookie: &str, id: i64, quota: Value| {
+        call(Method::POST, "/api/people/update")
+            .header("cookie", cookie)
+            .json(json!({ "id": id, "quota": quota }))
+    };
+    // An editor sets none; an admin sets an editor's, not another admin's; an owner anyone's.
+    assert_eq!(
+        set(&editor, editor_id, json!(1)).on(&app).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(set(&admin, admin_id, json!(1)).on(&app).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(
+        set(&admin, editor_id, json!("lots")).on(&app).await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let (status, changed) = set(&admin, editor_id, json!(1000)).value(&app).await;
+    assert_eq!(
+        (status, &changed["person"]["quota"]),
+        (StatusCode::OK, &json!(1000)),
+        "{changed}"
+    );
+    assert_eq!(set(&owner, admin_id, json!(5_000_000)).on(&app).await.0, StatusCode::OK);
+
+    // Nothing uploaded yet: no usage; the quota shown; the disk for owners alone.
+    let usage = |cookie: &str| call(Method::GET, "/api/library/usage").header("cookie", cookie);
+    let mine = usage(&editor).value(&app).await.1;
+    assert_eq!(
+        (&mine["songs"], &mine["bytes"], &mine["quota"]),
+        (&json!(0), &json!(0), &json!(1000)),
+        "{mine}"
+    );
+    assert!(mine["disk"].is_null());
+    let owners = usage(&owner).value(&app).await.1;
+    assert!(owners["quota"].is_null(), "{owners}");
+    if cfg!(unix) {
+        assert!(
+            owners["disk"]["total"].as_u64().is_some_and(|total| total > 0),
+            "{owners}"
+        );
+    }
+
+    // A song bigger than the editor's 1000 bytes: refused, nothing kept.
+    let song =
+        std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/tags/mp3-v24-ape.mp3")).unwrap();
+    let upload = |cookie: &str| {
+        let mut request = call(Method::POST, "/api/library/upload?path=Uploads%2Fx%2Fape.mp3")
+            .header("cookie", cookie)
+            .header("content-type", "application/octet-stream")
+            .header("content-length", &song.len().to_string());
+        request.body = Body::from(song.clone());
+        request
+    };
+    let (status, refused) = upload(&editor).value(&app).await;
+    assert_eq!(
+        (status, refused["code"].as_str()),
+        (StatusCode::INSUFFICIENT_STORAGE, Some("quota")),
+        "{refused}"
+    );
+    assert_eq!(usage(&editor).value(&app).await.1["songs"], 0);
+    // Room for it: taken, and counted.
+    assert_eq!(set(&owner, editor_id, Value::Null).on(&app).await.0, StatusCode::OK);
+    let (status, added) = upload(&editor).value(&app).await;
+    assert_eq!(
+        (status, added["result"].as_str()),
+        (StatusCode::OK, Some("added")),
+        "{added}"
+    );
+    let after = usage(&editor).value(&app).await.1;
+    assert_eq!(after["songs"], 1);
+    assert!(after["bytes"].as_u64().is_some_and(|bytes| bytes > 1000), "{after}");
+    assert!(after["quota"].is_null());
+}
+
+#[test]
+fn df_is_read_from_its_capacity() {
+    let text = "Filesystem     1024-blocks      Used Available Capacity Mounted on\n/dev/sda1         41152812  20123456  19012345      52% /\n";
+    assert_eq!(
+        crate::library_api::parse_df(text),
+        Some((41_152_812 * 1024, 19_012_345 * 1024))
+    );
+    let spaced = "Filesystem 1024-blocks Used Available Capacity Mounted on\nmy disk 100 40 60 40% /Volumes/My Music\n";
+    assert_eq!(crate::library_api::parse_df(spaced), Some((100 * 1024, 60 * 1024)));
+    assert_eq!(crate::library_api::parse_df("Filesystem\n"), None);
+}
