@@ -454,7 +454,9 @@ export async function openSamples(list: SampleList): Promise<void> {
   try {
     const { openSampleSource } = await import("./sources/samples");
     // One id wherever it is opened: the landing page's two frames name its tracks alike (lib/mirror.ts).
-    await hydrateRoot(await openSampleSource(list), { rootId: "samples" });
+    // On Folders, as the landing page's demo shows them (its phone follows the playing row), not the
+    // "Albums by artist" new sources open on: four songs in one folder (2026-11-19).
+    await hydrateRoot(await openSampleSource(list), { rootId: "samples", view: "files" });
   } catch (error) {
     library.errorMessage = error instanceof Error ? error.message : t("message.scanFailed");
   } finally {
