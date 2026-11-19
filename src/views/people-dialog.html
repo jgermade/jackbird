@@ -71,12 +71,24 @@
   let name: string = ""
   let email: string = ""
   let chosenRole: Role = "listener"
+  // The quota in GB as typed (empty: none): what their music may take on the server.
+  let quotaGb: string = ""
+  const GB = 1e9
+  const gbOf = (bytes: number | null | undefined): string => (bytes ? String(Math.round((bytes / GB) * 100) / 100) : "")
   const edit = (id: number) => {
     const person = people.list.find((one) => one.id === id)
     editing = id
     name = person?.name ?? ""
     email = person?.email ?? ""
     chosenRole = (person?.role ?? "listener") as Role
+    quotaGb = gbOf(person?.quota)
+  }
+  // The quota typed, in bytes: null for none, undefined for one that is not a number.
+  const quotaBytes = (): number | null | undefined => {
+    const typed = quotaGb.trim().replace(",", ".")
+    if (!typed) return null
+    const gb = Number(typed)
+    return Number.isFinite(gb) && gb > 0 ? Math.round(gb * GB) : undefined
   }
   const editable = (): boolean => {
     const person = people.list.find((one) => one.id === editing)
@@ -99,12 +111,14 @@
       if (await addPerson(name.trim(), email.trim(), chosenRole, t("people.invited"))) editing = null
     } else if (editing !== null) {
       const person = people.list.find((one) => one.id === editing)
+      const quota = quotaBytes()
       await updatePerson(
         editing,
         {
           name: name.trim(),
           ...(email.trim() !== (person?.email ?? "") ? { email: email.trim() } : {}),
-          ...(chosenRole !== person?.role ? { role: chosenRole } : {})
+          ...(chosenRole !== person?.role ? { role: chosenRole } : {}),
+          ...(quota !== undefined && quota !== (person?.quota ?? null) ? { quota } : {})
         },
         t("people.invited")
       )
@@ -185,8 +199,12 @@
         <Field :label="t('people.role')" control="person-role">
           <Select id="person-role" :model="chosenRole" :options="roles()" @change="chosenRole = $event.detail" />
         </Field>
+        <!-- What their music may take on the server; empty, no limit (uploads past it are refused). -->
+        <Field :if="editing !== 0" :label="t('people.quota')" control="person-quota" :hint="t('people.quotaHint')">
+          <TextInput id="person-quota" :model="quotaGb" inputmode="decimal" :disabled="!editable()" :placeholder="t('people.noQuota')" @input="quotaGb = $event.detail" />
+        </Field>
         <div class="keys">
-          <Key type="submit" variant="primary" :disabled="people.busy || !editable() || !name.trim()">{{ editing === 0 ? t("people.add") : t("people.save") }}</Key>
+          <Key type="submit" variant="primary" :disabled="people.busy || !editable() || !name.trim() || quotaBytes() === undefined">{{ editing === 0 ? t("people.add") : t("people.save") }}</Key>
           <Key :if="editing !== 0" variant="danger" :disabled="people.busy || !editable()" @click="remove()">{{ t("people.remove") }}</Key>
           <Key variant="ghost" @click="editing = null">{{ t("signin.cancel") }}</Key>
         </div>

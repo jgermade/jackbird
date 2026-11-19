@@ -22,7 +22,7 @@
   const Choice = await import("../../theme/default/components/choice.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
 
-  const { languageName, t } = await import("../lib/i18n")
+  const { languageName, t, tn } = await import("../lib/i18n")
   const { LANGUAGES, preferences, setDensity, setLanguage, setPeakFall, setSongsInTree, setSpectrumLook, setThemeChoice } = await import("../lib/preferences")
   const { DENSITIES, densityOf } = await import("../helpers/density")
   const { PEAK_FALLS, SPECTRUM_LOOKS, peakFallOf, spectrumLookOf } = await import("../helpers/spectrum")
@@ -33,6 +33,14 @@
   const { openPeople } = await import("../lib/people")
   const { serverName } = await import("../lib/adding")
   const { loadServerUpdate, serverUpdate, updateServer } = await import("../lib/server-update")
+  const { loadUsage, usage } = await import("../lib/usage")
+  const UsageBar = await import("../../theme/default/components/usage-bar.html")
+  const { formatDriveSize } = await import("../helpers/ipod")
+  const driveSize = (bytes: number): string => formatDriveSize(bytes, preferences.language)
+  const usageLine = (): string =>
+    usage.quota ? t("usage.ofQuota", { used: driveSize(usage.bytes), quota: driveSize(usage.quota) }) : t("usage.used", { used: driveSize(usage.bytes) })
+  const usageParts = () => [{ label: t("usage.music"), amount: usage.bytes, caption: driveSize(usage.bytes), tone: "info" }]
+  const diskParts = () => (usage.disk ? [{ label: t("usage.diskUsed"), amount: usage.disk.total - usage.disk.free, caption: driveSize(usage.disk.total - usage.disk.free), tone: "muted" }] : [])
   // The server's version, asked as its section opens (owners: they may update it); once each time
   // it is shown, not again as what the effect reads changes (an update's failure would be cleared).
   const onSection = (() => {
@@ -41,6 +49,7 @@
       const now = shown ? open : ""
       if (now === seen) return
       seen = now
+      if (now === "server") void loadUsage()
       if (now === "server" && can("owner")) void loadServerUpdate()
     }
   })()
@@ -133,8 +142,9 @@
       id === "sound" ? output.available || output.phone :
       id === "account" ? signedIn :
       id === "sharing" ? signedIn && importing.available :
-      // The server spoken to now, for its admins and owners: its people and sign-in.
-      id === "server" ? signedIn && can("admin") :
+      // The server spoken to now, for anyone signed in to one: the space one's music takes; its
+      // people and sign-in for its admins and owners; its version and disk for owners.
+      id === "server" ? signedIn :
       id === "service" ? isDesktop && !isPhone :
       true)
   }
@@ -298,8 +308,19 @@
           <h3 class="mm-legend is-ink">{{ t("preferences.section.server") }}</h3>
           <p class="state">{{ t("server.at", { name: serverName() }) }}</p>
         </div>
-        <div class="keys">
+        <div :if="can('admin')" class="keys">
           <Key variant="secondary" popup="dialog" @click="people()">{{ t("account.people") }}</Key>
+        </div>
+        <!-- The space one's music takes, against one's quota; the disk's, for owners. -->
+        <div :if="usage.loaded" class="sub">
+          <h4 class="mm-legend">{{ t("usage.title") }}</h4>
+          <p class="hint">{{ usageLine() }} · {{ tn("tracks.count", usage.songs) }}</p>
+          <UsageBar :if="usage.quota" :parts="usageParts()" :max="usage.quota" :label="t('usage.meter')" />
+          <p :if="!usage.quota" class="hint">{{ t("usage.noQuota") }}</p>
+          <div :if="usage.disk" class="disk">
+            <p class="hint">{{ t("usage.disk", { free: driveSize(usage.disk.free), total: driveSize(usage.disk.total) }) }}</p>
+            <UsageBar :parts="diskParts()" :max="usage.disk.total" :label="t('usage.diskMeter')" />
+          </div>
         </div>
         <!-- Its version, and updating it (owners). -->
         <div :if="can('owner')" class="sub">
@@ -389,6 +410,7 @@
   .prefs > * { min-width: 0; }
   .account .state { color: var(--mm-fg); }
   .sub h4 { margin: 0; }
+  .disk { display: grid; gap: var(--mm-space-2); }
   /* The people one may share one's music with, a box each. */
   .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--mm-space-2); margin: 0; padding: 0; list-style: none; }
   .secret { overflow-wrap: anywhere; user-select: all; }

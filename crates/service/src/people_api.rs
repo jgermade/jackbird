@@ -45,6 +45,7 @@ fn shown(service: &Service, person: &Person) -> Value {
         "confirmed": person.confirmed,
         "role": person.role,
         "enabled": enabled(service, person),
+        "quota": person.quota,
     })
 }
 
@@ -509,6 +510,14 @@ struct Change {
     email: Option<String>,
     role: Option<String>,
     lang: Option<String>,
+    /// A quota in bytes; `null` takes it away; left out, it stays.
+    #[serde(default, deserialize_with = "present")]
+    quota: Option<Value>,
+}
+
+/// A field that is there, even as `null` (which serde would read as not there).
+fn present<'de, D: serde::Deserializer<'de>>(field: D) -> Result<Option<Value>, D::Error> {
+    <Value as Deserialize>::deserialize(field).map(Some)
 }
 
 async fn change_person(
@@ -564,6 +573,19 @@ async fn change_person(
             return Err(not_allowed());
         }
         service.store.set_role(target.id, role).map_err(refused)?;
+    }
+    if let Some(quota) = &body.quota {
+        let bytes = match quota {
+            Value::Null => None,
+            other => Some(other.as_u64().filter(|bytes| *bytes > 0).ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "quota",
+                    "a quota is a number of bytes",
+                )
+            })?),
+        };
+        service.store.set_quota(target.id, bytes).map_err(refused)?;
     }
     let person = service
         .store

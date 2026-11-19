@@ -15,6 +15,7 @@ import { isAudioFile } from "../helpers/formats";
 import { isHomeAddress } from "../helpers/instance";
 import { folderUpload, isHandheld, type FolderUpload } from "../helpers/picked";
 import { account } from "./account";
+import { t } from "./i18n";
 import { library } from "./library";
 import { isDesktop, isPhone } from "./platform";
 import { refreshRoot } from "./roots";
@@ -87,7 +88,11 @@ type Song = { name: string; send(at: string | null): Promise<Uploaded> };
 /** A song's `send` throws this when the server could not be reached at all (not when it answered). */
 class Unreached extends Error {}
 
-const failed = (error: unknown): Uploaded => ({ result: "unreadable", why: error instanceof Error ? error.message : String(error) });
+const failed = (error: unknown): Uploaded => ({
+  result: "unreadable",
+  // The quota (refused by the service before the file is taken): said in the person's language.
+  why: (error as { code?: string } | null)?.code === "quota" ? t("import.overQuota") : error instanceof Error ? error.message : String(error)
+});
 
 /**
  * The server's address on its home network, for an app that speaks to it from elsewhere (through a

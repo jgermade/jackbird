@@ -12,6 +12,7 @@
   const Menu = await import("../../theme/default/components/menu.html")
   const Reel = await import("../../theme/default/components/reel.html")
   const IpodFoot = await import("./ipod-foot.html")
+  const ServerFoot = await import("./server-foot.html")
 
   const { rowHeights, rowPixels } = await import("../helpers/density")
   const { coverSrc } = await import("../lib/covers")
@@ -301,6 +302,8 @@
 
   <!-- An iPod's root: how full it is, a key to its sheet in Details (W5). -->
   <IpodFoot />
+  <!-- One's music on a server, in Folders: the server and the space used, a key to its details. -->
+  <ServerFoot />
 </section>
 
 <style scoped>

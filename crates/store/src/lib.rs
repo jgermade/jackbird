@@ -670,6 +670,19 @@ impl Library {
     // -----------------------------------------------------------------------------------------
     // Importing.
 
+    /// What a person's shelf holds: its songs and their stored size in bytes, the trash left out.
+    /// A song kept in several shelves counts in each (what each has).
+    pub fn shelf_usage(&self, shelf: i64) -> Result<(u64, u64), Error> {
+        let prefix = shelf_path(shelf, "") + "/";
+        self.db()
+            .query_row(
+                "select count(*), coalesce(sum(size), 0) from songs where trashed is null and substr(path, 1, length(?1)) = ?1",
+                [prefix],
+                |row| Ok((row.get::<_, i64>(0)?.max(0) as u64, row.get::<_, i64>(1)?.max(0) as u64)),
+            )
+            .map_err(store_error)
+    }
+
     /// Imports one file as `wanted` (a library path): copied in, or moved when `take` (an
     /// upload in `tmp/`). Never changes `source` otherwise. The same audio with other tags is a
     /// suggestion, and becomes the layer of `person` (the importer), when there is one (F3).

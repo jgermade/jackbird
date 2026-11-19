@@ -492,6 +492,7 @@ pub fn listeners() -> Router<Arc<Service>> {
     Router::new()
         .route("/library", get(info))
         .route("/library/shelves", get(shelves))
+        .route("/library/usage", get(usage))
         .route("/library/shares", get(shares).post(set_shares))
         .route("/library/walk", get(walk))
         .route("/library/list", get(list))
@@ -701,6 +702,62 @@ fn imported_json(shelf: &Shelf, imported: &Imported) -> Value {
     }
 }
 
+/// What one's own music takes on the server, and one's quota; for owners, the disk's size and room
+/// too (where the system says: Linux and macOS).
+async fn usage(State(service): Shared, Extension(person): Extension<Person>) -> Answer<Json<Value>> {
+    let library = library(&service)?;
+    let disk = (person.role == Role::Owner)
+        .then(|| disk_space(library.dir()))
+        .flatten()
+        .map(|(total, free)| json!({ "total": total, "free": free }));
+    let id = person.id;
+    let (songs, bytes) = blocking(move || library.shelf_usage(id)).await?;
+    Ok(Json(
+        json!({ "songs": songs, "bytes": bytes, "quota": person.quota, "disk": disk }),
+    ))
+}
+
+/// The size and the free room of the disk `path` is on, in bytes: as POSIX `df -Pk` tells them
+/// (Linux, macOS, a container's), with no unsafe code nor a crate for it; none elsewhere (Windows).
+fn disk_space(path: &std::path::Path) -> Option<(u64, u64)> {
+    if cfg!(windows) {
+        return None;
+    }
+    let out = std::process::Command::new("df").arg("-Pk").arg(path).output().ok()?;
+    out.status
+        .success()
+        .then(|| parse_df(&String::from_utf8_lossy(&out.stdout)))
+        .flatten()
+}
+
+/// `df -Pk`'s answer read: the second line's 1K blocks and available ones, found from its capacity
+/// (`52%`), so a disk's name or a mount point with spaces does not throw it.
+pub(crate) fn parse_df(text: &str) -> Option<(u64, u64)> {
+    let line = text.lines().nth(1)?;
+    let fields: Vec<&str> = line.split_whitespace().collect();
+    let capacity = fields
+        .iter()
+        .position(|field| field.ends_with('%') && field.len() > 1)?;
+    let at = |back: usize| -> Option<u64> { fields.get(capacity.checked_sub(back)?)?.parse().ok() };
+    Some((at(3)? * 1024, at(1)? * 1024))
+}
+
+/// Whether an upload of `coming` bytes fits in the quota of the shelf's owner; refused if not.
+fn within_quota(service: &Service, library: &Library, owner: i64, coming: u64) -> Answer<()> {
+    let Some(quota) = service.store.person(owner).and_then(|person| person.quota) else {
+        return Ok(());
+    };
+    let (_, used) = library.shelf_usage(owner).map_err(ApiError::from)?;
+    if used.saturating_add(coming) > quota {
+        return Err(ApiError::new(
+            StatusCode::INSUFFICIENT_STORAGE,
+            "quota",
+            format!("over the quota ({used} of {quota} bytes used)"),
+        ));
+    }
+    Ok(())
+}
+
 /// One file from the browser, streamed to `tmp/` and moved in as `path`.
 async fn upload(
     State(service): Shared,
@@ -711,6 +768,13 @@ async fn upload(
     let library = library(&service)?;
     let shelf = Shelf::of(&library, &person, at.shelf)?;
     shelf.writable()?;
+    // The quota (2026-11-19): what the upload says it brings, on top of what the shelf holds.
+    let coming = request
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok()?.parse::<u64>().ok())
+        .unwrap_or(0);
+    within_quota(&service, &library, shelf.owner, coming)?;
     let temporary = library.upload_path();
     let written = async {
         use futures_util::StreamExt;

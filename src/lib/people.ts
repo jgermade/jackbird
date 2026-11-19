@@ -91,8 +91,8 @@ export async function addPerson(name: string, email: string, role: Role, invited
   return Boolean(saved);
 }
 
-/** Changes someone's name, address or role. */
-export async function updatePerson(id: number, change: { name?: string; email?: string; role?: Role }, invitedNotice: string): Promise<void> {
+/** Changes someone's name, address, role or quota (bytes; null: none). */
+export async function updatePerson(id: number, change: { name?: string; email?: string; role?: Role; quota?: number | null }, invitedNotice: string): Promise<void> {
   const saved = await busy(() => serviceJson<Saved>("people/update", post({ id, ...change, lang: preferences.language })));
   if (saved?.invited) people.notice = invitedNotice;
   await loadPeople();
