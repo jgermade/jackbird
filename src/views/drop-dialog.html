@@ -2,7 +2,9 @@
   // Songs dropped on the library, before they land (plan H): where they go (the active root), the
   // pattern their paths are made by, each song from its dropped path to its new one, the tags it
   // lacks for its place (typed, or read from its dropped name by a pattern, as the rename tab
-  // does), then the progress and what was done. A view over lib/dropping.ts. See
+  // does), then the progress (in the foot) and what was done. The songs ready for their place come
+  // first, then what the others lack and the pattern to read it by, then those songs. A view over
+  // lib/dropping.ts. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, plan H).
 
   const Field = await import("../../theme/default/components/field.html")
@@ -15,7 +17,10 @@
 
   type Tag = ReturnType<typeof missingOf>[number]
   const tagLabel = (tag: Tag): string => t(`drop.tag.${tag}` as "drop.tag.title")
-  const lacking = (): number => dropping.songs.filter((song) => missingOf(song).length > 0).length
+  type Song = (typeof dropping.songs)[number]
+  const complete = (): Song[] => dropping.songs.filter((song) => missingOf(song).length === 0)
+  const incomplete = (): Song[] => dropping.songs.filter((song) => missingOf(song).length > 0)
+  const lacking = (): number => incomplete().length
   let readNote: string = ""
   const read = () => {
     const filled = readFromNames()
@@ -49,6 +54,14 @@
         </Field>
       </div>
 
+      <!-- The songs ready for their place, then what the others lack and how to read it, then them. -->
+      <ol :if="complete().length" class="songs">
+        <li :each="song in complete()" :key="song.from">
+          <span class="from">{{ song.from }}</span>
+          <span class="to">{{ pathOf(song) }}</span>
+        </li>
+      </ol>
+
       <p :if="lacking()" class="notice">{{ tn("drop.missing", lacking()) }}</p>
       <div :if="lacking()" class="read">
         <Field :label="t('drop.readPattern')" control="drop-read" :hint="t('drop.readHint')">
@@ -60,14 +73,14 @@
         </div>
       </div>
 
-      <ol :if="dropping.songs.length" class="songs">
-        <li :each="(song, index) in dropping.songs" :key="song.from" :class.lacks="missingOf(song).length > 0">
+      <ol :if="lacking()" class="songs">
+        <li :each="song in incomplete()" :key="song.from" class="lacks">
           <span class="from">{{ song.from }}</span>
           <span class="to">{{ pathOf(song) }}</span>
-          <div :if="missingOf(song).length" class="tags">
+          <div class="tags">
             <label :each="tag in missingOf(song)" :key="tag" class="tag">
               <span>{{ tagLabel(tag) }}</span>
-              <input :value="song.tags[tag]" :disabled="dropping.busy" @change="setTag(index, tag, $event.target.value)" />
+              <input :value="song.tags[tag]" :disabled="dropping.busy" @change="setTag(dropping.songs.indexOf(song), tag, $event.target.value)" />
             </label>
           </div>
         </li>
@@ -94,7 +107,7 @@
   .songs { display: grid; margin: 0; padding: 0; border: var(--mm-border-width) solid var(--mm-border); border-radius: var(--mm-radius-key); list-style: none; }
   .songs li { display: grid; gap: var(--mm-space-1); min-width: 0; padding: var(--mm-space-2) var(--mm-space-3); }
   .songs li + li { border-top: var(--mm-border-width) solid var(--mm-border); }
-  .songs li.lacks { background: var(--mm-sunken); }
+  .lacks { background: var(--mm-sunken); }
   .from { overflow: hidden; color: var(--mm-fg-subtle); font-size: var(--mm-text-xs); text-overflow: ellipsis; white-space: nowrap; }
   .to { font-family: var(--mm-font-mono); font-size: var(--mm-text-sm); overflow-wrap: anywhere; }
   .lacks .to { color: var(--mm-fg-muted); }
