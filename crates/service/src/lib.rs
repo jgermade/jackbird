@@ -153,6 +153,10 @@ impl Service {
             {
                 eprintln!("jackbird-service: the library could not move onto shelves: {error}");
             }
+            // Uploads at the root of one's music, no longer under `Uploads/<who>/` (2026-11-19).
+            if let Err(error) = library.uploads_to_root() {
+                eprintln!("jackbird-service: the uploads could not move to their library's root: {error}");
+            }
         }
         let (network, _) = tokio::sync::watch::channel(settings.signin && settings.network);
         let instance = {

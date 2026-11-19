@@ -30,6 +30,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod flatten;
 mod own;
 mod safety;
 #[cfg(test)]

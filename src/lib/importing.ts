@@ -14,7 +14,6 @@ import { $reactive, $toRaw } from "jq79";
 import { isAudioFile } from "../helpers/formats";
 import { isHomeAddress } from "../helpers/instance";
 import { folderUpload, isHandheld, type FolderUpload } from "../helpers/picked";
-import { account } from "./account";
 import { t } from "./i18n";
 import { library } from "./library";
 import { isDesktop, isPhone } from "./platform";
@@ -77,9 +76,12 @@ export function folderUploadHere(): FolderUpload {
   });
 }
 
-/** Where an upload goes: `Uploads/<who>/<its path in what was picked>`. */
-export function uploadPath(relative: string, who: string): string {
-  return `Uploads/${who.replace(/[\\/]/g, "-") || "Someone"}/${relative}`;
+/**
+ * Where an upload goes: at the root of one's own music, as it was in what was picked (no longer under
+ * `Uploads/<who>/`: each person's music is their own since shelves, and a name changes; 2026-11-19).
+ */
+export function uploadPath(relative: string): string {
+  return relative.replace(/^\/+/, "");
 }
 
 /** One song to upload: its name, for the report, and how it is sent, to a home address or (null) the usual one. */
@@ -150,7 +152,6 @@ async function uploadSongs(songs: Song[]): Promise<void> {
 
 /** Uploads the songs among `files` (chosen in the page: songs, or a folder's files). */
 export function uploadFiles(files: File[]): Promise<void> {
-  const who = account.me?.name ?? "";
   const songs = files
     .filter((file) => isAudioFile(file.name))
     .map((file): Song => {
@@ -159,7 +160,7 @@ export function uploadFiles(files: File[]): Promise<void> {
         name: file.name,
         async send(at) {
           try {
-            return await uploadToLibrary(uploadPath(relative, who), file, at ?? undefined);
+            return await uploadToLibrary(uploadPath(relative), file, at ?? undefined);
           } catch (error) {
             // `fetch` fails with a TypeError only when the server was not reached.
             throw error instanceof TypeError ? new Unreached(error.message) : error;
@@ -184,14 +185,13 @@ export async function uploadPhoneFolder(): Promise<void> {
   }
   if (!picked) return;
   const { tree, name } = picked;
-  const who = account.me?.name ?? "";
   const songs = picked.files
     .filter((path) => isAudioFile(path))
     .sort()
     .map((path): Song => ({
       name: path.slice(path.lastIndexOf("/") + 1),
       async send(at) {
-        const target = uploadTarget(uploadPath(`${name}/${path}`, who), at ?? undefined);
+        const target = uploadTarget(uploadPath(`${name}/${path}`), at ?? undefined);
         let reply: { status: number; body: string };
         try {
           reply = await uploadPhoneFile(tree, path, target.url, target.authorization);
