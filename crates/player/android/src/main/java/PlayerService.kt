@@ -7,8 +7,14 @@
 package es.germade.jackbird.player
 
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
+import android.os.Looper
+import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -67,13 +73,13 @@ class PlayerService : MediaSessionService() {
       }
     }
     val player = ExoPlayer.Builder(this, renderers)
-      // Music: it takes the audio focus (and gives it back to a call), and pauses when a headset is
-      // unplugged.
+      // Music: it takes the audio focus (and gives it back to a call). A headset unplugged pauses it:
+      // by `noisy` below, not Media3's own, so a USB DAC that only blinks goes on.
       .setAudioAttributes(
         AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
         true
       )
-      .setHandleAudioBecomingNoisy(true)
+      .setHandleAudioBecomingNoisy(false)
       // The songs come from the instance: the Wi-Fi is kept awake with the CPU while it plays.
       .setWakeMode(C.WAKE_MODE_NETWORK)
       .build()
@@ -88,12 +94,69 @@ class PlayerService : MediaSessionService() {
     // service; without one Android stops the service a minute after the app leaves the screen.
     addSession(made)
     session = made
+    player.addListener(object : Player.Listener {
+      // Played again by the person (or anything else) meanwhile: the noise's pause is no longer ours to undo.
+      override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+        if (playWhenReady) pausedByNoise = false
+      }
+    })
+    // A system broadcast: received though the receiver is not exported.
+    ContextCompat.registerReceiver(this, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
     current = made.player
     waiting.forEach { it(made.player) }
     waiting.clear()
   }
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
+
+  private val main = Handler(Looper.getMainLooper())
+
+  /** Paused by Android's "becoming noisy", and not played again since: `noisy` may play it again. */
+  private var pausedByNoise = false
+
+  /** Looks for the USB DAC again after the noise's pause, every second for a few: there, it plays on. */
+  private var looks = 0
+  private val resume = object : Runnable {
+    override fun run() {
+      val player = session?.player ?: return
+      if (!pausedByNoise) {
+        Log.i(TAG, "becoming noisy: played or paused since, left as it is")
+        return
+      }
+      val back = BitPerfect.usbDevice(this@PlayerService)
+      if (back != null) {
+        Log.i(TAG, "becoming noisy: ${back.productName} is there, playing on")
+        pausedByNoise = false
+        player.play()
+      } else if (++looks < RESUME_LOOKS) {
+        main.postDelayed(this, RESUME_EVERY)
+      } else {
+        Log.i(TAG, "becoming noisy: no USB DAC, it stays paused")
+        pausedByNoise = false
+      }
+    }
+  }
+
+  /**
+   * Android says the sound is about to come out of the phone's speaker (a headset unplugged, a USB
+   * DAC gone): it pauses at once, as Media3's own handling did. A USB DAC may only have blinked:
+   * some phones reset USB audio as the screen goes off (the owner's report: a HiBy FC3 and a
+   * NICEHCK NK1 MAX paused with the screen). If one is there again within a few seconds, it plays on.
+   */
+  private val noisy = object : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+      if (intent.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+      val player = session?.player ?: return
+      if (!player.playWhenReady) return
+      val usb = BitPerfect.usbDevice(context)
+      player.pause()
+      pausedByNoise = true
+      looks = 0
+      Log.i(TAG, "becoming noisy: paused (a USB DAC ${if (usb != null) "still listed: ${usb.productName}" else "not listed"})")
+      main.removeCallbacks(resume)
+      main.postDelayed(resume, RESUME_EVERY)
+    }
+  }
 
   // The app swiped away: the music goes on if it plays, else the service ends with it.
   override fun onTaskRemoved(rootIntent: Intent?) {
@@ -102,6 +165,12 @@ class PlayerService : MediaSessionService() {
   }
 
   override fun onDestroy() {
+    main.removeCallbacks(resume)
+    try {
+      unregisterReceiver(noisy)
+    } catch (error: IllegalArgumentException) {
+      // Not registered: the session was never made.
+    }
     session?.run {
       player.release()
       release()
@@ -112,6 +181,12 @@ class PlayerService : MediaSessionService() {
   }
 
   companion object {
+    private const val TAG = "jackbird"
+
+    /** How often the DAC is looked for after the noise's pause (ms), and how many times. */
+    private const val RESUME_EVERY = 1000L
+    private const val RESUME_LOOKS = 5
+
     private var current: Player? = null
     private val waiting = mutableListOf<(Player) -> Unit>()
 
