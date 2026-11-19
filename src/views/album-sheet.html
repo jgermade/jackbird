@@ -312,7 +312,8 @@
       "cover head"
       "cover discs";
     gap: var(--mm-space-2) var(--mm-space-5);
-    padding: var(--mm-space-4);
+    /* Twice the room below (the owner, 2026-11-19). */
+    padding: var(--mm-space-4) var(--mm-space-4) calc(var(--mm-space-4) * 2);
     border: var(--mm-border-width) solid var(--mm-border);
     border-radius: var(--mm-radius-md);
     background: var(--mm-surface);
@@ -411,7 +412,7 @@
         "cover head"
         "discs discs";
       gap: var(--mm-space-3);
-      padding: var(--mm-space-3);
+      padding: var(--mm-space-3) var(--mm-space-3) calc(var(--mm-space-3) * 2);
     }
     .album-head { align-self: center; }
     .cover { position: static; width: 5.5rem; }
