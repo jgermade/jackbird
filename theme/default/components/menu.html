@@ -16,7 +16,7 @@
   // emits `select` with the item's id. The list opens in the top layer (a
   // manual popover), under the key, or above it when there is no room below;
   // at 720px and below it is a sheet at the bottom of the screen over a
-  // dimmed page. A click outside it, Escape, Tab or an `mm-dismiss` event on its list (a phone's
+  // dimmed page (which takes no pointer meanwhile: a press there presses nothing behind it). A click outside it, Escape, Tab or an `mm-dismiss` event on its list (a phone's
   // back) close it, and the key gets
   // the focus back. A tap on the dimmed page only closes the sheet: what is
   // behind it does not get the click. Up, Down, Home and End move through the items; Enter and
@@ -111,12 +111,33 @@
     close(false)
   }
 
+  // As a sheet, the page under the veil takes no pointer while it is open (the menu does): a press
+  // on the veil lands on nothing, so the row under it is not pressed (nor lit) on its way to
+  // closing the menu.
+  const veil = (() => {
+    let before: string | null = null
+    return {
+      on(element: HTMLElement) {
+        if (before !== null || !matchMedia(PHONE).matches) return
+        before = document.body.style.pointerEvents
+        document.body.style.pointerEvents = "none"
+        element.style.pointerEvents = "auto"
+      },
+      off() {
+        if (before === null) return
+        document.body.style.pointerEvents = before
+        before = null
+      }
+    }
+  })()
+
   const show = () => {
     const element = list()
     if (!element || open) return
     // Open first, so its items are drawn, then shown and placed by their size.
     open = true
     element.showPopover()
+    veil.on(element)
     place()
     requestAnimationFrame(place)
     document.addEventListener("pointerdown", outside, true)
@@ -128,6 +149,7 @@
     const element = list()
     if (!open) return
     open = false
+    veil.off()
     document.removeEventListener("pointerdown", outside, true)
     removeEventListener("resize", place)
     if (element?.matches(":popover-open")) element.hidePopover()
@@ -135,6 +157,7 @@
   }
   $destroyed(() => {
     close(false)
+    veil.off()
     swallow.off()
   })
 
