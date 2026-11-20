@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { track as fixture } from "./fixtures.test-support.ts";
 import { albumArtistOf, albumFolder, albumKey, artistKey, artistName, artistOfKey, buildViewRows, coverOfTracks, trackPlace, yearOfTracks } from "./views.ts";
 
-const labels = { unknownArtist: "Unknown artist", unknownAlbum: "No album", variousArtists: "Various", missing: "Missing", locale: "en" };
+const labels = { unknownArtist: "Unknown artist", unknownAlbum: "No album", variousArtists: "Various", missing: "Missing", liked: "Liked songs", locale: "en" };
 
 const track = (relativePath: string, title: string, artist: string, album: string, trackNumber = "") => fixture(relativePath, { title, artist, album, trackNumber });
 
@@ -127,6 +127,17 @@ describe("buildViewRows", () => {
       [false, 3, "@pl:Playlists/Road.m3u8#3"]
     ]);
     assert.equal(rows[3].meta, "Missing");
+  });
+
+  it("Playlists: the liked songs first, by their translated name, marked", () => {
+    const playlists = [
+      { path: "A.m3u", name: "A", entries: [] },
+      { path: "Liked.m3u8", name: "Liked", entries: [{ path: "Mix/02.mp3", raw: "Mix/02.mp3" }] }
+    ];
+    const rows = buildViewRows("playlists", tracks, [], labels, playlists);
+    assert.deepEqual(labelsOf(rows), ["Liked songs", "A"]);
+    assert.deepEqual(rows.map((row) => row.liked ?? false), [true, false]);
+    assert.equal(rows[0].meta, "1");
   });
 });
 

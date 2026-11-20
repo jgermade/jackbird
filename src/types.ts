@@ -80,6 +80,8 @@ export type WizardTreeRow = {
   /** A playlist's path (its group and entries), and an entry's place in it. */
   playlist?: string;
   playlistIndex?: number;
+  /** The liked songs' list (helpers/playlists.ts `LIKED_PATH`): drawn with a heart. */
+  liked?: boolean;
   /** A playlist entry that is not in the library. */
   missing?: boolean;
   /** A track whose tags are not read yet (`Track.pending`). */

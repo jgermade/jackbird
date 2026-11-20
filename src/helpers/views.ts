@@ -12,6 +12,7 @@ import type { LibraryView, Track, Playlist, WizardTreeRow } from "../types.ts";
 import { isCompilation } from "./metadata.ts";
 import { compareText } from "./compare.ts";
 import { orderDetailPlaylist } from "./tracks.ts";
+import { isLikedPath } from "./playlists.ts";
 
 /** The words and the order a view needs. */
 export type ViewLabels = {
@@ -19,6 +20,8 @@ export type ViewLabels = {
   unknownAlbum: string;
   variousArtists: string;
   missing: string;
+  /** The liked songs' list's name (its file's is fixed: helpers/playlists.ts). */
+  liked: string;
   locale: string;
 };
 
@@ -249,8 +252,10 @@ export function buildViewRows(
     }
   } else if (view === "playlists") {
     const byPath = new Map(tracks.map((track) => [track.relativePath, track]));
-    const sorted = [...playlists].sort((left, right) => compareText(left.name, right.name, labels.locale));
+    // The liked songs first, by their translated name; the others by name.
+    const sorted = [...playlists].sort((left, right) => Number(isLikedPath(right.path)) - Number(isLikedPath(left.path)) || compareText(left.name, right.name, labels.locale));
     for (const playlist of sorted) {
+      const liked = isLikedPath(playlist.path);
       const key = `@playlist:${playlist.path}`;
       const found = playlist.entries.map((entry) => (entry.path ? byPath.get(entry.path) : undefined));
       const isOpen = open(key);
@@ -258,8 +263,9 @@ export function buildViewRows(
         key,
         kind: "album",
         album: key,
-        label: playlist.name,
+        label: liked ? labels.liked : playlist.name,
         meta: String(playlist.entries.length),
+        ...(liked ? { liked: true } : {}),
         expanded: isOpen,
         parentKey: null,
         depth: 0,

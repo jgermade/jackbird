@@ -41,7 +41,7 @@
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; format?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean }
+  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; format?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean; liked?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
@@ -99,7 +99,8 @@
   const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
   // A group's icon by what it is: in Artists an artist, in Albums and Compilations an album, in
   // Albums by artist an artist and under it its albums, in Playlists a playlist; else a folder.
-  const glyphOf = (row: Row): "folder" | "artist" | "album" | "playlist" => {
+  const glyphOf = (row: Row): "folder" | "artist" | "album" | "playlist" | "liked" => {
+    if (row.liked) return "liked"
     switch (row.inView) {
       case "artists": return "artist"
       case "albums":

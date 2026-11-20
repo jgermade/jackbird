@@ -20,6 +20,7 @@ import {
   newPlaylistPath,
   pathTaken,
   renamedEntries,
+  toggledLike,
   withPlaylist,
   withoutEntry
 } from "../helpers/playlists";
@@ -200,6 +201,27 @@ export function moveInPlaylist(rootId: string, path: string, from: number, to: n
 /** Takes the entry at `index` out of a playlist (its file stays where it is). */
 export function removeFromPlaylist(rootId: string, path: string, index: number): Promise<boolean> {
   return change(rootId, path, (entries) => withoutEntry(entries, index));
+}
+
+/**
+ * Likes a track of a root, or no longer (the display's heart): it goes at the end of the root's
+ * liked songs' list (`Liked.m3u8`, made on the first like), or out of it. Resolves to whether it
+ * was written; when not, the list is as it was.
+ */
+export async function toggleLike(rootId: string, trackId: string): Promise<boolean> {
+  const root = rootOf(rootId);
+  const track = root?.tracks.find((one) => one.id === trackId);
+  if (!root || !track) {
+    return false;
+  }
+  const before = root.playlists ?? [];
+  const next = toggledLike(before, track);
+  setPlaylists(rootId, (playlists) => withPlaylist(playlists, next));
+  if (await write(root, next)) {
+    return true;
+  }
+  setPlaylists(rootId, () => before);
+  return false;
 }
 
 /** Deletes a playlist (its file; its tracks stay). */
