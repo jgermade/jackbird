@@ -121,8 +121,8 @@
   // caret).
   // A phone (the panes one at a time) lists no nesting: one level at a time (lib/workspace.ts,
   // `treeLevels`). The open folders are stacked at the top, from the first one down, and under
-  // them only what the last one holds. A folder's row enters it; an open one's ‹ leaves it (and
-  // the ones under it), and the rest of it opens it in Details. Without the songs in the tree (a preference:
+  // them only what the last one holds. A folder's row enters it (a folder not stacked has no ❯);
+  // an open one's ‹ leaves it (and the ones under it), and the rest of it opens it in Details. Without the songs in the tree (a preference:
   // helpers/folders.ts), a folder that holds no other (a leaf) has nothing to enter: a tap opens it
   // in Details, and on a computer it has no toggle.
   const { watchMedia } = await import("../lib/media")
@@ -370,7 +370,8 @@
              @toggle="toggleFolder(row.album)">
       <template :slot.action>
         <span class="row-keys" @click.stop="null">
-          <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
+          <!-- Not on a phone: there a folder is stacked to be opened, and its name in the stack opens it in Details. -->
+          <Key :if="row.kind === 'album' && !phone" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
           <Menu :if="row.kind === 'album' || row.trackId || row.playlist" :label="t(row.kind === 'album' ? 'menu.folder' : 'menu.track', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
