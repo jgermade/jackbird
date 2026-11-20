@@ -176,9 +176,14 @@
   const turnTime = () => {
     timeView = TIME_VIEWS[(TIME_VIEWS.indexOf(timeView) + 1) % TIME_VIEWS.length]
   }
+  // While the song's place is dragged on the meter, the clock shows the place chosen (whichever way
+  // it is turned); null otherwise, or with the finger out of the display (letting go there gives
+  // the seek up).
+  let scrubbing: number | null = null
   $: elapsedClock = clockParts(playback.position)
   $: totalClock = clockParts(playback.duration)
-  $: clock = timeView === "total" ? totalClock : elapsedClock
+  $: scrubClock = scrubbing === null ? null : clockParts(scrubbing)
+  $: clock = scrubClock ?? (timeView === "total" ? totalClock : elapsedClock)
   // The play modes, in keys joined to the display's right: shuffle, and repeat (off, all, one).
   const REPEAT_LABELS = { off: "faceplate.repeatOff", all: "faceplate.repeatAll", one: "faceplate.repeatOne" } as const
   $: repeatLabel = t(REPEAT_LABELS[playback.repeat])
@@ -241,9 +246,10 @@
           </div>
         </div>
         <Meter :if="readingNow" variant="display" :segments="40" :pitch=".625" :level="readingNow.loaded" :max="readingNow.total" :label="t('faceplate.reading')" :level-text="t('faceplate.readingCount', { loaded: readingNow.loaded, total: readingNow.total })" />
-        <!-- The song's place: tapped or dragged, it moves the song there; the arrows by 5 s. -->
+        <!-- The song's place: tapped or dragged, it moves the song there (a marker, and the clock,
+             showing where while pressed; let go out of the display, it stays); the arrows by 5 s. -->
         <Meter :else variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText"
-               :seekable="!!current && playback.duration > 0" :step="5" @seek="seekTo($event.detail)" />
+               :seekable="!!current && playback.duration > 0" :step="5" within=".lcd" @scrub="scrubbing = $event.detail" @seek="seekTo($event.detail)" />
       </div>
     </div>
   </Display>
