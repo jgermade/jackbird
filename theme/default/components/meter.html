@@ -19,8 +19,8 @@
   // the level under the finger, the lit ones still the level, and `scrub` is
   // emitted with it as it moves (null once let go or given up), for the owner
   // to show it. `within` (a selector of an element around it) is where it may
-  // be let go: outside it the marker goes, `scrub` says null, and letting go
-  // there chooses nothing.
+  // be let go: outside it the marker stays still where it was, `scrub` says
+  // null, and letting go there chooses nothing.
   //
   // Not `value` nor `valueText`: jq79 keeps `:value` for an element's own
   // value, and ignores it on a component tag.
@@ -48,13 +48,13 @@
   $: count = fitted || Math.max(1, Math.round(Number(segments)) || 32)
   $: top = Number(max)
   const canSeek = (): boolean => (seekable === "" || seekable === true) && top > 0
-  // While pressed, the level under the finger (marked, not yet asked for), and whether the finger
-  // is out of where it may be let go.
+  // While pressed, the level under the finger (marked, not yet asked for; held still while the
+  // finger is out of where it may be let go), and whether it is.
   let dragged: number | null = null
   let outside = false
   $: fraction = top > 0 ? Math.min(1, Math.max(0, Number(level) / top)) : 0
   $: lit = Math.round(fraction * count)
-  $: marked = dragged === null || outside || top <= 0 ? -1 : Math.min(count - 1, Math.floor((dragged / top) * count))
+  $: marked = dragged === null || top <= 0 ? -1 : Math.min(count - 1, Math.floor((dragged / top) * count))
   $: aheadLit = top > 0 ? Math.round(Math.min(1, Math.max(0, Number(ahead) / top)) * count) : 0
   $: cells = Array.from({ length: count }, (_, index) => index)
 
@@ -70,9 +70,10 @@
     const box = area.getBoundingClientRect()
     return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom
   }
+  // Out of `within`, the marker stays where the finger left it: it will not go there.
   const follow = (event: PointerEvent) => {
-    dragged = levelAt(event)
     outside = isOutside(event)
+    if (!outside || dragged === null) dragged = levelAt(event)
     $emit("scrub", outside ? null : dragged)
   }
   const press = (event: PointerEvent) => {
