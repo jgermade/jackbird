@@ -666,7 +666,7 @@ export const en = {
   "log.action.open": "opened the folder",
   "log.action.close": "closed the folder",
 
-  "import.eyebrow": "The family library",
+  "import.eyebrow": "Your music",
   "import.title": "Add music",
   "import.about": "Songs are copied into the library once each; the files you pick are not changed. The same song brought again with other tags is kept as a suggestion beside it.",
   "import.files": "Upload songs",

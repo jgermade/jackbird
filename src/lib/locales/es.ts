@@ -667,7 +667,7 @@ export const es: Record<MessageKey, string> = {
   "log.action.open": "abrió la carpeta",
   "log.action.close": "cerró la carpeta",
 
-  "import.eyebrow": "La biblioteca de la familia",
+  "import.eyebrow": "Tu música",
   "import.title": "Añadir música",
   "import.about": "Las canciones se copian a la biblioteca una sola vez; los archivos que eliges no cambian. La misma canción traída de nuevo con otras etiquetas se guarda como sugerencia junto a ella.",
   "import.files": "Subir canciones",
