@@ -13,3 +13,10 @@ export const TAKES_SPACE = "input, textarea, select, button, a[href], [contented
 export function isPlayPauseKey(event: SpaceParts): boolean {
   return event.key === " " && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
 }
+
+/** Whether a key press opens the search: Ctrl or ⌘ with F, or "/" alone where nothing is typed (`typing`). */
+export function isSearchKey(event: SpaceParts, typing: boolean): boolean {
+  if (event.repeat || event.altKey) return false;
+  if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "f") return true;
+  return event.key === "/" && !event.ctrlKey && !event.metaKey && !typing;
+}

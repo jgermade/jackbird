@@ -49,6 +49,29 @@
   // The number alone ("2/6", "2 de 6" give "2"), and the length where the ▶ was (helpers/format.ts).
   const numberOf = (track: Track): string => cleanTrackNumber(track.metadata.trackNumber)
   const durationOf = (track: Track): string => formatDuration(track.audio?.durationMs)
+
+  // A track shown here from the search (lib/workspace.ts `revealTrack`): its row brought to the
+  // middle of the pane once drawn, and marked a moment (`found`).
+  let found: string | null = null
+  const scrollToShown = (() => {
+    let seen = 0
+    return (count: number): number => {
+      if (count !== seen && ui.shownTrack) {
+        const id = ui.shownTrack
+        found = id
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const row = [...document.querySelectorAll<HTMLElement>(".sheet-pane tr[data-track]")].find((item) => item.dataset.track === id)
+          row?.scrollIntoView({ block: "center" })
+          window.setTimeout(() => {
+            if (found === id) found = null
+          }, 1600)
+        }))
+      }
+      seen = count
+      return count
+    }
+  })()
+  $: shownTick = scrollToShown(ui.shown)
   // Its length's colour, its codec's (`--mm-codec-<family>`), and its click: the track's own info
   // dialog (views/track-info-dialog.html), not playing it.
   const familyOf = (track: Track): string => codecFamily(codecLabel(track.relativePath, track.audio))
@@ -224,6 +247,8 @@
                       tabindex="0"
                       :aria-selected="String(isChosen(track))"
                       :data-playing="String(track.id === playingId())"
+                      :data-track="track.id"
+                      :class.found="track.id === found"
                       @click="play(track, $event)"
                       @keydown="onKey(track, $event)">
                     <td class="pick-cell" @click="pickCell(track, $event)"><span class="pick-box" :class.numbered="discNumbered(disc)"><SelectBox :chosen="isChosen(track)" :number="discNumbered(disc) ? numberOf(track) : ''" @pick="pick(track, $event.detail)" /></span></td>
@@ -346,6 +371,9 @@
   .disc-head { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-3); }
   .disc-pick { display: inline-flex; align-items: center; gap: var(--mm-space-2); }
   .mm-table tr { cursor: pointer; user-select: none; }
+  /* The track shown from the search, marked a moment. */
+  .mm-table tr.found { animation: found 1.6s var(--mm-ease); }
+  @keyframes found { from, 40% { background: var(--mm-accent-soft); } }
   .mm-table tr:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
   /* A track is as tall as the density says for a row of one line (tokens.css), as the tree's. */
   .mm-table td { box-sizing: border-box; height: var(--mm-row); padding-block: 0; }

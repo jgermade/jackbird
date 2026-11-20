@@ -1,7 +1,7 @@
 // The way back on a phone (720px wide and below): the system's back (Android's gesture or key, the
 // browser's ‹) steps out of what was opened last, as the app's own ways back do, instead of
 // leaving the app. What can be stepped out of, from the bottom up: the library's open levels
-// (lib/workspace.ts `treeLevels`), Details in view (`ui.pane`), and the dialogs, sheets and menus
+// (lib/workspace.ts `treeLevels`), Details in view (`ui.pane`), the search (lib/search.ts), and the dialogs, sheets and menus
 // open, in the order they opened. Each step opened is one entry of the browser's history: opened
 // in the app, an entry is pushed; closed in the app, as many are gone back over; and the browser
 // going back closes the top step (asking a dialog, which decides: one busy stays, and its entry
@@ -12,6 +12,7 @@
 // theme's Modal, SubModal and Menu take it as Escape: theme/default/components/).
 
 import { $reactive } from "jq79";
+import { closeSearch, search } from "./search";
 import { ui } from "./ui";
 import { leaveLevel, treeLevels } from "./workspace";
 
@@ -40,6 +41,8 @@ function steps(): Step[] {
   if (!back.phone) return [];
   const list: Step[] = levelKeys().map((key) => () => leaveLevel(key));
   if (ui.pane === "details") list.push(() => (ui.pane = "library"));
+  // The search, under the tabs over the panes (a computer's is a dialog, counted below).
+  if (search.open) list.push(() => closeSearch());
   for (const element of opened) list.push(() => element.dispatchEvent(new Event("mm-dismiss")));
   return list;
 }

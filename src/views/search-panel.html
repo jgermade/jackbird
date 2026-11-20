@@ -1,0 +1,145 @@
+<script :setup="{ sheet = false }: Props" lang="ts">
+  // The search's field and its results (lib/search.ts): on a phone under the tabs, over the panes
+  // (`sheet`, views/workspace.html), on a computer in its dialog (views/search-dialog.html). Each
+  // result as a row of the queue: its cover, its title, "artist - album" under it, and its length
+  // in its codec's colour. A tap (or Enter) shows it in Details. Up and Down move through them from
+  // the field, Escape closes. Not more than SEARCH_LIMIT drawn: then the count of the rest. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-20).
+
+  type Props = { sheet?: boolean | "" }
+
+  const Key = await import("../../theme/default/components/key.html")
+  const Stripes = await import("../../theme/default/components/stripes.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+
+  const { t, tn } = await import("../lib/i18n")
+  const { coverSrc } = await import("../lib/covers")
+  const { SEARCH_LIMIT, chooseResult, closeSearch, search, searchResults } = await import("../lib/search")
+
+  type Result = { id: string; title: string; artist: string; album: string; duration: string; codec: string; cover: string | null }
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  const asSheet = (): boolean => flag(sheet)
+
+  // Read through functions: the results are boxed (see Opaque).
+  const results = (): Result[] => searchResults.value.data.results
+  const total = (): number => searchResults.value.data.total
+  const subtitle = (result: Result): string => [result.artist || t("album.unknownArtist"), result.album].filter(Boolean).join(" - ")
+  const itemId = (at: number): string => `search-result-${at}`
+
+  // The result the keyboard is on (Up and Down from the field); none until they are used.
+  let active = -1
+  const typed = (value: string) => {
+    search.query = value
+    active = -1
+  }
+  const onKey = (event: KeyboardEvent) => {
+    const count = results().length
+    if (event.key === "Escape") {
+      // A sheet's own Escape: the dialog's comes as its `cancel`.
+      if (!asSheet()) return
+      closeSearch()
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (count === 0) return
+      active = event.key === "ArrowDown" ? Math.min(count - 1, active + 1) : Math.max(0, active - 1)
+      requestAnimationFrame(() => document.getElementById(itemId(active))?.scrollIntoView({ block: "nearest" }))
+    } else if (event.key === "Enter") {
+      const chosen = results()[active < 0 ? 0 : active]
+      if (!chosen) return
+      chooseResult(chosen.id)
+    } else {
+      return
+    }
+    event.preventDefault()
+  }
+
+  // The field takes the focus as the search opens.
+  const focusField = (open: boolean) => {
+    if (!open) return
+    requestAnimationFrame(() => {
+      const input = $self("input") as HTMLInputElement | null
+      input?.focus()
+      input?.select()
+    })
+  }
+  $: focusField(search.open)
+</script>
+
+<div class="search-panel" :class.sheet="asSheet()" @keydown="onKey($event)">
+  <div class="field">
+    <svg class="lens" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.75" /><path d="M10.5 10.5 14 14" /></svg>
+    <TextInput type="search" :label="t('search.label')" :placeholder="t('search.placeholder')" autocomplete="off" :model="search.query" @input="typed($event.detail)" />
+    <Key :if="asSheet()" size="sm" variant="ghost" @click="closeSearch()">{{ t("search.close") }}</Key>
+  </div>
+  <p :if="search.query.trim() && total() === 0" class="none">{{ t("search.none") }}</p>
+  <ul :if="results().length > 0" class="results" role="listbox" :aria-label="t('search.results')" :aria-activedescendant="active >= 0 ? itemId(active) : null">
+    <li :each="(result, at) in results()" :key="result.id" :id="itemId(at)" role="option" class="item" :class.active="at === active"
+        :aria-selected="at === active ? 'true' : 'false'" @click="chooseResult(result.id)">
+      <span class="art" aria-hidden="true">
+        <img :if="coverSrc(result.cover)" :src="coverSrc(result.cover)" alt="" />
+        <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
+      </span>
+      <span class="text">
+        <span class="name">{{ result.title }}</span>
+        <span class="sub">{{ subtitle(result) }}</span>
+      </span>
+      <span class="cue" :data-codec="result.codec"><span class="duration">{{ result.duration }}</span></span>
+    </li>
+  </ul>
+  <p :if="total() > SEARCH_LIMIT" class="more">{{ tn("search.more", total() - SEARCH_LIMIT) }}</p>
+</div>
+
+<style scoped>
+  .search-panel { display: flex; flex-direction: column; gap: var(--mm-space-3); min-height: 0; }
+  /* On a phone: under the tabs, the whole stage, its results scrolling under the field. */
+  .search-panel.sheet { height: 100%; gap: 0; background: var(--mm-surface); }
+  .field { display: flex; align-items: center; gap: var(--mm-space-2); }
+  .sheet .field { flex: none; padding: var(--mm-space-2) var(--mm-space-3); border-bottom: var(--mm-border-width) solid var(--mm-border); background: var(--mm-sunken); }
+  .field > :nth-child(2) { flex: 1; min-width: 0; }
+  /* The lens before the field. */
+  .lens { flex: none; width: 1rem; height: 1rem; color: var(--mm-fg-subtle); }
+  .none, .more { margin: 0; padding: var(--mm-space-3); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  .results { margin: 0; padding: 0; list-style: none; }
+  .sheet .results { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  /* A row of the queue (views/queue-list.html): cover, two lines, the length in its codec's colour. */
+  .item {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--mm-space-3);
+    box-sizing: border-box;
+    min-height: var(--mm-row-queue);
+    padding: var(--mm-space-1) var(--mm-space-3);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-surface);
+    cursor: pointer;
+    user-select: none;
+  }
+  @media (hover: hover) { .item:hover { background: var(--mm-hover); } }
+  .item:active { background: var(--mm-sunken); }
+  .item.active { box-shadow: inset 0 0 0 2px var(--mm-accent); }
+  .art { display: block; width: 2.25rem; aspect-ratio: 1; overflow: hidden; border-radius: 3px; box-shadow: var(--mm-shadow-sm, 0 1px 2px rgb(0 0 0 / .15)); }
+  .art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .no-cover { position: relative; display: block; height: 100%; background: var(--mm-display-bezel); }
+  .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 16%; }
+  .text { display: grid; gap: .125rem; min-width: 0; }
+  .name, .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .name { color: var(--mm-fg); font-size: var(--mm-text-sm); }
+  .sub { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
+  .cue {
+    display: grid;
+    place-items: center end;
+    min-width: 4ch;
+    color: var(--mm-codec-other-ink);
+    font-family: var(--mm-font-mono);
+    font-weight: var(--mm-weight-medium);
+    font-size: var(--mm-text-xs);
+    line-height: 1;
+  }
+  .cue[data-codec="flac"] { color: var(--mm-codec-flac-ink); }
+  .cue[data-codec="mp3"] { color: var(--mm-codec-mp3-ink); }
+  .cue[data-codec="aac"] { color: var(--mm-codec-aac-ink); }
+  .cue[data-codec="alac"] { color: var(--mm-codec-alac-ink); }
+  .cue[data-codec="pcm"] { color: var(--mm-codec-pcm-ink); }
+  .cue[data-codec="ogg"] { color: var(--mm-codec-ogg-ink); }
+  .duration { font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>

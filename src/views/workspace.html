@@ -18,6 +18,8 @@
   const QueuePanel = await import("./queue-panel.html")
   const SourcesPanel = await import("./sources-panel.html")
   const DropZone = await import("./drop-zone.html")
+  const SearchPanel = await import("./search-panel.html")
+  const { openSearch, search } = await import("../lib/search")
   const { dragEntered, dragExited, dragMoved, dropped } = await import("../lib/dropping")
   const { t } = await import("../lib/i18n")
   const { tabsHere } = await import("../lib/adding")
@@ -39,12 +41,52 @@
   }))
 
   const escape = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || document.querySelector("dialog[open], :popover-open")) return
+    if (event.key !== "Escape" || event.defaultPrevented || document.querySelector("dialog[open], :popover-open")) return
     if (narrow && ui.queueOpen) ui.queueOpen = false
     else clearSelection()
   }
   window.addEventListener("keydown", escape)
   $destroyed(() => window.removeEventListener("keydown", escape))
+
+  // A phone: pulled down from the top of the library or of Details, the search's field comes down
+  // under the tabs, following the finger; let go once it is all out, the search opens (its field
+  // and results over the panes, views/search-panel.html); short of that it goes back up. Only from
+  // a pane scrolled to its top, and a pull mostly downwards: the rest is the panes' own.
+  const PULL_OPENS = 56
+  let pulled = 0
+  const pull = (() => {
+    let x0 = 0
+    let y0 = 0
+    let mode: "pull" | "no" | null = "no"
+    const start = (event: TouchEvent) => {
+      const target = event.target as Element | null
+      const pane = target?.closest?.(".pane") as HTMLElement | null
+      mode = narrow && !search.open && !ui.queueOpen && !!library.activeRootId && event.touches.length === 1 && !!pane && pane.scrollTop <= 0 ? null : "no"
+      if (mode === "no") return
+      x0 = event.touches[0].clientX
+      y0 = event.touches[0].clientY
+    }
+    const move = (event: TouchEvent) => {
+      if (mode === "no") return
+      const across = event.touches[0].clientX - x0
+      const down = event.touches[0].clientY - y0
+      if (mode === null) {
+        if (Math.abs(across) < 10 && Math.abs(down) < 10) return
+        mode = down > 0 && down > Math.abs(across) * 1.5 ? "pull" : "no"
+        if (mode === "no") return
+      }
+      event.preventDefault()
+      // Harder to pull past the field's height, as a spring.
+      const reach = Math.max(0, down)
+      pulled = reach <= PULL_OPENS ? reach : PULL_OPENS + (reach - PULL_OPENS) * 0.35
+    }
+    const end = () => {
+      if (mode === "pull" && pulled >= PULL_OPENS) openSearch()
+      mode = "no"
+      pulled = 0
+    }
+    return { start, move, end }
+  })()
 
   // The split between the panes, on wider screens: the library's width in rem, dragged by the
   // separator on the line between them (or moved with its keys: the arrows a rem, Home and End to
@@ -182,6 +224,14 @@
     }
   })()
   $: comeBack(library.restoring)
+
+  await $mounted()
+  // Not passive: a pull taken keeps the pane from scrolling (and the browser from refreshing).
+  const stage = $self(".stage") as HTMLElement | null
+  stage?.addEventListener("touchstart", pull.start, { passive: true })
+  stage?.addEventListener("touchmove", pull.move, { passive: false })
+  stage?.addEventListener("touchend", pull.end)
+  stage?.addEventListener("touchcancel", pull.end)
 </script>
 
 <div class="workspace">
@@ -211,6 +261,14 @@
       <DropZone />
     </div>
     <QueuePanel :if="narrow && ui.queueOpen" />
+    <!-- A phone's search, pulled down: what comes down while pulling, then the search itself. -->
+    <div :if="narrow && pulled > 0" class="pulling" :class.ready="pulled >= PULL_OPENS" :style="`height: ${pulled}px`" aria-hidden="true">
+      <span class="pull-field">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="7" cy="7" r="4.75" /><path d="M10.5 10.5 14 14" /></svg>
+        {{ t("search.placeholder") }}
+      </span>
+    </div>
+    <div :if="narrow && search.open" class="search-layer"><SearchPanel sheet /></div>
   </div>
   <div class="footbar"><DeckKeys place="footer" /></div>
 </div>
@@ -250,6 +308,40 @@
     .welcome-logo { width: 6.5rem; margin-bottom: var(--mm-space-2); }
   }
   .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+  /* A phone's search over the panes, under the tabs. */
+  .search-layer { position: absolute; inset: 0; z-index: 3; }
+  /* While pulled down: the search's field coming down from under the tabs, over the panes. */
+  .pulling {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 3;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    padding: 0 var(--mm-space-3);
+    border-bottom: var(--mm-border-width) solid var(--mm-border);
+    background: var(--mm-sunken);
+    box-shadow: var(--mm-shadow-sm, 0 1px 2px rgb(0 0 0 / .15));
+  }
+  .pull-field {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--mm-space-2);
+    height: var(--mm-control-md);
+    margin-bottom: var(--mm-space-2);
+    padding: 0 .625rem;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-field);
+    color: var(--mm-fg-subtle);
+    font-size: var(--mm-text-sm);
+    opacity: .6;
+  }
+  .pulling.ready .pull-field { border-color: var(--mm-accent); color: var(--mm-fg-muted); opacity: 1; }
+  .pull-field svg { width: 1rem; height: 1rem; flex: none; }
   .panes {
     /* Its columns, the library's width as chosen, are written on it (see `splitColumns`). */
     position: relative;
