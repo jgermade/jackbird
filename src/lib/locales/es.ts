@@ -33,6 +33,7 @@ export const es: Record<MessageKey, string> = {
   "tree.empty": "Sin pistas en este root.",
   "tree.loadingMetadata": "Cargando metadatos…",
   "tree.openFolder": "Abrir {title} en Detalle",
+  "tree.leave": "Volver de {title}",
 
   "selection.count.one": "{count} pista seleccionada",
   "selection.count.other": "{count} pistas seleccionadas",

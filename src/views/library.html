@@ -121,8 +121,8 @@
   // caret).
   // A phone (the panes one at a time) lists no nesting: one level at a time (lib/workspace.ts,
   // `treeLevels`). The open folders are stacked at the top, from the first one down, and under
-  // them only what the last one holds. A folder's row enters it; an open one's row leaves it (and
-  // the ones under it); its ❯ key opens it in Details. Without the songs in the tree (a preference:
+  // them only what the last one holds. A folder's row enters it; an open one's ‹ leaves it (and
+  // the ones under it), and the rest of it opens it in Details. Without the songs in the tree (a preference:
   // helpers/folders.ts), a folder that holds no other (a leaf) has nothing to enter: a tap opens it
   // in Details, and on a computer it has no toggle.
   const { watchMedia } = await import("../lib/media")
@@ -235,29 +235,31 @@
 
   <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
-    <!-- A phone: the open levels, stacked from the first one down; a tap on one leaves it. -->
+    <!-- A phone: the open levels, stacked from the first one down, each one a step further in.
+         Two zones: its ‹ leaves it (back to the list that holds it, the ones under it closing
+         too), and the rest of it, its name, opens it in Details. -->
     <div :if="levels().length > 0" class="levels">
-      <ListRow :each="row in levels()"
-               :key="row.key"
-               kind="folder"
-               :glyph="glyphOf(row)"
-               :cover="rowCover(row)"
-               :round="!!row.round"
-               :label="rowLabel(row)"
-               :meta="rowMeta(row)"
-               expanded
-               no-toggle
-               :row-id="rowDomId(row.key)"
-               @select="leaveLevel(row.key)">
-        <template :slot.action>
-          <span class="row-keys" @click.stop="null">
-            <Key square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
-              <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
-            </Key>
-            <Menu :label="t('menu.folder', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
-          </span>
-        </template>
-      </ListRow>
+      <div :each="(row, at) in levels()" :key="row.key" class="level" :style="`--at: ${at}`">
+        <button type="button" class="back" :aria-label="t('tree.leave', { title: rowLabel(row) })" :title="t('tree.leave', { title: rowLabel(row) })" @click="leaveLevel(row.key)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+        </button>
+        <ListRow kind="folder"
+                 :glyph="glyphOf(row)"
+                 :cover="rowCover(row)"
+                 :round="!!row.round"
+                 :label="rowLabel(row)"
+                 :meta="rowMeta(row)"
+                 expanded
+                 no-toggle
+                 :row-id="rowDomId(row.key)"
+                 @select="openFolder(row)">
+          <template :slot.action>
+            <span class="row-keys" @click.stop="null">
+              <Menu :label="t('menu.folder', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
+            </span>
+          </template>
+        </ListRow>
+      </div>
     </div>
     <ListRow :each="row in listed()"
              :key="row.key"
@@ -356,6 +358,25 @@
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     background: var(--mm-sunken);
   }
+  /* An open level: its ‹ (the way back), then its row (to Details); each a step in from the one above. */
+  .level { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: stretch; padding-left: calc(var(--at, 0) * 1rem); }
+  .back {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    margin-right: calc(-1 * var(--mm-space-3));
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--mm-fg-muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .back svg { width: 1rem; height: 1rem; }
+  .back:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  @media (hover: hover) { .back:hover { color: var(--mm-fg); } }
+  .back:active { background: var(--mm-hover); }
   .tree:focus-visible { box-shadow: inset 0 0 0 2px var(--mm-accent); }
   .row-keys { display: flex; align-items: center; gap: var(--mm-space-1); }
 </style>

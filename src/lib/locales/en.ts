@@ -32,6 +32,7 @@ export const en = {
   "tree.empty": "No tracks in this root.",
   "tree.loadingMetadata": "Loading metadata…",
   "tree.openFolder": "Open {title} in Details",
+  "tree.leave": "Back from {title}",
 
   "selection.count.one": "{count} track selected",
   "selection.count.other": "{count} tracks selected",

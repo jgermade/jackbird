@@ -16,8 +16,8 @@
   // the parent's head included. What the top layer would do is done here: the
   // rest of the parent is made `inert` (but its head), a veil covers the
   // parent's body and asks to close when clicked, and Escape is taken before
-  // it reaches the parent, so it closes this one alone. Escape, the veil and
-  // the close key only emit `close`; the owner closes it with `:open`. When
+  // it reaches the parent, so it closes this one alone. Escape, the veil, the
+  // close key and an `mm-dismiss` event on its dialog (a phone's back) only emit `close`; the owner closes it with `:open`. When
   // the parent closes under it, it goes at once and emits `close`, so the
   // parent does not open again with it inside.
   //
@@ -164,7 +164,7 @@
 
 <div class="sub-root">
   <div class="veil" :class.shown="isOpen || leaving" :class.leaving="leaving" :style="covered" @click="ask()"></div>
-  <dialog class="sub" :class.leaving="leaving" :style="sheet" :aria-labelledby="titleId">
+  <dialog class="sub" :class.leaving="leaving" :style="sheet" :aria-labelledby="titleId" @mm-dismiss="ask()">
     <header class="head">
       <h3 class="title" :id="titleId">{{ title }}</h3>
       <Key :if="isDismissible" variant="ghost" square size="sm" :label="closeLabel" :title="closeLabel" @click="ask()">

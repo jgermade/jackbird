@@ -8,7 +8,8 @@
   //   </Modal>
   //
   // **The owner decides whether it closes.** Escape, a click on the backdrop
-  // and the close key emit `close`; the dialog follows `:open`. `closeLabel`
+  // and the close key emit `close`; the dialog follows `:open`. So does an
+  // `mm-dismiss` event on the dialog (a phone's back: lib/back.ts). `closeLabel`
   // is the close key's accessible name. The `nav` slot sits in the header,
   // under the title, edge to edge: `Tabs` (`plain`) that switch the body.
   // With it the dialog keeps one height whichever tab is open (within the
@@ -221,6 +222,7 @@
         :class.sections="hasSections"
         :aria-labelledby="titleId"
         @cancel="cancel($event)"
+        @mm-dismiss="$emit('close')"
         @focusin="reveal($event)"
         @click.self="$emit('close')">
   <header class="head" :class.with-nav="$slots.nav && !navBelow" :class.sections="hasSections"

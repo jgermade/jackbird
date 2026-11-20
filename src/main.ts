@@ -10,6 +10,7 @@ import "../theme/default/base.css";
 import { startAccount } from "./lib/account";
 import { startCompact } from "./lib/compact";
 import { keepFaviconLit } from "./lib/favicon";
+import { startBack } from "./lib/back";
 import { startHotkeys } from "./lib/hotkeys";
 import { loadRecent } from "./lib/recent";
 import { loadFavourites, startMine } from "./lib/mine";
@@ -74,6 +75,7 @@ function tellLandingDrawn(): void {
 
 function startSession(): void {
   void loadRecent();
+  startBack();
   keepSessionSaved();
   startVerifier();
   // The folders come back once someone is in (the service's people, S3); the
