@@ -235,7 +235,7 @@
 
   <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
-    <!-- A phone: the open levels, stacked from the first one down, each one a step further in.
+    <!-- A phone: the open levels, stacked from the first one down, each one's ‹ a step further in.
          Two zones: its ‹ leaves it (back to the list that holds it, the ones under it closing
          too), and the rest of it, its name, opens it in Details. -->
     <div :if="levels().length > 0" class="levels">
@@ -358,15 +358,16 @@
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     background: var(--mm-sunken);
   }
-  /* An open level: its ‹ (the way back), then its row (to Details); each a step in from the one above. */
-  .level { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: stretch; padding-left: calc(var(--at, 0) * 1rem); }
+  /* An open level: its ‹ (the way back), then its row (to Details). The way back is as wide on every
+     level; where its ‹ sits in it tells how deep the level is (a step in each, up to the fourth). */
+  .level { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: stretch; }
   .back {
     flex: none;
-    display: grid;
-    place-items: center;
-    width: 2.5rem;
+    display: flex;
+    align-items: center;
+    width: 4.5rem;
     margin-right: calc(-1 * var(--mm-space-3));
-    padding: 0;
+    padding: 0 0 0 calc(var(--mm-space-3) + min(var(--at, 0), 3) * .75rem);
     border: 0;
     background: none;
     color: var(--mm-fg-muted);
