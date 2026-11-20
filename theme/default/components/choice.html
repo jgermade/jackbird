@@ -11,7 +11,8 @@
   // An option is `{ value, label, icon, title }`: `icon` an SVG path on a
   // 16 × 16 grid, stroked in the ink's colour. With `icons`, the keys show
   // their icons alone, and the label is each key's name and tooltip. The
-  // choice goes up through `:model` and as `change`.
+  // choice goes up through `:model` and as `change`. Keys that do not fit
+  // are not cut short: the row scrolls sideways, the chosen key kept in view.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`
@@ -23,6 +24,20 @@
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: iconsOnly = flag(icons)
   $: focusable = options.some((option: Option) => option.value === model) ? model : options[0]?.value
+
+  // The chosen key in view, in a row that scrolls (sideways only: the page stays where it is).
+  const keepInView = (value: string) => {
+    requestAnimationFrame(() => {
+      const row = $self(".choice") as HTMLElement | null
+      const chosen = row?.querySelector<HTMLElement>('[aria-checked="true"]')
+      if (!row || !chosen || row.scrollWidth <= row.clientWidth) return
+      const left = chosen.offsetLeft - row.offsetLeft
+      if (left < row.scrollLeft) row.scrollLeft = left
+      else if (left + chosen.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = left + chosen.offsetWidth - row.clientWidth
+    })
+    return value
+  }
+  $: kept = keepInView(model)
 
   const choose = (value: string) => {
     if (value === model) return
@@ -66,22 +81,25 @@
 
 <style scoped>
   /* The keys share one frame: a hairline between each two, the frame's corners rounded. */
+  /* Too many to fit: the row scrolls sideways (its bar hidden, as the tabs'), each key whole. */
   .choice {
     display: inline-flex;
     max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
     border: var(--mm-border-width) solid var(--mm-border-strong);
     border-radius: var(--mm-radius-key);
     background: var(--mm-sunken);
     box-shadow: var(--mm-key-shadow);
-    overflow: hidden;
   }
+  .choice::-webkit-scrollbar { display: none; }
   .option {
     display: inline-flex;
-    flex: 1 1 auto;
+    flex: 1 0 auto;
     align-items: center;
     justify-content: center;
     gap: var(--mm-space-2);
-    min-width: 0;
     height: var(--mm-control-md);
     padding: 0 var(--mm-space-3);
     border: 0;
@@ -102,7 +120,6 @@
   }
   .option + .option { border-left: var(--mm-border-width) solid var(--mm-border-strong); }
   .option.bare { width: calc(var(--mm-control-md) + .5rem); flex: none; padding: 0; }
-  .option span { overflow: hidden; text-overflow: ellipsis; }
   .glyph { flex: none; width: 1rem; height: 1rem; }
   @media (hover: hover) { .option:hover { color: var(--mm-fg); } }
   .option:active { background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
