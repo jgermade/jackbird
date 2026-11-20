@@ -27,6 +27,10 @@
   const { t } = await import("../lib/i18n")
   const { preferences } = await import("../lib/preferences")
   const { peakMotion } = await import("../helpers/spectrum")
+  const { isLiked } = await import("../helpers/playlists")
+  const { toggleLike } = await import("../lib/playlists")
+  const { can } = await import("../lib/account")
+  const { lastTabs } = await import("../lib/session")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   const logoStyle = `--logo: url("${logoUrl}")`
 
@@ -101,6 +105,8 @@
   // playing", and the artist's line what to do; each scrolls only if it does not fit, as any line.
   $: marquee = !current && !playback.error && !library.restoring && library.roots.length === 0 ? t("faceplate.marquee") : ""
   $: marqueeSub = marquee ? t("faceplate.marqueeSub") : ""
+  // The last session coming back (lib/session.ts `lastTabs`): the title's line says so meanwhile.
+  $: opening = !current && !playback.error && library.restoring && lastTabs.length > 0 ? t("faceplate.opening") : ""
   const pace = (text: string): string => `--marquee-time: ${Math.max(8, Math.round(text.length * 0.28))}s`
   // Nothing playing: a remark of the deck's own, a new one every so often (IDLE_LINES of them).
   const IDLE_LINES = 12
@@ -131,7 +137,7 @@
       const row = $self(rowSelector) as HTMLElement | null
       const sizer = row?.querySelector<HTMLElement>(".line-sizer")
       if (!row || !sizer) return false
-      const clock = row.querySelector<HTMLElement>(".lcd-time")
+      const clock = row.querySelector<HTMLElement>(".lcd-time, .lcd-like")
       const room = row.clientWidth - (clock ? clock.offsetWidth + (parseFloat(getComputedStyle(row).columnGap) || 0) : 0)
       return sizer.offsetWidth > room + 1
     }
@@ -166,9 +172,9 @@
     }
   })()
   $destroyed(() => fit.stop())
-  $: titleLine = marquee || dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
+  $: titleLine = marquee || opening || dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
   $: artistLine = marqueeSub || (dacName ? dacWay : playback.error ? "" : current ? (current.artist ?? "") : readingNow ? t("faceplate.readingCount", { loaded: readingNow.loaded, total: readingNow.total }) : "")
-  $: fit.check(`${titleLine}\n${artistLine}\n${current ? 1 : 0}`)
+  $: fit.check(`${titleLine}\n${artistLine}\n${current ? 1 : 0}${can("editor") ? 1 : 0}`)
   // The clock at the end of the artist's line, mm:ss, turned with a click or a tap: where the song
   // is, or its length. The minutes' zeros at the left are dimmed: "03" shows its 3 lit.
   const TIME_VIEWS = ["elapsed", "total"] as const
@@ -180,6 +186,27 @@
   // it is turned); null otherwise, or with the finger out of the display (letting go there gives
   // the seek up).
   let scrubbing: number | null = null
+  // The heart at the title's end: whether the song playing is in its folder's liked songs
+  // (`Liked.m3u8`, lib/playlists.ts); a tap likes it, or no longer. Only for one who may write.
+  const liked = (): boolean => {
+    const song = current
+    if (!song) return false
+    const root = library.roots.find((one) => one.id === song.rootId)
+    return !!root && isLiked(root.playlists ?? [], song.relativePath)
+  }
+  const canLike = (): boolean => !!current && can("editor")
+  const like = () => {
+    if (current) void toggleLike(current.rootId, current.trackId)
+  }
+  // Where a finger may be let go of the song's place: on a phone the display and the tabs' bar
+  // under it (the whole faceplate), a thumb sliding over the narrow strip drifting down; elsewhere
+  // (and in the compact view, which has no tabs) the display alone.
+  const phoneQuery = matchMedia("(max-width: 720px)")
+  let phone: boolean = phoneQuery.matches
+  const phoneChanged = (event: MediaQueryListEvent) => (phone = event.matches)
+  phoneQuery.addEventListener("change", phoneChanged)
+  $destroyed(() => phoneQuery.removeEventListener("change", phoneChanged))
+  $: scrubWithin = phone && !flag(small) ? ".faceplate" : ".lcd"
   $: elapsedClock = clockParts(playback.position)
   $: totalClock = clockParts(playback.duration)
   $: scrubClock = scrubbing === null ? null : clockParts(scrubbing)
@@ -231,6 +258,11 @@
               <span :else class="mm-display-title" :title="titleLine">{{ titleLine }}</span>
               <!-- The title laid out whole and unseen, to know whether it fits. -->
               <span class="mm-display-title line-sizer" aria-hidden="true">{{ titleLine }}</span>
+              <!-- The heart: empty, or full while the song is liked; a tap turns it. -->
+              <button :if="canLike()" type="button" class="lcd-like" :class.on="liked()" :aria-pressed="liked() ? 'true' : 'false'"
+                      :aria-label="t(liked() ? 'likes.unlike' : 'likes.like', { title: current?.title ?? '' })" :title="t(liked() ? 'likes.unlike' : 'likes.like', { title: current?.title ?? '' })" @click="like()">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.5S2 9.9 2 5.9C2 4 3.4 2.6 5.2 2.6c1.2 0 2.2.6 2.8 1.6.6-1 1.6-1.6 2.8-1.6C12.6 2.6 14 4 14 5.9c0 4-6 7.6-6 7.6z" /></svg>
+              </button>
             </span>
             <span class="now artist-row">
               <span :if="artistScrolls" class="artist mm-display-title marquee" :style="pace(artistLine)" :title="artistLine"><span class="marquee-run" aria-hidden="true"><span>{{ artistLine }}</span><span>{{ artistLine }}</span></span><span class="visually-hidden">{{ artistLine }}</span></span>
@@ -247,9 +279,10 @@
         </div>
         <Meter :if="readingNow" variant="display" :segments="40" :pitch=".625" :level="readingNow.loaded" :max="readingNow.total" :label="t('faceplate.reading')" :level-text="t('faceplate.readingCount', { loaded: readingNow.loaded, total: readingNow.total })" />
         <!-- The song's place: tapped or dragged, it moves the song there (a marker, and the clock,
-             showing where while pressed; let go out of the display, it stays); the arrows by 5 s. -->
+             showing where while pressed; let go out of the display, or on a phone of the
+             faceplate, it stays); the arrows by 5 s. -->
         <Meter :else variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText"
-               :seekable="!!current && playback.duration > 0" :step="5" within=".lcd" @scrub="scrubbing = $event.detail" @seek="seekTo($event.detail)" />
+               :seekable="!!current && playback.duration > 0" :step="5" :within="scrubWithin" @scrub="scrubbing = $event.detail" @seek="seekTo($event.detail)" />
       </div>
     </div>
   </Display>
@@ -428,6 +461,33 @@
     cursor: pointer;
   }
   .lcd-time:focus-visible { outline: 1px dashed currentColor; outline-offset: 2px; }
+  /* The title's line: the title, and the heart at its end. */
+  .title-row { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
+  .title-row > .mm-display-title:not(.line-sizer) { flex: 1 1 auto; min-width: 0; }
+  /* The heart: a key with no keycap, as tall as the title's capitals; a finger's room round it. */
+  .lcd-like {
+    flex: none;
+    display: grid;
+    place-items: center;
+    margin: calc(-1 * var(--mm-space-2));
+    padding: var(--mm-space-2);
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lcd-like svg {
+    width: calc(5 * var(--mm-display-dot));
+    height: calc(5 * var(--mm-display-dot));
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+    opacity: .7;
+  }
+  .lcd-like.on svg { fill: currentColor; opacity: 1; }
+  .lcd-like:focus-visible { outline: 1px dashed currentColor; outline-offset: -2px; }
   /* The artist's line: the artist, and the clock at its end. */
   .artist-row { display: flex; align-items: center; gap: var(--mm-space-3); min-width: 0; }
   .artist-row .artist { flex: 1 1 auto; min-width: 0; }

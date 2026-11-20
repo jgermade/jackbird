@@ -6,7 +6,7 @@
 // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
 
 import { $toRaw } from "jq79";
-import { sameSession, sessionOf, type Session } from "../helpers/session";
+import { parseSessionTabs, sameSession, sessionOf, sessionTabsOf, type Session, type SessionTab } from "../helpers/session";
 import { account, followServer } from "./account";
 import { importing } from "./importing";
 import { library } from "./library";
@@ -14,6 +14,14 @@ import { loadRootSession, saveRootSession } from "./rootSessionStore";
 import { hydrateRoot } from "./roots";
 import { restoreSource } from "./sources";
 import { currentServer } from "./sources/service";
+import { STORAGE_KEYS, readStored, writeStored } from "./storage";
+
+/**
+ * The tabs the last session left open, known at once on start (the session itself is read from
+ * IndexedDB, and each folder asked again, which takes a while): while they come back, the stage
+ * says so (views/workspace.html), not that there is no music; with none, the welcome shows at once.
+ */
+export const lastTabs: readonly SessionTab[] = parseSessionTabs(readStored(STORAGE_KEYS.sessionTabs));
 
 /**
  * Reopens the roots saved last time that still have permission, in their
@@ -115,6 +123,7 @@ export function keepSessionSaved(): () => void {
       return;
     }
     last = next;
+    writeStored(STORAGE_KEYS.sessionTabs, JSON.stringify(sessionTabsOf(next)));
     saveRootSession(next).catch(() => {
       last = null;
     });

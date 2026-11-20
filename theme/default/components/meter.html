@@ -20,7 +20,9 @@
   // emitted with it as it moves (null once let go or given up), for the owner
   // to show it. `within` (a selector of an element around it) is where it may
   // be let go: outside it the marker stays still where it was, dimmed, `scrub`
-  // says null, and letting go there chooses nothing.
+  // says null, and letting go there chooses nothing. A finger has some room
+  // round it (`SLACK_REM`): a strip at the edge of `within` (its hit area half
+  // out of it) drags as a finger drifts off it while sliding.
   //
   // Not `value` nor `valueText`: jq79 keeps `:value` for an element's own
   // value, and ignores it on a component tag.
@@ -62,13 +64,16 @@
     const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
     return box.width > 0 ? Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)) * top : 0
   }
-  // Whether the finger is out of `within` (or of the meter's own strip, without it).
+  // Whether the finger is out of `within`, by more than the room a finger has round it (nowhere
+  // is, without it).
+  const SLACK_REM = 2
   const isOutside = (event: PointerEvent): boolean => {
     const meter = event.currentTarget as HTMLElement
     const area = (within ? meter.closest(within) : null) as HTMLElement | null
     if (!area) return false
     const box = area.getBoundingClientRect()
-    return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom
+    const slack = SLACK_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16)
+    return event.clientX < box.left - slack || event.clientX > box.right + slack || event.clientY < box.top - slack || event.clientY > box.bottom + slack
   }
   // Out of `within`, the marker stays where the finger left it: it will not go there.
   const follow = (event: PointerEvent) => {

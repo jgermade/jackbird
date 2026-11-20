@@ -26,14 +26,15 @@
     const filled = readFromNames()
     readNote = filled === 0 ? t("drop.readNone") : tn("drop.readSome", filled)
   }
-  const title = (): string => (dropping.reading ? t("drop.reading") : tn("drop.title", dropping.songs.length))
+  const title = (): string => (dropping.reading ? t("drop.reading") : tn(dropping.copied ? "drop.copyTitle" : "drop.title", dropping.songs.length))
+  const eyebrow = (): string => t(dropping.copied ? "drop.copyEyebrow" : "drop.eyebrow", { name: dropping.target?.label ?? "" })
   const finished = (): boolean => dropping.report !== null
   // How much of the songs' bytes is in, the one being uploaded's as it goes: a large file counts
   // for more than a small one.
   const share = (): number => (dropping.bytesTotal > 0 ? Math.min(100, Math.round(((dropping.bytesDone + dropping.bytesSent) / dropping.bytesTotal) * 100)) : 0)
 </script>
 
-<Modal :open="dropping.open" :eyebrow="t('drop.eyebrow', { name: dropping.target?.label ?? '' })" :title="title()" size="lg" :close-label="t('drop.close')" @close="closeDrop()">
+<Modal :open="dropping.open" :eyebrow="eyebrow()" :title="title()" size="lg" :close-label="t('drop.close')" @close="closeDrop()">
   <div class="drop">
     <p :if="dropping.error" class="failure">{{ dropping.error }}</p>
 

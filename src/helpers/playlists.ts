@@ -87,3 +87,36 @@ export function withPlaylist(playlists: readonly Playlist[], playlist: Playlist)
     ? playlists.map((one) => (one.path === playlist.path ? playlist : one))
     : [...playlists, playlist];
 }
+
+/**
+ * The liked songs' list (the owner, 2026-11-20): a playlist like any other, at a fixed path at the
+ * folder's root, so it is found again whatever the language, and goes wherever the folder goes.
+ */
+export const LIKED_PATH = "Liked.m3u8";
+
+/** Whether `path` is the liked songs' list (compared without case). */
+export function isLikedPath(path: string): boolean {
+  return path.toLowerCase() === LIKED_PATH.toLowerCase();
+}
+
+/** The liked songs' list among a folder's playlists; null while none is liked. */
+export function likedOf(playlists: readonly Playlist[]): Playlist | null {
+  return playlists.find((playlist) => isLikedPath(playlist.path)) ?? null;
+}
+
+/** Whether a track (by its path in the folder) is in the liked songs' list. */
+export function isLiked(playlists: readonly Playlist[], relativePath: string): boolean {
+  return !!likedOf(playlists)?.entries.some((entry) => entry.path === relativePath);
+}
+
+/**
+ * The liked songs' list with a track liked (at its end) or, when it was, no longer (every entry of
+ * it out); made when there was none.
+ */
+export function toggledLike(playlists: readonly Playlist[], track: Pick<Track, "relativePath" | "metadata">): Playlist {
+  const liked = likedOf(playlists) ?? { path: LIKED_PATH, name: LIKED_PATH.replace(/\.m3u8$/i, ""), entries: [] };
+  const entries = liked.entries.some((entry) => entry.path === track.relativePath)
+    ? liked.entries.filter((entry) => entry.path !== track.relativePath)
+    : [...liked.entries, entryFor(track)];
+  return { ...liked, entries };
+}

@@ -22,8 +22,12 @@ import { uploadToLibrary } from "./sources/service";
 /** Where a drop goes: the active root, and what it is. */
 export type DropTarget = { rootId: string; kind: "server" | "folder" | "ipod"; label: string };
 
-/** A dropped song: the file, where it was in what was dropped, its tags as read and as they will be. */
-export type DroppedSong = { file: File; from: string; read: TrackMetadata; tags: TrackMetadata };
+/**
+ * A song dropped (or copied from another tab, lib/copying.ts): its file's name and size, where it
+ * was in what was dropped (or in its tab), its tags as read and as they will be, and its bytes,
+ * read only as it lands.
+ */
+export type DroppedSong = { name: string; size: number; from: string; read: TrackMetadata; tags: TrackMetadata; bytes: () => Promise<Uint8Array> };
 
 export type DropReport = { added: number; existing: number; failed: [string, string][]; leftOut: number };
 
@@ -35,6 +39,8 @@ export const dropping = $reactive({
   refusal: "",
   /** The dialog, once dropped: the songs, what was not a song, and the patterns. */
   open: false,
+  /** The songs come from another tab ("Copy to…"), not dropped. */
+  copied: false,
   reading: false,
   songs: [] as DroppedSong[],
   leftOut: 0,
@@ -160,6 +166,7 @@ export async function drop(event: DragEvent): Promise<void> {
   if (!transfer || !dropping.target) return;
   const files = droppedFiles(transfer);
   dropping.open = true;
+  dropping.copied = false;
   dropping.reading = true;
   dropping.songs = [];
   dropping.report = null;
@@ -176,7 +183,7 @@ export async function drop(event: DragEvent): Promise<void> {
         dropping.leftOut += 1;
         continue;
       }
-      read.push({ file, from: path, read: tags, tags: tidyTags(tags) });
+      read.push({ name: file.name, size: file.size, from: path, read: tags, tags: tidyTags(tags), bytes: async () => new Uint8Array(await file.arrayBuffer()) });
     }
     dropping.songs = read;
   } catch (error) {
@@ -184,6 +191,23 @@ export async function drop(event: DragEvent): Promise<void> {
   } finally {
     dropping.reading = false;
   }
+}
+
+/**
+ * Songs of another tab to copy to `target` (lib/copying.ts): the drop's dialog opens with them, as
+ * if they had been dropped there.
+ */
+export function openDropWith(target: DropTarget, songs: DroppedSong[]): void {
+  dropping.target = target;
+  dropping.refusal = "";
+  dropping.songs = songs;
+  dropping.leftOut = 0;
+  dropping.report = null;
+  dropping.error = "";
+  dropping.done = 0;
+  dropping.reading = false;
+  dropping.copied = true;
+  dropping.open = true;
 }
 
 /** The pattern the paths are made by, kept for the next time. */
@@ -207,7 +231,7 @@ export function setReadPattern(pattern: string): void {
 /** The pattern a song goes by: the compilations' for one its tags mark so, else everyone's. */
 const patternOf = (song: DroppedSong): string => patternFor(song.tags, dropping.pattern, dropping.compilationPattern);
 export const missingOf = (song: DroppedSong): DropTag[] => missingTags(patternOf(song), song.tags);
-export const pathOf = (song: DroppedSong): string => dropPath(patternOf(song), song.file.name, song.tags);
+export const pathOf = (song: DroppedSong): string => dropPath(patternOf(song), song.name, song.tags);
 /** Whether any dropped song is a compilation: the dialog then shows their pattern too. */
 export const hasCompilations = (): boolean => dropping.songs.some((song) => isCompilation({ compilation: String(song.tags.compilation ?? "") }));
 
@@ -240,7 +264,7 @@ export function closeDrop(): void {
 
 /** A song's bytes as it lands: its tags written where they changed. */
 async function copyOf(song: DroppedSong): Promise<Uint8Array> {
-  const bytes = new Uint8Array(await song.file.arrayBuffer());
+  const bytes = await song.bytes();
   const tags = tidyTags(song.tags);
   return tagsChanged(song.read, tags) ? writeTags(bytes, song.read, tags) : bytes;
 }
@@ -256,15 +280,15 @@ export async function confirmDrop(): Promise<void> {
   dropping.done = 0;
   dropping.bytesDone = 0;
   dropping.bytesSent = 0;
-  dropping.bytesTotal = songs.reduce((sum, song) => sum + song.file.size, 0);
+  dropping.bytesTotal = songs.reduce((sum, song) => sum + song.size, 0);
   dropping.error = "";
   const failed = (song: DroppedSong, error: unknown) => report.failed.push([song.from, error instanceof Error ? error.message : String(error)]);
   try {
     if (target.kind === "server") {
       for (const song of songs) {
-        dropping.current = song.file.name;
+        dropping.current = song.name;
         try {
-          const sent = (bytes: number) => (dropping.bytesSent = Math.min(bytes, song.file.size));
+          const sent = (bytes: number) => (dropping.bytesSent = Math.min(bytes, song.size));
           const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]), undefined, sent);
           if (answer.result === "added" || answer.result === "suggested") report.added += 1;
           else if (answer.result === "existing") report.existing += 1;
@@ -273,13 +297,13 @@ export async function confirmDrop(): Promise<void> {
           failed(song, error);
         }
         dropping.done += 1;
-        dropping.bytesDone += song.file.size;
+        dropping.bytesDone += song.size;
         dropping.bytesSent = 0;
       }
     } else if (target.kind === "folder") {
       const taken = new Set(root.tracks.map((track) => track.relativePath.toLowerCase()));
       for (const song of songs) {
-        dropping.current = song.file.name;
+        dropping.current = song.name;
         try {
           const path = freePath(pathOf(song), taken);
           await root.source.vfs.write(path, await copyOf(song));
@@ -289,7 +313,7 @@ export async function confirmDrop(): Promise<void> {
           failed(song, error);
         }
         dropping.done += 1;
-        dropping.bytesDone += song.file.size;
+        dropping.bytesDone += song.size;
       }
     } else {
       const ipod = root.source.ipod?.path;
@@ -300,7 +324,7 @@ export async function confirmDrop(): Promise<void> {
         const staged: { root: string; path: string }[] = [];
         const taken = new Set<string>();
         for (const song of songs) {
-          dropping.current = song.file.name;
+          dropping.current = song.name;
           try {
             const path = freePath(pathOf(song), taken);
             await staging.vfs.write(path, await copyOf(song));
@@ -310,7 +334,7 @@ export async function confirmDrop(): Promise<void> {
             failed(song, error);
           }
           dropping.done += 1;
-          dropping.bytesDone += song.file.size;
+          dropping.bytesDone += song.size;
         }
         if (ipod && staged.length > 0) {
           const sent = await sendFiles(ipod, staged);

@@ -47,6 +47,7 @@ function viewLabels(): ViewLabels {
     unknownAlbum: t("album.untitled"),
     variousArtists: t("views.variousArtists"),
     missing: t("playlist.missing"),
+    liked: t("likes.list"),
     locale: preferences.language
   };
 }

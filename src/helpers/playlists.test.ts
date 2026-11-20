@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
 import { parseM3u, serializeM3u } from "./m3u.ts";
-import { decodePlaylist, entryFor, isPlaylistFile, moveEntry, newPlaylistPath, pathTaken, renamedEntries, withoutEntry, withPlaylist } from "./playlists.ts";
+import { LIKED_PATH, decodePlaylist, entryFor, isLiked, isLikedPath, isPlaylistFile, likedOf, moveEntry, toggledLike, newPlaylistPath, pathTaken, renamedEntries, withoutEntry, withPlaylist } from "./playlists.ts";
 
 const a = { path: "A.mp3", raw: "A.mp3" };
 const b = { path: "B.mp3", raw: "B.mp3", title: "B" };
@@ -71,5 +71,35 @@ describe("withPlaylist", () => {
     const other = { path: "x.m3u", name: "x", entries: [] };
     assert.deepEqual(withPlaylist([road, other], { ...road, entries: [b] }), [{ ...road, entries: [b] }, other]);
     assert.deepEqual(withPlaylist([other], road), [other, road]);
+  });
+});
+
+describe("liked", () => {
+  const song = track("Jazz/So What.mp3", { title: "So What", artist: "Miles Davis" });
+  const other = { path: "Playlists/Road.m3u8", name: "Road", entries: [entryFor(song)] };
+
+  it("knows the liked list by its path, whatever its case", () => {
+    assert.equal(isLikedPath(LIKED_PATH), true);
+    assert.equal(isLikedPath("LIKED.M3U8"), true);
+    assert.equal(isLikedPath("Playlists/Liked.m3u8"), false);
+    assert.equal(likedOf([other]), null);
+  });
+
+  it("makes the list on the first like, and adds at its end", () => {
+    const made = toggledLike([other], song);
+    assert.equal(made.path, LIKED_PATH);
+    assert.equal(made.name, "Liked");
+    assert.deepEqual(made.entries, [entryFor(song)]);
+    assert.equal(isLiked([other, made], song.relativePath), true);
+    assert.equal(isLiked([other], song.relativePath), false);
+    const second = track("Rock/B.mp3", { title: "B" });
+    assert.deepEqual(toggledLike([made], second).entries.map((entry) => entry.path), ["Jazz/So What.mp3", "Rock/B.mp3"]);
+  });
+
+  it("takes every entry of a liked track out", () => {
+    const twice = { path: "liked.m3u8", name: "liked", entries: [entryFor(song), a, entryFor(song)] };
+    const unliked = toggledLike([twice], song);
+    assert.equal(unliked.path, "liked.m3u8");
+    assert.deepEqual(unliked.entries, [a]);
   });
 });

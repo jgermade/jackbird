@@ -166,3 +166,30 @@ export function parseViewState(raw: string | null): SavedView {
     return start;
   }
 }
+
+/**
+ * A tab of the last session, as kept where it can be read at once on the next start (localStorage):
+ * its id and name, so the app knows before the session is read (IndexedDB) that there is music
+ * coming back, and which.
+ */
+export type SessionTab = { id: string; label: string };
+
+/** The tabs a session holds, in order. */
+export function sessionTabsOf(session: Session<unknown>): SessionTab[] {
+  return session.roots.map((root) => ({ id: root.id, label: root.label }));
+}
+
+/** The tabs kept as text; none when there is nothing, or it cannot be read. */
+export function parseSessionTabs(text: string | null): SessionTab[] {
+  if (!text) return [];
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item: unknown) => {
+      const tab = item as Partial<SessionTab> | null;
+      return tab && typeof tab.id === "string" && typeof tab.label === "string" ? [{ id: tab.id, label: tab.label }] : [];
+    });
+  } catch {
+    return [];
+  }
+}

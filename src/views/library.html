@@ -41,7 +41,7 @@
     treeRows
   } = await import("../lib/workspace")
 
-  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; format?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean }
+  type Row = { key: string; kind: string; album: string; label: string; depth: number; expanded?: boolean; leaf?: boolean; playlist?: string; trackId?: string; trackNumber?: string; format?: string; artist?: string; meta?: string; sub?: string; cover?: string; framed?: boolean; round?: boolean; inView?: string; missing?: boolean; liked?: boolean }
 
   // Read through functions, not `$:` copies: the derived values are boxed
   // (see Opaque in lib/workspace.ts) and must not land in this store.
@@ -89,8 +89,11 @@
   const rowCover = (row: Row): string | null => (row.cover ? coverSrc(row.cover) : null)
   const rowSub = (row: Row): string => row.sub ?? ""
   const rowMeta = (row: Row): string => (row.missing ? (row.meta ?? "") : row.kind === "track" || row.sub ? "" : (row.meta ?? ""))
+  // Nothing listed: still loading (no tab in front yet, or its folder still read), or truly empty.
+  // Never "no tracks" before the music has come: while the session comes back with no tab in front,
+  // the notice above says so, and nothing is said here.
   const emptyText = (): string => {
-    if (isLoading()) return t("tree.loadingLibrary")
+    if (!root() || isLoading()) return t("tree.loadingLibrary")
     if (view() === "playlists") return t("views.empty.playlists")
     if (view() === "compilations") return t("views.empty.compilations")
     return t("tree.empty")
@@ -99,7 +102,8 @@
   const rowLabel = (row: Row): string => row.label || (isLoading() ? t("tree.loadingMetadata") : "—")
   // A group's icon by what it is: in Artists an artist, in Albums and Compilations an album, in
   // Albums by artist an artist and under it its albums, in Playlists a playlist; else a folder.
-  const glyphOf = (row: Row): "folder" | "artist" | "album" | "playlist" => {
+  const glyphOf = (row: Row): "folder" | "artist" | "album" | "playlist" | "liked" => {
+    if (row.liked) return "liked"
     switch (row.inView) {
       case "artists": return "artist"
       case "albums":
@@ -310,7 +314,7 @@
   </div>
 
 
-  <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
+  <p :if="rows().length === 0 && (root() || !library.restoring)" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
     <!-- A phone: the open levels, stacked from the first one down, each one's ‹ a step further in.
          Two zones: its ‹ leaves it (back to the list that holds it, the ones under it closing
@@ -447,7 +451,8 @@
     margin-right: calc(-1 * var(--mm-space-3));
     padding: 0 0 0 calc(var(--mm-space-3) + min(var(--at, 0), 3) * .75rem);
     border: 0;
-    background: none;
+    /* A little lighter than the levels' ground: the way back as a zone of its own. */
+    background: var(--mm-surface);
     color: var(--mm-fg-muted);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;

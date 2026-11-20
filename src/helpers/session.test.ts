@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parsePlaybackState, parseViewState, sameSession, sessionOf } from "./session.ts";
+import { parsePlaybackState, parseSessionTabs, parseViewState, sameSession, sessionOf, sessionTabsOf } from "./session.ts";
 
 const music = { name: "Music" };
 const podcasts = { name: "Podcasts" };
@@ -127,5 +127,22 @@ describe("parseViewState", () => {
     assert.deepEqual(parseViewState("{"), start);
     assert.deepEqual(parseViewState("7"), start);
     assert.deepEqual(parseViewState(JSON.stringify({ panel: "elsewhere", treeScroll: -5, sheetScroll: "x" })), start);
+  });
+});
+
+describe("session tabs", () => {
+  it("keeps each tab's id and name, in order", () => {
+    const session = { roots: [{ id: "a", label: "Music", handle: "x", groupingMode: "wizard" as const }, { id: "b", label: "iPod", handle: "y", groupingMode: "wizard" as const }], activeRootId: "b" };
+    const tabs = sessionTabsOf(session);
+    assert.deepEqual(tabs, [{ id: "a", label: "Music" }, { id: "b", label: "iPod" }]);
+    assert.deepEqual(parseSessionTabs(JSON.stringify(tabs)), tabs);
+  });
+
+  it("reads none from nothing, from what is not a list, and leaves out what is not a tab", () => {
+    assert.deepEqual(parseSessionTabs(null), []);
+    assert.deepEqual(parseSessionTabs(""), []);
+    assert.deepEqual(parseSessionTabs("{"), []);
+    assert.deepEqual(parseSessionTabs('{"id":"a"}'), []);
+    assert.deepEqual(parseSessionTabs('[{"id":"a","label":"A"},{"id":1},null,"x"]'), [{ id: "a", label: "A" }]);
   });
 });
