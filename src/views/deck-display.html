@@ -180,6 +180,15 @@
   // it is turned); null otherwise, or with the finger out of the display (letting go there gives
   // the seek up).
   let scrubbing: number | null = null
+  // Where a finger may be let go of the song's place: on a phone the display and the tabs' bar
+  // under it (the whole faceplate), a thumb sliding over the narrow strip drifting down; elsewhere
+  // (and in the compact view, which has no tabs) the display alone.
+  const phoneQuery = matchMedia("(max-width: 720px)")
+  let phone: boolean = phoneQuery.matches
+  const phoneChanged = (event: MediaQueryListEvent) => (phone = event.matches)
+  phoneQuery.addEventListener("change", phoneChanged)
+  $destroyed(() => phoneQuery.removeEventListener("change", phoneChanged))
+  $: scrubWithin = phone && !flag(small) ? ".faceplate" : ".lcd"
   $: elapsedClock = clockParts(playback.position)
   $: totalClock = clockParts(playback.duration)
   $: scrubClock = scrubbing === null ? null : clockParts(scrubbing)
@@ -247,9 +256,10 @@
         </div>
         <Meter :if="readingNow" variant="display" :segments="40" :pitch=".625" :level="readingNow.loaded" :max="readingNow.total" :label="t('faceplate.reading')" :level-text="t('faceplate.readingCount', { loaded: readingNow.loaded, total: readingNow.total })" />
         <!-- The song's place: tapped or dragged, it moves the song there (a marker, and the clock,
-             showing where while pressed; let go out of the display, it stays); the arrows by 5 s. -->
+             showing where while pressed; let go out of the display, or on a phone of the
+             faceplate, it stays); the arrows by 5 s. -->
         <Meter :else variant="display" :segments="40" :pitch=".625" :level="playback.position" :ahead="playback.buffered < playback.duration ? playback.buffered : 0" :max="playback.duration" :label="t('faceplate.position')" :level-text="positionText"
-               :seekable="!!current && playback.duration > 0" :step="5" within=".lcd" @scrub="scrubbing = $event.detail" @seek="seekTo($event.detail)" />
+               :seekable="!!current && playback.duration > 0" :step="5" :within="scrubWithin" @scrub="scrubbing = $event.detail" @seek="seekTo($event.detail)" />
       </div>
     </div>
   </Display>
