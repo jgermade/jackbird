@@ -89,8 +89,11 @@
   const rowCover = (row: Row): string | null => (row.cover ? coverSrc(row.cover) : null)
   const rowSub = (row: Row): string => row.sub ?? ""
   const rowMeta = (row: Row): string => (row.missing ? (row.meta ?? "") : row.kind === "track" || row.sub ? "" : (row.meta ?? ""))
+  // Nothing listed: still loading (no tab in front yet, or its folder still read), or truly empty.
+  // Never "no tracks" before the music has come: while the session comes back with no tab in front,
+  // the notice above says so, and nothing is said here.
   const emptyText = (): string => {
-    if (isLoading()) return t("tree.loadingLibrary")
+    if (!root() || isLoading()) return t("tree.loadingLibrary")
     if (view() === "playlists") return t("views.empty.playlists")
     if (view() === "compilations") return t("views.empty.compilations")
     return t("tree.empty")
@@ -311,7 +314,7 @@
   </div>
 
 
-  <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
+  <p :if="rows().length === 0 && (root() || !library.restoring)" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
     <!-- A phone: the open levels, stacked from the first one down, each one's ‹ a step further in.
          Two zones: its ‹ leaves it (back to the list that holds it, the ones under it closing

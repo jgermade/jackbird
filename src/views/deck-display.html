@@ -30,6 +30,7 @@
   const { isLiked } = await import("../helpers/playlists")
   const { toggleLike } = await import("../lib/playlists")
   const { can } = await import("../lib/account")
+  const { lastTabs } = await import("../lib/session")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
   const logoStyle = `--logo: url("${logoUrl}")`
 
@@ -104,6 +105,8 @@
   // playing", and the artist's line what to do; each scrolls only if it does not fit, as any line.
   $: marquee = !current && !playback.error && !library.restoring && library.roots.length === 0 ? t("faceplate.marquee") : ""
   $: marqueeSub = marquee ? t("faceplate.marqueeSub") : ""
+  // The last session coming back (lib/session.ts `lastTabs`): the title's line says so meanwhile.
+  $: opening = !current && !playback.error && library.restoring && lastTabs.length > 0 ? t("faceplate.opening") : ""
   const pace = (text: string): string => `--marquee-time: ${Math.max(8, Math.round(text.length * 0.28))}s`
   // Nothing playing: a remark of the deck's own, a new one every so often (IDLE_LINES of them).
   const IDLE_LINES = 12
@@ -169,7 +172,7 @@
     }
   })()
   $destroyed(() => fit.stop())
-  $: titleLine = marquee || dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
+  $: titleLine = marquee || opening || dacName || playback.error || (current ? current.title : readingNow ? t("faceplate.reading") : t(`faceplate.idle.${idleLine}`))
   $: artistLine = marqueeSub || (dacName ? dacWay : playback.error ? "" : current ? (current.artist ?? "") : readingNow ? t("faceplate.readingCount", { loaded: readingNow.loaded, total: readingNow.total }) : "")
   $: fit.check(`${titleLine}\n${artistLine}\n${current ? 1 : 0}${can("editor") ? 1 : 0}`)
   // The clock at the end of the artist's line, mm:ss, turned with a click or a tap: where the song

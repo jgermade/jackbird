@@ -19,11 +19,20 @@
   const SourcesPanel = await import("./sources-panel.html")
   const DropZone = await import("./drop-zone.html")
   const SearchPanel = await import("./search-panel.html")
+  const Reel = await import("../../theme/default/components/reel.html")
+  const { lastTabs } = await import("../lib/session")
   const { openSearch, search } = await import("../lib/search")
   const { dragEntered, dragExited, dragMoved, dropped } = await import("../lib/dropping")
   const { t } = await import("../lib/i18n")
   const { tabsHere } = await import("../lib/adding")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
+  // The last session's tabs coming back (lib/session.ts `lastTabs`, known at once): until one is in
+  // front, the stage says so, each tab ticked as it opens, not that there is no music.
+  // With none known (a first start, or the first after this was kept), the stage stays bare until
+  // the session is read: neither the welcome nor an empty library before the music has come.
+  const hadSession = lastTabs.length > 0
+  const opening = (): boolean => library.restoring && !library.activeRootId
+  const opened = (id: string): boolean => library.roots.some((root) => root.id === id)
   // The welcome: no folder open, none coming back, and something to offer.
   const welcome = (): boolean => !library.restoring && library.roots.length === 0 && tabsHere().length > 0
   const { parseViewState } = await import("../helpers/session")
@@ -240,7 +249,20 @@
   <div class="stage">
     <!-- While no folder is open (and none is coming back), one space, not the two panes: what the
          roots' bar's tab offers, a folder or a server (views/sources-panel.html). -->
-    <section :if="welcome()" class="welcome" :aria-label="t('sources.eyebrow')">
+    <section :if="opening()" class="opening" role="status" aria-live="polite">
+      <div :if="hadSession" class="opening-body">
+        <Reel :size="32" />
+        <p class="opening-lead">{{ t("session.opening") }}</p>
+        <ul class="opening-tabs">
+          <li :each="tab in lastTabs" :key="tab.id" :class.done="opened(tab.id)">
+            <svg :if="opened(tab.id)" class="state" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 4.5" /></svg>
+            <span :else class="state pending" aria-hidden="true"></span>
+            <span class="name">{{ tab.label }}</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+    <section :elseif="welcome()" class="welcome" :aria-label="t('sources.eyebrow')">
       <div class="welcome-body">
         <img class="welcome-logo" :src="logoUrl" alt="" width="1152" height="1061" />
         <p class="welcome-lead">{{ t("sources.welcome") }}</p>
@@ -309,6 +331,20 @@
   @media (max-width: 480px) {
     .welcome-logo { width: 6.5rem; margin-bottom: var(--mm-space-2); }
   }
+  /* The last session coming back: in the welcome's place, its tabs listed, each ticked as it opens. */
+  .opening { display: flex; flex: 1 1 auto; justify-content: center; min-height: 0; overflow: auto; padding: var(--mm-space-6) var(--mm-space-4); background: var(--mm-sheet); }
+  .opening-body { display: grid; justify-items: center; align-content: start; gap: var(--mm-space-3); width: 100%; max-width: 20rem; padding-top: var(--mm-space-6); color: var(--mm-fg-muted); }
+  .opening-lead { margin: 0; color: var(--mm-fg); font-size: var(--mm-text-md); }
+  .opening-tabs { display: grid; justify-self: center; gap: var(--mm-space-2); max-width: 100%; margin: var(--mm-space-2) 0 0; padding: 0; list-style: none; }
+  .opening-tabs li { display: grid; grid-template-columns: 1rem minmax(0, 1fr); align-items: center; gap: var(--mm-space-2); font-size: var(--mm-text-sm); transition: color var(--mm-duration) var(--mm-ease); }
+  .opening-tabs li.done { color: var(--mm-fg); }
+  .opening-tabs .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opening-tabs .state { width: 1rem; height: 1rem; }
+  .opening-tabs .done .state { color: var(--mm-accent-ink); }
+  /* Not yet back: a dot that breathes (still under reduced motion). */
+  .opening-tabs .pending { justify-self: center; width: .375rem; height: .375rem; border-radius: 50%; background: currentColor; animation: opening-pulse 1.2s ease-in-out infinite; }
+  @keyframes opening-pulse { 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { .opening-tabs .pending { animation: none; } }
   .stage { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   /* A phone's search over the panes, under the tabs. */
   .search-layer { position: absolute; inset: 0; z-index: 3; }

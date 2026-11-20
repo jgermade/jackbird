@@ -22,6 +22,8 @@ export const en = {
   "landing.note": "Changes are written straight to your music files.",
 
   "library.title": "Library",
+  "session.opening": "Opening your music…",
+  "faceplate.opening": "Opening your music…",
   "library.restoring": "Restoring tabs…",
   "library.loadingMetadata": "Loading metadata {loaded}/{total}…",
 
