@@ -443,9 +443,9 @@
     flex: none;
     display: flex;
     align-items: center;
-    width: 3.25rem;
+    width: calc(var(--mm-space-3) + 3.25rem);
     margin-right: calc(-1 * var(--mm-space-3));
-    padding: 0 0 0 calc(min(var(--at, 0), 3) * .75rem);
+    padding: 0 0 0 calc(var(--mm-space-3) + min(var(--at, 0), 3) * .75rem);
     border: 0;
     background: none;
     color: var(--mm-fg-muted);
