@@ -174,7 +174,8 @@
     <div :if="section() === 'library'" class="prefs">
       <!-- The library's tree with its songs, or its folders only (helpers/folders.ts). -->
       <section class="pref inline">
-        <div class="text">
+        <!-- Its heading and text flip the switch too, as a label would. -->
+        <div class="text toggles" @click="setSongsInTree(!preferences.songsInTree)">
           <h3 class="mm-legend is-ink">{{ t("preferences.library") }}</h3>
           <p>{{ preferences.songsInTree ? t("preferences.songsInTreeOn") : t("preferences.songsInTreeOff") }}</p>
         </div>
@@ -276,7 +277,7 @@
       <section class="pref account">
         <div :if="importing.available" class="sub">
           <div class="row own">
-            <div class="text">
+            <div class="text toggles" @click="showOwnVersion(!mine.ownVersion)">
               <h4 class="mm-legend">{{ t("account.ownVersion") }}</h4>
               <p class="hint">{{ t("account.ownVersionHint") }}</p>
             </div>
@@ -287,7 +288,7 @@
         <!-- Whom one's own music is shared with (SH-D3): everyone, or the people picked. -->
         <div :if="importing.available && sharing.loaded" class="sub">
           <div class="row own">
-            <div class="text">
+            <div class="text toggles" @click="sharing.busy || shareWithEveryone(!sharing.everyone)">
               <h4 class="mm-legend">{{ t("sharing.title") }}</h4>
               <p class="hint">{{ t("sharing.hint") }}</p>
             </div>
@@ -339,6 +340,8 @@
   .text { display: grid; gap: var(--mm-space-1); }
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  /* A switch's heading and text, which flip it when clicked. */
+  .toggles { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
   .density { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); justify-items: start; }
   /* A choice under its own caption (the spectrum's look, its peaks' fall). */
   .choice { display: grid; gap: var(--mm-space-1); justify-items: start; }
