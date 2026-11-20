@@ -19,8 +19,8 @@
   // the level under the finger, the lit ones still the level, and `scrub` is
   // emitted with it as it moves (null once let go or given up), for the owner
   // to show it. `within` (a selector of an element around it) is where it may
-  // be let go: outside it the marker stays still where it was, `scrub` says
-  // null, and letting go there chooses nothing.
+  // be let go: outside it the marker stays still where it was, dimmed, `scrub`
+  // says null, and letting go there chooses nothing.
   //
   // Not `value` nor `valueText`: jq79 keeps `:value` for an element's own
   // value, and ignores it on a component tag.
@@ -145,7 +145,7 @@
      :aria-valuetext="levelText || null"
      :style="`--segments: ${count}`"
      @pointerdown="press($event)" @pointermove="move($event)" @pointerup="release($event)" @pointercancel="cancel()" @keydown="key($event)">
-  <i :each="cell in cells" :key="cell" :class.on="cell < lit" :class.ahead="cell >= lit && cell < aheadLit" :class.marker="cell === marked"></i>
+  <i :each="cell in cells" :key="cell" :class.on="cell < lit" :class.ahead="cell >= lit && cell < aheadLit" :class.marker="cell === marked" :class.given-up="cell === marked && outside"></i>
 </div>
 
 <style scoped>
@@ -168,6 +168,8 @@
   /* Where it would go, while pressed: a lit segment standing out above and below the row. */
   i.marker { transform: scaleY(2.4); }
   .display i.marker { background: var(--mm-display-fg); box-shadow: var(--mm-display-glow); }
+  /* Held still out of `within`: dimmed, letting go there will not move it. */
+  .display i.marker.given-up { background: color-mix(in srgb, var(--mm-display-fg) 30%, var(--mm-display-dim)); box-shadow: none; }
 
   .chassis {
     box-sizing: content-box;
@@ -181,4 +183,5 @@
   .chassis i.ahead { background: var(--mm-accent); opacity: .35; }
   .chassis i.on { background: var(--mm-accent); opacity: 1; box-shadow: 0 0 .25rem var(--mm-accent); }
   .chassis i.marker { background: var(--mm-fg); opacity: 1; }
+  .chassis i.marker.given-up { opacity: .35; }
 </style>
