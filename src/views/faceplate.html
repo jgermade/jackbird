@@ -27,7 +27,7 @@
   // Something to add: a folder, a server, or someone's music shared with one (SH-D6, a listener's too).
   const canAdd = (): boolean => sourcesHere().length > 0 || adding.shared.length > 0
   const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tabLabel(tab) }))
-  const { openSelection } = await import("../lib/editor")
+  const { inSharedMusic, openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
   // The display's spectrum: 24 bands above 640px, 12 below.
   const { watchMedia } = await import("../lib/media")
@@ -77,7 +77,8 @@
     <template :slot.end>
       <!-- Adding another folder, once one is open: before that, the welcome offers it. Two keys of
            glyphs alone, so the tabs keep the bar's room on a phone: + and a folder (a folder, a
-           server, an iPod), + and a note (songs to the family library). -->
+           server, an iPod), + and a note (songs to one's own music, so not while someone's shared
+           music is in view). -->
       <span :if="hasRoots && canAdd()" class="open-folder" :class.has-roots="hasRoots">
         <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openAdding()">
           <Reel :if="library.loading" :size="12" speed="fast" />
@@ -88,7 +89,8 @@
           <span :if="folderText" class="folder-text">{{ folderText }}</span>
         </Key>
       </span>
-      <Key :if="importing.available && can('editor')" size="sm" popup="dialog" :label="t('import.open')" :title="t('import.open')" @click="openImport()">
+      <!-- Not over someone's music shared with one: songs go to one's own (lib/importing.ts, uploadPath). -->
+      <Key :if="importing.available && can('editor') && !inSharedMusic()" size="sm" popup="dialog" :label="t('import.open')" :title="t('import.open')" @click="openImport()">
         <span class="glyphs">
           <svg class="plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" stroke="none" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" stroke="none" /></svg>
