@@ -297,7 +297,7 @@
     <!-- At the head's right: the folder scanned again (new, changed and removed files). -->
     <div class="rescan"><Key square size="sm" variant="ghost" :label="t('duplicates.find')" :title="t('duplicates.find')" :disabled="isLoading()" @click="ui.duplicatesOpen = true">
       <!-- Two notes, one over the other: the same song twice (no lens: the search's is in the tabs' bar). -->
-      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1.25" /><path d="M5.75 5.75v8.5h8.5v-8.5z" fill="var(--mm-surface)" /><path d="M9.25 12.25V8.5l2.5-.6" stroke-linecap="round" /><circle cx="8.6" cy="12.25" r=".9" fill="currentColor" stroke="none" /></svg>
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x=".75" y=".75" width="9.75" height="9.75" rx="1.25" /><path d="M5.25 5.25v10h10v-10z" fill="var(--mm-surface)" /><path d="M9.6 12.6V8.4l2.9-.7" stroke-linecap="round" /><circle cx="8.75" cy="12.6" r="1.05" fill="currentColor" stroke="none" /></svg>
     </Key><Key square size="sm" variant="ghost" :label="t('library.rescan')" :title="t('library.rescan')" :disabled="isLoading()" @click="rescanRoot(root().id)">
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.25 8A5.25 5.25 0 1 1 11.7 4.3" /><path d="M12.25 1.75v2.9h-2.9" /></svg>
     </Key></div>
