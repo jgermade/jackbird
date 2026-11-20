@@ -485,9 +485,11 @@ export function selectUnlessChosen(trackId: string): void {
  * Shows a track in the library: its root active, the rows above it open in the root's view (its
  * folders in Files; its artist, album or both in the others), and it the current row; then the
  * list scrolls to it (`ui.revealed`). A view with no row of it (Playlists) gives way to Files.
- * The selection stays as it is. On a phone the library comes into view.
+ * The selection stays as it is. On a phone the library comes into view; with `details`, Details
+ * does instead (its group's or folder's songs), scrolled to the track (`ui.shownTrack`), and the
+ * rows above it are the only ones open of their levels (a phone's way back goes up through them).
  */
-export function revealTrack(rootId: string, trackId: string): void {
+export function revealTrack(rootId: string, trackId: string, details = false): void {
   library.activeRootId = rootId;
   updateRoots((roots) =>
     roots.map((root) => {
@@ -497,11 +499,18 @@ export function revealTrack(rootId: string, trackId: string): void {
       const place = view === "files" ? null : trackPlace(buildViewRows(view, root.tracks, "all", viewLabels(), root.playlists ?? []), trackId);
       const files = view === "files" || !place;
       const open = files ? collectFolderPaths([track]) : place.open;
-      return { ...root, view: files ? "files" : view, expandedAlbums: [...new Set([...root.expandedAlbums, ...open])], activeRowKey: `track:${track.id}` };
+      // With `details`, the view's other folders or groups close (another view's stay as they are).
+      const shown = !details ? null : new Set(files ? collectFolderPaths(root.tracks) : buildViewRows(view, root.tracks, "all", viewLabels(), root.playlists ?? []).filter((row) => row.kind === "album").map((row) => row.album));
+      const expanded = shown ? root.expandedAlbums.filter((key) => !shown.has(key)) : root.expandedAlbums;
+      return { ...root, view: files ? "files" : view, expandedAlbums: [...new Set([...expanded, ...open])], activeRowKey: `track:${track.id}` };
     })
   );
-  ui.pane = "library";
+  ui.pane = details ? "details" : "library";
   ui.revealed += 1;
+  if (details) {
+    ui.shownTrack = trackId;
+    ui.shown += 1;
+  }
 }
 
 /** Shows the track playing in the library (the faceplate's key); nothing when none plays. */

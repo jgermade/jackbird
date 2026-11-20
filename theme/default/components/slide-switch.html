@@ -1,6 +1,6 @@
 <script :setup="{ model = false, label = '', offLegend = '', onLegend = '', disabled = false }: Props" lang="ts">
   // A slide switch, like the hold switch on a portable player: the signal
-  // colour shows under the thumb when it is on. Printed legends either side
+  // colour lights the track round the thumb when it is on. Printed legends either side
   // move it there when clicked.
   //
   //   <SlideSwitch label="Dark tone" off-legend="Silver" on-legend="Graphite" :model="dark" />
@@ -60,11 +60,11 @@
   }
   .track:disabled { cursor: default; }
   .track:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
-  /* The signal colour under the thumb once it has moved, like a hold switch. */
+  /* The signal colour lit all round the thumb once it is on. */
   .track::before {
     content: "";
     position: absolute;
-    inset: 0 50% 0 0;
+    inset: 0;
     background: var(--mm-accent);
     opacity: 0;
     transition: opacity var(--mm-duration) var(--mm-ease);

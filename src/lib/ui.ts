@@ -31,6 +31,9 @@ export const ui = $reactive({
   pane: "library" as Pane,
   /** Bumped when a track is shown in the library (lib/workspace.ts `revealTrack`): the list scrolls to its row. */
   revealed: 0,
+  /** The track shown in Details from the search (lib/workspace.ts `revealTrack`), and a count bumped each time: Details scrolls to its row. */
+  shownTrack: null as string | null,
+  shown: 0,
   /** The active root's duplicates dialog (views/duplicates-dialog.html). */
   duplicatesOpen: false,
   /** The track of the active root whose own info dialog is open (views/track-info-dialog.html), from its length in Details. */

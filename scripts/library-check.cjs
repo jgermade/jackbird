@@ -172,12 +172,22 @@ async function report(page) {
     const editor = await person(browser, "editor@example.com");
     await openShared(editor);
     await editor.getByText("Before").first().waitFor({ timeout: 30000 });
+    // Uploads go to one's own music, so the key is not offered over someone else's: the editor
+    // goes to a tab of their own (or, with none, leaves the owner's music a moment) to upload.
+    if ((await editor.getByRole("button", { name: "Add music" }).count()) > 0) fail("uploading is offered over the owner's music");
+    const ownTab = editor.locator("header").getByRole("tab").filter({ hasNotText: "Owner's music" });
+    const leftShared = (await ownTab.count()) === 0;
+    if (leftShared) await editor.getByRole("button", { name: "Close Owner's music" }).click();
+    else await ownTab.first().click();
     await addMusic(editor);
     await editor.locator('input[type="file"][multiple]').setInputFiles(path.join(elsewhere, "ape.mp3"));
     const uploaded = await report(editor);
-    console.log("editor uploaded a song:", uploaded);
+    console.log("editor uploaded a song:", uploaded, "(upload not offered over the owner's music)");
     if (!/^1 added/.test(uploaded)) fail(`the upload said ${uploaded}`);
     await editor.getByRole("dialog", { name: "Add music" }).getByRole("button", { name: "Close" }).click();
+    if (leftShared) await openShared(editor);
+    else await editor.locator("header").getByRole("tab", { name: /Owner's music/ }).first().click();
+    await editor.getByText("Before").first().waitFor({ timeout: 30000 });
 
     // ── Its owner retitles a song, for everyone.
     await retitle(owner, "Before", "Retitled by the owner");

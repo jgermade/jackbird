@@ -121,8 +121,8 @@
   // caret).
   // A phone (the panes one at a time) lists no nesting: one level at a time (lib/workspace.ts,
   // `treeLevels`). The open folders are stacked at the top, from the first one down, and under
-  // them only what the last one holds. A folder's row enters it; an open one's row leaves it (and
-  // the ones under it); its ❯ key opens it in Details. Without the songs in the tree (a preference:
+  // them only what the last one holds. A folder's row enters it (a folder not stacked has no ❯);
+  // an open one's ‹ leaves it (and the ones under it), and the rest of it opens it in Details. Without the songs in the tree (a preference:
   // helpers/folders.ts), a folder that holds no other (a leaf) has nothing to enter: a tap opens it
   // in Details, and on a computer it has no toggle.
   const { watchMedia } = await import("../lib/media")
@@ -190,6 +190,83 @@
       if (id) document.getElementById(id)?.scrollIntoView({ block: "nearest" })
     })
   }
+
+  // A phone, a level open, the library in view: a swipe to the right takes the level's list with
+  // it (the open levels above it stay), as a swipe from Details does the pane. Let go past a third
+  // of the width, or flicked, it goes out and the level is left; short of that it springs back.
+  // Vertical swipes, and swipes to the left (to Details, the panes' own), are not taken.
+  const swipeBack = (() => {
+    let x0 = 0
+    let y0 = 0
+    let t0 = 0
+    let dx = 0
+    let mode: "back" | "no" | null = "no"
+    const ms = (): number => {
+      const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mm-duration"))
+      return Number.isFinite(value) ? value : 0
+    }
+    // The list moves; the open levels (sticky, inside it) are held where they are.
+    const slide = (px: number, animate: boolean) => {
+      const tree = $self(".tree") as HTMLElement | null
+      const held = $self(".levels") as HTMLElement | null
+      const transition = animate ? "transform var(--mm-duration) var(--mm-ease)" : ""
+      for (const [element, shift] of [[tree, px], [held, -px]] as const) {
+        if (!element) continue
+        element.style.transition = transition
+        element.style.transform = px === 0 ? "" : `translateX(${shift}px)`
+      }
+    }
+    const start = (event: TouchEvent) => {
+      mode = phone && ui.pane === "library" && levels().length > 0 && event.touches.length === 1 ? null : "no"
+      if (mode === "no") return
+      x0 = event.touches[0].clientX
+      y0 = event.touches[0].clientY
+      t0 = performance.now()
+      dx = 0
+    }
+    const move = (event: TouchEvent) => {
+      if (mode === "no") return
+      const across = event.touches[0].clientX - x0
+      const down = event.touches[0].clientY - y0
+      if (mode === null) {
+        if (Math.abs(across) < 10 && Math.abs(down) < 10) return
+        mode = across > 0 && Math.abs(across) > Math.abs(down) * 1.5 ? "back" : "no"
+        if (mode === "no") return
+      }
+      event.preventDefault()
+      dx = Math.max(0, across)
+      slide(dx, false)
+    }
+    const end = () => {
+      if (mode !== "back") {
+        mode = "no"
+        return
+      }
+      mode = "no"
+      const width = ($self(".tree") as HTMLElement | null)?.clientWidth ?? 0
+      const flicked = dx > 40 && dx / Math.max(1, performance.now() - t0) > 0.5
+      if (width > 0 && (dx > width / 3 || flicked)) {
+        slide(width, true)
+        window.setTimeout(() => {
+          const open = levels()
+          if (open.length > 0) leaveLevel(open[open.length - 1].key)
+          slide(0, false)
+        }, ms())
+      } else {
+        slide(0.001, true)
+        window.setTimeout(() => slide(0, false), ms())
+      }
+    }
+    return { start, move, end }
+  })()
+
+  await $mounted()
+  // Not passive: a swipe taken to go back keeps the page from scrolling.
+  const body = $self(".library") as HTMLElement | null
+  body?.addEventListener("touchstart", swipeBack.start, { passive: true })
+  body?.addEventListener("touchmove", swipeBack.move, { passive: false })
+  body?.addEventListener("touchend", swipeBack.end)
+  body?.addEventListener("touchcancel", swipeBack.end)
 </script>
 
 <section class="library" :aria-label="t('library.title')">
@@ -219,8 +296,8 @@
     </div>
     <!-- At the head's right: the folder scanned again (new, changed and removed files). -->
     <div class="rescan"><Key square size="sm" variant="ghost" :label="t('duplicates.find')" :title="t('duplicates.find')" :disabled="isLoading()" @click="ui.duplicatesOpen = true">
-      <!-- A lens over an equals sign: looking for the same song. -->
-      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="6.75" cy="6.75" r="4.75" /><path d="M10.25 10.25 14.25 14.25M4.75 5.75h4M4.75 7.75h4" /></svg>
+      <!-- Two notes, one over the other: the same song twice (no lens: the search's is in the tabs' bar). -->
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x=".75" y=".75" width="9.75" height="9.75" rx="1.25" /><path d="M5.25 5.25v10h10v-10z" fill="var(--mm-surface)" /><path d="M9.6 12.6V8.4l2.9-.7" stroke-linecap="round" /><circle cx="8.75" cy="12.6" r="1.05" fill="currentColor" stroke="none" /></svg>
     </Key><Key square size="sm" variant="ghost" :label="t('library.rescan')" :title="t('library.rescan')" :disabled="isLoading()" @click="rescanRoot(root().id)">
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.25 8A5.25 5.25 0 1 1 11.7 4.3" /><path d="M12.25 1.75v2.9h-2.9" /></svg>
     </Key></div>
@@ -235,29 +312,31 @@
 
   <p :if="rows().length === 0" class="no-tracks">{{ emptyText() }}</p>
   <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
-    <!-- A phone: the open levels, stacked from the first one down; a tap on one leaves it. -->
+    <!-- A phone: the open levels, stacked from the first one down, each one's ‹ a step further in.
+         Two zones: its ‹ leaves it (back to the list that holds it, the ones under it closing
+         too), and the rest of it, its name, opens it in Details. -->
     <div :if="levels().length > 0" class="levels">
-      <ListRow :each="row in levels()"
-               :key="row.key"
-               kind="folder"
-               :glyph="glyphOf(row)"
-               :cover="rowCover(row)"
-               :round="!!row.round"
-               :label="rowLabel(row)"
-               :meta="rowMeta(row)"
-               expanded
-               no-toggle
-               :row-id="rowDomId(row.key)"
-               @select="leaveLevel(row.key)">
-        <template :slot.action>
-          <span class="row-keys" @click.stop="null">
-            <Key square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
-              <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
-            </Key>
-            <Menu :label="t('menu.folder', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
-          </span>
-        </template>
-      </ListRow>
+      <div :each="(row, at) in levels()" :key="row.key" class="level" :style="`--at: ${at}`">
+        <button type="button" class="back" :aria-label="t('tree.leave', { title: rowLabel(row) })" :title="t('tree.leave', { title: rowLabel(row) })" @click="leaveLevel(row.key)">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+        </button>
+        <ListRow kind="folder"
+                 :glyph="glyphOf(row)"
+                 :cover="rowCover(row)"
+                 :round="!!row.round"
+                 :label="rowLabel(row)"
+                 :meta="rowMeta(row)"
+                 expanded
+                 no-toggle
+                 :row-id="rowDomId(row.key)"
+                 @select="openFolder(row)">
+          <template :slot.action>
+            <span class="row-keys" @click.stop="null">
+              <Menu :label="t('menu.folder', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
+            </span>
+          </template>
+        </ListRow>
+      </div>
     </div>
     <ListRow :each="row in listed()"
              :key="row.key"
@@ -291,7 +370,8 @@
              @toggle="toggleFolder(row.album)">
       <template :slot.action>
         <span class="row-keys" @click.stop="null">
-          <Key :if="row.kind === 'album'" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
+          <!-- Not on a phone: there a folder is stacked to be opened, and its name in the stack opens it in Details. -->
+          <Key :if="row.kind === 'album' && !phone" square size="sm" variant="ghost" :label="t('tree.openFolder', { title: rowLabel(row) })" :title="t('tree.openFolder', { title: rowLabel(row) })" @click="openFolder(row)">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
           </Key>
           <Menu :if="row.kind === 'album' || row.trackId || row.playlist" :label="t(row.kind === 'album' ? 'menu.folder' : 'menu.track', { title: rowLabel(row) })" :items="() => rowMenu(row)" @select="onRowMenu(row, $event.detail)" />
@@ -356,6 +436,26 @@
     border-bottom: var(--mm-border-width) solid var(--mm-border);
     background: var(--mm-sunken);
   }
+  /* An open level: its ‹ (the way back), then its row (to Details). The way back is as wide on every
+     level; where its ‹ sits in it tells how deep the level is (a step in each, up to the fourth). */
+  .level { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: stretch; }
+  .back {
+    flex: none;
+    display: flex;
+    align-items: center;
+    width: calc(var(--mm-space-3) + 4.5rem);
+    margin-right: calc(-1 * var(--mm-space-3));
+    padding: 0 0 0 calc(var(--mm-space-3) + min(var(--at, 0), 3) * .75rem);
+    border: 0;
+    background: none;
+    color: var(--mm-fg-muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .back svg { width: 1rem; height: 1rem; }
+  .back:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  @media (hover: hover) { .back:hover { color: var(--mm-fg); } }
+  .back:active { background: var(--mm-hover); }
   .tree:focus-visible { box-shadow: inset 0 0 0 2px var(--mm-accent); }
   .row-keys { display: flex; align-items: center; gap: var(--mm-space-1); }
 </style>

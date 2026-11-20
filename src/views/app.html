@@ -26,6 +26,7 @@
   const Toast = await import("./toast.html")
   const PictureDialog = await import("./picture-dialog.html")
   const DuplicatesDialog = await import("./duplicates-dialog.html")
+  const SearchDialog = await import("./search-dialog.html")
   const TrackInfoDialog = await import("./track-info-dialog.html")
   const { t } = await import("../lib/i18n")
   const { compact, compactMarker } = await import("../lib/compact")
@@ -119,6 +120,7 @@
   <SourcesDialog />
   <PictureDialog />
   <DuplicatesDialog />
+  <SearchDialog />
   <TrackInfoDialog />
   <Toast :if="!small" />
 </main>

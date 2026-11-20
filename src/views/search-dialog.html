@@ -1,0 +1,26 @@
+<script :setup lang="ts">
+  // The search on a computer: its field and results (views/search-panel.html) in a dialog. On a
+  // phone the search is under the tabs instead (views/workspace.html). See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-20).
+
+  const Modal = await import("../../theme/default/components/modal.html")
+  const SearchPanel = await import("./search-panel.html")
+
+  const { t } = await import("../lib/i18n")
+  const { closeSearch, search } = await import("../lib/search")
+  const { watchMedia } = await import("../lib/media")
+  let narrow: boolean = matchMedia("(max-width: 720px)").matches
+  $destroyed(watchMedia("(max-width: 720px)", (matches) => {
+    narrow = matches
+  }))
+</script>
+
+<div class="search-dialog">
+  <Modal :open="search.open && !narrow" :title="t('search.title')" size="md" :close-label="t('people.close')" @close="closeSearch()">
+    <SearchPanel :if="!narrow" />
+  </Modal>
+</div>
+
+<style scoped>
+  .search-dialog { display: contents; }
+</style>

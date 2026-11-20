@@ -11,7 +11,9 @@
   // An option is `{ value, label, icon, title }`: `icon` an SVG path on a
   // 16 × 16 grid, stroked in the ink's colour. With `icons`, the keys show
   // their icons alone, and the label is each key's name and tooltip. The
-  // choice goes up through `:model` and as `change`.
+  // choice goes up through `:model` and as `change`. Keys that do not fit
+  // are not cut short: the row scrolls sideways, the chosen key kept in view,
+  // and runs then across the side room of what holds it, edge to edge.
   //
   // **Part of the default theme**: imports nothing, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`
@@ -23,6 +25,26 @@
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   $: iconsOnly = flag(icons)
   $: focusable = options.some((option: Option) => option.value === model) ? model : options[0]?.value
+
+  // The chosen key in view, in a row that scrolls (sideways only: the page stays where it is),
+  // clear of the row's side room.
+  const reveal = () => {
+    const row = $self(".scroller") as HTMLElement | null
+    const chosen = row?.querySelector<HTMLElement>('[aria-checked="true"]')
+    if (!row || !chosen || row.scrollWidth <= row.clientWidth) return
+    const own = getComputedStyle(row)
+    const box = row.getBoundingClientRect()
+    const key = chosen.getBoundingClientRect()
+    const start = box.left + (parseFloat(own.paddingLeft) || 0)
+    const end = box.right - (parseFloat(own.paddingRight) || 0)
+    if (key.left < start) row.scrollLeft -= start - key.left
+    else if (key.right > end) row.scrollLeft += key.right - end
+  }
+  const keepInView = (value: string) => {
+    requestAnimationFrame(reveal)
+    return value
+  }
+  $: kept = keepInView(model)
 
   const choose = (value: string) => {
     if (value === model) return
@@ -44,8 +66,59 @@
     choose(options[next].value)
     $$self('[role="radio"]')[next]?.focus()
   }
+
+  // When the keys do not fit, the side room of what holds the row (the nearest one it sits flush
+  // in) becomes the row's: it runs from edge to edge, scrolling there, its first key where it was.
+  let bleed = ""
+  const measure = () => {
+    const row = $self(".scroller") as HTMLElement | null
+    const keys = $self(".choice") as HTMLElement | null
+    if (!row || !keys) return
+    // Where the row's keys start and end, its own room (taken from what holds it) left out.
+    const own = getComputedStyle(row)
+    const rect = row.getBoundingClientRect()
+    const start = rect.left + (parseFloat(own.paddingLeft) || 0)
+    const end = rect.right - (parseFloat(own.paddingRight) || 0)
+    if (keys.offsetWidth <= end - start + 1) {
+      if (bleed) bleed = ""
+      return
+    }
+    let left = 0
+    let right = 0
+    for (let node = row.parentElement; node && node !== document.body; node = node.parentElement) {
+      const style = getComputedStyle(node)
+      // A component's own tag, drawn as its content: not a box to measure.
+      if (style.display === "contents") continue
+      const edges = node.getBoundingClientRect()
+      const borderLeft = parseFloat(style.borderLeftWidth) || 0
+      const borderRight = parseFloat(style.borderRightWidth) || 0
+      const padLeft = parseFloat(style.paddingLeft) || 0
+      const padRight = parseFloat(style.paddingRight) || 0
+      // Flush in its content box: its padding is the room the row may take.
+      if (Math.abs(edges.left + borderLeft + padLeft - start) > 1) break
+      left = start - edges.left - borderLeft
+      right = edges.right - borderRight - end
+      if (padLeft > 0 || padRight > 0) break
+    }
+    const next = left > 0 || right > 0 ? `--bleed-left: ${left}px; --bleed-right: ${Math.max(0, right)}px` : ""
+    if (next !== bleed) {
+      bleed = next
+      requestAnimationFrame(reveal)
+    }
+  }
+  await $mounted()
+  const row = $self(".scroller") as HTMLElement | null
+  if (row?.parentElement) {
+    const sizes = new ResizeObserver(() => measure())
+    sizes.observe(row.parentElement)
+    const keys = $self(".choice") as HTMLElement | null
+    if (keys) sizes.observe(keys)
+    measure()
+    $destroyed(() => sizes.disconnect())
+  }
 </script>
 
+<div class="scroller" :class.scrolls="!!bleed" :style="bleed">
 <div class="choice" role="radiogroup" :aria-label="label || null">
   <button :each="option in options"
           :key="option.value"
@@ -63,25 +136,40 @@
     <span :if="!iconsOnly || !option.icon">{{ option.label }}</span>
   </button>
 </div>
+</div>
 
 <style scoped>
   /* The keys share one frame: a hairline between each two, the frame's corners rounded. */
+  /* Too many to fit: the row scrolls sideways (its bar hidden, as the tabs'), each key whole, and
+     across the whole width of what holds it, its side room kept as the row's own (`--bleed-*`). */
+  .scroller {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .scroller::-webkit-scrollbar { display: none; }
+  .scroller.scrolls {
+    max-width: none;
+    margin: 0 calc(-1 * var(--bleed-right)) 0 calc(-1 * var(--bleed-left));
+    padding: 0 var(--bleed-right) 0 var(--bleed-left);
+  }
   .choice {
     display: inline-flex;
-    max-width: 100%;
+    flex: none;
+    overflow: hidden;
     border: var(--mm-border-width) solid var(--mm-border-strong);
     border-radius: var(--mm-radius-key);
     background: var(--mm-sunken);
     box-shadow: var(--mm-key-shadow);
-    overflow: hidden;
   }
   .option {
     display: inline-flex;
-    flex: 1 1 auto;
+    flex: 1 0 auto;
     align-items: center;
     justify-content: center;
     gap: var(--mm-space-2);
-    min-width: 0;
     height: var(--mm-control-md);
     padding: 0 var(--mm-space-3);
     border: 0;
@@ -102,7 +190,6 @@
   }
   .option + .option { border-left: var(--mm-border-width) solid var(--mm-border-strong); }
   .option.bare { width: calc(var(--mm-control-md) + .5rem); flex: none; padding: 0; }
-  .option span { overflow: hidden; text-overflow: ellipsis; }
   .glyph { flex: none; width: 1rem; height: 1rem; }
   @media (hover: hover) { .option:hover { color: var(--mm-fg); } }
   .option:active { background: var(--mm-key-down); box-shadow: var(--mm-key-pressed); }
