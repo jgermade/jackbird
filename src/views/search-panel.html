@@ -73,6 +73,15 @@
     event.preventDefault()
   }
 
+  // A sheet whose field is left empty closes as the focus leaves it (for anything outside the
+  // search: its own Cancel closes it anyway).
+  const left = (event: FocusEvent) => {
+    if (!asSheet() || search.query.trim()) return
+    const to = event.relatedTarget as Node | null
+    if (to && (event.currentTarget as Element).contains(to)) return
+    closeSearch()
+  }
+
   // The field takes the focus as the search opens.
   const focusField = (open: boolean) => {
     if (!open) return
@@ -85,7 +94,7 @@
   $: focusField(search.open)
 </script>
 
-<div class="search-panel" :class.sheet="asSheet()" @keydown="onKey($event)">
+<div class="search-panel" :class.sheet="asSheet()" @keydown="onKey($event)" @focusout="left($event)">
   <div class="field">
     <svg class="lens" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.75" /><path d="M10.5 10.5 14 14" /></svg>
     <TextInput type="search" :label="t('search.label')" :placeholder="t('search.placeholder')" autocomplete="off" :model="search.query" @input="typed($event.detail)" />

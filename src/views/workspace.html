@@ -54,6 +54,8 @@
   // a pane scrolled to its top, and a pull mostly downwards: the rest is the panes' own.
   const PULL_OPENS = 56
   let pulled = 0
+  // The panes fade as the field comes down, to a quarter once it is all out.
+  const pullFade = (by: number): string => (by > 0 ? `; opacity: ${1 - Math.min(1, by / PULL_OPENS) * 0.75}` : "")
   const pull = (() => {
     let x0 = 0
     let y0 = 0
@@ -246,7 +248,7 @@
       </div>
     </section>
     <!-- Files dropped on the panes are added to the active root (lib/dropping.ts, plan H). -->
-    <div :else class="panes" :class.splitting="splitting" :style="`grid-template-columns: ${splitColumns(splitWidth)}`" @scrollend="settle($event)"
+    <div :else class="panes" :class.splitting="splitting" :style="`grid-template-columns: ${splitColumns(splitWidth)}${pullFade(pulled)}`" @scrollend="settle($event)"
          @dragenter="dragEntered($event)" @dragover="dragMoved($event)" @dragleave="dragExited($event)" @drop="dropped($event)">
       <div class="pane tree-pane"><Library /></div>
       <div class="pane sheet-pane"><AlbumSheet /></div>
