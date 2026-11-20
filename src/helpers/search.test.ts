@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { foldText, queryWords, searchRank, searchSongs } from "./search.ts";
+import { foldText, highlightParts, queryWords, searchRank, searchSongs } from "./search.ts";
 
 test("foldText: no capitals, accents, marks or punctuation", () => {
   assert.equal(foldText("Canción  Ñandú"), "cancion nandu");
@@ -47,4 +47,22 @@ test("searchSongs: best first, in the order given within each, at most the limit
   assert.deepEqual(searchSongs(songs, "blackbird", 2).found.length, 2);
   assert.equal(searchSongs(songs, "blackbird", 2).total, 4);
   assert.deepEqual(searchSongs(songs, "  "), { found: [], total: 0 });
+});
+
+test("highlightParts: the words found lit, as written", () => {
+  assert.deepEqual(highlightParts("Canción Ñandú", "nan"), [
+    { text: "Canción ", hit: false },
+    { text: "Ñan", hit: true },
+    { text: "dú", hit: false }
+  ]);
+  assert.deepEqual(highlightParts("Blackbird", "BIRD black"), [{ text: "Blackbird", hit: true }]);
+  assert.deepEqual(highlightParts("Straße", "strasse"), [{ text: "Straße", hit: true }]);
+  assert.deepEqual(highlightParts("Don't Stop", "dont"), [
+    { text: "Don't", hit: true },
+    { text: " Stop", hit: false }
+  ]);
+  assert.deepEqual(highlightParts("AC/DC", "acdc"), [{ text: "AC/DC", hit: false }]);
+  assert.deepEqual(highlightParts("Song", "  "), [{ text: "Song", hit: false }]);
+  assert.deepEqual(highlightParts("", "a"), []);
+  assert.deepEqual(highlightParts("e\u0301xito", "exi"), [{ text: "e\u0301xi", hit: true }, { text: "to", hit: false }]);
 });

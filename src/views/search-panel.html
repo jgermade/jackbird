@@ -2,7 +2,8 @@
   // The search's field and its results (lib/search.ts): on a phone under the tabs, over the panes
   // (`sheet`, views/workspace.html), on a computer in its dialog (views/search-dialog.html). Each
   // result as a row of the queue: its cover, its title, "artist - album" under it, and its length
-  // in its codec's colour. A tap (or Enter) shows it in Details. Up and Down move through them from
+  // in its codec's colour; a few artists and albums above them. What was typed is lit where it is
+  // found. A tap (or Enter) shows it in Details. Up and Down move through them from
   // the field, Escape closes. Not more than SEARCH_LIMIT drawn: then the count of the rest. See
   // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-20).
 
@@ -14,17 +15,37 @@
 
   const { t, tn } = await import("../lib/i18n")
   const { coverSrc } = await import("../lib/covers")
-  const { SEARCH_LIMIT, chooseResult, closeSearch, search, searchResults } = await import("../lib/search")
+  const { SEARCH_LIMIT, chooseGroup, chooseResult, closeSearch, search, searchResults } = await import("../lib/search")
+  const { highlightParts } = await import("../helpers/search")
 
   type Result = { id: string; title: string; artist: string; album: string; duration: string; codec: string; cover: string | null }
+  type Group = { key: string; kind: "artist" | "album"; title: string; sub: string; trackId: string; cover: string | null; count: number }
   const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
   const asSheet = (): boolean => flag(sheet)
 
   // Read through functions: the results are boxed (see Opaque).
   const results = (): Result[] => searchResults.value.data.results
+  const artists = (): Group[] => searchResults.value.data.artists
+  const albums = (): Group[] => searchResults.value.data.albums
   const total = (): number => searchResults.value.data.total
   const subtitle = (result: Result): string => [result.artist || t("album.unknownArtist"), result.album].filter(Boolean).join(" - ")
+  const groupSub = (group: Group): string => (group.kind === "artist" ? tn("tracks.count", group.count) : group.sub || t("album.unknownArtist"))
+  // What was typed, lit where it is found (helpers/search.ts).
+  const lit = (text: string) => highlightParts(text, search.query)
+  // Everything listed, in order (the artists, the albums, the songs), for Up and Down: each one's
+  // place in it is its id.
+  const listed = (): { choose: () => void }[] => [
+    ...artists().map((group) => ({ choose: () => chooseGroup(group.trackId, "artist") })),
+    ...albums().map((group) => ({ choose: () => chooseGroup(group.trackId, "album") })),
+    ...results().map((result) => ({ choose: () => chooseResult(result.id) }))
+  ]
   const itemId = (at: number): string => `search-result-${at}`
+  const albumsFrom = (): number => artists().length
+  const sections = () => [
+    { id: "artist", label: t("search.artists"), groups: artists(), from: 0 },
+    { id: "album", label: t("search.albums"), groups: albums(), from: albumsFrom() }
+  ]
+  const songsFrom = (): number => artists().length + albums().length
 
   // The result the keyboard is on (Up and Down from the field); none until they are used.
   let active = -1
@@ -33,7 +54,7 @@
     active = -1
   }
   const onKey = (event: KeyboardEvent) => {
-    const count = results().length
+    const count = listed().length
     if (event.key === "Escape") {
       // A sheet's own Escape: the dialog's comes as its `cancel`.
       if (!asSheet()) return
@@ -43,9 +64,9 @@
       active = event.key === "ArrowDown" ? Math.min(count - 1, active + 1) : Math.max(0, active - 1)
       requestAnimationFrame(() => document.getElementById(itemId(active))?.scrollIntoView({ block: "nearest" }))
     } else if (event.key === "Enter") {
-      const chosen = results()[active < 0 ? 0 : active]
+      const chosen = listed()[active < 0 ? 0 : active]
       if (!chosen) return
-      chooseResult(chosen.id)
+      chosen.choose()
     } else {
       return
     }
@@ -71,20 +92,37 @@
     <Key :if="asSheet()" size="sm" variant="ghost" @click="closeSearch()">{{ t("search.close") }}</Key>
   </div>
   <p :if="search.query.trim() && total() === 0" class="none">{{ t("search.none") }}</p>
-  <ul :if="results().length > 0" class="results" role="listbox" :aria-label="t('search.results')" :aria-activedescendant="active >= 0 ? itemId(active) : null">
-    <li :each="(result, at) in results()" :key="result.id" :id="itemId(at)" role="option" class="item" :class.active="at === active"
-        :aria-selected="at === active ? 'true' : 'false'" @click="chooseResult(result.id)">
+  <div :if="listed().length > 0" class="results" role="listbox" :aria-label="t('search.results')" :aria-activedescendant="active >= 0 ? itemId(active) : null">
+    <!-- Artists and albums first, a few of each: a tap shows the group in Details. -->
+    <div :each="section in sections()" :key="section.id" class="section">
+      <h3 :if="section.groups.length > 0" class="mm-legend heading" role="presentation">{{ section.label }}</h3>
+      <div :each="(group, at) in section.groups" :key="group.key" :id="itemId(section.from + at)" role="option" class="item" :class.active="section.from + at === active"
+           :class.artist="group.kind === 'artist'" :aria-selected="section.from + at === active ? 'true' : 'false'" @click="chooseGroup(group.trackId, group.kind)">
+        <span class="art" aria-hidden="true">
+          <img :if="coverSrc(group.cover)" :src="coverSrc(group.cover)" alt="" />
+          <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
+        </span>
+        <span class="text">
+          <span class="name"><span :each="(part, i) in lit(group.title)" :key="i" :class.hit="part.hit">{{ part.text }}</span></span>
+          <span class="sub"><span :each="(part, i) in lit(groupSub(group))" :key="i" :class.hit="part.hit">{{ part.text }}</span></span>
+        </span>
+        <svg class="go" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" /></svg>
+      </div>
+    </div>
+    <h3 :if="results().length > 0 && songsFrom() > 0" class="mm-legend heading" role="presentation">{{ t("search.songs") }}</h3>
+    <div :each="(result, at) in results()" :key="result.id" :id="itemId(songsFrom() + at)" role="option" class="item" :class.active="songsFrom() + at === active"
+         :aria-selected="songsFrom() + at === active ? 'true' : 'false'" @click="chooseResult(result.id)">
       <span class="art" aria-hidden="true">
         <img :if="coverSrc(result.cover)" :src="coverSrc(result.cover)" alt="" />
         <span :else class="no-cover"><span class="band"><Stripes variant="band" /></span></span>
       </span>
       <span class="text">
-        <span class="name">{{ result.title }}</span>
-        <span class="sub">{{ subtitle(result) }}</span>
+        <span class="name"><span :each="(part, i) in lit(result.title)" :key="i" :class.hit="part.hit">{{ part.text }}</span></span>
+        <span class="sub"><span :each="(part, i) in lit(subtitle(result))" :key="i" :class.hit="part.hit">{{ part.text }}</span></span>
       </span>
       <span class="cue" :data-codec="result.codec"><span class="duration">{{ result.duration }}</span></span>
-    </li>
-  </ul>
+    </div>
+  </div>
   <p :if="total() > SEARCH_LIMIT" class="more">{{ tn("search.more", total() - SEARCH_LIMIT) }}</p>
 </div>
 
@@ -98,7 +136,14 @@
   /* The lens before the field. */
   .lens { flex: none; width: 1rem; height: 1rem; color: var(--mm-fg-subtle); }
   .none, .more { margin: 0; padding: var(--mm-space-3); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
-  .results { margin: 0; padding: 0; list-style: none; }
+  .results { margin: 0; padding: 0; }
+  /* Artists, Albums, Songs: each part's name over it. */
+  .section { display: contents; }
+  .heading { margin: 0; padding: var(--mm-space-3) var(--mm-space-3) var(--mm-space-1); }
+  /* What was typed, where it is found. */
+  .hit { color: var(--mm-accent-ink); font-weight: var(--mm-weight-bold); }
+  .artist .art { border-radius: 50%; }
+  .go { width: .875rem; height: .875rem; color: var(--mm-fg-subtle); }
   .sheet .results { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   /* A row of the queue (views/queue-list.html): cover, two lines, the length in its codec's colour. */
   .item {

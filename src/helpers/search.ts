@@ -73,3 +73,52 @@ export function searchIndexed<T>(index: readonly Indexed<T>[], query: string, li
 export function searchSongs<T extends Searchable>(songs: readonly T[], query: string, limit = Infinity): { found: T[]; total: number } {
   return searchIndexed(searchIndex(songs), query, limit);
 }
+
+/** A piece of a text, and whether it is where a word of the query is found. */
+export type Part = { text: string; hit: boolean };
+
+/** One character folded as `foldText` folds it (a mark gone, a sign a space). */
+function foldChar(char: string): string {
+  const folded = foldText(char);
+  if (folded) return folded;
+  return /['’`´]/.test(char) || /^\p{M}+$/u.test(char) ? "" : " ";
+}
+
+/**
+ * `text` in pieces, those where a word of `query` is found marked (as it is found: without
+ * capitals, accents or marks), to light them. Words run together ("acdc" in "AC/DC") are not lit.
+ */
+export function highlightParts(text: string, query: string): Part[] {
+  const words = queryWords(query);
+  if (!text) return [];
+  if (words.length === 0) return [{ text, hit: false }];
+  // The folded text, each of its letters knowing the character of `text` it comes from.
+  let folded = "";
+  const from: number[] = [];
+  const chars = Array.from(text);
+  chars.forEach((char, at) => {
+    for (const letter of foldChar(char)) {
+      folded += letter;
+      from.push(at);
+    }
+  });
+  const lit = new Array<boolean>(chars.length).fill(false);
+  for (const word of words) {
+    for (let at = folded.indexOf(word); at >= 0; at = folded.indexOf(word, at + 1)) {
+      for (let i = at; i < at + word.length; i++) lit[from[i]] = true;
+    }
+  }
+  // What folds to nothing goes with what is round it: a mark with its letter, an apostrophe lit
+  // inside a word lit on both sides.
+  chars.forEach((char, at) => {
+    if (foldChar(char) !== "" || at === 0) return;
+    lit[at] = /^\p{M}+$/u.test(char) ? lit[at - 1] : lit[at - 1] && !!lit[at + 1];
+  });
+  const parts: Part[] = [];
+  chars.forEach((char, at) => {
+    const last = parts[parts.length - 1];
+    if (last && last.hit === lit[at]) last.text += char;
+    else parts.push({ text: char, hit: lit[at] });
+  });
+  return parts;
+}
