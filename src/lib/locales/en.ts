@@ -35,7 +35,6 @@ export const en = {
   "search.title": "Search",
   "search.label": "Search the songs of this tab",
   "search.placeholder": "Search",
-  "search.close": "Cancel",
   "search.none": "No song found.",
   "search.results": "Songs found",
   "search.more.one": "And {count} more: type more to narrow it down.",

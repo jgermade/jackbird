@@ -122,6 +122,25 @@ export function closeSearch(): void {
   search.open = false;
 }
 
+// When an empty search last closed for losing the focus (`leaveSearch`): pressing the search's key
+// takes the focus from the field before its click, so that click must not open it again.
+let leftAt = 0;
+const LEFT_JUST_NOW_MS = 300;
+
+/** An empty search left (its field lost the focus): it closes. */
+export function leaveSearch(): void {
+  search.open = false;
+  leftAt = Date.now();
+}
+
+/** The search's key: it opens the search, and closes it while open. */
+export function toggleSearch(): void {
+  const justLeft = Date.now() - leftAt < LEFT_JUST_NOW_MS;
+  leftAt = 0;
+  if (search.open) search.open = false;
+  else if (!justLeft) search.open = true;
+}
+
 /** An artist or an album chosen: the search closes, and Details shows it (in Artists or Albums). */
 export function chooseGroup(trackId: string, kind: "artist" | "album"): void {
   search.open = false;

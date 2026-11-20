@@ -21,7 +21,7 @@
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { importing, openImport } = await import("../lib/importing")
-  const { openSearch } = await import("../lib/search")
+  const { search, toggleSearch } = await import("../lib/search")
   const { library } = await import("../lib/library")
   const { closeRoot, selectRoot } = await import("../lib/roots")
   const { adding, chooseTab, openAdding, shownTab, sourcesHere, tabLabel, tabsHere } = await import("../lib/adding")
@@ -99,8 +99,9 @@
       </Key>
     </template>
     <template :slot.aside>
-      <!-- The search of the open tab (lib/search.ts), always in view at the bar's right end. -->
-      <Key :if="library.activeRootId" size="sm" square :label="t('search.open')" :title="t('search.openKeys')" @click="openSearch()">
+      <!-- The search of the open tab (lib/search.ts), always in view at the bar's right end: a latching
+           key, down while the search is open; pressed again, it closes it. -->
+      <Key :if="library.activeRootId" size="sm" square :pressed="search.open" :label="t('search.open')" :title="t('search.openKeys')" @click="toggleSearch()">
         <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.75" /><path d="M10.5 10.5 14 14" /></svg>
       </Key>
       <span :if="selectedCount() > 0" class="selection">

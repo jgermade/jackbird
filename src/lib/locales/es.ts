@@ -36,7 +36,6 @@ export const es: Record<MessageKey, string> = {
   "search.title": "Buscar",
   "search.label": "Buscar en las canciones de esta pestaña",
   "search.placeholder": "Buscar",
-  "search.close": "Cancelar",
   "search.none": "No se ha encontrado ninguna canción.",
   "search.results": "Canciones encontradas",
   "search.more.one": "Y {count} más: escribe algo más para afinar.",
