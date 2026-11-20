@@ -333,7 +333,9 @@
   .preferences-dialog { display: contents; }
   .prefs { display: grid; gap: var(--mm-space-5); }
   .pref + .pref { padding-top: var(--mm-space-5); border-top: var(--mm-border-width) solid var(--mm-border); }
-  .pref.inline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--mm-space-3); }
+  /* The text beside its switch, the switch level with the heading: a text that changes with the
+     switch (Library) grows downwards and never moves it. */
+  .pref.inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--mm-space-3); }
   .text { display: grid; gap: var(--mm-space-1); }
   .text h3 { margin: 0; }
   .text p { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
