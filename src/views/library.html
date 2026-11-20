@@ -190,6 +190,83 @@
       if (id) document.getElementById(id)?.scrollIntoView({ block: "nearest" })
     })
   }
+
+  // A phone, a level open, the library in view: a swipe to the right takes the level's list with
+  // it (the open levels above it stay), as a swipe from Details does the pane. Let go past a third
+  // of the width, or flicked, it goes out and the level is left; short of that it springs back.
+  // Vertical swipes, and swipes to the left (to Details, the panes' own), are not taken.
+  const swipeBack = (() => {
+    let x0 = 0
+    let y0 = 0
+    let t0 = 0
+    let dx = 0
+    let mode: "back" | "no" | null = "no"
+    const ms = (): number => {
+      const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mm-duration"))
+      return Number.isFinite(value) ? value : 0
+    }
+    // The list moves; the open levels (sticky, inside it) are held where they are.
+    const slide = (px: number, animate: boolean) => {
+      const tree = $self(".tree") as HTMLElement | null
+      const held = $self(".levels") as HTMLElement | null
+      const transition = animate ? "transform var(--mm-duration) var(--mm-ease)" : ""
+      for (const [element, shift] of [[tree, px], [held, -px]] as const) {
+        if (!element) continue
+        element.style.transition = transition
+        element.style.transform = px === 0 ? "" : `translateX(${shift}px)`
+      }
+    }
+    const start = (event: TouchEvent) => {
+      mode = phone && ui.pane === "library" && levels().length > 0 && event.touches.length === 1 ? null : "no"
+      if (mode === "no") return
+      x0 = event.touches[0].clientX
+      y0 = event.touches[0].clientY
+      t0 = performance.now()
+      dx = 0
+    }
+    const move = (event: TouchEvent) => {
+      if (mode === "no") return
+      const across = event.touches[0].clientX - x0
+      const down = event.touches[0].clientY - y0
+      if (mode === null) {
+        if (Math.abs(across) < 10 && Math.abs(down) < 10) return
+        mode = across > 0 && Math.abs(across) > Math.abs(down) * 1.5 ? "back" : "no"
+        if (mode === "no") return
+      }
+      event.preventDefault()
+      dx = Math.max(0, across)
+      slide(dx, false)
+    }
+    const end = () => {
+      if (mode !== "back") {
+        mode = "no"
+        return
+      }
+      mode = "no"
+      const width = ($self(".tree") as HTMLElement | null)?.clientWidth ?? 0
+      const flicked = dx > 40 && dx / Math.max(1, performance.now() - t0) > 0.5
+      if (width > 0 && (dx > width / 3 || flicked)) {
+        slide(width, true)
+        window.setTimeout(() => {
+          const open = levels()
+          if (open.length > 0) leaveLevel(open[open.length - 1].key)
+          slide(0, false)
+        }, ms())
+      } else {
+        slide(0.001, true)
+        window.setTimeout(() => slide(0, false), ms())
+      }
+    }
+    return { start, move, end }
+  })()
+
+  await $mounted()
+  // Not passive: a swipe taken to go back keeps the page from scrolling.
+  const body = $self(".library") as HTMLElement | null
+  body?.addEventListener("touchstart", swipeBack.start, { passive: true })
+  body?.addEventListener("touchmove", swipeBack.move, { passive: false })
+  body?.addEventListener("touchend", swipeBack.end)
+  body?.addEventListener("touchcancel", swipeBack.end)
 </script>
 
 <section class="library" :aria-label="t('library.title')">
