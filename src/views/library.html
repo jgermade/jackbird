@@ -23,7 +23,6 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { ui } = await import("../lib/ui")
-  const { openSearch } = await import("../lib/search")
   const { nowPlaying, readRowSpectrum } = await import("../lib/player")
   const { onRowMenu, rowMenu } = await import("../lib/menus")
   const { rescanRoot } = await import("../lib/roots")
@@ -296,12 +295,9 @@
       </Key>
     </div>
     <!-- At the head's right: the folder scanned again (new, changed and removed files). -->
-    <!-- The search (a computer's: a phone pulls it down from the top of the list). -->
-    <div class="rescan"><Key :if="!phone" square size="sm" variant="ghost" :label="t('search.open')" :title="t('search.openKeys')" @click="openSearch()">
-      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.75" /><path d="M10.5 10.5 14 14" /></svg>
-    </Key><Key square size="sm" variant="ghost" :label="t('duplicates.find')" :title="t('duplicates.find')" :disabled="isLoading()" @click="ui.duplicatesOpen = true">
-      <!-- A lens over an equals sign: looking for the same song. -->
-      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="6.75" cy="6.75" r="4.75" /><path d="M10.25 10.25 14.25 14.25M4.75 5.75h4M4.75 7.75h4" /></svg>
+    <div class="rescan"><Key square size="sm" variant="ghost" :label="t('duplicates.find')" :title="t('duplicates.find')" :disabled="isLoading()" @click="ui.duplicatesOpen = true">
+      <!-- Two notes, one over the other: the same song twice (no lens: the search's is in the tabs' bar). -->
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="1.75" width="8.5" height="8.5" rx="1.25" /><path d="M5.75 5.75v8.5h8.5v-8.5z" fill="var(--mm-surface)" /><path d="M9.25 12.25V8.5l2.5-.6" stroke-linecap="round" /><circle cx="8.6" cy="12.25" r=".9" fill="currentColor" stroke="none" /></svg>
     </Key><Key square size="sm" variant="ghost" :label="t('library.rescan')" :title="t('library.rescan')" :disabled="isLoading()" @click="rescanRoot(root().id)">
       <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.25 8A5.25 5.25 0 1 1 11.7 4.3" /><path d="M12.25 1.75v2.9h-2.9" /></svg>
     </Key></div>
