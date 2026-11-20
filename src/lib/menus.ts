@@ -5,6 +5,7 @@
 // W8's plan for the playlists' items).
 
 import type { WizardTreeRow } from "../types";
+import { askCopy, canCopyFrom } from "./copying";
 import { canChange, openSelectionFor } from "./editor";
 import { askRemove, askSend, canSendFrom } from "./ipod";
 import { isFavourite, toggleFavourite } from "./mine";
@@ -35,6 +36,7 @@ const ICONS: Record<string, string> = {
   up: "M8 13V3M4 7l4-4 4 4",
   down: "M8 3v10M4 9l4 4 4-4",
   out: "M2.5 4h11M2.5 8h11M2.5 12h5M10 12.25h4.5",
+  copyTo: "M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3",
   sendToIpod: "M5 1.75h6v12.5H5zM8 4.5v4.5M6.25 7.25 8 9l1.75-1.75M7 12h2",
   removeFromIpod: "M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.75 9h6.5l.75-9"
 };
@@ -81,6 +83,8 @@ export function trackMenu(trackId: string, place: TrackMenuPlace): MenuItem[] {
   const root = activeRoot.value.data;
   // The iPod (the panel): songs of this machine's folders go to it; an iPod's songs leave it.
   if (canSendFrom(root)) items.push({ id: "sendToIpod", label: tn("menu.sendToIpod", count), rule: true });
+  // Another tab: the songs copied there (lib/copying.ts).
+  if (canCopyFrom(root?.id)) items.push({ id: "copyTo", label: tn("menu.copyTo", count), rule: !canSendFrom(root) });
   // The family library: one's favourites (F3).
   const track = root?.source.kind === "library" ? root.tracks.find((one) => one.id === trackId) : undefined;
   if (track) {
@@ -141,6 +145,13 @@ export function onTrackMenu(trackId: string, choice: string): void {
       }
       break;
     }
+    case "copyTo": {
+      const root = activeRoot.value.data;
+      const targets = menuTargets(trackId);
+      const track = root?.tracks.find((item) => item.id === trackId);
+      if (root) askCopy(root.id, targets, targets.length === 1 && track ? track.metadata.title || track.name : tn("tracks.count", targets.length));
+      break;
+    }
     case "sendToIpod":
     case "removeFromIpod": {
       const root = activeRoot.value.data;
@@ -171,6 +182,7 @@ export function folderMenu(playlist = false): MenuItem[] {
   ];
   if (!playlist) {
     items.push({ id: "playlist", label: tn("menu.addToPlaylist", 1) });
+    if (canCopyFrom(activeRoot.value.data?.id)) items.push({ id: "copyTo", label: tn("menu.copyTo", 1) });
   }
   items.push({ id: "details", label: t("menu.openInDetails"), rule: true });
   if (playlist) {
@@ -195,6 +207,12 @@ export function onFolderMenu(rowKey: string, choice: string): void {
       if (found) {
         askPlaylist(found.trackIds, found.label);
       }
+      break;
+    }
+    case "copyTo": {
+      const found = folderTracks(rowKey);
+      const root = activeRoot.value.data;
+      if (found && root) askCopy(root.id, found.trackIds, found.label);
       break;
     }
     case "details":

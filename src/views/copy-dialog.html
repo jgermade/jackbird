@@ -1,0 +1,53 @@
+<script :setup lang="ts">
+  // "Copy to…" (lib/copying.ts): the other tabs, one under the other, each with what it is; one that
+  // cannot take songs is off, with why. A tap on one opens the drop's dialog on it with the songs.
+  // See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-20).
+
+  const Modal = await import("../../theme/default/components/modal.html")
+
+  const { t } = await import("../lib/i18n")
+  const { closeCopy, copying, copyTo, otherTabs } = await import("../lib/copying")
+
+  type Tab = ReturnType<typeof otherTabs>[number]
+  const tabs = (): Tab[] => (copying.open ? otherTabs(copying.rootId) : [])
+  const what = (tab: Tab): string => (tab.target ? t(`copy.kind.${tab.target.kind}` as "copy.kind.folder") : tab.why)
+</script>
+
+<Modal :open="copying.open" :eyebrow="t('copy.eyebrow', { name: copying.label })" :title="t('copy.title')" size="sm" :close-label="t('copy.close')" @close="closeCopy()">
+  <div class="copy-tabs">
+    <button :each="tab in tabs()" :key="tab.id" type="button" class="copy-tab" :disabled="!tab.target" @click="copyTo(tab.id)">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M1.75 4.25v8.5h12.5v-7H7.5L6 4.25z" /></svg>
+      <span class="text">
+        <span class="name">{{ tab.label }}</span>
+        <span class="what">{{ what(tab) }}</span>
+      </span>
+    </button>
+  </div>
+</Modal>
+
+<style scoped>
+  .copy-tabs { display: grid; gap: var(--mm-space-1); }
+  /* A tab: its folder, its name and what it is under it; the whole row a key. */
+  .copy-tab {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--mm-space-3);
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-surface);
+    color: var(--mm-fg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  @media (hover: hover) { .copy-tab:not(:disabled):hover { background: var(--mm-hover); } }
+  .copy-tab:active:not(:disabled) { background: var(--mm-hover); }
+  .copy-tab:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
+  .copy-tab:disabled { cursor: default; opacity: .55; }
+  .icon { width: 1.125rem; height: 1.125rem; color: var(--mm-fg-muted); }
+  .text { display: grid; min-width: 0; }
+  .name { overflow: hidden; font-weight: var(--mm-weight-bold, 600); text-overflow: ellipsis; white-space: nowrap; }
+  .what { color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+</style>

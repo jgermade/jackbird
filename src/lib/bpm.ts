@@ -6,6 +6,7 @@
 import { $reactive } from "jq79";
 import { detectBpm } from "../helpers/bpm";
 import type { RootSource, Track } from "../types";
+import { fileBytes as bytesOf } from "./file-bytes";
 
 /** The rate the audio is decoded at: enough for a beat, a fraction of the memory. */
 const RATE = 11_025;
@@ -13,22 +14,6 @@ const RATE = 11_025;
 /** The work under way: how far, and on which file; `total` is 0 when there is none. */
 export const bpmJob = $reactive({ at: 0, total: 0, name: "" });
 let cancelled = false;
-
-/** The file's bytes: through the URL it plays from (every source has one), else its folder. */
-async function bytesOf(source: RootSource, path: string): Promise<ArrayBuffer> {
-  const media = await source.openMedia(path);
-  try {
-    const response = await fetch(media.url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.arrayBuffer();
-  } catch (error) {
-    const read = await source.vfs.read(path).catch(() => null);
-    if (!read) throw error;
-    return read.slice().buffer;
-  } finally {
-    media.release();
-  }
-}
 
 /** The file decoded, its channels mixed into one, at `RATE`. */
 async function decode(bytes: ArrayBuffer): Promise<Float32Array> {
