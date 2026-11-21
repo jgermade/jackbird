@@ -38,9 +38,12 @@
     }))
 
   let address: string = ""
+  // Asked with the address: if the server asks to sign in, its code goes to it at once.
+  let email: string = ""
+  const ready = (): boolean => Boolean(address.trim()) && email.includes("@")
   const submit = (event: Event) => {
     event.preventDefault()
-    void addServer(address)
+    void addServer(address, email)
   }
 </script>
 
@@ -115,9 +118,12 @@
            phone's keyboard is still the address one. -->
       <TextInput id="server-address" inputmode="url" autocomplete="url" :model="address" @input="address = $event.detail" />
     </Field>
+    <Field :label="t('account.email')" control="server-email" :hint="t('instance.emailHint')">
+      <TextInput id="server-email" type="email" autocomplete="username" :model="email" @input="email = $event.detail" />
+    </Field>
     <p :if="adding.error" class="failure">{{ adding.error }}</p>
     <div class="keys">
-      <Key type="submit" variant="primary" :disabled="adding.busy || !address.trim()">{{ t("instance.connect") }}</Key>
+      <Key type="submit" variant="primary" :disabled="adding.busy || !ready()">{{ t("instance.connect") }}</Key>
     </div>
   </form>
 </div>

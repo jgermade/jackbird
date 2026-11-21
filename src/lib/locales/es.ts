@@ -449,6 +449,7 @@ export const es: Record<MessageKey, string> = {
   "instance.address": "La dirección de la instancia",
   "instance.addressHint": "Como musica.ejemplo.org, o 192.168.1.20:4646 en casa.",
   "instance.connect": "Conectar",
+  "instance.emailHint": "Con la que te añadieron en ese servidor: te llegará un código para entrar.",
   "instance.notAddress": "Eso no es una dirección.",
   "instance.notJackbird": "{address} ha respondido, pero no es jackbird.",
   "instance.unreachable": "{address} no ha respondido.",
