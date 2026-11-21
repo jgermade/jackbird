@@ -13,8 +13,13 @@
   const { t } = await import("../lib/i18n")
   const { account, askCode, cancelSignIn, checkCode, otherAddress, passkeySignIn, passkeysHere, pickProfile } = await import("../lib/account")
 
-  let email: string = ""
+  let email: string = account.email
   let code: string = ""
+  // The email typed beside a server's address, there already if its code could not be sent.
+  const prefill = (typed: string): void => {
+    if (typed && !email) email = typed
+  }
+  $: prefill(account.email)
   const picking = (): boolean => !account.signin && Boolean(account.profiles)
   const title = (): string => (picking() ? t("account.whoTitle") : t("account.signInTitle"))
   const role = (name: string): string => t(`role.${name}` as "role.owner")

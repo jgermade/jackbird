@@ -90,7 +90,7 @@ export async function restoreSession(): Promise<void> {
  * favourites are read there. Start it once the session is restored.
  */
 export function followActiveRoot(): void {
-  library.$on("activeRootId", () => {
+  const follow = (): void => {
     const root = $toRaw(library).roots.find((one) => one.id === $toRaw(library).activeRootId);
     if (!root) return;
     const before = currentServer();
@@ -99,7 +99,11 @@ export function followActiveRoot(): void {
       importing.available = $toRaw(library).roots.some((one) => one.source.kind === "library" && one.source.server === currentServer());
       await (await import("./mine")).loadFavourites();
     });
-  });
+  };
+  library.$on("activeRootId", follow);
+  // The root restored in front was made active before this listened: on a phone (no home server)
+  // the account would stay on none, and the server's features (its foot in Folders) unasked.
+  follow();
 }
 
 /**
