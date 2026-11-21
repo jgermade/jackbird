@@ -12,7 +12,7 @@ export const es: Record<MessageKey, string> = {
 
   "picker.scanning": "Escaneando...",
   "picker.addRoot": "Añadir biblioteca",
-  "picker.openLibrary": "Abrir librería",
+  "picker.openLibrary": "Abrir biblioteca",
 
   "roots.close": "Cerrar {name}",
   "roots.fallbackName": "Root {number}",
