@@ -4,7 +4,7 @@
 // side is `GET /api/library/usage`. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, B).
 
 import { $reactive } from "jq79";
-import { serviceJson } from "./sources/service";
+import { currentServer, type ServiceClient } from "./sources/service";
 
 type UsageAnswer = { songs: number; bytes: number; quota: number | null; disk: { total: number; free: number } | null };
 
@@ -16,10 +16,13 @@ export const usage = $reactive({
   disk: null as { total: number; free: number } | null
 });
 
-/** Asks the server what one's music takes. */
-export async function loadUsage(): Promise<void> {
-  const got = await serviceJson<UsageAnswer>("library/usage").catch(() => null);
-  if (!got) return;
+/** Asks a server (the one spoken to now, unless another is given) what one's music takes. */
+export async function loadUsage(client: ServiceClient = currentServer()): Promise<void> {
+  const got = await client.json<UsageAnswer>("library/usage").catch(() => null);
+  if (!got) {
+    usage.loaded = false;
+    return;
+  }
   usage.songs = got.songs;
   usage.bytes = got.bytes;
   usage.quota = got.quota;

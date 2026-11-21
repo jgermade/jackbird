@@ -18,11 +18,12 @@
   const root = () => activeRoot.value.data
   // One's own music on a server (not someone's shared with one), listed by its folders.
   const shown = (): boolean => root()?.source.kind === "library" && root()?.source.shelf === undefined && root()?.view === "files"
-  // Asked as it shows, and again as the songs change (an upload, a deletion).
-  const askFor = (on: boolean, _count: number): void => {
-    if (on) void loadUsage()
+  // Asked of the root's own server (not whichever the account speaks to yet: on a phone, restored,
+  // it follows a moment later) as it shows, and again as the songs change (an upload, a deletion).
+  const askFor = (on: boolean, _id: string, _count: number): void => {
+    if (on) void loadUsage(root()?.source.server)
   }
-  $: askFor(shown(), root()?.tracks.length ?? 0)
+  $: askFor(shown(), root()?.id ?? "", root()?.tracks.length ?? 0)
 
   const size = (bytes: number): string => formatDriveSize(bytes, preferences.language)
   const spaceText = (): string =>
