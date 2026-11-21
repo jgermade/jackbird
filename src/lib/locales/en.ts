@@ -10,7 +10,7 @@ export const en = {
   "common.none": "-",
 
   "picker.scanning": "Scanning…",
-  "picker.addRoot": "Add to the library",
+  "picker.addRoot": "Add a library",
   "picker.openLibrary": "Open library",
 
   "roots.close": "Close {name}",
