@@ -8,7 +8,7 @@ import { $reactive, $toRaw } from "jq79";
 import { normaliseAddress } from "../helpers/instance";
 import type { FolderAccess } from "../helpers/picked";
 import type { SampleList } from "../helpers/samples";
-import { account, can, followServer, whenSignedIn } from "./account";
+import { account, askCode, can, followServer, whenSignedIn } from "./account";
 import { t } from "./i18n";
 import { importing } from "./importing";
 import { ipodsHere } from "./ipod";
@@ -193,10 +193,10 @@ export async function addFrom(kind: SourceKind): Promise<void> {
 
 /**
  * Connects to a server by the address typed: it must answer as jackbird's service. Then signs in
- * there if it asks, and opens its family library and the folders its owners opened, the first in
- * front.
+ * there if it asks (with the email typed beside the address, its code asked at once), and opens its
+ * family library and the folders its owners opened, the first in front.
  */
-export async function addServer(typed: string): Promise<void> {
+export async function addServer(typed: string, email = ""): Promise<void> {
   const address = normaliseAddress(typed);
   if (!address) {
     adding.error = t("instance.notAddress");
@@ -214,6 +214,7 @@ export async function addServer(typed: string): Promise<void> {
     const client = serviceAt(address);
     adding.open = false;
     await followServer(client);
+    if (!account.me && account.signin && account.smtp && email.trim()) await askCode(email.trim());
     if (!account.me && !(await whenSignedIn())) return;
     const open = new Set($toRaw(library).roots.map((root) => root.source.saved));
     let first: string | null = null;

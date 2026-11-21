@@ -192,6 +192,7 @@ export async function pickProfile(id: number): Promise<void> {
 
 /** Asks for a code at an address; the code is then typed in. */
 export async function askCode(email: string): Promise<void> {
+  account.email = email;
   const answer = await busy(() => serviceJson<{ attempt: string }>("auth/code", post({ email, lang: preferences.language })));
   if (answer) {
     account.email = email;

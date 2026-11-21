@@ -11,8 +11,8 @@ export const es: Record<MessageKey, string> = {
   "common.none": "-",
 
   "picker.scanning": "Escaneando...",
-  "picker.addRoot": "Añadir a la biblioteca",
-  "picker.openLibrary": "Abrir librería",
+  "picker.addRoot": "Añadir biblioteca",
+  "picker.openLibrary": "Abrir biblioteca",
 
   "roots.close": "Cerrar {name}",
   "roots.fallbackName": "Root {number}",
@@ -449,6 +449,7 @@ export const es: Record<MessageKey, string> = {
   "instance.address": "La dirección de la instancia",
   "instance.addressHint": "Como musica.ejemplo.org, o 192.168.1.20:4646 en casa.",
   "instance.connect": "Conectar",
+  "instance.emailHint": "Con la que te añadieron en ese servidor: te llegará un código para entrar.",
   "instance.notAddress": "Eso no es una dirección.",
   "instance.notJackbird": "{address} ha respondido, pero no es jackbird.",
   "instance.unreachable": "{address} no ha respondido.",

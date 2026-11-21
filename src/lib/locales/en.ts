@@ -10,7 +10,7 @@ export const en = {
   "common.none": "-",
 
   "picker.scanning": "Scanning…",
-  "picker.addRoot": "Add to the library",
+  "picker.addRoot": "Add a library",
   "picker.openLibrary": "Open library",
 
   "roots.close": "Close {name}",
@@ -448,6 +448,7 @@ export const en = {
   "instance.address": "The instance's address",
   "instance.addressHint": "Such as music.example.org, or 192.168.1.20:4646 at home.",
   "instance.connect": "Connect",
+  "instance.emailHint": "The one you were added with on that server: a code to sign in is sent to it.",
   "instance.notAddress": "That is not an address.",
   "instance.notJackbird": "{address} answered, but it is not jackbird.",
   "instance.unreachable": "{address} did not answer.",
