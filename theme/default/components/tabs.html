@@ -9,9 +9,10 @@
   // after the label (a count), `closeLabel` the close key's accessible name.
   // The choice goes up through `:model` and as `change`; a close key emits
   // `close` with the item's id, and the owner decides what goes. The tabs
-  // scroll sideways, the open one kept in view, and the `end` slot (keys that
-  // add one, say) right after them scrolls with them; the `aside` slot stays
-  // in view at the bar's right end. `compact` turns the tabs into one at 720px and below:
+  // scroll sideways, the open one kept in view; the `end` slot (keys that
+  // add one, say) comes right after them and does not scroll: it keeps its
+  // room, so what follows it is pushed along, never covered; the `aside` slot
+  // sits at the bar's right end, pushed by the end slot when the bar is tight. `compact` turns the tabs into one at 720px and below:
   // the chosen item as the open tab, with a caret, and every item in its
   // drop-down; there the chosen one has its × when `closable` (Delete closes
   // it from the keyboard), and `addLabel` adds a last option that emits `add`
@@ -158,8 +159,8 @@
     </button>
   </div>
   </div>
-  <div :if="$slots.end" class="end"><slot.end /></div>
   </div>
+  <div :if="$slots.end" class="end"><slot.end /></div>
   <div :if="flag(compact) && items.length > 0" class="picker">
     <div class="tab on picked">
       <select class="pick" :aria-label="label || null" @change="picked($event)" @keydown="pickKey($event)">
@@ -199,7 +200,7 @@
     background: linear-gradient(var(--mm-chassis), var(--mm-chassis-hi));
   }
   .tabs.plain { background: none; }
-  /* What scrolls sideways: the tabs and the keys after them (the end slot). */
+  /* What scrolls sideways: the tabs. The keys after them (the end slot) keep their room beside it. */
   .strip {
     display: flex;
     flex: 0 1 auto;
@@ -339,7 +340,9 @@
     align-self: stretch;
     align-items: center;
     gap: var(--mm-space-2);
-    padding: 0 0 var(--mm-space-1) var(--mm-space-2);
+    /* As far from the last tab as when it scrolled with them: the strip's right padding is part of it. */
+    margin-left: calc(var(--mm-space-2) - var(--mm-space-3));
+    padding: 0 0 var(--mm-space-1);
   }
   .tab {
     position: relative;
