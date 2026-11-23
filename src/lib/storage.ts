@@ -18,8 +18,12 @@ export const STORAGE_KEYS = {
   splitWidth: "jackbird.splitWidth",
   /** The compact mode's state (src/helpers/compact.ts): whether it was on, its place, "on top". */
   compact: "jackbird.compact",
-  /** Whether the library's tree shows the songs ("off" when not: src/helpers/folders.ts). */
+  /** Before 2026-11-23, whether the library's tree showed the songs, in every view: what the two below start from. */
   songsInTree: "jackbird.songsInTree",
+  /** Whether the library shows the songs in Files ("off" when not: src/helpers/folders.ts). */
+  songsInFolders: "jackbird.songsInFolders",
+  /** Whether the library shows the songs in its other views ("off" when not). */
+  songsInViews: "jackbird.songsInViews",
   /** How tall the lists' rows are: compact, comfortable or spacious (src/helpers/density.ts). */
   density: "jackbird.density",
   /** The display spectrum's look: segments or lines (src/helpers/spectrum.ts). */

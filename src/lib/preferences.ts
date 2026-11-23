@@ -2,7 +2,7 @@
 // saved, else from the system (colour scheme, browser languages), is saved
 // once chosen, and is applied to <html> (data-theme, lang). The theme follows
 // the system until one is chosen. And whether the library's tree shows the
-// songs (helpers/folders.ts), on until turned off. And how tall the lists' rows
+// songs (helpers/folders.ts), in Files and in the other views apart, on until turned off. And how tall the lists' rows
 // are (helpers/density.ts), applied to <html> as data-density. And the display spectrum's look
 // and how its peaks fall (helpers/spectrum.ts). A jq79 store, so views can bind to it.
 
@@ -45,6 +45,11 @@ const embeddedTheme = (): Theme | null => {
 };
 const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => language === embedded?.get("lang")) ?? null;
 
+/** Whether the songs are shown where `key` says: on until turned off, from the one switch there was before when not saved. */
+function songsShown(key: string): boolean {
+  return (readStored(key) ?? readStored(STORAGE_KEYS.songsInTree)) !== "off";
+}
+
 /** The tone chosen: one of the two, or "auto", following the system's. */
 export type ThemeChoice = Theme | "auto";
 
@@ -52,7 +57,8 @@ export const preferences = $reactive({
   theme: embeddedTheme() ?? storedTheme() ?? systemTheme(),
   themeChoice: (storedTheme() ?? "auto") as ThemeChoice,
   language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage(),
-  songsInTree: readStored(STORAGE_KEYS.songsInTree) !== "off",
+  songsInFolders: songsShown(STORAGE_KEYS.songsInFolders),
+  songsInViews: songsShown(STORAGE_KEYS.songsInViews),
   density: densityOf(readStored(STORAGE_KEYS.density)),
   spectrumLook: spectrumLookOf(readStored(STORAGE_KEYS.spectrumLook)),
   peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall))
@@ -101,10 +107,16 @@ export function toggleTheme(): void {
   setTheme(preferences.theme === "dark" ? "light" : "dark");
 }
 
-/** Shows the songs in the library's tree, or only its folders and groups (a song reached through Details). */
-export function setSongsInTree(on: boolean): void {
-  preferences.songsInTree = on;
-  writeStored(STORAGE_KEYS.songsInTree, on ? "on" : "off");
+/** Shows the songs in Files, or only its folders (a song reached through Details). */
+export function setSongsInFolders(on: boolean): void {
+  preferences.songsInFolders = on;
+  writeStored(STORAGE_KEYS.songsInFolders, on ? "on" : "off");
+}
+
+/** Shows the songs in the library's other views, or only their groups (a song reached through Details). */
+export function setSongsInViews(on: boolean): void {
+  preferences.songsInViews = on;
+  writeStored(STORAGE_KEYS.songsInViews, on ? "on" : "off");
 }
 
 /** How tall the lists' rows are. */

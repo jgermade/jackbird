@@ -12,7 +12,7 @@ import { isFavourite, toggleFavourite } from "./mine";
 import { t, tn } from "./i18n";
 import { moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
 import { ui } from "./ui";
-import { activeRoot, folderTracks, goToGroup, menuTargetCount, menuTargets, playFromTree, queueFolder, queueTracks, revealTrack, setCurrentRow } from "./workspace";
+import { activeRoot, folderTracks, goToGroup, menuTargetCount, menuTargets, playFromTree, playTrackIds, queueFolder, queueTracks, revealTrack, setCurrentRow } from "./workspace";
 
 /** An item of a menu, as the theme's `Menu` takes it: its glyph, and the row it shares (`group`). */
 export type MenuItem = { id: string; label: string; danger?: boolean; rule?: boolean; icon?: string; group?: string; disabled?: boolean };
@@ -218,6 +218,48 @@ export function onFolderMenu(rowKey: string, choice: string): void {
     case "details":
       setCurrentRow(rowKey);
       ui.pane = "details";
+      break;
+  }
+}
+
+/** An album's menu in the album sheet (its card's ⋮): its tracks played, queued or added, its artist, its place in the library. */
+export function albumMenu(): MenuItem[] {
+  const items: MenuItem[] = [
+    { id: "play", label: t("menu.play") },
+    { id: "next", label: tn("menu.playNext", 1) },
+    { id: "queue", label: tn("menu.addToQueue", 1) },
+    { id: "playlist", label: tn("menu.addToPlaylist", 1) }
+  ];
+  if (canCopyFrom(activeRoot.value.data?.id)) items.push({ id: "copyTo", label: tn("menu.copyTo", 1) });
+  items.push({ id: "artist", label: t("menu.goToArtist"), rule: true }, { id: "show", label: t("menu.showInLibrary") });
+  return allowed(items);
+}
+
+/** Does what an album's menu item says, on its tracks (in the order they play) and by its title. */
+export function onAlbumMenu(album: { title: string; trackIds: readonly string[] }, choice: string): void {
+  const [first] = album.trackIds;
+  const root = activeRoot.value.data;
+  if (!first || !root) return;
+  switch (choice) {
+    case "play":
+      playTrackIds(album.trackIds, album.title);
+      break;
+    case "next":
+    case "queue":
+      queueTracks(album.trackIds, choice === "next" ? "next" : "end");
+      break;
+    case "playlist":
+      askPlaylist([...album.trackIds], album.title);
+      break;
+    case "copyTo":
+      askCopy(root.id, [...album.trackIds], album.title);
+      break;
+    case "artist":
+      goToGroup(first, "artist");
+      break;
+    case "show":
+      revealTrack(root.id, first);
+      ui.pane = "library";
       break;
   }
 }

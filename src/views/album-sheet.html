@@ -19,7 +19,9 @@
   const { library } = await import("../lib/library")
   const { playback } = await import("../lib/playback")
   const { nowPlaying, readRowSpectrum } = await import("../lib/player")
-  const { onTrackMenu, trackMenu } = await import("../lib/menus")
+  const { albumMenu, onAlbumMenu, onTrackMenu, trackMenu } = await import("../lib/menus")
+  // An album's tracks, in the order they play (disc by disc), for its menu.
+  const albumOf = (album: { title: string; discs: { tracks: Track[] }[] }) => ({ title: album.title, trackIds: album.discs.flatMap((disc) => disc.tracks.map((track) => track.id)) })
   const { openFolder } = await import("../lib/roots")
   const { artistName, artistOfKey } = await import("../helpers/views")
   const { codecFamily, codecLabel } = await import("../helpers/formats")
@@ -219,6 +221,10 @@
             <span class="band"><Stripes variant="band" /></span>
           </div>
         </div>
+        <!-- The album's menu, at the card's top right corner. -->
+        <span class="album-menu">
+          <Menu :label="t('menu.folder', { title: album.title })" :items="() => albumMenu()" @select="onAlbumMenu(albumOf(album), $event.detail)" />
+        </span>
         <div class="album-head">
           <h3>{{ album.title }}</h3>
           <p class="artist">{{ album.artist || t("album.unknownArtist") }}</p>
@@ -342,6 +348,7 @@
       "cover head"
       "cover discs";
     gap: var(--mm-space-2) var(--mm-space-5);
+    position: relative;
     /* Twice the room below (the owner, 2026-11-19). */
     padding: var(--mm-space-4) var(--mm-space-4) calc(var(--mm-space-4) * 2);
     border: var(--mm-border-width) solid var(--mm-border);
@@ -361,7 +368,9 @@
   .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .no-cover { position: relative; height: 100%; background: var(--mm-display-bezel); }
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
-  .album-head { grid-area: head; display: grid; align-content: start; gap: var(--mm-space-2); min-width: 0; }
+  .album-head { grid-area: head; display: grid; align-content: start; gap: var(--mm-space-2); min-width: 0; padding-right: var(--mm-space-6); }
+  /* Its ⋮ in the card's top right corner, the title kept clear of it (above). */
+  .album-menu { position: absolute; top: var(--mm-space-2); right: var(--mm-space-2); line-height: 0; }
   .album-head h3 { font-size: var(--mm-text-xl); }
   .album-discs { grid-area: discs; display: grid; align-content: start; min-width: 0; }
   .artist { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
