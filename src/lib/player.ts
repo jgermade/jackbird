@@ -39,6 +39,8 @@ import { streamInfo, streamInfoNeeds, type StreamInfo } from "../helpers/stream-
 import type { MediaHandle, PlaybackQueue, QueueItem, RootWorkspace, Track } from "../types";
 import { NativeAudio, type Sounding } from "./native-audio";
 import { PhoneAudio, phoneAudioAvailable, type PhoneSong } from "./phone-audio";
+import { TwinAudio } from "./twin-audio";
+import { preferences } from "./preferences";
 import { coverDataUrlNow } from "./covers";
 import { output } from "./output";
 import { mirror, mirroredSpectrum, sendCommand } from "./mirror";
@@ -170,13 +172,11 @@ export const queueEntries = $computed((): Opaque<QueueEntry[]> => {
   );
 });
 
-const embedded: HTMLAudioElement | null = typeof Audio === "function" ? new Audio() : null;
-// The analyser reads the element only when its media is not cross-origin, as it is from the
-// desktop app's asset protocol on Windows and its local server on Linux (E4-D5): asked for with
-// CORS, those allow it; a blob: URL in the browser is same-origin anyway.
-if (embedded) {
-  embedded.crossOrigin = "anonymous";
-}
+// The browser's player: two elements, one holding the next song ahead (gapless, crossfade:
+// lib/twin-audio.ts). The analyser reads them only when their media is not cross-origin, as it is
+// from the desktop app's asset protocol on Windows and its local server on Linux (E4-D5): asked for
+// with CORS (twin-audio.ts), those allow it; a blob: URL in the browser is same-origin anyway.
+const embedded: TwinAudio | null = typeof Audio === "function" ? new TwinAudio() : null;
 // The desktop app's native player (E5), shaped like the element; it plays the desktop's own
 // folders' tracks unless the embedded output is chosen.
 const native: NativeAudio | null = output.available && embedded ? new NativeAudio() : null;
@@ -184,10 +184,10 @@ const native: NativeAudio | null = output.available && embedded ? new NativeAudi
 // and the queue's next ones are handed to it ahead, so it goes on with the app in the background.
 const phone: PhoneAudio | null = phoneAudioAvailable && embedded ? new PhoneAudio() : null;
 /** The element that plays the loaded track: the embedded one, the desktop's native one or the phone's. */
-let audio: HTMLAudioElement | NativeAudio | PhoneAudio | null = phone ?? embedded;
+let audio: TwinAudio | NativeAudio | PhoneAudio | null = phone ?? embedded;
 /** A track after the loaded one, as handed to a native player to follow by itself. */
 type Ahead = { key: string; rootId: string; relativePath: string; lastModified?: number; media: MediaHandle };
-/** The tracks handed ahead: the next one to the desktop's player (gapless), up to PHONE_AHEAD to the phone's. */
+/** The tracks handed ahead: the next one to the desktop's player and the browser's (gapless, crossfade), up to PHONE_AHEAD to the phone's. */
 let upcoming: Ahead[] = [];
 /** How many tracks after the loaded one the phone's player is given. */
 const PHONE_AHEAD = 50;
@@ -215,7 +215,7 @@ let resumedAt = 0;
  * Plays on the first click or key anywhere: what is left when the browser
  * does not let a page start sound by itself after a reload.
  */
-function resumeOnFirstInteraction(element: HTMLAudioElement): void {
+function resumeOnFirstInteraction(element: TwinAudio): void {
   const events = ["pointerdown", "keydown"] as const;
   const resume = () => {
     events.forEach((type) => document.removeEventListener(type, resume, true));
@@ -266,7 +266,7 @@ function wakeAudioOnGestures(): void {
 }
 wakeAudioOnGestures();
 
-function routeThroughAnalyser(element: HTMLAudioElement): void {
+function routeThroughAnalyser(element: TwinAudio): void {
   const made = audioContext();
   if (!made) return;
   if (made.state === "suspended") {
@@ -283,7 +283,7 @@ function routeThroughAnalyser(element: HTMLAudioElement): void {
     // Headroom for the bass (see SPECTRUM_DECIBELS); crates/audio's spectrum spans the same.
     node.minDecibels = SPECTRUM_DECIBELS.min;
     node.maxDecibels = SPECTRUM_DECIBELS.max;
-    made.createMediaElementSource(element).connect(node);
+    element.route(made, node);
     node.connect(made.destination);
     analyser = node;
     bins = new Uint8Array(node.frequencyBinCount);
@@ -515,6 +515,30 @@ async function sendNext(): Promise<void> {
     phone.setUpcoming(ahead.map((one) => songOf(one.media, one.key)));
     return;
   }
+  if (embedded && audio === embedded) {
+    // As it always was, nothing is loaded ahead.
+    if (preferences.transition === "normal") {
+      upcoming = [];
+      embedded.setNext(null);
+      return;
+    }
+    const [ahead] = (await openAhead(1)) ?? [];
+    if (audio !== embedded) return;
+    // A queue of one repeating: the same song again, which the loaded element plays (`ended`).
+    if (!ahead || ahead.key === loadedKey) {
+      upcoming = [];
+      embedded.setNext(null);
+      return;
+    }
+    if (upcoming[0]?.key === ahead.key) {
+      ahead.media.release();
+      return;
+    }
+    upcoming[0]?.media.release();
+    upcoming = [ahead];
+    embedded.setNext({ url: ahead.media.url, key: ahead.key });
+    return;
+  }
   if (!native) return;
   const { queue, index } = $toRaw(playback);
   const after = queue ? upcomingIndices(index, queue.items.length, playMode(), queuedCount({ queue, index }))[0] : undefined;
@@ -613,7 +637,7 @@ async function load(current: NowPlaying | null): Promise<void> {
 }
 
 /** The element's events, heard only while it is the one playing the loaded track. */
-function wire(element: HTMLAudioElement | NativeAudio | PhoneAudio): void {
+function wire(element: TwinAudio | NativeAudio | PhoneAudio): void {
   element.addEventListener("play", () => {
     if (element !== audio) return;
     if (element === embedded) routeThroughAnalyser(embedded);
@@ -679,8 +703,8 @@ function wire(element: HTMLAudioElement | NativeAudio | PhoneAudio): void {
   }
 }
 
-/** A native player's own events: what sounds, the next track started by itself, and a track it cannot play. */
-function wireNative(element: NativeAudio | PhoneAudio): void {
+/** A player's own events: what sounds, the next track started by itself, and a track it cannot play. */
+function wireNative(element: NativeAudio | PhoneAudio | TwinAudio): void {
   element.addEventListener("started", (event) => {
     if (element === audio) output.sounding = (event as CustomEvent<Sounding>).detail;
   });
@@ -694,7 +718,14 @@ function wireNative(element: NativeAudio | PhoneAudio): void {
     if (element !== audio || taken < 0 || at < 0) return;
     const next = upcoming[taken];
     upcoming = upcoming.slice(taken + 1);
-    release();
+    // The browser's song fading out still reads its media: released once it is let go.
+    if (element === embedded) {
+      const ending = media;
+      media = null;
+      embedded.whenEnded(() => ending?.release());
+    } else {
+      release();
+    }
     media = next.media;
     loadedKey = key;
     loaded = { rootId: next.rootId, relativePath: next.relativePath, lastModified: next.lastModified };
@@ -702,7 +733,7 @@ function wireNative(element: NativeAudio | PhoneAudio): void {
     goTo(at);
     // The desktop's player has only the next one: it is given the one after. The phone's has the
     // rest, topped up once half of them are played (if the page can reach the instance now).
-    if (element === native || upcoming.length < PHONE_AHEAD / 2) void sendNext();
+    if (element !== phone || upcoming.length < PHONE_AHEAD / 2) void sendNext();
   });
   // The native player could not play it (its format, the device): the embedded output takes over, where it was.
   element.addEventListener("fallback", (event) => {
@@ -740,6 +771,7 @@ function switchOutput(): void {
 
 if (embedded) {
   wire(embedded);
+  wireNative(embedded);
   if (native) {
     wire(native);
     wireNative(native);
@@ -755,18 +787,29 @@ if (embedded) {
   if (native) {
     output.$on("kind", switchOutput);
   }
-  if (native || phone) {
-    // The queue changed around the loaded track: the native player's next ones may have too.
-    let nextQueued = false;
-    playback.$on("queue", () => {
-      if (nextQueued) return;
-      nextQueued = true;
-      queueMicrotask(() => {
-        nextQueued = false;
-        void sendNext();
-      });
+  // The queue changed around the loaded track: the player's next ones may have too.
+  let nextQueued = false;
+  playback.$on("queue", () => {
+    if (nextQueued) return;
+    nextQueued = true;
+    queueMicrotask(() => {
+      nextQueued = false;
+      void sendNext();
     });
-  }
+  });
+  // How one song follows another, told to each player (helpers/transition.ts); the browser's next
+  // song is loaded ahead, or forgotten.
+  const tellTransition = () => {
+    const way = preferences.transition;
+    const seconds = preferences.crossfadeSeconds;
+    embedded.configure(way, seconds);
+    native?.setTransition(way, seconds);
+    if (phone) phone.setTransition(way, seconds);
+    void sendNext();
+  };
+  tellTransition();
+  preferences.$on("transition", tellTransition);
+  preferences.$on("crossfadeSeconds", tellTransition);
 }
 
 /**

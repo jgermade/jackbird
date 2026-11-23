@@ -15,8 +15,9 @@ use std::time::Duration;
 
 use serde::Serialize;
 
+use crate::convert::Converter;
 use crate::spectrum::{SIZE, Spectrum};
-use crate::{Output, Outputs, PcmFormat, Pipe, Route, Settings, Source};
+use crate::{Fidelity, Mode, Output, Outputs, PcmFormat, Pipe, Route, Settings, Source, Transition};
 
 /// What the player tells the interface.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -81,6 +82,7 @@ enum Command {
     Seek(f64),
     Stop,
     Configure(Settings),
+    Transition(Transition),
     Quit,
 }
 
@@ -93,6 +95,9 @@ struct Song {
     key: String,
     source: Option<Source>,
     exhausted: bool,
+    /// Its samples made into the pipe's format, when it follows a song of another one without the
+    /// output opening again (gapless or crossfade, shared: crate::convert).
+    convert: Option<Converter>,
 }
 
 #[derive(Clone)]
@@ -102,6 +107,8 @@ struct Info {
     codec: String,
     format: PcmFormat,
     duration: Option<f64>,
+    /// Converted to the output's format (resampled or remixed): not the file's own samples.
+    converted: bool,
 }
 
 struct Engine {
@@ -116,6 +123,13 @@ struct Engine {
     previous: Option<Song>,
     /// The song after it.
     next: Option<Song>,
+    /// How one song follows another.
+    transition: Transition,
+    /// Crossfading: the last frames decoded of the song decoding (at most the crossfade's
+    /// length), held back from the pipe to be mixed with the next song's first ones.
+    tail: Vec<i32>,
+    /// The tail the next song was mixed with, as it was, while that song may still be taken back.
+    faded: Option<Vec<i32>>,
     infos: VecDeque<Info>,
     playing: bool,
     ended: bool,
@@ -141,6 +155,15 @@ impl Engine {
             key,
             source: None,
             exhausted: false,
+            convert: None,
+        }
+    }
+
+    /// The frames the tail holds while crossfading into a pipe of `format` (0: no crossfade).
+    fn fade_frames(&self, format: PcmFormat) -> usize {
+        match self.transition {
+            Transition::Crossfade { seconds } if seconds > 0.0 => (seconds * f64::from(format.rate)) as usize,
+            _ => 0,
         }
     }
 
@@ -157,6 +180,7 @@ impl Engine {
                     codec: source.codec().to_string(),
                     format: source.format(),
                     duration: source.duration(),
+                    converted: false,
                 });
                 while self.infos.len() > 8 {
                     self.infos.pop_front();
@@ -224,6 +248,9 @@ impl Engine {
             Some(pipe)
         };
         self.previous = None;
+        self.tail.clear();
+        self.faded = None;
+        song.convert = None;
         self.decoding = Some(song);
         self.playing = play;
         self.ended = false;
@@ -249,6 +276,8 @@ impl Engine {
         self.decoding = None;
         self.previous = None;
         self.next = None;
+        self.tail.clear();
+        self.faded = None;
         self.playing = false;
     }
 
@@ -259,9 +288,13 @@ impl Engine {
             if let Some(pipe) = self.pipe() {
                 pipe.drop_ahead();
             }
+            // The tail held is the song taken back's: the song before it holds its own again (the
+            // one it was mixed with), or none when it went to the pipe whole.
+            self.tail = self.faded.take().unwrap_or_default();
             if let Some(mut ahead) = self.decoding.replace(previous) {
                 ahead.source = None;
                 ahead.exhausted = false;
+                ahead.convert = None;
                 if self.next.is_none() {
                     self.next = Some(ahead);
                 }
@@ -315,6 +348,7 @@ impl Engine {
                 }
             }
             Command::Stop => self.stop(),
+            Command::Transition(transition) => self.transition = transition,
             Command::Configure(settings) => {
                 if settings != self.settings {
                     self.settings = settings;
@@ -338,18 +372,41 @@ impl Engine {
         true
     }
 
-    /// Keeps the pipe [`AHEAD`] seconds full; true while there is more to decode now.
+    /// Keeps the pipe [`AHEAD`] seconds full. Crossfading, the song decoding's last frames are held
+    /// back (`tail`) and mixed with the next song's first ones when it comes.
     fn feed(&mut self) {
         let Some(pipe) = self.pipe() else { return };
         let format = pipe.format();
+        let channels = usize::from(format.channels);
+        let fade = self.fade_frames(format);
         let target = (AHEAD * f64::from(format.rate)) as u64;
+        // No crossfade any more (or a shorter one): what the tail holds beyond it goes on.
+        let over = self.tail.len() / channels;
+        if over > fade {
+            let excess = (over - fade) * channels;
+            pipe.push(&self.tail[..excess]);
+            self.tail.drain(..excess);
+        }
         while pipe.queued() < target {
             let Some(song) = self.decoding.as_mut() else { return };
             if !song.exhausted {
                 let Some(source) = song.source.as_mut() else { return };
                 match source.next_block() {
-                    Ok(Some(block)) => pipe.push(block),
-                    Ok(None) => song.exhausted = true,
+                    Ok(Some(block)) if fade == 0 && song.convert.is_none() => pipe.push(block),
+                    Ok(Some(block)) => {
+                        let samples = match song.convert.as_mut() {
+                            Some(convert) => convert.push(block),
+                            None => block,
+                        };
+                        hold(&mut self.tail, &pipe, samples, fade * channels);
+                    }
+                    Ok(None) => {
+                        // What the resampler still holds of the song's end.
+                        if let Some(convert) = song.convert.as_mut() {
+                            hold(&mut self.tail, &pipe, convert.finish(), fade * channels);
+                        }
+                        song.exhausted = true;
+                    }
                     Err(message) => {
                         (self.events)(Event::Failed {
                             key: song.key.clone(),
@@ -360,18 +417,118 @@ impl Engine {
                 }
                 continue;
             }
-            // The song is all in the pipe: the next one follows it there if it has its format.
-            let Some(mut next) = self.next.take() else { return };
+            // The song is all decoded: the next one follows it in the pipe if it has its format
+            // (crossfading, one of its rate and channels and no more bits), mixed with the tail.
+            // With no next song (yet: the interface sends it just after the song is loaded), the
+            // tail waits until the pipe runs low, and then goes as it is.
+            let Some(mut next) = self.next.take() else {
+                if pipe.queued() < target / 4 {
+                    self.flush_tail(&pipe);
+                }
+                return;
+            };
             if !self.ready(&mut next) {
                 continue;
             }
-            if next.source.as_ref().map(Source::format) != Some(format) {
-                self.next = Some(next);
+            let Some(next_format) = next.source.as_ref().map(Source::format) else {
                 return;
+            };
+            // Another format follows in the same opening when it is converted to this one: a song of
+            // fewer bits and the same rate and channels being crossfaded (shifted, exactly), or any
+            // song, gapless or crossfaded, in the shared mode (resampled, remixed). Else the output
+            // opens again for it once this one has played.
+            if next_format != format {
+                let exact = next_format.rate == format.rate
+                    && next_format.channels == format.channels
+                    && next_format.bits <= format.bits;
+                let joined = self.transition != Transition::Normal && self.settings.mode == Mode::Shared;
+                let convert = if (fade > 0 && exact) || joined {
+                    Converter::new(next_format, format)
+                } else {
+                    None
+                };
+                let Some(convert) = convert else {
+                    self.flush_tail(&pipe);
+                    self.next = Some(next);
+                    return;
+                };
+                if !convert.exact()
+                    && let Some(info) = self.infos.iter_mut().find(|info| info.serial == next.serial)
+                {
+                    info.converted = true;
+                }
+                next.convert = Some(convert);
             }
-            pipe.mark(next.serial, 0);
+            if fade > 0 && !self.tail.is_empty() {
+                self.crossfade(&pipe, &mut next, format);
+            } else {
+                self.flush_tail(&pipe);
+                pipe.mark(next.serial, 0);
+            }
             self.previous = self.decoding.replace(next);
         }
+    }
+
+    /// Puts what the tail holds in the pipe as it is.
+    fn flush_tail(&mut self, pipe: &Pipe) {
+        if !self.tail.is_empty() {
+            pipe.push(&self.tail);
+            self.tail.clear();
+        }
+    }
+
+    /// Mixes the tail (the song ending) with `next`'s first frames, one fading out as the other
+    /// fades in (equal power), and puts the mix in the pipe as `next`'s start; what `next` decoded
+    /// beyond the mix is held as its own tail.
+    fn crossfade(&mut self, pipe: &Pipe, next: &mut Song, format: PcmFormat) {
+        let channels = usize::from(format.channels);
+        let old = std::mem::take(&mut self.tail);
+        let frames = old.len() / channels;
+        let mut incoming: Vec<i32> = Vec::with_capacity(old.len());
+        while incoming.len() < old.len() && !next.exhausted {
+            let Some(source) = next.source.as_mut() else { break };
+            match source.next_block() {
+                Ok(Some(block)) => match next.convert.as_mut() {
+                    Some(convert) => incoming.extend_from_slice(convert.push(block)),
+                    None => incoming.extend_from_slice(block),
+                },
+                Ok(None) => {
+                    if let Some(convert) = next.convert.as_mut() {
+                        incoming.extend_from_slice(convert.finish());
+                    }
+                    next.exhausted = true;
+                }
+                Err(message) => {
+                    (self.events)(Event::Failed {
+                        key: next.key.clone(),
+                        message,
+                    });
+                    next.exhausted = true;
+                }
+            }
+        }
+        let rest = if incoming.len() > old.len() {
+            incoming.split_off(old.len())
+        } else {
+            Vec::new()
+        };
+        let top = f64::from((1u64 << (format.bits - 1)) as u32 - 1);
+        let mut mixed = Vec::with_capacity(old.len());
+        for frame in 0..frames {
+            let at = (frame as f64 + 0.5) / frames as f64 * std::f64::consts::FRAC_PI_2;
+            let (fading_in, fading_out) = at.sin_cos();
+            for channel in 0..channels {
+                let index = frame * channels + channel;
+                let ending = f64::from(old[index]);
+                let starting = incoming.get(index).copied().map_or(0.0, f64::from);
+                let value = (ending * fading_out + starting * fading_in).round();
+                mixed.push(value.clamp(-top - 1.0, top) as i32);
+            }
+        }
+        pipe.mark(next.serial, 0);
+        pipe.push(&mixed);
+        self.faded = Some(old);
+        self.tail = rest;
     }
 
     /// The song sounding and its position in seconds.
@@ -392,21 +549,23 @@ impl Engine {
         for sounding in pipe.take_started() {
             if self.decoding.as_ref().is_some_and(|song| song.serial == sounding) {
                 self.previous = None;
+                self.faded = None;
             }
             if let (Some(info), Some(route)) = (
                 self.infos.iter().find(|info| info.serial == sounding).cloned(),
                 self.route.clone(),
             ) {
                 (self.events)(Event::Started {
+                    route: route_of(route, info.converted),
                     key: info.key,
                     codec: info.codec,
                     format: info.format,
-                    route,
                     duration: info.duration,
                 });
             }
         }
-        let drained = self.decoding.as_ref().is_some_and(|song| song.exhausted) && pipe.queued() == 0;
+        let drained =
+            self.decoding.as_ref().is_some_and(|song| song.exhausted) && self.tail.is_empty() && pipe.queued() == 0;
         if !drained || self.ended {
             return;
         }
@@ -435,7 +594,10 @@ impl Engine {
             duration: info.and_then(|info| info.duration),
             codec: info.map(|info| info.codec.clone()),
             format: info.map(|info| info.format),
-            route: self.route.clone(),
+            route: self
+                .route
+                .clone()
+                .map(|route| route_of(route, info.is_some_and(|info| info.converted))),
         };
     }
 
@@ -470,6 +632,33 @@ impl Engine {
     }
 }
 
+/// Puts `samples` after what the tail holds, and what goes beyond its `keep` samples in the pipe.
+fn hold(tail: &mut Vec<i32>, pipe: &Pipe, samples: &[i32], keep: usize) {
+    if keep == 0 && tail.is_empty() {
+        pipe.push(samples);
+        return;
+    }
+    tail.extend_from_slice(samples);
+    if tail.len() > keep {
+        let excess = tail.len() - keep;
+        pipe.push(&tail[..excess]);
+        tail.drain(..excess);
+    }
+}
+
+/// The way a song goes to the device: the output's, said to convert when the song was converted
+/// to the output's format.
+fn route_of(route: Route, converted: bool) -> Route {
+    if converted {
+        Route {
+            fidelity: Fidelity::Converted,
+            ..route
+        }
+    } else {
+        route
+    }
+}
+
 /// The native player.
 pub struct Player {
     commands: Sender<Command>,
@@ -494,6 +683,9 @@ impl Player {
             decoding: None,
             previous: None,
             next: None,
+            transition: Transition::default(),
+            tail: Vec::new(),
+            faded: None,
             infos: VecDeque::new(),
             playing: false,
             ended: false,
@@ -554,6 +746,11 @@ impl Player {
     /// Stops and lets the device go.
     pub fn stop(&self) {
         self.send(Command::Stop);
+    }
+
+    /// How one song follows another: as it does now, gapless, or crossfaded (from the next one).
+    pub fn set_transition(&self, transition: Transition) {
+        self.send(Command::Transition(transition));
     }
 
     /// Changes the output's settings (the song sounding goes on from where it was).

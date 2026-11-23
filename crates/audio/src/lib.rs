@@ -6,7 +6,9 @@
 //!   whole; samples come out as integers at the file's own depth (MP3, a lossy format, at 24 bits).
 //! - **The player** ([`Player`]): a thread that decodes ahead into a [`Pipe`], from which the
 //!   output takes what it plays. The next song is decoded into the same pipe when its format is
-//!   the same (gapless); another format reopens the output once the first has played.
+//!   the same (gapless); another format reopens the output once the first has played, unless
+//!   the person chose gapless or crossfade in the shared mode: then it is converted to the open
+//!   output's format ([`Converter`], `rubato`'s resampler) and follows in the same opening.
 //! - **Outputs** ([`Output`]): a device, shared (the system's mixer) or exclusive (macOS's hog
 //!   mode, WASAPI's exclusive mode, ALSA's `hw:` devices), behind the `device` feature; and a
 //!   capture output, which records what a device would have been given (the tests).
@@ -16,6 +18,7 @@
 //! The tag crates stay free of dependencies; this one is beside them, as `store` is.
 
 mod capture;
+mod convert;
 mod decode;
 #[cfg(feature = "device")]
 mod device;
@@ -24,6 +27,7 @@ mod pipe;
 mod spectrum;
 
 pub use capture::{Capture, CaptureOutput};
+pub use convert::Converter;
 pub use decode::Source;
 #[cfg(feature = "device")]
 pub use device::{DeviceOutput, devices};
@@ -62,6 +66,27 @@ pub struct Settings {
     pub mode: Mode,
     /// The device's id (from [`devices`]); `None` is the system's default output.
     pub device: Option<String>,
+}
+
+/// How one song follows another (the interface's setting).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Transition {
+    /// As the player always did: the next song of the same format follows without a gap, one of
+    /// another format once the output has opened again for it.
+    #[default]
+    Normal,
+    /// Without a gap: as `Normal`, and in the shared mode a song of another format is converted to
+    /// the one of the output already open (`Converter`: resampled, remixed) instead of opening it
+    /// again. In the exclusive mode each song keeps its own format, so the output opens again.
+    Gapless,
+    /// The next song fades in over the last `seconds` of the one ending, which fades out. A song
+    /// of another format is converted as for `Gapless` (in the exclusive mode, only one of fewer
+    /// bits and the same rate and channels, exactly); others follow as `Normal`.
+    Crossfade {
+        /// How long the two overlap.
+        seconds: f64,
+    },
 }
 
 /// The device's sample format, as the output writes it.

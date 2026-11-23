@@ -10,6 +10,7 @@
 
 import { addPluginListener, invoke } from "@tauri-apps/api/core";
 import type { Sounding } from "./native-audio";
+import type { Transition } from "../types";
 import { output } from "./output";
 import { isPhone } from "./platform";
 
@@ -61,6 +62,19 @@ export class PhoneAudio extends EventTarget {
       output.offered = offered;
       this.dispatchEvent(new CustomEvent("started", { detail: sounding }));
     }).catch(() => undefined);
+    // Back on screen: what the player says now (paused or played from the lock screen meanwhile,
+    // its events maybe not heard while the page slept in the background).
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || !this.#song) return;
+      void this.#call<Status>("status")
+        .then((status) => {
+          if (status.key !== this.#song?.key) return;
+          this.#position = status.position;
+          this.#take(status);
+          this.dispatchEvent(new Event("timeupdate"));
+        })
+        .catch(() => undefined);
+    });
   }
 
   /**
@@ -121,6 +135,11 @@ export class PhoneAudio extends EventTarget {
     void this.#call("set_queue", { songs: [song], at: 0, play: false }).catch((error: unknown) => this.#fail(song.key, error));
   }
 
+  /** How one song follows another (crates/player: a second player fades in for a crossfade). */
+  setTransition(way: Transition, seconds: number): void {
+    void this.#call("set_transition", { crossfade: way === "crossfade" ? seconds : 0 }).catch(() => undefined);
+  }
+
   /** The songs to follow the one loaded, in order (none: the queue ends with it). */
   setUpcoming(songs: PhoneSong[]): void {
     if (!this.#song || sameSongs(songs, this.#upcoming)) return;
@@ -131,7 +150,13 @@ export class PhoneAudio extends EventTarget {
   async play(): Promise<void> {
     if (!this.#song) return;
     this.paused = false;
-    await this.#call("play");
+    try {
+      await this.#call("play");
+    } catch (error) {
+      // Not played (the player's service could not start): paused still, so the next press plays.
+      this.paused = true;
+      throw error;
+    }
     this.dispatchEvent(new Event("play"));
     this.#startPolling();
   }

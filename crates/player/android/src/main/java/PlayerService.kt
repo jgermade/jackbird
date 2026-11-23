@@ -20,6 +20,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import android.os.Handler
 import androidx.media3.common.Format
+import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -38,6 +39,32 @@ class PlayerService : MediaSessionService() {
 
   override fun onCreate() {
     super.onCreate()
+    val player = buildPlayer()
+    val builder = MediaSession.Builder(this, player)
+    // The notification opens the app.
+    packageManager.getLaunchIntentForPackage(packageName)?.let { launch ->
+      builder.setSessionActivity(PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE))
+    }
+    val made = builder.build()
+    // Added by hand: Media3 adds a session when a MediaController asks for it, and PlayerPlugin uses
+    // the player directly. Only an added session gets the notification, and with it the foreground
+    // service; without one Android stops the service a minute after the app leaves the screen.
+    addSession(made)
+    session = made
+    player.addListener(watcher)
+    // A system broadcast: received though the receiver is not exported.
+    ContextCompat.registerReceiver(this, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
+    current = made.player
+    service = this
+    if (crossfadeMs > 0) main.post(fading)
+    val ready = waiting.toList()
+    waiting.clear()
+    failing.clear()
+    ready.forEach { it(made.player) }
+  }
+
+  /** A player: the session's, or the one a crossfade fades in. */
+  private fun buildPlayer(): ExoPlayer {
     // Decoded to float (24-bit songs keep their depth), through a sink that prepares Android's mixer
     // for bit-perfect output to a USB DAC when the person wants it, and writes integers to a DAC
     // that takes only those (E6b-D10, BitPerfect.kt). The renderer tells it each song's own depth.
@@ -72,44 +99,113 @@ class PlayerService : MediaSessionService() {
         })
       }
     }
-    val player = ExoPlayer.Builder(this, renderers)
+    return ExoPlayer.Builder(this, renderers)
       // Music: it takes the audio focus (and gives it back to a call). A headset unplugged pauses it:
       // by `noisy` below, not Media3's own, so a USB DAC that only blinks goes on.
-      .setAudioAttributes(
-        AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
-        true
-      )
+      .setAudioAttributes(MUSIC, true)
       .setHandleAudioBecomingNoisy(false)
       // The songs come from the instance: the Wi-Fi is kept awake with the CPU while it plays.
       .setWakeMode(C.WAKE_MODE_NETWORK)
       .build()
-    val builder = MediaSession.Builder(this, player)
-    // The notification opens the app.
-    packageManager.getLaunchIntentForPackage(packageName)?.let { launch ->
-      builder.setSessionActivity(PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE))
-    }
-    val made = builder.build()
-    // Added by hand: Media3 adds a session when a MediaController asks for it, and PlayerPlugin uses
-    // the player directly. Only an added session gets the notification, and with it the foreground
-    // service; without one Android stops the service a minute after the app leaves the screen.
-    addSession(made)
-    session = made
-    player.addListener(object : Player.Listener {
-      // Played again by the person (or anything else) meanwhile: the noise's pause is no longer ours to undo.
-      override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-        if (playWhenReady) pausedByNoise = false
-      }
-    })
-    // A system broadcast: received though the receiver is not exported.
-    ContextCompat.registerReceiver(this, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
-    current = made.player
-    waiting.forEach { it(made.player) }
-    waiting.clear()
   }
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
   private val main = Handler(Looper.getMainLooper())
+
+  /** What the service hears of the session's player. */
+  private val watcher = object : Player.Listener {
+    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+      // Played again by the person (or anything else) meanwhile: the noise's pause is no longer ours to undo.
+      if (playWhenReady) pausedByNoise = false
+      // Paused or played during a crossfade: the song ending with it.
+      ending?.playWhenReady = playWhenReady
+    }
+
+    // A seek, another queue or a stop during a crossfade ends it: the song ending goes at once.
+    override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+      if (reason == Player.DISCONTINUITY_REASON_SEEK) endFade()
+    }
+
+    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+      if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) endFade()
+    }
+
+    override fun onPlaybackStateChanged(playbackState: Int) {
+      if (playbackState == Player.STATE_IDLE) endFade()
+    }
+  }
+
+  // ─── The crossfade (2026-11-23) ─────────────────────────────────────────────
+  //
+  // Media3's player plays one song at a time. A crossfade fades a second player in: some seconds
+  // before the song's end, a new player is given the songs after it and starts, silent, and the
+  // session (the notification, the lock screen) and the page move on to it; their volumes cross
+  // (equal power) while the first plays its last seconds, and the first is then let go. Not with
+  // "Bit-perfect to a USB DAC": its sink cannot mix two players.
+
+  /** The player fading out, while the session's fades in. */
+  private var ending: ExoPlayer? = null
+  /** How long the crossfade under way lasts, in ms. */
+  private var overlap = 0L
+
+  private val fading = object : Runnable {
+    override fun run() {
+      tick()
+      if (crossfadeMs > 0 || ending != null) main.postDelayed(this, if (ending != null) FADE_STEP else WATCH_STEP)
+    }
+  }
+
+  private fun tick() {
+    val player = session?.player as? ExoPlayer ?: return
+    val out = ending
+    if (out != null) {
+      val progress = if (overlap > 0) player.currentPosition.toDouble() / overlap else 1.0
+      val at = progress.coerceIn(0.0, 1.0) * Math.PI / 2
+      player.volume = Math.sin(at).toFloat()
+      out.volume = Math.cos(at).toFloat()
+      if (progress >= 1.0 || out.playbackState == Player.STATE_ENDED) endFade()
+      return
+    }
+    if (crossfadeMs <= 0 || BitPerfect.wanted || !player.isPlaying || !player.hasNextMediaItem()) return
+    val duration = player.duration
+    if (duration == C.TIME_UNSET || duration <= 0) return
+    val length = minOf(crossfadeMs, duration / 2)
+    if (duration - player.currentPosition > length) return
+    startFade(player, length)
+  }
+
+  private fun startFade(player: ExoPlayer, length: Long) {
+    val made = session ?: return
+    val next = buildPlayer()
+    val after = player.nextMediaItemIndex
+    next.setMediaItems((after until player.mediaItemCount).map { player.getMediaItemAt(it) }, 0, 0L)
+    next.volume = 0f
+    next.prepare()
+    // The song ending plays only its own last seconds, and gives up the audio focus to the next one.
+    if (player.mediaItemCount > after) player.removeMediaItems(after, player.mediaItemCount)
+    player.setAudioAttributes(MUSIC, false)
+    player.removeListener(watcher)
+    ending = player
+    overlap = length
+    next.addListener(watcher)
+    made.player = next
+    current = next
+    next.play()
+    Log.i(TAG, "crossfade: ${length} ms into ${next.currentMediaItem?.mediaId}")
+    switched?.invoke(next)
+    main.removeCallbacks(fading)
+    main.post(fading)
+  }
+
+  /** The crossfade ends: the song fading out is let go, the one fading in at its full volume. */
+  private fun endFade() {
+    val out = ending ?: return
+    ending = null
+    out.stop()
+    out.release()
+    session?.player?.volume = 1f
+  }
 
   /** Paused by Android's "becoming noisy", and not played again since: `noisy` may play it again. */
   private var pausedByNoise = false
@@ -166,6 +262,8 @@ class PlayerService : MediaSessionService() {
 
   override fun onDestroy() {
     main.removeCallbacks(resume)
+    main.removeCallbacks(fading)
+    endFade()
     try {
       unregisterReceiver(noisy)
     } catch (error: IllegalArgumentException) {
@@ -177,6 +275,7 @@ class PlayerService : MediaSessionService() {
     }
     session = null
     current = null
+    service = null
     super.onDestroy()
   }
 
@@ -187,18 +286,58 @@ class PlayerService : MediaSessionService() {
     private const val RESUME_EVERY = 1000L
     private const val RESUME_LOOKS = 5
 
+    /** How often the end of a song is watched for a crossfade, and how often its volumes move (ms). */
+    private const val WATCH_STEP = 200L
+    private const val FADE_STEP = 40L
+
+    /** Music: it takes the audio focus (and gives it back to a call). */
+    private val MUSIC: AudioAttributes =
+      AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build()
+
+    private var service: PlayerService? = null
+
+    /** The crossfade's length in ms (0: none), as the page last said. */
+    var crossfadeMs = 0L
+      set(value) {
+        field = value
+        service?.let { running ->
+          running.main.removeCallbacks(running.fading)
+          if (value > 0) running.main.post(running.fading)
+        }
+      }
+
+    /** Told when a crossfade moves the session to another player (PlayerPlugin follows it). */
+    var switched: ((Player) -> Unit)? = null
+
     private var current: Player? = null
     private val waiting = mutableListOf<(Player) -> Unit>()
+    private val failing = mutableListOf<(Exception) -> Unit>()
 
-    /** Runs `work` with the player, starting the service first if it is not running. On the main thread. */
-    fun withPlayer(context: Context, work: (Player) -> Unit) {
+    /**
+     * Runs `work` with the player, starting the service first if it is not running (Android stops
+     * it a minute or so after the app leaves the screen with the music paused, and its player goes
+     * with it). On the main thread. When the service cannot be started (Android refuses it to an
+     * app in the background), `failed` is told, and so is every call waiting for it: none waits for
+     * ever, and the next call tries again.
+     */
+    fun withPlayer(context: Context, work: (Player) -> Unit, failed: (Exception) -> Unit) {
       val player = current
       if (player != null) {
         work(player)
         return
       }
       waiting.add(work)
-      if (waiting.size == 1) context.startService(Intent(context, PlayerService::class.java))
+      failing.add(failed)
+      if (waiting.size > 1) return
+      try {
+        context.startService(Intent(context, PlayerService::class.java))
+      } catch (error: Exception) {
+        Log.w(TAG, "the player's service could not start: ${error.message}")
+        val told = failing.toList()
+        waiting.clear()
+        failing.clear()
+        told.forEach { it(error) }
+      }
     }
   }
 }

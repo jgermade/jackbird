@@ -72,11 +72,12 @@ function derive(): Derived {
   const roots = $toRaw(library.roots);
   const id = library.activeRootId;
   const language = preferences.language;
-  const songs = preferences.songsInTree;
+  const root = roots.find((item) => item.id === id) ?? null;
+  // Files and the other views each show their songs or not (two preferences).
+  const songs = (root?.view ?? "files") === "files" ? preferences.songsInFolders : preferences.songsInViews;
   if (cache && cache.roots === roots && cache.id === id && cache.language === language && cache.songs === songs) {
     return cache.derived;
   }
-  const root = roots.find((item) => item.id === id) ?? null;
   const all = root ? rowsOf(root) : [];
   // Without the songs (a preference), the tree shows and walks the folders only; what Details
   // shows, and its breadcrumb, are still worked out from every row.
@@ -357,6 +358,12 @@ export function playFromDetail(trackId: string): void {
   if (index !== -1) {
     playTracks(queueOf(root.id, trackIds, scope.label).items, index, scope.label);
   }
+}
+
+/** Plays `trackIds` of the active root (an album of the sheet), in that order, from the first. */
+export function playTrackIds(trackIds: readonly string[], label: string): void {
+  const root = current();
+  if (root && trackIds.length > 0) playTracks(queueOf(root.id, [...trackIds], label).items, 0, label);
 }
 
 /**

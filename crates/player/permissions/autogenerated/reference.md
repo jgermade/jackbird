@@ -12,6 +12,7 @@ Every command of the phone's player, and its events.
 - `allow-stop`
 - `allow-status`
 - `allow-set-output`
+- `allow-set-transition`
 - `allow-output-info`
 - `allow-pick-folder`
 - `allow-folder-check`
@@ -608,6 +609,32 @@ Enables the set_queue command without any pre-configured scope.
 <td>
 
 Denies the set_queue command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:allow-set-transition`
+
+</td>
+<td>
+
+Enables the set_transition command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`jackbird-player:deny-set-transition`
+
+</td>
+<td>
+
+Denies the set_transition command without any pre-configured scope.
 
 </td>
 </tr>

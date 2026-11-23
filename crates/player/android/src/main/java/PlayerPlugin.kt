@@ -123,6 +123,12 @@ class OutputArgs {
 }
 
 @InvokeArg
+class TransitionArgs {
+  /** The crossfade's length in seconds (0: none, as it always was, or gapless). */
+  var crossfade: Double = 0.0
+}
+
+@InvokeArg
 class SeekArgs {
   var seconds: Double = 0.0
 }
@@ -139,10 +145,36 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   private val analyser = Executors.newSingleThreadExecutor()
   private var player: Player? = null
 
-  private val listener = object : Player.Listener {
-    override fun onIsPlayingChanged(isPlaying: Boolean) = send("state")
+  /** The player's queue, where it was in it and at what time (ms): what a player made anew gets back. */
+  private class Kept(val items: List<MediaItem>, val index: Int, val position: Long)
 
-    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = send("state")
+  /**
+   * The queue as the player last had it. Paused, the service is no longer in the foreground, and
+   * Android stops it a minute or so after the app leaves the screen: its player is released with its
+   * queue, and the next play (the person back in the app) starts a service with an empty player,
+   * which played nothing while the page thought it played (the owner's report, 2026-11-23). The
+   * new player is given this queue back, paused where it was (`withPlayer`).
+   */
+  private var kept: Kept? = null
+
+  private fun keep(player: Player) {
+    kept = if (player.mediaItemCount == 0) null else Kept(
+      (0 until player.mediaItemCount).map { player.getMediaItemAt(it) },
+      player.currentMediaItemIndex,
+      player.currentPosition
+    )
+  }
+
+  private val listener = object : Player.Listener {
+    override fun onIsPlayingChanged(isPlaying: Boolean) {
+      player?.let { keep(it) }
+      send("state")
+    }
+
+    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+      player?.let { keep(it) }
+      send("state")
+    }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
       if (playbackState == Player.STATE_READY) send("state")
@@ -151,6 +183,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
 
     // The next song started: by itself, or from the notification's or the lock screen's ⏭.
     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+      player?.let { keep(it) }
       if (mediaItem != null && reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) send("advance")
     }
 
@@ -253,6 +286,17 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   override fun load(webView: WebView) {
     super.load(webView)
     BitPerfect.listener = { main.post { sendSounding() } }
+    // A crossfade moved the session to another player (PlayerService): its events are the ones
+    // heard now, and the page moves on to its song.
+    PlayerService.switched = { next ->
+      if (player !== next) {
+        player?.removeListener(listener)
+        next.addListener(listener)
+        player = next
+      }
+      keep(next)
+      send("advance")
+    }
     // What covers the page's edges: the status bar, the camera's cutout, the navigation bar. The page
     // keeps clear of them (src/lib/safe-area.ts); the webview's own reading of them is not relied on.
     // And the keyboard: edge to edge, the webview keeps its size and the keyboard lies over it, so
@@ -615,6 +659,19 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
+  /**
+   * How one song follows another: the crossfade's length (PlayerService fades a second player in);
+   * none, as it always was, the player's own playlist (no pause between songs, as gapless).
+   */
+  @Command
+  fun setTransition(invoke: Invoke) {
+    val args = invoke.parseArgs(TransitionArgs::class.java)
+    main.post {
+      PlayerService.crossfadeMs = (args.crossfade * 1000).toLong().coerceAtLeast(0L)
+      invoke.resolve()
+    }
+  }
+
   /** Whether this Android can play bit-perfect to a USB DAC (14 and later), and the DAC connected, if any. */
   @Command
   fun outputInfo(invoke: Invoke) {
@@ -624,21 +681,32 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     })
   }
 
-  /** Runs `work` with the player on the main thread, the player's own; an exception rejects the call. */
+  /**
+   * Runs `work` with the player on the main thread, the player's own; an exception rejects the call,
+   * as does a service that could not start (the call never waits for ever: the page's calls go one
+   * after the other, and one left waiting would hold up every one after it). A player made anew
+   * (the service stopped and started again) gets the queue back first, paused where it was.
+   */
   private fun withPlayer(invoke: Invoke, work: (Player) -> Unit) {
     main.post {
-      PlayerService.withPlayer(activity) { found ->
-        if (player !== found) {
-          player?.removeListener(listener)
-          found.addListener(listener)
-          player = found
-        }
+      PlayerService.withPlayer(activity, { found ->
         try {
+          if (player !== found) {
+            player?.removeListener(listener)
+            val back = kept
+            if (found.mediaItemCount == 0 && back != null) {
+              found.setMediaItems(back.items, back.index.coerceIn(0, back.items.size - 1), back.position)
+              found.playWhenReady = false
+              found.prepare()
+            }
+            found.addListener(listener)
+            player = found
+          }
           work(found)
         } catch (error: Exception) {
           invoke.reject(error.message ?: error.toString())
         }
-      }
+      }, { error -> invoke.reject(error.message ?: error.toString()) })
     }
   }
 
@@ -662,6 +730,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       player.setMediaItems(args.songs.map(::itemOf), 0, (args.at * 1000).toLong())
       player.playWhenReady = args.play
       player.prepare()
+      keep(player)
       invoke.resolve()
     }
   }
@@ -676,6 +745,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
       // The songs before it are done with: the one playing becomes the first.
       if (at > 0) player.removeMediaItems(0, at)
       player.addMediaItems(args.songs.map(::itemOf))
+      keep(player)
       invoke.resolve()
     }
   }
@@ -694,6 +764,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   fun pause(invoke: Invoke) {
     withPlayer(invoke) { player ->
       player.pause()
+      keep(player)
       invoke.resolve()
     }
   }
@@ -703,6 +774,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     val args = invoke.parseArgs(SeekArgs::class.java)
     withPlayer(invoke) { player ->
       player.seekTo((args.seconds * 1000).toLong())
+      keep(player)
       invoke.resolve()
     }
   }
@@ -713,6 +785,7 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
     withPlayer(invoke) { player ->
       player.stop()
       player.clearMediaItems()
+      kept = null
       invoke.resolve()
     }
   }

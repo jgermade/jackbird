@@ -5,7 +5,7 @@
 //! cannot play.
 
 use jackbird_api::{Failure, failure};
-use jackbird_audio::{DeviceInfo, DeviceOutput, Output, Player, Settings, Status};
+use jackbird_audio::{DeviceInfo, DeviceOutput, Output, Player, Settings, Status, Transition};
 use jackbird_core::Root;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
@@ -47,6 +47,12 @@ pub async fn audio_devices() -> Result<Vec<DeviceInfo>, Failure> {
 #[tauri::command]
 pub fn audio_configure(audio: State<'_, Audio>, settings: Settings) {
     audio.0.configure(settings);
+}
+
+/// How one song follows another: as now, gapless, or crossfaded.
+#[tauri::command]
+pub fn audio_transition(audio: State<'_, Audio>, transition: Transition) {
+    audio.0.set_transition(transition);
 }
 
 /// Plays a file of an open root (the interface's `key` for it) from `at` seconds, or loads it paused.

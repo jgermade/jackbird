@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use common::{decode_all, fixture, pcm_bytes};
-use jackbird_audio::{Capture, CaptureOutput, DeviceSample, Event, Fidelity, Player, Settings};
+use jackbird_audio::{Capture, CaptureOutput, DeviceSample, Event, Fidelity, Mode, Player, Settings, Transition};
 
 fn player(sample: Option<DeviceSample>) -> (Player, Arc<Mutex<Capture>>, Receiver<Event>) {
     paced(sample, 40)
@@ -125,6 +125,141 @@ fn the_next_song_of_the_same_format_follows_without_a_gap() {
         device_bytes(&both, 24, DeviceSample::I24),
         "sample after sample"
     );
+}
+
+#[test]
+fn crossfaded_the_next_song_fades_in_over_the_end_of_the_one_ending() {
+    let (player, capture, events) = player(None);
+    player.set_transition(Transition::Crossfade { seconds: 0.05 });
+    player.load(&fixture("flac-24-96.flac"), "one", 0.0, true);
+    player.set_next(Some((&fixture("flac-24-96-b.flac"), "two")));
+    let seen = until(&events, ended);
+    let keys: Vec<&str> = seen.iter().filter_map(started).collect();
+    assert_eq!(keys, ["one", "two"]);
+    let (_, one) = decode_all("flac-24-96.flac");
+    let (_, two) = decode_all("flac-24-96-b.flac");
+    let expected = faded(&one, &two, 4800, 8_388_607.0);
+    let capture = capture.lock().unwrap();
+    assert_eq!(capture.opens.len(), 1, "one opening: the two overlap in it");
+    let got = &capture.opens[0].2;
+    let want = device_bytes(&expected, 24, DeviceSample::I24);
+    assert_eq!(got, &want);
+}
+
+/// `one`'s end mixed with `two`'s start over `fade` frames (stereo), as the player does.
+fn faded(one: &[i32], two: &[i32], fade: usize, top: f64) -> Vec<i32> {
+    let samples = fade * 2;
+    let mut out: Vec<i32> = one[..one.len() - samples].to_vec();
+    for frame in 0..fade {
+        let at = (frame as f64 + 0.5) / fade as f64 * std::f64::consts::FRAC_PI_2;
+        for channel in 0..2 {
+            let index = frame * 2 + channel;
+            let value = f64::from(one[one.len() - samples + index]) * at.cos() + f64::from(two[index]) * at.sin();
+            out.push(value.round().clamp(-top - 1.0, top) as i32);
+        }
+    }
+    out.extend_from_slice(&two[samples..]);
+    out
+}
+
+#[test]
+fn crossfaded_a_changed_next_song_is_mixed_in_place_of_the_one_before() {
+    let (player, capture, events) = player(None);
+    player.set_transition(Transition::Crossfade { seconds: 0.05 });
+    player.load(&fixture("flac-24-96.flac"), "one", 0.0, false);
+    player.set_next(Some((&fixture("flac-24-96-b.flac"), "two")));
+    // Paused, the decoder fills the pipe: "two" is mixed in ahead of time.
+    std::thread::sleep(Duration::from_millis(300));
+    player.set_next(Some((&fixture("flac-24-96.flac"), "three")));
+    player.play();
+    let seen = until(&events, ended);
+    let keys: Vec<&str> = seen.iter().filter_map(started).collect();
+    assert_eq!(keys, ["one", "three"]);
+    let (_, one) = decode_all("flac-24-96.flac");
+    assert_eq!(
+        capture.lock().unwrap().opens[0].2,
+        device_bytes(&faded(&one, &one, 4800, 8_388_607.0), 24, DeviceSample::I24)
+    );
+}
+
+/// Frames of a song of `frames` at `from` Hz, resampled to `to` Hz.
+fn resampled(frames: usize, from: f64, to: f64) -> usize {
+    (frames as f64 * to / from).round() as usize
+}
+
+#[test]
+fn gapless_a_next_song_of_another_rate_is_resampled_into_the_same_opening() {
+    let (player, capture, events) = player(None);
+    player.set_transition(Transition::Gapless);
+    player.load(&fixture("flac-24-96.flac"), "one", 0.0, true);
+    player.set_next(Some((&fixture("flac-16-44.flac"), "two")));
+    let seen = until(&events, ended);
+    let keys: Vec<&str> = seen.iter().filter_map(started).collect();
+    assert_eq!(keys, ["one", "two"]);
+    let two_started = seen.iter().find(|event| started(event) == Some("two"));
+    assert!(
+        matches!(two_started, Some(Event::Started { format, route, .. }) if format.rate == 44100 && route.rate == 96000 && route.fidelity == Fidelity::Converted),
+        "said as its own format, converted to the output's: {two_started:?}"
+    );
+    let (_, one) = decode_all("flac-24-96.flac");
+    let (_, two) = decode_all("flac-16-44.flac");
+    let capture = capture.lock().unwrap();
+    assert_eq!(capture.opens.len(), 1, "one opening: the device never stopped");
+    let bytes = &capture.opens[0].2;
+    let first = device_bytes(&one, 24, DeviceSample::I24);
+    assert_eq!(&bytes[..first.len()], &first[..], "the first song as it is");
+    assert_eq!(
+        bytes.len() - first.len(),
+        resampled(two.len() / 2, 44100.0, 96000.0) * 2 * 4,
+        "the second at 96 kHz, to the frame"
+    );
+}
+
+#[test]
+fn crossfaded_a_next_song_of_another_rate_is_resampled_and_mixed() {
+    let (player, capture, events) = player(None);
+    player.set_transition(Transition::Crossfade { seconds: 0.05 });
+    player.load(&fixture("flac-24-96.flac"), "one", 0.0, true);
+    player.set_next(Some((&fixture("flac-16-44.flac"), "two")));
+    until(&events, ended);
+    let (_, one) = decode_all("flac-24-96.flac");
+    let (_, two) = decode_all("flac-16-44.flac");
+    let capture = capture.lock().unwrap();
+    assert_eq!(capture.opens.len(), 1);
+    let bytes = &capture.opens[0].2;
+    let unfaded = device_bytes(&one[..one.len() - 4800 * 2], 24, DeviceSample::I24);
+    assert_eq!(&bytes[..unfaded.len()], &unfaded[..]);
+    assert_eq!(
+        bytes.len() / 4 / 2,
+        one.len() / 2 + resampled(two.len() / 2, 44100.0, 96000.0) - 4800
+    );
+}
+
+#[test]
+fn exclusive_a_next_song_of_another_rate_still_reopens_the_output() {
+    let capture = Arc::new(Mutex::new(Capture::default()));
+    let outputs = {
+        let capture = Arc::clone(&capture);
+        Box::new(move |_: &Settings| {
+            Box::new(CaptureOutput::new(Arc::clone(&capture), None, 40)) as Box<dyn jackbird_audio::Output>
+        })
+    };
+    let (sender, events) = channel();
+    let settings = Settings {
+        mode: Mode::Exclusive,
+        device: None,
+    };
+    let player = Player::new(outputs, settings, move |event| {
+        let _ = sender.send(event);
+    });
+    player.set_transition(Transition::Gapless);
+    player.load(&fixture("flac-24-96.flac"), "one", 0.0, true);
+    player.set_next(Some((&fixture("flac-16-44.flac"), "two")));
+    until(&events, ended);
+    let (_, two) = decode_all("flac-16-44.flac");
+    let capture = capture.lock().unwrap();
+    assert_eq!(capture.opens.len(), 2, "bit-perfect: each song at its own rate");
+    assert_eq!(capture.opens[1].2, device_bytes(&two, 16, DeviceSample::I16));
 }
 
 #[test]

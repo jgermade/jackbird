@@ -2,15 +2,17 @@
 // saved, else from the system (colour scheme, browser languages), is saved
 // once chosen, and is applied to <html> (data-theme, lang). The theme follows
 // the system until one is chosen. And whether the library's tree shows the
-// songs (helpers/folders.ts), on until turned off. And how tall the lists' rows
+// songs (helpers/folders.ts), in Files and in the other views apart, off until turned on. And how tall the lists' rows
 // are (helpers/density.ts), applied to <html> as data-density. And the display spectrum's look
-// and how its peaks fall (helpers/spectrum.ts). A jq79 store, so views can bind to it.
+// and how its peaks fall (helpers/spectrum.ts). And how one song follows another, and the
+// crossfade's length (helpers/transition.ts). A jq79 store, so views can bind to it.
 
 import { $reactive } from "jq79";
 import { densityOf } from "../helpers/density";
 import { pickLanguage } from "../helpers/i18n";
 import { peakFallOf, spectrumLookOf } from "../helpers/spectrum";
-import type { Density, Language, PeakFall, SpectrumLook, Theme } from "../types";
+import { crossfadeSecondsOf, transitionOf } from "../helpers/transition";
+import type { Density, Language, PeakFall, SpectrumLook, Theme, Transition } from "../types";
 import { isEmbed } from "./platform";
 import { STORAGE_KEYS, readStored, removeStored, writeStored } from "./storage";
 
@@ -45,6 +47,14 @@ const embeddedTheme = (): Theme | null => {
 };
 const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => language === embedded?.get("lang")) ?? null;
 
+/**
+ * Whether the songs are shown where `key` says: off until turned on (the owner, 2026-11-23), from
+ * the one switch there was before when not saved.
+ */
+function songsShown(key: string): boolean {
+  return (readStored(key) ?? readStored(STORAGE_KEYS.songsInTree)) === "on";
+}
+
 /** The tone chosen: one of the two, or "auto", following the system's. */
 export type ThemeChoice = Theme | "auto";
 
@@ -52,10 +62,13 @@ export const preferences = $reactive({
   theme: embeddedTheme() ?? storedTheme() ?? systemTheme(),
   themeChoice: (storedTheme() ?? "auto") as ThemeChoice,
   language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage(),
-  songsInTree: readStored(STORAGE_KEYS.songsInTree) !== "off",
+  songsInFolders: songsShown(STORAGE_KEYS.songsInFolders),
+  songsInViews: songsShown(STORAGE_KEYS.songsInViews),
   density: densityOf(readStored(STORAGE_KEYS.density)),
   spectrumLook: spectrumLookOf(readStored(STORAGE_KEYS.spectrumLook)),
-  peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall))
+  peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall)),
+  transition: transitionOf(readStored(STORAGE_KEYS.transition)),
+  crossfadeSeconds: crossfadeSecondsOf(readStored(STORAGE_KEYS.crossfadeSeconds))
 });
 
 function apply(): void {
@@ -101,10 +114,16 @@ export function toggleTheme(): void {
   setTheme(preferences.theme === "dark" ? "light" : "dark");
 }
 
-/** Shows the songs in the library's tree, or only its folders and groups (a song reached through Details). */
-export function setSongsInTree(on: boolean): void {
-  preferences.songsInTree = on;
-  writeStored(STORAGE_KEYS.songsInTree, on ? "on" : "off");
+/** Shows the songs in Files, or only its folders (a song reached through Details). */
+export function setSongsInFolders(on: boolean): void {
+  preferences.songsInFolders = on;
+  writeStored(STORAGE_KEYS.songsInFolders, on ? "on" : "off");
+}
+
+/** Shows the songs in the library's other views, or only their groups (a song reached through Details). */
+export function setSongsInViews(on: boolean): void {
+  preferences.songsInViews = on;
+  writeStored(STORAGE_KEYS.songsInViews, on ? "on" : "off");
 }
 
 /** How tall the lists' rows are. */
@@ -117,6 +136,18 @@ export function setDensity(density: Density): void {
 export function setSpectrumLook(look: SpectrumLook): void {
   preferences.spectrumLook = look;
   writeStored(STORAGE_KEYS.spectrumLook, look);
+}
+
+/** How one song follows another (each player hears it: lib/player.ts). */
+export function setTransition(transition: Transition): void {
+  preferences.transition = transition;
+  writeStored(STORAGE_KEYS.transition, transition);
+}
+
+/** The crossfade's length, in whole seconds from 1 to 12. */
+export function setCrossfadeSeconds(seconds: number): void {
+  preferences.crossfadeSeconds = crossfadeSecondsOf(seconds);
+  writeStored(STORAGE_KEYS.crossfadeSeconds, String(preferences.crossfadeSeconds));
 }
 
 /** How the display spectrum's peaks fall, or none. */

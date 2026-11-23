@@ -454,6 +454,7 @@ pub fn run() {
     let builder = builder.invoke_handler(commands![
         audio::audio_devices,
         audio::audio_configure,
+        audio::audio_transition,
         audio::audio_load,
         audio::audio_next,
         audio::audio_play,
