@@ -401,7 +401,7 @@ export const en = {
   "transition.crossfadeHint": "The next song is loaded ahead and fades in over the end of this one, which fades out.",
   "transition.seconds": "Crossfade length",
   "transition.secondsValue": "{seconds} s",
-  "transition.nativeLimits": "In the native output, a song of another sample rate or channels follows without a fade.",
+  "transition.nativeLimits": "In the shared native output, a song of another sample rate is resampled to the one playing, so the output never stops. In exclusive mode each song keeps its own rate: one of another rate follows after a short break, without a fade.",
   "transition.phoneLimits": "With “Bit-perfect to a USB DAC” on, songs follow without a fade.",
   "preferences.peakFall": "Peaks' fall",
   "preferences.peakFall.none": "None",

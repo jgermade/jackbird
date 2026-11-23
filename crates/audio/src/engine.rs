@@ -15,8 +15,9 @@ use std::time::Duration;
 
 use serde::Serialize;
 
+use crate::convert::Converter;
 use crate::spectrum::{SIZE, Spectrum};
-use crate::{Output, Outputs, PcmFormat, Pipe, Route, Settings, Source, Transition};
+use crate::{Fidelity, Mode, Output, Outputs, PcmFormat, Pipe, Route, Settings, Source, Transition};
 
 /// What the player tells the interface.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -94,9 +95,9 @@ struct Song {
     key: String,
     source: Option<Source>,
     exhausted: bool,
-    /// Bits its samples are shifted up by to reach the pipe's depth: a song of fewer bits
-    /// crossfaded into a pipe of more (exact: nothing is lost).
-    shift: u32,
+    /// Its samples made into the pipe's format, when it follows a song of another one without the
+    /// output opening again (gapless or crossfade, shared: crate::convert).
+    convert: Option<Converter>,
 }
 
 #[derive(Clone)]
@@ -106,6 +107,8 @@ struct Info {
     codec: String,
     format: PcmFormat,
     duration: Option<f64>,
+    /// Converted to the output's format (resampled or remixed): not the file's own samples.
+    converted: bool,
 }
 
 struct Engine {
@@ -152,7 +155,7 @@ impl Engine {
             key,
             source: None,
             exhausted: false,
-            shift: 0,
+            convert: None,
         }
     }
 
@@ -177,6 +180,7 @@ impl Engine {
                     codec: source.codec().to_string(),
                     format: source.format(),
                     duration: source.duration(),
+                    converted: false,
                 });
                 while self.infos.len() > 8 {
                     self.infos.pop_front();
@@ -246,7 +250,7 @@ impl Engine {
         self.previous = None;
         self.tail.clear();
         self.faded = None;
-        song.shift = 0;
+        song.convert = None;
         self.decoding = Some(song);
         self.playing = play;
         self.ended = false;
@@ -290,7 +294,7 @@ impl Engine {
             if let Some(mut ahead) = self.decoding.replace(previous) {
                 ahead.source = None;
                 ahead.exhausted = false;
-                ahead.shift = 0;
+                ahead.convert = None;
                 if self.next.is_none() {
                     self.next = Some(ahead);
                 }
@@ -386,20 +390,23 @@ impl Engine {
         while pipe.queued() < target {
             let Some(song) = self.decoding.as_mut() else { return };
             if !song.exhausted {
-                let shift = song.shift;
                 let Some(source) = song.source.as_mut() else { return };
                 match source.next_block() {
-                    Ok(Some(block)) if fade == 0 && shift == 0 => pipe.push(block),
+                    Ok(Some(block)) if fade == 0 && song.convert.is_none() => pipe.push(block),
                     Ok(Some(block)) => {
-                        self.tail.extend(block.iter().map(|sample| sample << shift));
-                        let held = self.tail.len() / channels;
-                        if held > fade {
-                            let excess = (held - fade) * channels;
-                            pipe.push(&self.tail[..excess]);
-                            self.tail.drain(..excess);
-                        }
+                        let samples = match song.convert.as_mut() {
+                            Some(convert) => convert.push(block),
+                            None => block,
+                        };
+                        hold(&mut self.tail, &pipe, samples, fade * channels);
                     }
-                    Ok(None) => song.exhausted = true,
+                    Ok(None) => {
+                        // What the resampler still holds of the song's end.
+                        if let Some(convert) = song.convert.as_mut() {
+                            hold(&mut self.tail, &pipe, convert.finish(), fade * channels);
+                        }
+                        song.exhausted = true;
+                    }
                     Err(message) => {
                         (self.events)(Event::Failed {
                             key: song.key.clone(),
@@ -426,22 +433,37 @@ impl Engine {
             let Some(next_format) = next.source.as_ref().map(Source::format) else {
                 return;
             };
-            let crossfade = fade > 0
-                && !self.tail.is_empty()
-                && next_format.rate == format.rate
-                && next_format.channels == format.channels
-                && next_format.bits <= format.bits;
-            if crossfade {
-                next.shift = format.bits - next_format.bits;
+            // Another format follows in the same opening when it is converted to this one: a song of
+            // fewer bits and the same rate and channels being crossfaded (shifted, exactly), or any
+            // song, gapless or crossfaded, in the shared mode (resampled, remixed). Else the output
+            // opens again for it once this one has played.
+            if next_format != format {
+                let exact = next_format.rate == format.rate
+                    && next_format.channels == format.channels
+                    && next_format.bits <= format.bits;
+                let joined = self.transition != Transition::Normal && self.settings.mode == Mode::Shared;
+                let convert = if (fade > 0 && exact) || joined {
+                    Converter::new(next_format, format)
+                } else {
+                    None
+                };
+                let Some(convert) = convert else {
+                    self.flush_tail(&pipe);
+                    self.next = Some(next);
+                    return;
+                };
+                if !convert.exact()
+                    && let Some(info) = self.infos.iter_mut().find(|info| info.serial == next.serial)
+                {
+                    info.converted = true;
+                }
+                next.convert = Some(convert);
+            }
+            if fade > 0 && !self.tail.is_empty() {
                 self.crossfade(&pipe, &mut next, format);
-            } else if next_format == format {
+            } else {
                 self.flush_tail(&pipe);
                 pipe.mark(next.serial, 0);
-            } else {
-                // Another format: the output opens again for it once this one has played.
-                self.flush_tail(&pipe);
-                self.next = Some(next);
-                return;
             }
             self.previous = self.decoding.replace(next);
         }
@@ -466,8 +488,16 @@ impl Engine {
         while incoming.len() < old.len() && !next.exhausted {
             let Some(source) = next.source.as_mut() else { break };
             match source.next_block() {
-                Ok(Some(block)) => incoming.extend(block.iter().map(|sample| sample << next.shift)),
-                Ok(None) => next.exhausted = true,
+                Ok(Some(block)) => match next.convert.as_mut() {
+                    Some(convert) => incoming.extend_from_slice(convert.push(block)),
+                    None => incoming.extend_from_slice(block),
+                },
+                Ok(None) => {
+                    if let Some(convert) = next.convert.as_mut() {
+                        incoming.extend_from_slice(convert.finish());
+                    }
+                    next.exhausted = true;
+                }
                 Err(message) => {
                     (self.events)(Event::Failed {
                         key: next.key.clone(),
@@ -526,10 +556,10 @@ impl Engine {
                 self.route.clone(),
             ) {
                 (self.events)(Event::Started {
+                    route: route_of(route, info.converted),
                     key: info.key,
                     codec: info.codec,
                     format: info.format,
-                    route,
                     duration: info.duration,
                 });
             }
@@ -564,7 +594,10 @@ impl Engine {
             duration: info.and_then(|info| info.duration),
             codec: info.map(|info| info.codec.clone()),
             format: info.map(|info| info.format),
-            route: self.route.clone(),
+            route: self
+                .route
+                .clone()
+                .map(|route| route_of(route, info.is_some_and(|info| info.converted))),
         };
     }
 
@@ -596,6 +629,33 @@ impl Engine {
             self.watch();
             self.publish();
         }
+    }
+}
+
+/// Puts `samples` after what the tail holds, and what goes beyond its `keep` samples in the pipe.
+fn hold(tail: &mut Vec<i32>, pipe: &Pipe, samples: &[i32], keep: usize) {
+    if keep == 0 && tail.is_empty() {
+        pipe.push(samples);
+        return;
+    }
+    tail.extend_from_slice(samples);
+    if tail.len() > keep {
+        let excess = tail.len() - keep;
+        pipe.push(&tail[..excess]);
+        tail.drain(..excess);
+    }
+}
+
+/// The way a song goes to the device: the output's, said to convert when the song was converted
+/// to the output's format.
+fn route_of(route: Route, converted: bool) -> Route {
+    if converted {
+        Route {
+            fidelity: Fidelity::Converted,
+            ..route
+        }
+    } else {
+        route
     }
 }
 

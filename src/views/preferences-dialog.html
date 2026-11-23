@@ -205,7 +205,7 @@
         <Field :if="preferences.transition === 'crossfade'" :label="t('transition.seconds')" control="crossfade-seconds">
           <Select id="crossfade-seconds" :model="fadeLength()" :options="fadeLengths()" @change="setCrossfadeSeconds(Number($event.detail))" />
         </Field>
-        <p :if="preferences.transition === 'crossfade' && output.available && output.kind !== 'embedded'" class="hint">{{ t("transition.nativeLimits") }}</p>
+        <p :if="preferences.transition !== 'normal' && output.available && output.kind !== 'embedded'" class="hint">{{ t("transition.nativeLimits") }}</p>
         <p :if="preferences.transition === 'crossfade' && output.phone" class="hint">{{ t("transition.phoneLimits") }}</p>
       </section>
       <section :if="output.available" class="pref output">

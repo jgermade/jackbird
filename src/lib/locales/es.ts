@@ -402,7 +402,7 @@ export const es: Record<MessageKey, string> = {
   "transition.crossfadeHint": "La siguiente canción se precarga y entra fundiéndose con el final de esta, que se apaga.",
   "transition.seconds": "Duración del fundido",
   "transition.secondsValue": "{seconds} s",
-  "transition.nativeLimits": "En la salida nativa, una canción de otra frecuencia de muestreo o con otros canales sigue sin fundido.",
+  "transition.nativeLimits": "En la salida nativa compartida, una canción de otra frecuencia de muestreo se remuestrea a la de la que suena, y la salida no se detiene. En modo exclusivo cada canción conserva su frecuencia: una de otra frecuencia sigue tras un breve corte, sin fundido.",
   "transition.phoneLimits": "Con «Bit-perfect a un DAC USB» activado, las canciones siguen sin fundido.",
   "preferences.peakFall": "Caída de los picos",
   "preferences.peakFall.none": "Ninguno",
