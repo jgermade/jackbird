@@ -8,12 +8,15 @@
 
 import type { Transition } from "../types.ts";
 
-/** The ways, the default first. */
+/** The ways, as Settings lists them. */
 export const TRANSITIONS: readonly Transition[] = ["normal", "gapless", "crossfade"];
+
+/** The way until one is chosen: gapless (the owner, 2026-11-23). */
+export const DEFAULT_TRANSITION: Transition = "gapless";
 
 /** The way a saved value names, else the default. */
 export function transitionOf(value: unknown): Transition {
-  return TRANSITIONS.find((one) => one === value) ?? "normal";
+  return TRANSITIONS.find((one) => one === value) ?? DEFAULT_TRANSITION;
 }
 
 /** The crossfade's lengths to choose from, in seconds, and the default. */

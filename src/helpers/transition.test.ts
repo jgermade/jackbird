@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CROSSFADE_DEFAULT, GAPLESS_LEAD, TRANSITIONS, crossfadeSecondsOf, fadeLevels, overlapOf, transitionOf, transitionStep } from "./transition.ts";
+import { CROSSFADE_DEFAULT, DEFAULT_TRANSITION, GAPLESS_LEAD, TRANSITIONS, crossfadeSecondsOf, fadeLevels, overlapOf, transitionOf, transitionStep } from "./transition.ts";
 
 describe("transitionOf", () => {
   it("names a way, else the default", () => {
     for (const way of TRANSITIONS) assert.equal(transitionOf(way), way);
-    assert.equal(transitionOf("fade"), "normal");
-    assert.equal(transitionOf(null), "normal");
+    assert.equal(transitionOf("fade"), DEFAULT_TRANSITION);
+    assert.equal(transitionOf(null), "gapless");
   });
 });
 
