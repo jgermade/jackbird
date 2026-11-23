@@ -11,6 +11,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PcmFormat, Route } from "../helpers/output";
+import type { Transition } from "../types";
 
 /** A file of an open root, and the player's key for it. */
 export type NativeTrack = { root: string; path: string; key: string };
@@ -62,6 +63,11 @@ export class NativeAudio extends EventTarget {
     this.#position = seconds;
     if (this.#track) void invoke("audio_seek", { seconds }).catch(() => undefined);
     this.dispatchEvent(new Event("timeupdate"));
+  }
+
+  /** How one song follows another (crates/audio's `Transition`): from the next one. */
+  setTransition(way: Transition, seconds: number): void {
+    void invoke("audio_transition", { transition: way === "crossfade" ? { kind: way, seconds } : { kind: way } }).catch(() => undefined);
   }
 
   /** Loads a track, paused, at its start. */

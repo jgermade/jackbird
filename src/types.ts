@@ -162,6 +162,9 @@ export type SpectrumLook = "segments" | "lines";
 /** How the display's spectrum's peaks fall (helpers/spectrum.ts), or none drawn. */
 export type PeakFall = "none" | "fast" | "slow" | "very-slow";
 
+/** How one song follows another: as it always did, without a pause, or crossfaded (helpers/transition.ts). */
+export type Transition = "normal" | "gapless" | "crossfade";
+
 export type GroupingMode = "flat" | "wizard";
 
 /** One open folder ("root") and everything the library shows of it. */

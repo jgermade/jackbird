@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "stop",
     "status",
     "set_output",
+    "set_transition",
     "output_info",
     "pick_folder",
     "folder_check",

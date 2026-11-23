@@ -123,6 +123,12 @@ class OutputArgs {
 }
 
 @InvokeArg
+class TransitionArgs {
+  /** The crossfade's length in seconds (0: none, as it always was, or gapless). */
+  var crossfade: Double = 0.0
+}
+
+@InvokeArg
 class SeekArgs {
   var seconds: Double = 0.0
 }
@@ -280,6 +286,17 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
   override fun load(webView: WebView) {
     super.load(webView)
     BitPerfect.listener = { main.post { sendSounding() } }
+    // A crossfade moved the session to another player (PlayerService): its events are the ones
+    // heard now, and the page moves on to its song.
+    PlayerService.switched = { next ->
+      if (player !== next) {
+        player?.removeListener(listener)
+        next.addListener(listener)
+        player = next
+      }
+      keep(next)
+      send("advance")
+    }
     // What covers the page's edges: the status bar, the camera's cutout, the navigation bar. The page
     // keeps clear of them (src/lib/safe-area.ts); the webview's own reading of them is not relied on.
     // And the keyboard: edge to edge, the webview keeps its size and the keyboard lies over it, so
@@ -638,6 +655,19 @@ class PlayerPlugin(private val activity: Activity) : Plugin(activity) {
         val at = player.currentPosition
         player.seekTo(if (at > 0) at - 1 else 1)
       }
+      invoke.resolve()
+    }
+  }
+
+  /**
+   * How one song follows another: the crossfade's length (PlayerService fades a second player in);
+   * none, as it always was, the player's own playlist (no pause between songs, as gapless).
+   */
+  @Command
+  fun setTransition(invoke: Invoke) {
+    val args = invoke.parseArgs(TransitionArgs::class.java)
+    main.post {
+      PlayerService.crossfadeMs = (args.crossfade * 1000).toLong().coerceAtLeast(0L)
       invoke.resolve()
     }
   }

@@ -64,6 +64,25 @@ pub struct Settings {
     pub device: Option<String>,
 }
 
+/// How one song follows another (the interface's setting).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Transition {
+    /// As the player always did: the next song of the same format follows without a gap, one of
+    /// another format once the output has opened again for it.
+    #[default]
+    Normal,
+    /// Without a gap: here, as `Normal` (the next song decoded ahead into the same pipe).
+    Gapless,
+    /// The next song fades in over the last `seconds` of the one ending, which fades out. Only
+    /// between songs of the same rate and channels (and no more bits than the one ending); others
+    /// follow as `Normal`.
+    Crossfade {
+        /// How long the two overlap.
+        seconds: f64,
+    },
+}
+
 /// The device's sample format, as the output writes it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

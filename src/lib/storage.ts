@@ -24,6 +24,10 @@ export const STORAGE_KEYS = {
   songsInFolders: "jackbird.songsInFolders",
   /** Whether the library shows the songs in its other views ("off" when not). */
   songsInViews: "jackbird.songsInViews",
+  /** How one song follows another: normal, gapless or crossfade (src/helpers/transition.ts). */
+  transition: "jackbird.transition",
+  /** The crossfade's length, in whole seconds from 1 to 12. */
+  crossfadeSeconds: "jackbird.crossfadeSeconds",
   /** How tall the lists' rows are: compact, comfortable or spacious (src/helpers/density.ts). */
   density: "jackbird.density",
   /** The display spectrum's look: segments or lines (src/helpers/spectrum.ts). */

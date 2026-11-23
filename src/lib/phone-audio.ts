@@ -10,6 +10,7 @@
 
 import { addPluginListener, invoke } from "@tauri-apps/api/core";
 import type { Sounding } from "./native-audio";
+import type { Transition } from "../types";
 import { output } from "./output";
 import { isPhone } from "./platform";
 
@@ -132,6 +133,11 @@ export class PhoneAudio extends EventTarget {
     this.paused = true;
     this.#stopPolling();
     void this.#call("set_queue", { songs: [song], at: 0, play: false }).catch((error: unknown) => this.#fail(song.key, error));
+  }
+
+  /** How one song follows another (crates/player: a second player fades in for a crossfade). */
+  setTransition(way: Transition, seconds: number): void {
+    void this.#call("set_transition", { crossfade: way === "crossfade" ? seconds : 0 }).catch(() => undefined);
   }
 
   /** The songs to follow the one loaded, in order (none: the queue ends with it). */

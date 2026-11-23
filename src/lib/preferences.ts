@@ -4,13 +4,15 @@
 // the system until one is chosen. And whether the library's tree shows the
 // songs (helpers/folders.ts), in Files and in the other views apart, on until turned off. And how tall the lists' rows
 // are (helpers/density.ts), applied to <html> as data-density. And the display spectrum's look
-// and how its peaks fall (helpers/spectrum.ts). A jq79 store, so views can bind to it.
+// and how its peaks fall (helpers/spectrum.ts). And how one song follows another, and the
+// crossfade's length (helpers/transition.ts). A jq79 store, so views can bind to it.
 
 import { $reactive } from "jq79";
 import { densityOf } from "../helpers/density";
 import { pickLanguage } from "../helpers/i18n";
 import { peakFallOf, spectrumLookOf } from "../helpers/spectrum";
-import type { Density, Language, PeakFall, SpectrumLook, Theme } from "../types";
+import { crossfadeSecondsOf, transitionOf } from "../helpers/transition";
+import type { Density, Language, PeakFall, SpectrumLook, Theme, Transition } from "../types";
 import { isEmbed } from "./platform";
 import { STORAGE_KEYS, readStored, removeStored, writeStored } from "./storage";
 
@@ -61,7 +63,9 @@ export const preferences = $reactive({
   songsInViews: songsShown(STORAGE_KEYS.songsInViews),
   density: densityOf(readStored(STORAGE_KEYS.density)),
   spectrumLook: spectrumLookOf(readStored(STORAGE_KEYS.spectrumLook)),
-  peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall))
+  peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall)),
+  transition: transitionOf(readStored(STORAGE_KEYS.transition)),
+  crossfadeSeconds: crossfadeSecondsOf(readStored(STORAGE_KEYS.crossfadeSeconds))
 });
 
 function apply(): void {
@@ -129,6 +133,18 @@ export function setDensity(density: Density): void {
 export function setSpectrumLook(look: SpectrumLook): void {
   preferences.spectrumLook = look;
   writeStored(STORAGE_KEYS.spectrumLook, look);
+}
+
+/** How one song follows another (each player hears it: lib/player.ts). */
+export function setTransition(transition: Transition): void {
+  preferences.transition = transition;
+  writeStored(STORAGE_KEYS.transition, transition);
+}
+
+/** The crossfade's length, in whole seconds from 1 to 12. */
+export function setCrossfadeSeconds(seconds: number): void {
+  preferences.crossfadeSeconds = crossfadeSecondsOf(seconds);
+  writeStored(STORAGE_KEYS.crossfadeSeconds, String(preferences.crossfadeSeconds));
 }
 
 /** How the display spectrum's peaks fall, or none. */

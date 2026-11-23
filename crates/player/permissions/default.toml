@@ -11,6 +11,7 @@ permissions = [
   "allow-stop",
   "allow-status",
   "allow-set-output",
+  "allow-set-transition",
   "allow-output-info",
   "allow-pick-folder",
   "allow-folder-check",
