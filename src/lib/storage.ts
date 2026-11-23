@@ -20,9 +20,9 @@ export const STORAGE_KEYS = {
   compact: "jackbird.compact",
   /** Before 2026-11-23, whether the library's tree showed the songs, in every view: what the two below start from. */
   songsInTree: "jackbird.songsInTree",
-  /** Whether the library shows the songs in Files ("off" when not: src/helpers/folders.ts). */
+  /** Whether the library shows the songs in Files ("on" when it does; off by default: src/helpers/folders.ts). */
   songsInFolders: "jackbird.songsInFolders",
-  /** Whether the library shows the songs in its other views ("off" when not). */
+  /** Whether the library shows the songs in its other views ("on" when it does; off by default). */
   songsInViews: "jackbird.songsInViews",
   /** How one song follows another: normal, gapless or crossfade (src/helpers/transition.ts). */
   transition: "jackbird.transition",

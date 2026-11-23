@@ -2,7 +2,7 @@
 // saved, else from the system (colour scheme, browser languages), is saved
 // once chosen, and is applied to <html> (data-theme, lang). The theme follows
 // the system until one is chosen. And whether the library's tree shows the
-// songs (helpers/folders.ts), in Files and in the other views apart, on until turned off. And how tall the lists' rows
+// songs (helpers/folders.ts), in Files and in the other views apart, off until turned on. And how tall the lists' rows
 // are (helpers/density.ts), applied to <html> as data-density. And the display spectrum's look
 // and how its peaks fall (helpers/spectrum.ts). And how one song follows another, and the
 // crossfade's length (helpers/transition.ts). A jq79 store, so views can bind to it.
@@ -47,9 +47,12 @@ const embeddedTheme = (): Theme | null => {
 };
 const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => language === embedded?.get("lang")) ?? null;
 
-/** Whether the songs are shown where `key` says: on until turned off, from the one switch there was before when not saved. */
+/**
+ * Whether the songs are shown where `key` says: off until turned on (the owner, 2026-11-23), from
+ * the one switch there was before when not saved.
+ */
 function songsShown(key: string): boolean {
-  return (readStored(key) ?? readStored(STORAGE_KEYS.songsInTree)) !== "off";
+  return (readStored(key) ?? readStored(STORAGE_KEYS.songsInTree)) === "on";
 }
 
 /** The tone chosen: one of the two, or "auto", following the system's. */
