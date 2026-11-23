@@ -5,7 +5,9 @@
 // `env(safe-area-inset-*)`). See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-12).
 // The keyboard too: the webview keeps its size and the keyboard lies over it, so the plugin says how
 // much it covers, which becomes `--mm-keyboard` (lib/keyboard.ts does it in a browser). See
-// RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-14).
+// RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-14). Here it is also `--mm-keyboard-under`:
+// the app (views/app.html) is that much shorter, so it ends where the keyboard starts, as Chrome's
+// page does; and the field being typed in is brought into view above it (2026-11-23).
 
 import { addPluginListener, invoke } from "@tauri-apps/api/core";
 
@@ -17,8 +19,19 @@ function apply(edges: Edges): void {
   const root = document.documentElement.style;
   // Device pixels, as the system gives them: the one size here that is not in rem.
   for (const side of ["top", "right", "bottom", "left"] as const) root.setProperty(`--mm-safe-${side}`, `${edges[side]}px`);
-  root.setProperty("--mm-keyboard", `${Math.max(0, edges.keyboard ?? 0)}px`);
+  const keyboard = Math.max(0, edges.keyboard ?? 0);
+  root.setProperty("--mm-keyboard", `${keyboard}px`);
+  root.setProperty("--mm-keyboard-under", `${keyboard}px`);
   document.dispatchEvent(new Event("mm-keyboard"));
+  // Once the app is laid out at its new height: the field typed in, in view in what scrolls it.
+  if (keyboard > 0) requestAnimationFrame(() => requestAnimationFrame(showFocused));
+}
+
+function showFocused(): void {
+  const field = document.activeElement;
+  if (field instanceof HTMLElement && field.matches("input, textarea, select, [contenteditable]")) {
+    field.scrollIntoView({ block: "nearest" });
+  }
 }
 
 /** Keeps the page clear of what covers the screen's edges, from now on. */
