@@ -103,8 +103,10 @@ class PlayerService : MediaSessionService() {
     // A system broadcast: received though the receiver is not exported.
     ContextCompat.registerReceiver(this, noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
     current = made.player
-    waiting.forEach { it(made.player) }
+    val ready = waiting.toList()
     waiting.clear()
+    failing.clear()
+    ready.forEach { it(made.player) }
   }
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -189,16 +191,33 @@ class PlayerService : MediaSessionService() {
 
     private var current: Player? = null
     private val waiting = mutableListOf<(Player) -> Unit>()
+    private val failing = mutableListOf<(Exception) -> Unit>()
 
-    /** Runs `work` with the player, starting the service first if it is not running. On the main thread. */
-    fun withPlayer(context: Context, work: (Player) -> Unit) {
+    /**
+     * Runs `work` with the player, starting the service first if it is not running (Android stops
+     * it a minute or so after the app leaves the screen with the music paused, and its player goes
+     * with it). On the main thread. When the service cannot be started (Android refuses it to an
+     * app in the background), `failed` is told, and so is every call waiting for it: none waits for
+     * ever, and the next call tries again.
+     */
+    fun withPlayer(context: Context, work: (Player) -> Unit, failed: (Exception) -> Unit) {
       val player = current
       if (player != null) {
         work(player)
         return
       }
       waiting.add(work)
-      if (waiting.size == 1) context.startService(Intent(context, PlayerService::class.java))
+      failing.add(failed)
+      if (waiting.size > 1) return
+      try {
+        context.startService(Intent(context, PlayerService::class.java))
+      } catch (error: Exception) {
+        Log.w(TAG, "the player's service could not start: ${error.message}")
+        val told = failing.toList()
+        waiting.clear()
+        failing.clear()
+        told.forEach { it(error) }
+      }
     }
   }
 }

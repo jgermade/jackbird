@@ -61,6 +61,19 @@ export class PhoneAudio extends EventTarget {
       output.offered = offered;
       this.dispatchEvent(new CustomEvent("started", { detail: sounding }));
     }).catch(() => undefined);
+    // Back on screen: what the player says now (paused or played from the lock screen meanwhile,
+    // its events maybe not heard while the page slept in the background).
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || !this.#song) return;
+      void this.#call<Status>("status")
+        .then((status) => {
+          if (status.key !== this.#song?.key) return;
+          this.#position = status.position;
+          this.#take(status);
+          this.dispatchEvent(new Event("timeupdate"));
+        })
+        .catch(() => undefined);
+    });
   }
 
   /**
@@ -131,7 +144,13 @@ export class PhoneAudio extends EventTarget {
   async play(): Promise<void> {
     if (!this.#song) return;
     this.paused = false;
-    await this.#call("play");
+    try {
+      await this.#call("play");
+    } catch (error) {
+      // Not played (the player's service could not start): paused still, so the next press plays.
+      this.paused = true;
+      throw error;
+    }
     this.dispatchEvent(new Event("play"));
     this.#startPolling();
   }
