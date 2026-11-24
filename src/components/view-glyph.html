@@ -1,7 +1,7 @@
 <script :setup="{ view = 'files', lit = false }: Props" lang="ts">
   // A library view's glyph (Files, Playlists, Artists, Albums by artist, Albums, Compilations), as
   // its key in the library's head and in Settings draws it: a 16-unit box, in the current colour;
-  // `lit`, in the accent's ink (a key down in Settings: its view shown).
+  // `lit`, in the accent and glowing, as shuffle and repeat (a key down in Settings: its view shown).
   // Depends on no store. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-24).
 
   type Props = { view?: string; lit?: boolean }
@@ -18,6 +18,8 @@
 
 <style scoped>
   .box { display: inline-flex; }
-  .box.lit { color: var(--mm-accent-ink); }
+  /* Lit as the deck's shuffle and repeat are (views/deck-display.html): the accent, glowing. */
+  .box { transition: color var(--mm-duration) var(--mm-ease), filter var(--mm-duration) var(--mm-ease); }
+  .box.lit { color: var(--mm-accent); filter: drop-shadow(0 0 .2rem var(--mm-accent)); }
   .view-glyph { display: block; width: .875rem; height: .875rem; }
 </style>
