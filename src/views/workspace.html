@@ -65,6 +65,15 @@
   let pulled = 0
   // The panes fade as the field comes down, to a quarter once it is all out.
   const pullFade = (by: number): string => (by > 0 ? `; opacity: ${1 - Math.min(1, by / PULL_OPENS) * 0.75}` : "")
+  // Whether nothing between the finger and its pane is scrolled down: on a phone the library's
+  // list scrolls in a page of its own (views/library.html), inside the pane.
+  const atTop = (target: Element | null, pane: HTMLElement): boolean => {
+    for (let node = target as HTMLElement | null; node; node = node.parentElement) {
+      if (node.scrollTop > 0) return false
+      if (node === pane) return true
+    }
+    return true
+  }
   const pull = (() => {
     let x0 = 0
     let y0 = 0
@@ -72,7 +81,7 @@
     const start = (event: TouchEvent) => {
       const target = event.target as Element | null
       const pane = target?.closest?.(".pane") as HTMLElement | null
-      mode = narrow && !search.open && !ui.queueOpen && !!library.activeRootId && event.touches.length === 1 && !!pane && pane.scrollTop <= 0 ? null : "no"
+      mode = narrow && !search.open && !ui.queueOpen && !!library.activeRootId && event.touches.length === 1 && !!pane && atTop(target, pane) ? null : "no"
       if (mode === "no") return
       x0 = event.touches[0].clientX
       y0 = event.touches[0].clientY
@@ -204,15 +213,17 @@
   // Across a reload: kept as the page goes, put back once the roots are open
   // and drawn (two frames, then once more for covers that took longer).
   const paneOf = (name: string) => $self(name) as HTMLElement | null
+  // The library's list scrolls in its pane, or, on a phone, in its page (views/library.html).
+  const treeScroller = () => paneOf(".tree-pane .paging > .page.level") ?? paneOf(".tree-pane")
   const keepView = () => {
-    writeSession(SESSION_KEYS.view, JSON.stringify({ panel: ui.pane, treeScroll: paneOf(".tree-pane")?.scrollTop ?? 0, sheetScroll: paneOf(".sheet-pane")?.scrollTop ?? 0 }))
+    writeSession(SESSION_KEYS.view, JSON.stringify({ panel: ui.pane, treeScroll: treeScroller()?.scrollTop ?? 0, sheetScroll: paneOf(".sheet-pane")?.scrollTop ?? 0 }))
   }
   window.addEventListener("pagehide", keepView)
   $destroyed(() => window.removeEventListener("pagehide", keepView))
 
   const saved = parseViewState(readSession(SESSION_KEYS.view))
   const putBack = () => {
-    const tree = paneOf(".tree-pane")
+    const tree = treeScroller()
     const sheet = paneOf(".sheet-pane")
     if (tree && tree.scrollTop < saved.treeScroll) tree.scrollTop = saved.treeScroll
     if (sheet && sheet.scrollTop < saved.sheetScroll) sheet.scrollTop = saved.sheetScroll
@@ -457,7 +468,8 @@
     .footbar {
       display: flex;
       flex: none;
-      padding: var(--mm-space-2) var(--mm-space-3) max(var(--mm-space-2), var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)));
+      /* The navigation bar's room, unless the keyboard is up over it. */
+      padding: var(--mm-space-2) var(--mm-space-3) max(var(--mm-space-2), calc(var(--mm-safe-bottom, env(safe-area-inset-bottom, 0px)) - var(--mm-keyboard, 0px)));
       border-top: var(--mm-border-width) solid var(--mm-chassis-lo);
       background: linear-gradient(var(--mm-chassis-hi), var(--mm-chassis));
     }

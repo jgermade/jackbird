@@ -198,124 +198,32 @@
     })
   }
 
-  // A phone, a level open, the library in view: a swipe to the right takes the level's list with
-  // it, its own level's row too (the open levels above it stay), as a swipe from Details does the
-  // pane; the level above comes in from the left, on its heels (`.peek`, helpers/levels.ts
-  // `levelAbove`). Let go past a third of the width, or flicked, it goes out and the level is left;
-  // short of that it springs back. Vertical swipes, and swipes to the left (to Details, the panes'
-  // own), are not taken.
-  // The level above, drawn while a swipe back is under way only.
-  let peeking: boolean = false
+  // A phone, a level open: the level and the one above it are two pages in a row that snaps, as the
+  // library and Details are (views/workspace.html). The row runs right to left, so the level is its
+  // start, in view as levels open and close, and the level above (helpers/levels.ts `levelAbove`)
+  // waits at its left: a swipe to the right brings it in, and once the row comes to rest on it the
+  // level is left, the row back at its start showing the same rows. A swipe to the left, from the
+  // row's start, is the panes' own (to Details).
   const above = (): Row[] => levelAbove(rows())
-  const swipeBack = (() => {
-    let x0 = 0
-    let y0 = 0
-    let t0 = 0
-    let dx = 0
-    let mode: "back" | "no" | null = "no"
-    // Where the level above is drawn: from the top of the level left down to the pane's bottom.
-    let peekTop = 0
-    let peekHeight = 0
-    const ms = (): number => {
-      const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mm-duration"))
-      return Number.isFinite(value) ? value : 0
-    }
-    const lastLevel = (): HTMLElement | null => {
-      const all = $self(".levels")?.querySelectorAll(".level")
-      return all && all.length > 0 ? (all[all.length - 1] as HTMLElement) : null
-    }
-    const measure = () => {
-      const library = $self(".library") as HTMLElement | null
-      const last = lastLevel()
-      if (!library || !last) return
-      const box = library.getBoundingClientRect()
-      const top = last.getBoundingClientRect().top
-      peekTop = top - box.top
-      peekHeight = Math.max(0, Math.min(box.bottom, innerHeight) - top)
-    }
-    // The list moves, the last level's row with it; the open levels above it (sticky, inside it)
-    // are held where they are, and the level above comes in from the left under it, a third of the
-    // width out to begin with, in its place as the list leaves.
-    const slide = (px: number, animate: boolean) => {
-      const tree = $self(".tree") as HTMLElement | null
-      const peek = $self(".peek") as HTMLElement | null
-      const last = lastLevel()
-      const held = [...($self(".levels")?.querySelectorAll(".level") ?? [])].filter((level) => level !== last) as HTMLElement[]
-      const width = tree?.clientWidth ?? 0
-      const transition = animate ? "transform var(--mm-duration) var(--mm-ease)" : ""
-      const moves: [HTMLElement | null, number][] = [[tree, px], ...held.map((level): [HTMLElement, number] => [level, -px])]
-      for (const [element, shift] of moves) {
-        if (!element) continue
-        element.style.transition = transition
-        element.style.transform = px === 0 ? "" : `translateX(${shift}px)`
-      }
-      if (peek) {
-        peek.style.top = `${peekTop}px`
-        peek.style.height = `${peekHeight}px`
-        peek.style.transition = transition
-        peek.style.transform = px === 0 ? "" : `translateX(${(px - width) / 3}px)`
-      }
-    }
-    const start = (event: TouchEvent) => {
-      mode = phone && ui.pane === "library" && levels().length > 0 && event.touches.length === 1 ? null : "no"
-      if (mode === "no") return
-      x0 = event.touches[0].clientX
-      y0 = event.touches[0].clientY
-      t0 = performance.now()
-      dx = 0
-    }
-    const move = (event: TouchEvent) => {
-      if (mode === "no") return
-      const across = event.touches[0].clientX - x0
-      const down = event.touches[0].clientY - y0
-      if (mode === null) {
-        if (Math.abs(across) < 10 && Math.abs(down) < 10) return
-        mode = across > 0 && Math.abs(across) > Math.abs(down) * 1.5 ? "back" : "no"
-        if (mode === "no") return
-        measure()
-        peeking = true
-      }
-      event.preventDefault()
-      dx = Math.max(0, across)
-      slide(dx, false)
-    }
-    const end = () => {
-      if (mode !== "back") {
-        mode = "no"
-        return
-      }
-      mode = "no"
-      const width = ($self(".tree") as HTMLElement | null)?.clientWidth ?? 0
-      const flicked = dx > 40 && dx / Math.max(1, performance.now() - t0) > 0.5
-      if (width > 0 && (dx > width / 3 || flicked)) {
-        slide(width, true)
-        window.setTimeout(() => {
-          const open = levels()
-          if (open.length > 0) leaveLevel(open[open.length - 1].key)
-          slide(0, false)
-          peeking = false
-        }, ms())
-      } else {
-        slide(0.001, true)
-        window.setTimeout(() => {
-          slide(0, false)
-          peeking = false
-        }, ms())
-      }
-    }
-    return { start, move, end }
-  })()
-
-  await $mounted()
-  // Not passive: a swipe taken to go back keeps the page from scrolling.
-  const body = $self(".library") as HTMLElement | null
-  body?.addEventListener("touchstart", swipeBack.start, { passive: true })
-  body?.addEventListener("touchmove", swipeBack.move, { passive: false })
-  body?.addEventListener("touchend", swipeBack.end)
-  body?.addEventListener("touchcancel", swipeBack.end)
+  // The levels shown above the level above's rows: the open ones but the last.
+  const aboveLevels = (): Row[] => levels().slice(0, -1)
+  const settle = (event: Event) => {
+    const row = event.currentTarget as HTMLElement
+    const width = row.clientWidth
+    if (width === 0 || Math.abs(row.scrollLeft) < width / 2) return
+    const open = levels()
+    const page = $self(".page.above") as HTMLElement | null
+    const top = page?.scrollTop ?? 0
+    if (open.length > 0) leaveLevel(open[open.length - 1].key)
+    // Drawn already (a store's write runs its effects at once): back at the start, as far down
+    // as the page that came in was.
+    row.scrollLeft = 0
+    const level = $self(".page.level") as HTMLElement | null
+    if (level) level.scrollTop = top
+  }
 </script>
 
-<section class="library" :class.swiping="peeking" :aria-label="t('library.title')">
+<section class="library" :class.paged="phone" :aria-label="t('library.title')">
   <header :if="root()" class="head">
     <div class="views" role="group" :aria-label="t('views.label')">
       <Key square size="sm" variant="ghost" :label="t('views.files')" :title="t('views.files')" :pressed="view() === 'files'" @click="setView('files')">
@@ -356,30 +264,12 @@
   </div>
 
 
-  <!-- While a swipe back is under way (a phone): the level above, under the list as it goes, coming
-       in from the left, from the top of the level being left down. Only to be seen. Before the
-       tree, so the tree is drawn over it. -->
-  <div :if="peeking" class="peek" :class.from-top="levels().length === 1" aria-hidden="true">
-    <ListRow :each="row in above()"
-             :key="row.key"
-             :kind="row.kind === 'album' ? 'folder' : 'item'"
-             :glyph="glyphOf(row)"
-             :depth="0"
-             :label="rowLabel(row)"
-             :meta="rowMeta(row)"
-             :format="row.kind === 'track' ? (row.format ?? '') : ''"
-             :sub="rowSub(row)"
-             :cover="rowCover(row)"
-             :framed="!!row.framed"
-             :round="!!row.round"
-             :playing="row.kind === 'track' && row.trackId === playingId()"
-             :holds-playing="holdsPlaying(row)"
-             :muted="!!row.missing"
-             no-toggle />
-  </div>
-
   <p :if="rows().length === 0 && (root() || !library.restoring)" class="no-tracks">{{ emptyText() }}</p>
-  <div :else class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
+  <!-- The list in a page; on a phone with a level open, the level above in another page at its
+       left, to swipe to (see `settle`). On a computer the pages are no boxes. -->
+  <div :else class="pages" :class.paging="phone" @scrollend="settle($event)">
+  <div class="page level">
+  <div class="tree" role="tree" tabindex="0" aria-multiselectable="true" :aria-label="t('tree.label')" :aria-activedescendant="activeId()" @keydown="onKey($event)">
     <!-- A phone: the open levels, stacked from the first one down, each one's ‹ a step further in.
          Two zones: its ‹ leaves it (back to the list that holds it, the ones under it closing
          too), and the rest of it, its name, opens it in Details. -->
@@ -442,6 +332,38 @@
       </template>
     </ListRow>
   </div>
+  </div>
+  <!-- The level above, only to be seen until it comes in: its levels (the open ones but the last)
+       and its rows, the level left among them closed. -->
+  <div :if="phone && levels().length > 0" class="page above" aria-hidden="true" inert>
+    <div class="tree">
+      <div :if="aboveLevels().length > 0" class="levels" :style="`--levels: ${aboveLevels().length}`">
+        <div :each="(row, at) in aboveLevels()" :key="row.key" class="level" :style="`--at: ${at}`">
+          <span class="back">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
+          </span>
+          <ListRow kind="folder" :glyph="glyphOf(row)" :cover="rowCover(row)" :round="!!row.round" :label="rowLabel(row)" :meta="rowMeta(row)" expanded no-toggle />
+        </div>
+      </div>
+      <ListRow :each="row in above()"
+               :key="row.key"
+               :kind="row.kind === 'album' ? 'folder' : 'item'"
+               :glyph="glyphOf(row)"
+               :depth="0"
+               :label="rowLabel(row)"
+               :meta="rowMeta(row)"
+               :format="row.kind === 'track' ? (row.format ?? '') : ''"
+               :sub="rowSub(row)"
+               :cover="rowCover(row)"
+               :framed="!!row.framed"
+               :round="!!row.round"
+               :playing="row.kind === 'track' && row.trackId === playingId()"
+               :holds-playing="holdsPlaying(row)"
+               :muted="!!row.missing"
+               no-toggle />
+    </div>
+  </div>
+  </div>
 
   <!-- An iPod's root: how full it is, a key to its sheet in Details (W5). -->
   <IpodFoot />
@@ -451,21 +373,7 @@
 
 <style scoped>
   /* As tall as its pane at least, so an iPod's foot keeps to the bottom. */
-  .library { position: relative; display: flex; flex-direction: column; min-height: 100%; color: var(--mm-fg); }
-  /* The level above, during a swipe back: under the list, a third of the width out to the left
-     until the swipe brings it in (the inline transform), its rows from the list's own room down. */
-  .peek {
-    position: absolute;
-    left: 0;
-    width: 100%;
-    overflow: hidden;
-    padding-top: var(--mm-space-1);
-    background: var(--mm-surface);
-    transform: translateX(-33.333%);
-    pointer-events: none;
-  }
-  /* The levels' room below their border; with the one level left, the tree's own room on top. */
-  .peek.from-top { padding-top: var(--mm-space-2); }
+  .library { display: flex; flex-direction: column; min-height: 100%; color: var(--mm-fg); }
   /* The view keys from the left, flat on the head, the open one down. */
   .head {
     position: sticky;
@@ -501,11 +409,37 @@
 
 
   .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }
-  /* On the pane's ground: a swipe back slides it over the level above (`.peek`). */
-  .tree { padding-block: var(--mm-space-2); outline: none; background: var(--mm-surface); }
-  /* While it is swiped back: as tall as the pane, a hairline down its left edge, between it and the
-     level above. The levels held in place are drawn over it. */
-  .swiping .tree { flex-grow: 1; box-shadow: -1px 0 0 var(--mm-border-strong); }
+  .tree { padding-block: var(--mm-space-2); outline: none; }
+  /* A computer: no pages, the tree in the library as it is. */
+  .pages:not(.paging), .pages:not(.paging) > .page { display: contents; }
+  /* A phone: the library as tall as its pane, its head on top, and under it the pages, each
+     scrolling on its own, in a row that snaps (as the panes do, views/workspace.html), right to
+     left: the level at its start, the level above at its left. */
+  .library.paged { height: 100%; }
+  .paging {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    direction: rtl;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .paging::-webkit-scrollbar { display: none; }
+  .paging > .page {
+    flex: 0 0 100%;
+    min-width: 0;
+    overflow-y: auto;
+    direction: ltr;
+    background: var(--mm-surface);
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  /* The line between the level above and the level, as between the panes. */
+  .paging > .above { border-right: var(--mm-border-width) solid var(--mm-border-strong); }
+  /* In a page the head is not over the levels: they stay at its top. */
+  .paging .levels { top: 0; }
   /* A phone's open levels: they stay under the head while the level's list scrolls. */
   .levels {
     position: sticky;
