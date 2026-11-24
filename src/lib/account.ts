@@ -152,9 +152,11 @@ let homeServed = false;
 /**
  * Speaks to the server of the root in front (E6b-D11): its sign-in, its profiles and its people; for
  * a root that is on no server (the browser's or the device's own folders), the home server, if
- * there is one. Asks to sign in there if its session is gone.
+ * there is one. Asks to sign in there if its session is gone, unless `quiet`: then the caller asks,
+ * once it has done what comes first (a server added with an email asks its code before the dialog
+ * shows, which would otherwise show the email's step for a moment: lib/adding.ts `addServer`).
  */
-export async function followServer(client: ServiceClient | null | undefined): Promise<void> {
+export async function followServer(client: ServiceClient | null | undefined, { quiet = false } = {}): Promise<void> {
   const next = client ?? homeServer();
   if (next === currentServer()) return;
   useServer(next);
@@ -166,7 +168,7 @@ export async function followServer(client: ServiceClient | null | undefined): Pr
   await loadState().catch((error) => {
     account.error = message(error);
   });
-  if (!account.me && currentServer() === next) account.needed = true;
+  if (!account.me && currentServer() === next && !quiet) account.needed = true;
 }
 
 async function busy<T>(work: () => Promise<T>): Promise<T | undefined> {

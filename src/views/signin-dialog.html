@@ -9,6 +9,7 @@
   const Key = await import("../../theme/default/components/key.html")
   const Modal = await import("../../theme/default/components/modal.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
+  const CodeInput = await import("../../theme/default/components/code-input.html")
 
   const { t } = await import("../lib/i18n")
   const { account, askCode, cancelSignIn, checkCode, otherAddress, passkeySignIn, passkeysHere, pickProfile } = await import("../lib/account")
@@ -27,6 +28,11 @@
     event.preventDefault()
     if (account.step === "email") void askCode(email.trim())
     else void checkCode(code.trim())
+  }
+  // Its six digits in: sent at once, as a code's field does.
+  const filled = (value: string) => {
+    code = value
+    if (!account.busy) void checkCode(value)
   }
   const again = () => {
     code = ""
@@ -54,7 +60,7 @@
       <div :if="account.step === 'code'" class="code">
         <p class="hint">{{ t("account.codeSent", { email: account.email }) }}</p>
         <Field :label="t('account.code')" control="signin-code">
-          <TextInput id="signin-code" numeric inputmode="numeric" autocomplete="one-time-code" :model="code" @input="code = $event.detail" />
+          <CodeInput id="signin-code" :invalid="!!account.error" :model="code" @input="code = $event.detail" @complete="filled($event.detail)" />
         </Field>
       </div>
       <p :if="account.error" class="failure">{{ account.error }}</p>

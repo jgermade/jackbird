@@ -1,0 +1,138 @@
+<script :setup="{
+  model = '',
+  id = '',
+  length = 6,
+  label = '',
+  describedby = '',
+  disabled = false,
+  invalid = false
+}: Props" lang="ts">
+  // A one-time code's field: a cell per digit, as many as the code has (`length`, 6 by default).
+  // One real input lies over the cells, unseen, so the keyboard, pasting and the system's offer of
+  // a code just received (`autocomplete="one-time-code"`) all work as in any field; the cells only
+  // show what it holds, the next one lit while it has the focus. Digits only.
+  //
+  //   <CodeInput id="code" :model="code" @input="code = $event.detail" @complete="send()" />
+  //
+  // The value goes up through `:model` on every keystroke, and as `input`; once every cell is
+  // filled, `complete` too. `label` is its accessible name when no Field names it.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with `tokens.css`. See
+  // `RECORD/2026-11-03.deck-design-system.WIP.md`.
+
+  type Props = {
+    model?: string
+    id?: string
+    length?: number | string
+    label?: string
+    describedby?: string
+    disabled?: boolean | ""
+    invalid?: boolean | ""
+  }
+
+  const flag = (v: unknown): boolean => v === "" || v === true || v === "true"
+  const size = (): number => Math.max(1, Number(length) || 6)
+  const digits = (value: string): string => value.replace(/\D/g, "").slice(0, size())
+
+  let focused: boolean = false
+  // What it holds: typed here, or given by the owner through `:model` (a new code asked: empty).
+  let code: string = digits(String(model ?? ""))
+  const follow = (given: unknown) => {
+    code = digits(String(given ?? ""))
+  }
+  $: follow(model)
+  // The cells: each one's digit, and whether it is the one the next digit goes in.
+  const cells = (): { at: number; digit: string; next: boolean }[] => {
+    const value = code
+    const next = Math.min(value.length, size() - 1)
+    return Array.from({ length: size() }, (_, at) => ({ at, digit: value[at] ?? "", next: focused && at === next }))
+  }
+
+  const typed = (event: Event) => {
+    const input = event.target as HTMLInputElement
+    const value = digits(input.value)
+    if (input.value !== value) input.value = value
+    code = value
+    $updateModel(value)
+    $emit("input", value)
+    if (value.length === size()) $emit("complete", value)
+  }
+  // The caret always at the end: a digit typed goes in the next cell, a backspace takes the last.
+  const toEnd = (event: Event) => {
+    const input = event.target as HTMLInputElement
+    const end = input.value.length
+    requestAnimationFrame(() => input.setSelectionRange(end, end))
+  }
+  const focus = (event: Event) => {
+    focused = true
+    toEnd(event)
+  }
+</script>
+
+<span class="code-input" :class.invalid="flag(invalid)" :class.disabled="flag(disabled)">
+  <input class="field"
+         type="text"
+         inputmode="numeric"
+         autocomplete="one-time-code"
+         pattern="[0-9]*"
+         :id="id || null"
+         :value="code"
+         :aria-label="label || null"
+         :aria-describedby="describedby || null"
+         :aria-invalid="flag(invalid) ? 'true' : null"
+         :disabled="flag(disabled)"
+         @input="typed($event)"
+         @focus="focus($event)"
+         @click="toEnd($event)"
+         @blur="focused = false">
+  <span class="cells" aria-hidden="true">
+    <span :each="cell in cells()" :key="String(cell.at)" class="cell" :class.filled="!!cell.digit" :class.next="cell.next">{{ cell.digit }}</span>
+  </span>
+</span>
+
+<style scoped>
+  .code-input { position: relative; display: block; width: 100%; max-width: 22rem; }
+  /* The real input, over the cells and unseen: it takes the taps, the keys and the pasting. */
+  .field {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: transparent;
+    caret-color: transparent;
+    font-size: 1rem;
+    letter-spacing: 0;
+    outline: none;
+    opacity: 0;
+    cursor: text;
+  }
+  .field:disabled { cursor: not-allowed; }
+  .cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--mm-space-2); }
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 3rem;
+    border: var(--mm-border-width) solid var(--mm-border);
+    border-radius: var(--mm-radius-key);
+    background: var(--mm-field);
+    box-shadow: var(--mm-well-shadow);
+    color: var(--mm-fg);
+    font-family: var(--mm-font-mono);
+    font-size: var(--mm-text-lg);
+    font-weight: var(--mm-weight-bold);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: border-color var(--mm-duration) var(--mm-ease), box-shadow var(--mm-duration) var(--mm-ease);
+  }
+  .cell.filled { border-color: var(--mm-border-strong); }
+  /* Where the next digit goes, while the field has the focus. */
+  .cell.next { border-color: var(--mm-accent); box-shadow: var(--mm-well-shadow), 0 0 0 1px var(--mm-accent); }
+  .invalid .cell { border-color: var(--mm-bad); }
+  .disabled .cell { background: var(--mm-sunken); color: var(--mm-fg-subtle); }
+</style>

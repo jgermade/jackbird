@@ -28,6 +28,7 @@
   const Stripes = await import("./components/stripes.html")
   const Tabs = await import("./components/tabs.html")
   const TextInput = await import("./components/text-input.html")
+  const CodeInput = await import("./components/code-input.html")
 
   type Track = { n: string; title: string; secs: number }
   type TreeNode = { id: string; kind: "folder" | "item"; depth: number; label: string; meta: string; parent?: string; track?: number }
@@ -506,6 +507,7 @@
             <Field label="Path" control="f-path" hint="Read only: renaming happens on save.">
               <TextInput id="f-path" numeric disabled model="Jazz/Miles Davis/1959 - Kind of Blue/" describedby="f-path-note" />
             </Field>
+            <Field label="Code" control="f-code" hint="A one-time code: one cell per digit; paste one, or type it."><CodeInput id="f-code" /></Field>
           </div>
         </div>
         <template :slot.foot>

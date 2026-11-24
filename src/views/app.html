@@ -158,7 +158,8 @@
     flex-direction: column;
     box-sizing: border-box;
     height: 100vh;
-    height: 100dvh;
+    /* Above the keyboard in the Android app, which lays it over the page (lib/safe-area.ts). */
+    height: calc(100dvh - var(--mm-app-keyboard, 0px));
     /* Clear of a phone's cutouts at the sides (landscape); the top's and the bottom's are the faceplate's and the footbar's. */
     padding-right: var(--mm-safe-right, env(safe-area-inset-right, 0px));
     padding-left: var(--mm-safe-left, env(safe-area-inset-left, 0px));
