@@ -49,9 +49,11 @@ const embeddedLanguage = (): Language | null => LANGUAGES.find((language) => lan
 
 /**
  * Whether the songs are shown where `key` says: off until turned on (the owner, 2026-11-23), from
- * the one switch there was before when not saved.
+ * the one switch there was before when not saved; always in the landing page's demo.
  */
 function songsShown(key: string): boolean {
+  // The landing page's demo (`?embed`) lists its songs: its phone follows the row playing.
+  if (isEmbed) return true;
   return (readStored(key) ?? readStored(STORAGE_KEYS.songsInTree)) === "on";
 }
 
