@@ -70,11 +70,14 @@ async function ready() {
   fail("the service did not start");
 }
 
-/** The emails sent so far. */
-const mails = () =>
-  fs.existsSync(mailbox)
-    ? fs.readFileSync(mailbox, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line))
-    : [];
+/**
+ * The emails sent so far: the whole lines of the mailbox. The SMTP sink (another process) may be
+ * writing one as it is read, and a line not ended yet is left for the next read.
+ */
+const mails = () => {
+  const text = fs.existsSync(mailbox) ? fs.readFileSync(mailbox, "utf8") : "";
+  return text.slice(0, text.lastIndexOf("\n") + 1).split("\n").filter(Boolean).map((line) => JSON.parse(line));
+};
 
 /** The code of the newest email to `to`, waiting for it. */
 async function codeFor(to, after) {
