@@ -23,11 +23,18 @@
   const Tabs = await import("../../theme/default/components/tabs.html")
 
   const { languageName, t, tn } = await import("../lib/i18n")
-  const { LANGUAGES, preferences, setCrossfadeSeconds, setDensity, setLanguage, setPeakFall, setSongsInFolders, setSongsInViews, setSpectrumLook, setThemeChoice, setTransition } = await import("../lib/preferences")
+  const { LANGUAGES, preferences, showView, setCrossfadeSeconds, setDensity, setLanguage, setPeakFall, setSongsInFolders, setSongsInViews, setSpectrumLook, setThemeChoice, setTransition } = await import("../lib/preferences")
   const { CROSSFADE_MAX, CROSSFADE_MIN, TRANSITIONS, transitionOf } = await import("../helpers/transition")
   const { DENSITIES, densityOf } = await import("../helpers/density")
   const { PEAK_FALLS, SPECTRUM_LOOKS, peakFallOf, spectrumLookOf } = await import("../helpers/spectrum")
   const { ui } = await import("../lib/ui")
+  const ViewGlyph = await import("../components/view-glyph.html")
+  const { VIEW_ORDER } = await import("../helpers/shown-views")
+  // The library's views, each a latching key: down, its key is in the library's head. The last one
+  // down cannot be raised: the library shows at least one.
+  const VIEW_LABELS: Record<string, string> = { files: "views.files", playlists: "views.playlists", artists: "views.artists", albumsByArtist: "views.albumsByArtist", albums: "views.albums", compilations: "views.compilations" }
+  const isShown = (view: string): boolean => preferences.shownViews.includes(view as never)
+  const lastShown = (view: string): boolean => isShown(view) && preferences.shownViews.length === 1
   const { isDesktop, isPhone } = await import("../lib/platform")
   const { installService, refreshServiceStatus, serviceState, startService, uninstallService, updateService } = await import("../lib/desktop-service")
   const { account, addKey, addPasskey, can, endSession, loadMine, passkeysHere, removeKey, removePasskey, renameMe, signOut } = await import("../lib/account")
@@ -177,6 +184,19 @@
       </section>
     </div>
     <div :if="section() === 'library'" class="prefs">
+      <!-- Which views have their key in the library's head (helpers/shown-views.ts). -->
+      <section class="pref">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("preferences.views") }}</h3>
+          <p>{{ t("preferences.viewsHint") }}</p>
+        </div>
+        <div class="view-keys" role="group" :aria-label="t('preferences.views')">
+          <Key :each="name in VIEW_ORDER" :key="name" size="sm" :pressed="isShown(name)" :disabled="lastShown(name)" :title="t(VIEW_LABELS[name])" @click="showView(name, !isShown(name))">
+            <ViewGlyph :view="name" />
+            {{ t(VIEW_LABELS[name]) }}
+          </Key>
+        </div>
+      </section>
       <!-- The library's tree with its songs, or its folders or groups only (helpers/folders.ts): in Files, and in the other views. -->
       <section class="pref inline">
         <!-- Its heading and text flip the switch too, as a label would. -->
@@ -371,6 +391,8 @@
   /* A choice under its own caption (the spectrum's look, its peaks' fall). */
   .transition { display: grid; gap: var(--mm-space-3); justify-items: start; }
   .transition > .text { justify-self: stretch; }
+  /* The views' keys, side by side, wrapping. */
+  .view-keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); margin-top: var(--mm-space-3); }
   .choice { display: grid; gap: var(--mm-space-1); justify-items: start; }
   .caption { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
   .service, .output { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }

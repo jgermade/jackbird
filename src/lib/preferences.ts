@@ -12,7 +12,8 @@ import { densityOf } from "../helpers/density";
 import { pickLanguage } from "../helpers/i18n";
 import { peakFallOf, spectrumLookOf } from "../helpers/spectrum";
 import { crossfadeSecondsOf, transitionOf } from "../helpers/transition";
-import type { Density, Language, PeakFall, SpectrumLook, Theme, Transition } from "../types";
+import { shownViewsOf, toggledView } from "../helpers/shown-views";
+import type { Density, Language, LibraryView, PeakFall, SpectrumLook, Theme, Transition } from "../types";
 import { isEmbed } from "./platform";
 import { STORAGE_KEYS, readStored, removeStored, writeStored } from "./storage";
 
@@ -66,6 +67,8 @@ export const preferences = $reactive({
   language: embeddedLanguage() ?? storedLanguage() ?? browserLanguage(),
   songsInFolders: songsShown(STORAGE_KEYS.songsInFolders),
   songsInViews: songsShown(STORAGE_KEYS.songsInViews),
+  /** The library's views whose keys are in its head (helpers/shown-views.ts). */
+  shownViews: shownViewsOf(readStored(STORAGE_KEYS.shownViews)),
   density: densityOf(readStored(STORAGE_KEYS.density)),
   spectrumLook: spectrumLookOf(readStored(STORAGE_KEYS.spectrumLook)),
   peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall)),
@@ -126,6 +129,13 @@ export function setSongsInFolders(on: boolean): void {
 export function setSongsInViews(on: boolean): void {
   preferences.songsInViews = on;
   writeStored(STORAGE_KEYS.songsInViews, on ? "on" : "off");
+}
+
+/** Shows a view's key in the library's head, or hides it; the last one shown stays. */
+export function showView(view: LibraryView, on: boolean): void {
+  const next = toggledView(preferences.shownViews, view, on);
+  preferences.shownViews = next;
+  writeStored(STORAGE_KEYS.shownViews, next.join(","));
 }
 
 /** How tall the lists' rows are. */

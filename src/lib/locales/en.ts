@@ -376,6 +376,8 @@ export const en = {
   "preferences.songsInFolders": "Songs in Files",
   "preferences.songsInFoldersOn": "Files shows the folders and their songs.",
   "preferences.songsInFoldersOff": "Files shows the folders only: their songs are in Details. On a phone, a folder opens in Details, and the trail above it goes back to the library.",
+  "preferences.views": "Views",
+  "preferences.viewsHint": "The ways to list the library, as keys at its top. Those down are shown.",
   "preferences.songsInViews": "Songs in the other views",
   "preferences.songsInViewsOn": "Playlists, artists and albums show their songs.",
   "preferences.songsInViewsOff": "Playlists, artists and albums show the groups only: their songs are in Details. On a phone, a group opens in Details, and the trail above it goes back to the library.",

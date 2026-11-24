@@ -148,7 +148,7 @@
   // The Lists view: a card per list (lib/workspace.ts `detailLists`), not albums, and no cover: a
   // list is not an album. Each with its name,
   // how many songs and how long, Play and Shuffle; the rest (queue, rename, export, delete) under its
-  // ⋮. Its songs in the list's order, numbered by their place; one not in the library, marked.
+  // ⋮. Its songs in the list's order, each with its box (no number); one not in the library, marked.
   type Card = { key: string; name: string; kind: "all" | "liked" | "playlist"; path?: string; entries: { key: string; index: number; trackId?: string; title: string; sub: string; missing: boolean }[]; trackIds: string[]; durationMs: number }
   const lists = (): Card[] => detailLists.value.data
   const listing = (): boolean => view() === "playlists"
@@ -281,9 +281,9 @@
                     @click="playEntry(list, entry.trackId, $event)"
                     @keydown="entryKey(list, entry.trackId, $event)">
                   <td class="pick-cell" @click="entry.missing ? null : pickCell(trackOf(entry.trackId), $event)">
-                    <span class="pick-box numbered">
-                      <SelectBox :if="!entry.missing" :chosen="isChosen(trackOf(entry.trackId))" :number="String(entry.index + 1)" @pick="pick(trackOf(entry.trackId), $event.detail)" />
-                      <span :else class="place">{{ entry.index + 1 }}</span>
+                    <!-- Its box, empty, always in view: no number (a list's place is not a track's). -->
+                    <span class="pick-box shown">
+                      <SelectBox :if="!entry.missing" :chosen="isChosen(trackOf(entry.trackId))" @pick="pick(trackOf(entry.trackId), $event.detail)" />
                     </span>
                   </td>
                   <td>
@@ -489,7 +489,7 @@
   .mm-table .pick-cell { width: 1%; padding-left: var(--mm-space-2); padding-right: 0; }
   .pick-box { display: grid; }
   @media (hover: hover) and (min-width: 721px) {
-    .pick-box:not(.numbered) { visibility: hidden; }
+    .pick-box:not(.numbered):not(.shown) { visibility: hidden; }
     .mm-table tr:hover .pick-box, .mm-table tr[aria-selected="true"] .pick-box, .mm-table tr:focus-visible .pick-box, .mm-table tr:has(:focus-visible) .pick-box { visibility: visible; }
   }
   /* The cue at the row's end: ▶ on hover and on keyboard focus (always on a touch screen), the bars on the track playing. */
@@ -542,7 +542,6 @@
   /* Its line under the title: the row as tall as two lines (tokens.css). */
   .list-card .mm-table td { height: var(--mm-row-two); }
   .mm-table tr.missing { cursor: default; opacity: .55; }
-  .place { display: inline-block; min-width: 1.25rem; color: var(--mm-fg-subtle); font: var(--mm-text-xs) var(--mm-font-mono); text-align: center; }
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
   .prompt p { margin: 0; color: var(--mm-fg-muted); }

@@ -377,6 +377,8 @@ export const es: Record<MessageKey, string> = {
   "preferences.songsInFolders": "Canciones en Archivos",
   "preferences.songsInFoldersOn": "Archivos muestra las carpetas y sus canciones.",
   "preferences.songsInFoldersOff": "Archivos muestra solo las carpetas: sus canciones se ven en Detalle. En el móvil, una carpeta se abre en Detalle y la ruta de arriba vuelve a la biblioteca.",
+  "preferences.views": "Vistas",
+  "preferences.viewsHint": "Las formas de ver la biblioteca, como teclas en su parte superior. Se muestran las que están pulsadas.",
   "preferences.songsInViews": "Canciones en el resto de vistas",
   "preferences.songsInViewsOn": "Listas, artistas y álbumes muestran sus canciones.",
   "preferences.songsInViewsOff": "Listas, artistas y álbumes muestran solo los grupos: sus canciones se ven en Detalle. En el móvil, un grupo se abre en Detalle y la ruta de arriba vuelve a la biblioteca.",
