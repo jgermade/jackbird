@@ -50,8 +50,6 @@ export type ListCard = {
   trackIds: string[];
   /** How long its songs found last, all told. */
   durationMs: number;
-  /** The first cover among its songs. */
-  cover?: string;
 };
 
 type CardTrack = Pick<Track, "id" | "name" | "relativePath" | "metadata" | "audio">;
@@ -65,7 +63,6 @@ function card(key: string, name: string, kind: ListCard["kind"], found: (CardTra
       : { key: `#${index}`, index, title: titles[index] ?? "", sub: "", missing: true }
   );
   const songs = found.filter((track): track is CardTrack => !!track);
-  const cover = songs.find((track) => track.metadata.coverDataUrl)?.metadata.coverDataUrl;
   return {
     key,
     name,
@@ -73,8 +70,7 @@ function card(key: string, name: string, kind: ListCard["kind"], found: (CardTra
     ...(path ? { path } : {}),
     entries,
     trackIds: songs.map((track) => track.id),
-    durationMs: songs.reduce((sum, track) => sum + (track.audio?.durationMs ?? 0), 0),
-    ...(cover ? { cover } : {})
+    durationMs: songs.reduce((sum, track) => sum + (track.audio?.durationMs ?? 0), 0)
   };
 }
 

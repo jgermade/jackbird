@@ -47,7 +47,7 @@ describe("listCards", () => {
     ]);
   });
 
-  it("gives a card its songs in order, the missing ones marked, what plays, how long, and a cover", () => {
+  it("gives a card its songs in order, the missing ones marked, what plays and how long", () => {
     const road = listCards(tracks, playlists, labels).find((card) => card.name === "Road");
     assert.deepEqual(road?.entries, [
       { key: "A/a.mp3", index: 0, trackId: "A/a.mp3", title: "Alpha", sub: "Ana", missing: false },
@@ -57,13 +57,11 @@ describe("listCards", () => {
     ]);
     assert.deepEqual(road?.trackIds, ["A/a.mp3", "B/b.mp3"]);
     assert.equal(road?.durationMs, 3000);
-    assert.equal(road?.cover, "cover-b");
     const all = listCards(tracks, playlists, labels)[0];
     assert.deepEqual(all.trackIds, ["A/a.mp3", "B/b.mp3", "Z/z.mp3"]);
     assert.equal(all.entries[2].title, "z.mp3");
     assert.equal(all.durationMs, 3000);
     const calm = listCards(tracks, playlists, labels).find((card) => card.name === "Calm");
-    assert.equal(calm?.cover, undefined);
     assert.equal(calm?.durationMs, 0);
   });
 
