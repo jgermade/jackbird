@@ -18,6 +18,7 @@
   const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
   const Checkbox = await import("../../theme/default/components/checkbox.html")
   const Key = await import("../../theme/default/components/key.html")
+  const KeyBank = await import("../../theme/default/components/key-bank.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
   const Choice = await import("../../theme/default/components/choice.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
@@ -190,11 +191,13 @@
           <h3 class="mm-legend is-ink">{{ t("preferences.views") }}</h3>
           <p>{{ t("preferences.viewsHint") }}</p>
         </div>
-        <div class="view-keys" role="group" :aria-label="t('preferences.views')">
-          <Key :each="name in VIEW_ORDER" :key="name" size="sm" :pressed="isShown(name)" :disabled="lastShown(name)" :title="t(VIEW_LABELS[name])" @click="showView(name, !isShown(name))">
-            <ViewGlyph :view="name" />
-            {{ t(VIEW_LABELS[name]) }}
-          </Key>
+        <!-- One bank of keys, icons alone (each named for a screen reader and on hover). -->
+        <div class="view-keys">
+          <KeyBank :label="t('preferences.views')">
+            <Key :each="name in VIEW_ORDER" :key="name" square :pressed="isShown(name)" :disabled="lastShown(name)" :label="t(VIEW_LABELS[name])" :title="t(VIEW_LABELS[name])" @click="showView(name, !isShown(name))">
+              <ViewGlyph :view="name" />
+            </Key>
+          </KeyBank>
         </div>
       </section>
       <!-- The library's tree with its songs, or its folders or groups only (helpers/folders.ts): in Files, and in the other views. -->
@@ -391,8 +394,8 @@
   /* A choice under its own caption (the spectrum's look, its peaks' fall). */
   .transition { display: grid; gap: var(--mm-space-3); justify-items: start; }
   .transition > .text { justify-self: stretch; }
-  /* The views' keys, side by side, wrapping. */
-  .view-keys { display: flex; flex-wrap: wrap; gap: var(--mm-space-2); margin-top: var(--mm-space-3); }
+  /* The views' bank, under the text, as wide as its keys. */
+  .view-keys { display: flex; margin-top: var(--mm-space-3); }
   .choice { display: grid; gap: var(--mm-space-1); justify-items: start; }
   .caption { color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
   .service, .output { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
