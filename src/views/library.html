@@ -315,7 +315,7 @@
   body?.addEventListener("touchcancel", swipeBack.end)
 </script>
 
-<section class="library" :aria-label="t('library.title')">
+<section class="library" :class.swiping="peeking" :aria-label="t('library.title')">
   <header :if="root()" class="head">
     <div class="views" role="group" :aria-label="t('views.label')">
       <Key square size="sm" variant="ghost" :label="t('views.files')" :title="t('views.files')" :pressed="view() === 'files'" @click="setView('files')">
@@ -503,6 +503,9 @@
   .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }
   /* On the pane's ground: a swipe back slides it over the level above (`.peek`). */
   .tree { padding-block: var(--mm-space-2); outline: none; background: var(--mm-surface); }
+  /* While it is swiped back: as tall as the pane, a hairline down its left edge, between it and the
+     level above. The levels held in place are drawn over it. */
+  .swiping .tree { flex-grow: 1; box-shadow: -1px 0 0 var(--mm-border-strong); }
   /* A phone's open levels: they stay under the head while the level's list scrolls. */
   .levels {
     position: sticky;
