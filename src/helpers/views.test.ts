@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { track as fixture } from "./fixtures.test-support.ts";
 import { albumArtistOf, albumFolder, albumKey, artistKey, artistName, artistOfKey, buildViewRows, coverOfTracks, trackPlace, yearOfTracks } from "./views.ts";
 
-const labels = { unknownArtist: "Unknown artist", unknownAlbum: "No album", variousArtists: "Various", missing: "Missing", liked: "Liked songs", locale: "en" };
+const labels = { unknownArtist: "Unknown artist", unknownAlbum: "No album", variousArtists: "Various", missing: "Missing", liked: "Liked songs", allSongs: "All songs", locale: "en" };
 
 const track = (relativePath: string, title: string, artist: string, album: string, trackNumber = "") => fixture(relativePath, { title, artist, album, trackNumber });
 
@@ -34,13 +34,18 @@ describe("keys", () => {
 });
 
 describe("buildViewRows", () => {
-  it("Songs: every track by title, its artist and album beside it", () => {
-    const rows = buildViewRows("songs", tracks, [], labels);
-    assert.deepEqual(labelsOf(rows), ["Freddie Freeloader", "Giant Steps", "Naima", "One", "So What", "Two", "x.mp3"]);
-    assert.equal(rows[0].meta, "Miles Davis - Kind of Blue");
-    assert.equal(rows[6].meta, "");
-    assert.equal(rows[0].inView, "songs");
-    assert.equal(rows[0].parentKey, null);
+  it("Lists: All songs first, every track by title, its artist and album beside it", () => {
+    const closed = buildViewRows("playlists", tracks, [], labels);
+    assert.deepEqual(labelsOf(closed), ["All songs"]);
+    assert.equal(closed[0].allSongs, true);
+    assert.equal(closed[0].meta, "7");
+    const rows = buildViewRows("playlists", tracks, ["@all-songs"], labels);
+    assert.deepEqual(labelsOf(rows).slice(1), ["Freddie Freeloader", "Giant Steps", "Naima", "One", "So What", "Two", "x.mp3"]);
+    assert.deepEqual(rows[0].trackIds, rows.slice(1).map((row) => row.trackId));
+    assert.equal(rows[1].meta, "Miles Davis - Kind of Blue");
+    assert.equal(rows[7].meta, "");
+    assert.equal(rows[1].inView, "playlists");
+    assert.equal(rows[1].parentKey, "@all-songs");
   });
 
   it("Artists: each artist, unknown last, opening into their tracks in play order", () => {
@@ -117,16 +122,16 @@ describe("buildViewRows", () => {
       { path: "A.m3u", name: "A", entries: [] }
     ];
     const rows = buildViewRows("playlists", tracks, ["@playlist:Playlists/Road.m3u8"], labels, playlists);
-    assert.deepEqual(labelsOf(rows), ["A", "Road", "Two", "x.mp3", "Gone - Y", "Two"]);
-    assert.deepEqual(rows[1].trackIds, ["Mix/02.mp3", "Mix/02.mp3"]);
-    assert.equal(rows[1].meta, "4");
-    assert.deepEqual(rows.slice(2).map((row) => [row.missing ?? false, row.playlistIndex, row.key]), [
+    assert.deepEqual(labelsOf(rows), ["All songs", "A", "Road", "Two", "x.mp3", "Gone - Y", "Two"]);
+    assert.deepEqual(rows[2].trackIds, ["Mix/02.mp3", "Mix/02.mp3"]);
+    assert.equal(rows[2].meta, "4");
+    assert.deepEqual(rows.slice(3).map((row) => [row.missing ?? false, row.playlistIndex, row.key]), [
       [false, 0, "@pl:Playlists/Road.m3u8#0"],
       [true, 1, "@pl:Playlists/Road.m3u8#1"],
       [true, 2, "@pl:Playlists/Road.m3u8#2"],
       [false, 3, "@pl:Playlists/Road.m3u8#3"]
     ]);
-    assert.equal(rows[3].meta, "Missing");
+    assert.equal(rows[4].meta, "Missing");
   });
 
   it("Playlists: the liked songs first, by their translated name, marked", () => {
@@ -135,9 +140,9 @@ describe("buildViewRows", () => {
       { path: "Liked.m3u8", name: "Liked", entries: [{ path: "Mix/02.mp3", raw: "Mix/02.mp3" }] }
     ];
     const rows = buildViewRows("playlists", tracks, [], labels, playlists);
-    assert.deepEqual(labelsOf(rows), ["Liked songs", "A"]);
-    assert.deepEqual(rows.map((row) => row.liked ?? false), [true, false]);
-    assert.equal(rows[0].meta, "1");
+    assert.deepEqual(labelsOf(rows), ["All songs", "Liked songs", "A"]);
+    assert.deepEqual(rows.map((row) => row.liked ?? false), [false, true, false]);
+    assert.equal(rows[1].meta, "1");
   });
 });
 
@@ -180,8 +185,8 @@ describe("an album's row: its cover, and who it is by and its year", () => {
     assert.ok(rows.filter((row) => row.kind === "track").every((row) => !row.sub && !row.cover));
   });
 
-  it("gives Songs their album's cover and a line of artist and album; Artists' tracks the same line", () => {
-    const songs = buildViewRows("songs", covered, [], labels);
+  it("gives All songs' songs their album's cover and a line of artist and album; Artists' tracks the same line", () => {
+    const songs = buildViewRows("playlists", covered, ["@all-songs"], labels).slice(1);
     const freddie = songs.find((row) => row.label === "Freddie");
     assert.equal(freddie?.cover, "jackbird-cover:kob.jpg");
     assert.equal(freddie?.sub, "Miles Davis - Kind of Blue");
@@ -204,8 +209,9 @@ describe("trackPlace", () => {
   });
 
   it("is null where the list has no row of it", () => {
-    assert.equal(trackPlace(buildViewRows("playlists", tracks, "all", labels), tracks[0].id), null);
-    assert.equal(trackPlace(buildViewRows("songs", tracks, "all", labels), tracks[0].id)?.open.length, 0);
+    assert.equal(trackPlace(buildViewRows("artists", tracks, [], labels), tracks[0].id), null);
+    // In the lists, a song is in All songs.
+    assert.deepEqual(trackPlace(buildViewRows("playlists", tracks, "all", labels), tracks[0].id)?.open, ["@all-songs"]);
   });
 });
 

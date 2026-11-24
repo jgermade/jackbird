@@ -1,7 +1,6 @@
 /**
  * The library's views other than Files, as the same flat rows the tree
- * draws: groups (artists, albums, playlists) that open into their tracks,
- * or a flat list (Songs). A group row carries its tracks' ids in the order
+ * draws: groups (artists, albums, lists) that open into their tracks. A group row carries its tracks' ids in the order
  * they play, and its key is also what opens and closes it (kept in the
  * root's `expandedAlbums`, beside the folders' paths). See
  * RECORD/2026-11-04.github-actions-workflows.WIP.md (22:00 and W6's plan).
@@ -13,6 +12,7 @@ import { isCompilation } from "./metadata.ts";
 import { compareText } from "./compare.ts";
 import { orderDetailPlaylist } from "./tracks.ts";
 import { isLikedPath } from "./playlists.ts";
+import { ALL_SONGS_KEY, playlistKey, songsByTitle, sortedPlaylists } from "./lists.ts";
 
 /** The words and the order a view needs. */
 export type ViewLabels = {
@@ -22,6 +22,8 @@ export type ViewLabels = {
   missing: string;
   /** The liked songs' list's name (its file's is fixed: helpers/playlists.ts). */
   liked: string;
+  /** "All songs", the first of the lists (helpers/lists.ts). */
+  allSongs: string;
   locale: string;
 };
 
@@ -214,17 +216,7 @@ export function buildViewRows(
     });
   };
 
-  if (view === "songs") {
-    const byTitle = [...tracks].sort(
-      (left, right) => compareText(left.metadata.title || left.name, right.metadata.title || right.name, labels.locale) || left.relativePath.localeCompare(right.relativePath)
-    );
-    // Each song with its album's cover and, under its title, who and which album.
-    for (const track of byTitle) {
-      const cover = track.metadata.coverDataUrl;
-      const sub = byWhom(track);
-      trackRow(track, null, 0, sub, { framed: true, ...(cover ? { cover } : {}), ...(sub ? { sub } : {}) });
-    }
-  } else if (view === "artists") {
+  if (view === "artists") {
     for (const artist of artistsOf(tracks, labels)) {
       if (groupRow(artist, null, 0, artistExtras(artist))) {
         for (const track of artist.tracks) {
@@ -252,11 +244,22 @@ export function buildViewRows(
     }
   } else if (view === "playlists") {
     const byPath = new Map(tracks.map((track) => [track.relativePath, track]));
-    // The liked songs first, by their translated name; the others by name.
-    const sorted = [...playlists].sort((left, right) => Number(isLikedPath(right.path)) - Number(isLikedPath(left.path)) || compareText(left.name, right.name, labels.locale));
-    for (const playlist of sorted) {
+    // "All songs" first: every song, by title, each with its album's cover and, under its title,
+    // who and which album (helpers/lists.ts).
+    const all = songsByTitle(tracks, labels.locale);
+    const allOpen = groupRow({ key: ALL_SONGS_KEY, label: labels.allSongs, meta: String(all.length), tracks: all, known: true }, null, 0);
+    rows[rows.length - 1].allSongs = true;
+    if (allOpen) {
+      for (const track of all) {
+        const cover = track.metadata.coverDataUrl;
+        const sub = byWhom(track);
+        trackRow(track, ALL_SONGS_KEY, 1, sub, { framed: true, ...(cover ? { cover } : {}), ...(sub ? { sub } : {}) });
+      }
+    }
+    // Then the liked songs, by their translated name; the others by name.
+    for (const playlist of sortedPlaylists(playlists, labels.locale)) {
       const liked = isLikedPath(playlist.path);
-      const key = `@playlist:${playlist.path}`;
+      const key = playlistKey(playlist.path);
       const found = playlist.entries.map((entry) => (entry.path ? byPath.get(entry.path) : undefined));
       const isOpen = open(key);
       rows.push({

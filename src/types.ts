@@ -82,6 +82,8 @@ export type WizardTreeRow = {
   playlistIndex?: number;
   /** The liked songs' list (helpers/playlists.ts `LIKED_PATH`): drawn with a heart. */
   liked?: boolean;
+  /** "All songs", the first of the lists (helpers/lists.ts `ALL_SONGS_KEY`): every song of the root. */
+  allSongs?: boolean;
   /** A playlist entry that is not in the library. */
   missing?: boolean;
   /** A track whose tags are not read yet (`Track.pending`). */
@@ -89,7 +91,7 @@ export type WizardTreeRow = {
 };
 
 /** How the library lists a root: its folders, or grouped by tags, or its playlists. */
-export type LibraryView = "files" | "playlists" | "artists" | "albumsByArtist" | "albums" | "compilations" | "songs";
+export type LibraryView = "files" | "playlists" | "artists" | "albumsByArtist" | "albums" | "compilations";
 
 /** One entry of a playlist: its path in the root when it resolves, and what the file said of it. */
 export type PlaylistEntry = {

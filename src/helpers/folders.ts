@@ -18,10 +18,9 @@ export function foldersWithSubfolders(tracks: readonly Pick<Track, "relativePath
 
 /**
  * `rows` without their songs (and their discs, which only hold songs), each folder or group marked
- * a leaf or not, a leaf closed. The Songs view is its songs: as it is.
+ * a leaf or not, a leaf closed.
  */
 export function withoutSongs(rows: readonly WizardTreeRow[], view: LibraryView, tracks: readonly Pick<Track, "relativePath">[]): WizardTreeRow[] {
-  if (view === "songs") return [...rows];
   const parents = view === "files" ? foldersWithSubfolders(tracks) : null;
   return rows
     .filter((row) => row.kind === "album")

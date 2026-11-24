@@ -19,6 +19,7 @@ import {
   moveEntry,
   newPlaylistPath,
   pathTaken,
+  renamedPlaylistPath,
   renamedEntries,
   toggledLike,
   withPlaylist,
@@ -244,6 +245,73 @@ export async function deletePlaylist(rootId: string, path: string): Promise<bool
   return true;
 }
 
+/** Why a playlist cannot be renamed `name`, as the dialog says it; null when it can. */
+export function renameProblem(rootId: string, path: string, name: string): string | null {
+  const next = renamedPlaylistPath(path, name);
+  if (!next) return t("playlist.nameEmpty");
+  if (next === path) return null;
+  const taken = (rootOf(rootId)?.playlists ?? []).map((playlist) => playlist.path).filter((one) => one !== path);
+  return pathTaken(next, taken) ? t("playlist.nameTaken") : null;
+}
+
+/**
+ * Renames a playlist: written again beside where it was, under its new name (`.m3u8`), and the old
+ * file deleted; the library's open lists and current row follow it. Resolves to why not, or null.
+ */
+export async function renamePlaylist(rootId: string, path: string, name: string): Promise<string | null> {
+  const root = rootOf(rootId);
+  const playlist = root?.playlists.find((one) => one.path === path);
+  const next = renamedPlaylistPath(path, name);
+  const problem = renameProblem(rootId, path, name);
+  if (!root || !playlist || !next || problem) return problem ?? t("playlist.nameEmpty");
+  if (next === path) return null;
+  try {
+    if (next.toLowerCase() !== path.toLowerCase() && (await storeOf(root).exists(next))) return t("playlist.nameTaken");
+    await writing;
+    const renamed: Playlist = { ...playlist, path: next, name: playlistName(next) };
+    await storeOf(root).save(renamed);
+    if (next.toLowerCase() !== path.toLowerCase()) await storeOf(root).delete(path);
+    const from = `@playlist:${path}`;
+    const to = `@playlist:${next}`;
+    const moved = (key: string): string => (key === from ? to : key.startsWith(`@pl:${path}#`) ? `@pl:${next}#${key.slice(`@pl:${path}#`.length)}` : key);
+    updateRoots((roots) =>
+      roots.map((item) =>
+        item.id === rootId
+          ? {
+              ...item,
+              playlists: item.playlists.map((one) => (one.path === path ? renamed : one)),
+              expandedAlbums: item.expandedAlbums.map(moved),
+              activeRowKey: item.activeRowKey === null ? null : moved(item.activeRowKey)
+            }
+          : item
+      )
+    );
+  } catch (error) {
+    return reasonOf(error);
+  }
+  library.errorMessage = null;
+  library.infoMessage = t("message.playlistRenamed", { name: playlistName(next) });
+  return null;
+}
+
+/**
+ * A list as a `.m3u8` file to save, for other players: its songs' paths relative to the root's top
+ * (where the file is meant to sit), each with its artist and title.
+ */
+export function exportList(rootId: string, name: string, trackIds: readonly string[]): void {
+  const root = rootOf(rootId);
+  if (!root) return;
+  const text = serializeM3u(entriesOf(root, trackIds), `${name}.m3u8`);
+  const url = URL.createObjectURL(new Blob([text], { type: "audio/x-mpegurl;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${name}.m3u8`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /**
  * How many of the queue's tracks are in a root, and how many in others
  * (which a playlist there cannot hold: a `.m3u8` points at files under its
@@ -275,7 +343,7 @@ export const playlistForm = $reactive({ name: "", rootId: "", error: "", busy: f
 export function openPlaylistDialog(dialog: PlaylistDialog): void {
   const { queue } = $toRaw(playback);
   const playing = queue?.items[$toRaw(playback).index]?.rootId;
-  playlistForm.name = "";
+  playlistForm.name = dialog.mode === "rename" ? dialog.name : "";
   playlistForm.error = "";
   playlistForm.busy = false;
   playlistForm.rootId = dialog.mode === "queue" ? (playing ?? $toRaw(library).activeRootId ?? "") : dialog.rootId;
@@ -296,12 +364,17 @@ export function playlistTitle(): string {
   if (dialog.mode === "add") {
     return t("playlist.addTitle");
   }
+  if (dialog.mode === "rename") {
+    return t("playlist.renameTitle", { name: dialog.name });
+  }
   return dialog.mode === "queue" ? t("playlist.queueTitle") : t("playlist.deleteTitle", { name: dialog.name });
 }
 
 /** Why the name typed cannot be used, once something is typed ("" when it can). */
 export function playlistProblem(): string {
   const name = playlistForm.name;
+  const dialog = ui.playlist;
+  if (dialog?.mode === "rename") return name.trim() ? (renameProblem(dialog.rootId, dialog.path, name) ?? "") : "";
   return name.trim() ? (nameProblem(playlistForm.rootId, name) ?? "") : "";
 }
 
@@ -342,6 +415,9 @@ export function submitPlaylistDialog(): Promise<void> {
   }
   if (dialog.mode === "delete") {
     return run(async () => ((await deletePlaylist(dialog.rootId, dialog.path)) ? null : library.errorMessage ?? ""));
+  }
+  if (dialog.mode === "rename") {
+    return run(() => renamePlaylist(dialog.rootId, dialog.path, name));
   }
   if (dialog.mode === "queue") {
     // Saved, a disc waiting for it replaces the queue (lib/player.ts playTracks); before the dialog

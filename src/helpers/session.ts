@@ -16,6 +16,17 @@ export type SessionRoot<Handle> = {
   view?: LibraryView;
 };
 
+const VIEWS: readonly LibraryView[] = ["files", "playlists", "artists", "albumsByArtist", "albums", "compilations"];
+
+/**
+ * A saved view as one there is: the Songs view, gone, is now the lists' "All songs"
+ * (helpers/lists.ts), so it reads as Lists; anything else unknown, or none, as Files.
+ */
+export function knownView(view: unknown): LibraryView {
+  if (view === "songs") return "playlists";
+  return VIEWS.includes(view as LibraryView) ? (view as LibraryView) : "files";
+}
+
 /** The open roots, in tab order, and the active one. */
 export type Session<Handle> = {
   roots: SessionRoot<Handle>[];

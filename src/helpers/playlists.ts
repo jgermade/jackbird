@@ -38,6 +38,14 @@ export function newPlaylistPath(name: string): string | null {
   return safe ? `${PLAYLIST_FOLDER}/${safe}.m3u8` : null;
 }
 
+/** Where a playlist renamed `name` is written: beside where it was, as `.m3u8`; null with no name. */
+export function renamedPlaylistPath(path: string, name: string): string | null {
+  const safe = safeName(name);
+  if (!safe) return null;
+  const slash = path.lastIndexOf("/");
+  return `${slash < 0 ? "" : path.slice(0, slash + 1)}${safe}.m3u8`;
+}
+
 /** Whether `path` is one of `taken`, compared without case (as Windows and macOS compare names). */
 export function pathTaken(path: string, taken: readonly string[]): boolean {
   const key = path.toLowerCase();

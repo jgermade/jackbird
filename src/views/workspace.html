@@ -214,7 +214,7 @@
   // and drawn (two frames, then once more for covers that took longer).
   const paneOf = (name: string) => $self(name) as HTMLElement | null
   // The library's list scrolls in its pane, or, on a phone, in its page (views/library.html).
-  const treeScroller = () => paneOf(".tree-pane .paging > .page.level") ?? paneOf(".tree-pane")
+  const treeScroller = () => paneOf(".tree-pane .paging > .page.current") ?? paneOf(".tree-pane")
   const keepView = () => {
     writeSession(SESSION_KEYS.view, JSON.stringify({ panel: ui.pane, treeScroll: treeScroller()?.scrollTop ?? 0, sheetScroll: paneOf(".sheet-pane")?.scrollTop ?? 0 }))
   }

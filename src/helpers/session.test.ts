@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parsePlaybackState, parseSessionTabs, parseViewState, sameSession, sessionOf, sessionTabsOf } from "./session.ts";
+import { knownView, parsePlaybackState, parseSessionTabs, parseViewState, sameSession, sessionOf, sessionTabsOf } from "./session.ts";
 
 const music = { name: "Music" };
 const podcasts = { name: "Podcasts" };
@@ -37,7 +37,7 @@ describe("sameSession", () => {
   });
 
   it("differs when a root's view changes, and reads a session saved before views as Files", () => {
-    assert.equal(sameSession(saved, sessionOf(open.map((root) => (root.id === "1" ? { ...root, view: "songs" as const } : root)), "1")), false);
+    assert.equal(sameSession(saved, sessionOf(open.map((root) => (root.id === "1" ? { ...root, view: "artists" as const } : root)), "1")), false);
     const before = { ...saved, roots: saved.roots.map(({ view: _view, ...root }) => root) };
     assert.equal(sameSession(before, sessionOf(open.map((root) => ({ ...root, view: "files" as const })), "1")), true);
   });
@@ -144,5 +144,15 @@ describe("session tabs", () => {
     assert.deepEqual(parseSessionTabs("{"), []);
     assert.deepEqual(parseSessionTabs('{"id":"a"}'), []);
     assert.deepEqual(parseSessionTabs('[{"id":"a","label":"A"},{"id":1},null,"x"]'), [{ id: "a", label: "A" }]);
+  });
+});
+
+describe("knownView", () => {
+  it("reads a saved view as one there is: Songs, gone, as Lists; the unknown as Files", () => {
+    assert.equal(knownView("artists"), "artists");
+    assert.equal(knownView("playlists"), "playlists");
+    assert.equal(knownView("songs"), "playlists");
+    assert.equal(knownView("nope"), "files");
+    assert.equal(knownView(undefined), "files");
   });
 });

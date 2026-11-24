@@ -16,7 +16,8 @@ export type SelectionTab = "info" | "edit" | "rename" | "danger";
 export type PlaylistDialog =
   | { mode: "add"; rootId: string; trackIds: string[]; label: string }
   | { mode: "queue"; sub?: boolean }
-  | { mode: "delete"; rootId: string; path: string; name: string };
+  | { mode: "delete"; rootId: string; path: string; name: string }
+  | { mode: "rename"; rootId: string; path: string; name: string };
 
 export type Pane = "library" | "details";
 

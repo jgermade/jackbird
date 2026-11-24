@@ -10,6 +10,8 @@ import { queueOf } from "../helpers/queue";
 import { byCaret, followFolder } from "../helpers/follow";
 import { withoutSongs } from "../helpers/folders";
 import { levelsOf, openOnEntering, openOnLeaving, type Levels } from "../helpers/levels";
+import { listCards, type ListCard } from "../helpers/lists";
+import { shuffledOrder } from "../helpers/order";
 import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
 import { nextSelection, selectMany } from "../helpers/selection";
 import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
@@ -48,6 +50,7 @@ function viewLabels(): ViewLabels {
     variousArtists: t("views.variousArtists"),
     missing: t("playlist.missing"),
     liked: t("likes.list"),
+    allSongs: t("lists.allSongs"),
     locale: preferences.language
   };
 }
@@ -130,6 +133,26 @@ export const detailAlbums = $computed((): Opaque<AlbumGroup[]> => {
     albumsOf = { tracks, untitled, language, box: new Opaque(groupAlbums(tracks, untitled, language)) };
   }
   return albumsOf.box;
+});
+
+/**
+ * The Lists view's Details: a card per list (helpers/lists.ts), or only the one chosen in the
+ * library (a list, or a song of one). Empty in the other views.
+ */
+let cardsOf: { roots: RootWorkspace[]; id: string | null; key: string | null; language: string; box: Opaque<ListCard[]> } | null = null;
+export const detailLists = $computed((): Opaque<ListCard[]> => {
+  const { root, rows } = derive();
+  const roots = $toRaw(library.roots);
+  const language = preferences.language;
+  if (!root || root.view !== "playlists") return new Opaque([]);
+  const row = root.activeRowKey ? rows.find((item) => item.key === root.activeRowKey) : undefined;
+  const group = row?.kind === "album" ? row : row?.parentKey ? rows.find((item) => item.key === row.parentKey) : undefined;
+  const key = group?.key ?? null;
+  if (!cardsOf || cardsOf.roots !== roots || cardsOf.id !== root.id || cardsOf.key !== key || cardsOf.language !== language) {
+    const cards = listCards(root.tracks, root.playlists ?? [], { allSongs: t("lists.allSongs"), liked: t("likes.list"), locale: language }, key);
+    cardsOf = { roots, id: root.id, key, language, box: new Opaque(cards) };
+  }
+  return cardsOf.box;
 });
 
 export const selectedTracks = $computed((): Opaque<Track[]> => {
@@ -364,6 +387,27 @@ export function playFromDetail(trackId: string): void {
 export function playTrackIds(trackIds: readonly string[], label: string): void {
   const root = current();
   if (root && trackIds.length > 0) playTracks(queueOf(root.id, [...trackIds], label).items, 0, label);
+}
+
+/** Plays tracks of the active root in an order of chance, `label` the queue's name. */
+export function shuffleTrackIds(trackIds: readonly string[], label: string): void {
+  const root = current();
+  if (!root || trackIds.length === 0) return;
+  const order = shuffledOrder(trackIds.length, Math.floor(Math.random() * trackIds.length));
+  playTrackIds(order.map((at) => trackIds[at]), label);
+}
+
+/** Plays a list's songs from one of them (Details' Lists): the one playing pauses or resumes. */
+export function playFromList(trackIds: readonly string[], trackId: string, label: string): void {
+  const root = current();
+  if (!root) return;
+  const playing = $toRaw(nowPlaying.value);
+  if (playing && playing.rootId === root.id && playing.trackId === trackId) {
+    togglePlay();
+    return;
+  }
+  const index = trackIds.indexOf(trackId);
+  if (index !== -1) playTracks(queueOf(root.id, [...trackIds], label).items, index, label);
 }
 
 /**

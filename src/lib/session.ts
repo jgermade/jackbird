@@ -6,7 +6,7 @@
 // RECORD/2026-11-03.deck-design-system.WIP.md (steps 6 and 7).
 
 import { $toRaw } from "jq79";
-import { parseSessionTabs, sameSession, sessionOf, sessionTabsOf, type Session, type SessionTab } from "../helpers/session";
+import { knownView, parseSessionTabs, sameSession, sessionOf, sessionTabsOf, type Session, type SessionTab } from "../helpers/session";
 import { account, followServer } from "./account";
 import { importing } from "./importing";
 import { library } from "./library";
@@ -48,7 +48,7 @@ export async function restoreSession(): Promise<void> {
         setActive: false,
         expandedAlbums: saved.expandedAlbums ?? [],
         activeRowKey: saved.activeRowKey ?? null,
-        view: saved.view ?? "files"
+        view: knownView(saved.view)
       });
       reopened.push(saved.id);
       if (typeof saved.handle === "string") paths.add(saved.handle);

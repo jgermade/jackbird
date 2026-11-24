@@ -43,7 +43,7 @@ describe("detailScope in the views", () => {
   const rows = [
     { key: "@artist:x", kind: "album" as const, album: "@artist:x", label: "X", parentKey: null, depth: 0, trackIds: [b.id, a.id], inView: "artists" as const },
     { key: "track:B/2.mp3", kind: "track" as const, album: "", label: "Two", parentKey: "@artist:x", depth: 1, trackId: b.id, inView: "artists" as const },
-    { key: "track:A/1.mp3", kind: "track" as const, album: "", label: "One", parentKey: null, depth: 0, trackId: a.id, inView: "songs" as const }
+    { key: "track:A/1.mp3", kind: "track" as const, album: "", label: "One", parentKey: null, depth: 0, trackId: a.id, inView: "playlists" as const }
   ];
 
   it("shows a group's tracks in its order", () => {
@@ -78,7 +78,7 @@ describe("scopeCrumbs", () => {
       { key: "@artist:x", kind: "album" as const, album: "@artist:x", label: "X", parentKey: null, depth: 0, trackIds: ["b", "a"], inView: "albumsByArtist" as const },
       { key: "@aba:x::y", kind: "album" as const, album: "@aba:x::y", label: "Y", parentKey: "@artist:x", depth: 1, trackIds: ["b"], inView: "albumsByArtist" as const },
       { key: "track:b", kind: "track" as const, album: "", label: "Two", parentKey: "@aba:x::y", depth: 2, trackId: "b", inView: "albumsByArtist" as const },
-      { key: "track:a", kind: "track" as const, album: "", label: "One", parentKey: null, depth: 0, trackId: "a", inView: "songs" as const }
+      { key: "track:a", kind: "track" as const, album: "", label: "One", parentKey: null, depth: 0, trackId: "a", inView: "playlists" as const }
     ];
     const at = (key: string) => ({ label: "Music", tracks: [], activeRowKey: key, view: "albumsByArtist" });
     assert.deepEqual(scopeCrumbs(at("@artist:x"), views), [{ key: "@artist:x", label: "X" }]);
