@@ -192,11 +192,11 @@
           <p>{{ t("preferences.viewsHint") }}</p>
         </div>
         <!-- One bank of keys, icons alone (each named for a screen reader and on hover); one down,
-             its view shown, is lit, as play is while the music plays. -->
+             its view shown, has its glyph lit, as the library's head lights the view in use. -->
         <div class="view-keys">
           <KeyBank :label="t('preferences.views')">
-            <Key :each="name in VIEW_ORDER" :key="name" square :variant="isShown(name) ? 'primary' : 'secondary'" :pressed="isShown(name)" :disabled="lastShown(name)" :label="t(VIEW_LABELS[name])" :title="t(VIEW_LABELS[name])" @click="showView(name, !isShown(name))">
-              <ViewGlyph :view="name" />
+            <Key :each="name in VIEW_ORDER" :key="name" square :pressed="isShown(name)" :disabled="lastShown(name)" :label="t(VIEW_LABELS[name])" :title="t(VIEW_LABELS[name])" @click="showView(name, !isShown(name))">
+              <ViewGlyph :view="name" :lit="isShown(name)" />
             </Key>
           </KeyBank>
         </div>
