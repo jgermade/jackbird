@@ -245,3 +245,13 @@ describe("an artist's picture in the rows", () => {
     assert.ok(none.every((row) => row.framed && row.round && !row.cover));
   });
 });
+
+describe("Albums by artist, by year", () => {
+  it("lists an artist's albums oldest first (none last), and their songs in that order", () => {
+    const by = (path: string, album: string, year: string) => fixture(path, { album, artist: "Miles Davis", albumArtist: "Miles Davis", year, title: path });
+    const songs = [by("k/1.mp3", "Kind of Blue", "1959"), by("b/1.mp3", "Bitches Brew", "1970"), by("a/1.mp3", "Aura", ""), by("w/1.mp3", "Walkin'", "1957")];
+    const rows = buildViewRows("albumsByArtist", songs, "all", labels);
+    assert.deepEqual(rows.filter((row) => row.depth === 1).map((row) => row.label), ["Walkin'", "Kind of Blue", "Bitches Brew", "Aura"]);
+    assert.deepEqual(rows[0].trackIds, ["w/1.mp3", "k/1.mp3", "b/1.mp3", "a/1.mp3"]);
+  });
+});

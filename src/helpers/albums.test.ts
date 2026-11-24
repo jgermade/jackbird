@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { groupAlbums } from "./albums.ts";
+import { groupAlbums, yearOrder } from "./albums.ts";
 import { track } from "./fixtures.test-support.ts";
 
 const kob = { artist: "Miles Davis", album: "Kind of Blue", year: "1959", genre: "Jazz", coverDataUrl: "data:kob" };
@@ -82,5 +82,34 @@ describe("groupAlbums", () => {
 
   it("is empty for no tracks", () => {
     assert.deepEqual(groupAlbums([], "No album", "en"), []);
+  });
+});
+
+describe("albums by year", () => {
+  const one = (path: string, album: string, year: string) => track(path, { album, artist: "Miles Davis", year });
+  const tracks = [
+    one("a/1.mp3", "Kind of Blue", "1959"),
+    one("b/1.mp3", "Bitches Brew", "1970-03-30"),
+    one("c/1.mp3", "Birth of the Cool", ""),
+    one("c/2.mp3", "Birth of the Cool", "1957"),
+    one("d/1.mp3", "Aura", ""),
+    one("e/1.mp3", "Miles Ahead", "1957")
+  ];
+
+  it("reads a year tag's place, oldest first, none last", () => {
+    assert.equal(yearOrder("1959"), 1959);
+    assert.equal(yearOrder("1970-03-30"), 1970);
+    assert.ok(yearOrder("") > yearOrder("2999"));
+    assert.ok(yearOrder(undefined) > yearOrder("2999"));
+    assert.ok(yearOrder("unknown") > yearOrder("2999"));
+  });
+
+  it("sorts by year, then by title, when asked; by title otherwise", () => {
+    assert.deepEqual(groupAlbums(tracks, "Untitled", "en", true).map((album) => album.title), ["Birth of the Cool", "Miles Ahead", "Kind of Blue", "Bitches Brew", "Aura"]);
+    assert.deepEqual(groupAlbums(tracks, "Untitled", "en").map((album) => album.title), ["Aura", "Birth of the Cool", "Bitches Brew", "Kind of Blue", "Miles Ahead"]);
+  });
+
+  it("takes an album's first year among its tracks", () => {
+    assert.equal(groupAlbums(tracks, "Untitled", "en").find((album) => album.title === "Birth of the Cool")?.year, "1957");
   });
 });

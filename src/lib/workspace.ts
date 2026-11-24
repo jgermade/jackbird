@@ -124,13 +124,16 @@ export function showWhole(): void {
 }
 
 /** The sheet's tracks as albums and discs, titled in the current language. */
-let albumsOf: { tracks: Track[]; untitled: string; language: string; box: Opaque<AlbumGroup[]> } | null = null;
+let albumsOf: { tracks: Track[]; untitled: string; language: string; byYear: boolean; box: Opaque<AlbumGroup[]> } | null = null;
 export const detailAlbums = $computed((): Opaque<AlbumGroup[]> => {
-  const tracks = derive().scope.tracks;
+  const { scope, root } = derive();
+  const tracks = scope.tracks;
   const untitled = t("album.untitled");
   const language = preferences.language;
-  if (!albumsOf || albumsOf.tracks !== tracks || albumsOf.untitled !== untitled || albumsOf.language !== language) {
-    albumsOf = { tracks, untitled, language, box: new Opaque(groupAlbums(tracks, untitled, language)) };
+  // Albums by artist: by year, as the library lists them.
+  const byYear = root?.view === "albumsByArtist";
+  if (!albumsOf || albumsOf.tracks !== tracks || albumsOf.untitled !== untitled || albumsOf.language !== language || albumsOf.byYear !== byYear) {
+    albumsOf = { tracks, untitled, language, byYear, box: new Opaque(groupAlbums(tracks, untitled, language, byYear)) };
   }
   return albumsOf.box;
 });
@@ -175,7 +178,7 @@ function current(): RootWorkspace | null {
  */
 function playOrder(scope: Scope): Track[] {
   if (scope.ordered) return scope.tracks;
-  return groupAlbums(scope.tracks, t("album.untitled"), preferences.language).flatMap((album) => album.discs.flatMap((disc) => disc.tracks));
+  return groupAlbums(scope.tracks, t("album.untitled"), preferences.language, derive().root?.view === "albumsByArtist").flatMap((album) => album.discs.flatMap((disc) => disc.tracks));
 }
 
 function updateActive(update: (root: RootWorkspace) => RootWorkspace): void {

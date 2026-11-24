@@ -12,6 +12,7 @@ import { isCompilation } from "./metadata.ts";
 import { compareText } from "./compare.ts";
 import { orderDetailPlaylist } from "./tracks.ts";
 import { isLikedPath } from "./playlists.ts";
+import { yearOrder } from "./albums.ts";
 import { ALL_SONGS_KEY, playlistKey, songsByTitle, sortedPlaylists } from "./lists.ts";
 
 /** The words and the order a view needs. */
@@ -226,9 +227,15 @@ export function buildViewRows(
       }
     }
   } else if (view === "albumsByArtist") {
-    for (const artist of albumArtistsOf(tracks, labels)) {
+    for (const found of albumArtistsOf(tracks, labels)) {
+      // Their albums by year, oldest first (none last), then by title; and the artist's songs,
+      // what plays, in that order.
+      const albums = albumsOf(found.tracks, labels).sort(
+        (left, right) => yearOrder(yearOfTracks(left.tracks)) - yearOrder(yearOfTracks(right.tracks)) || Number(right.known) - Number(left.known) || compareText(left.label, right.label, labels.locale)
+      );
+      const artist = { ...found, tracks: albums.flatMap((album) => album.tracks) };
       if (!groupRow(artist, null, 0, artistExtras(artist))) continue;
-      for (const album of albumsOf(artist.tracks, labels)) {
+      for (const album of albums) {
         const sub = { ...album, key: `@aba:${artist.key.slice(8)}::${album.key.slice(7)}`, meta: "" };
         if (groupRow(sub, artist.key, 1, albumExtras(sub, false))) {
           for (const track of album.tracks) trackRow(track, sub.key, 2, track.metadata.artist);
