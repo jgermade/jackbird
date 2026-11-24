@@ -60,3 +60,17 @@ export function openOnEntering(rows: readonly WizardTreeRow[], expanded: readonl
 export function openOnLeaving(rows: readonly WizardTreeRow[], expanded: readonly string[], rowKey: string): string[] {
   return onlyOpen(rows, expanded, pathTo(rows, rowKey).slice(0, -1));
 }
+
+/**
+ * What the list would hold once the last open level is left: the rows of the level above it, the
+ * folder left among them, closed. Shown while a phone's swipe back is under way, coming in from the
+ * left. With no level open, none.
+ */
+export function levelAbove(rows: readonly WizardTreeRow[]): WizardTreeRow[] {
+  const { open } = levelsOf(rows);
+  const last = open[open.length - 1];
+  if (!last) return [];
+  return rows
+    .filter((row) => row.parentKey === last.parentKey)
+    .map((row) => (row.key === last.key ? { ...row, expanded: false } : row));
+}

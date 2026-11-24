@@ -5,6 +5,7 @@
   square = false,
   pressed = null,
   led = false,
+  armed = false,
   disabled = false,
   label = '',
   title = '',
@@ -26,7 +27,8 @@
   // It is not emitted while disabled. `square` is for an icon alone, and then
   // `label` is its accessible name. A key that opens something says so:
   // `popup` (`menu`, `dialog`…) and `expanded` (whether it is open) become
-  // `aria-haspopup` and `aria-expanded`.
+  // `aria-haspopup` and `aria-expanded`. An `armed` key is ready to go: its edge
+  // is the accent's orange (play, while a song is loaded and paused).
   //
   // **Part of the default theme**: imports only `Led`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -38,6 +40,7 @@
     square?: boolean | ""
     pressed?: boolean | "" | null
     led?: boolean | ""
+    armed?: boolean | ""
     disabled?: boolean | ""
     label?: string
     title?: string
@@ -52,6 +55,7 @@
   $: isDisabled = flag(disabled)
   $: isSquare = flag(square)
   $: hasLed = flag(led)
+  $: isArmed = flag(armed)
   $: latching = pressed !== null && pressed !== undefined
   $: isPressed = latching && flag(pressed)
 
@@ -64,6 +68,7 @@
         :type="type"
         :class="`variant-${variant} size-${size}`"
         :class.square="isSquare"
+        :class.armed="isArmed"
         :aria-pressed="latching ? String(isPressed) : null"
         :aria-label="label || null"
         :aria-haspopup="popup || null"
@@ -109,6 +114,8 @@
   @media (hover: hover) { .key:hover:not(:disabled) { border-color: var(--mm-fg-subtle); } }
   .key:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; }
   .key:disabled { opacity: .45; cursor: default; }
+  /* Armed: ready to go, its edge in the signal colour (after the hover's, so it keeps it). */
+  .key.armed:not(:disabled) { border-color: var(--mm-accent); }
 
   /* Pressed, and latched: the key travels down and its face goes into shadow. */
   .key:active:not(:disabled),

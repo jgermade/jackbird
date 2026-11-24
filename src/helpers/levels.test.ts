@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { WizardTreeRow } from "../types.ts";
-import { levelsOf, openOnEntering, openOnLeaving } from "./levels.ts";
+import { levelAbove, levelsOf, openOnEntering, openOnLeaving } from "./levels.ts";
 
 const folder = (album: string, parentKey: string | null, depth: number, expanded = false): WizardTreeRow => ({
   key: `folder:${album}`,
@@ -85,4 +85,15 @@ test("leaving an open folder closes it and the ones under it", () => {
 test("a track's row, or an unknown one, opens only the folders above it", () => {
   assert.deepEqual(openOnEntering(rows, ["Jazz", "Jazz/Miles"], "track:jazz-intro"), ["Jazz"]);
   assert.deepEqual(openOnEntering(rows, ["Jazz"], "folder:Nowhere"), []);
+});
+
+test("the level above the last open one: its rows, the folder left among them closed", () => {
+  const above = levelAbove(rows);
+  assert.deepEqual(keys(above), ["folder:Jazz/Miles", "folder:Jazz/Monk", "track:jazz-intro"]);
+  assert.equal(above[0].expanded, false);
+  // One level open: the top of the list comes back.
+  const one = rows.filter((row) => row.parentKey === null || row.key === "track:jazz-intro").map((row) => row);
+  assert.deepEqual(keys(levelAbove(one)), ["folder:Jazz", "folder:Rock", "track:loose"]);
+  // Nothing open: none.
+  assert.deepEqual(levelAbove([folder("Rock", null, 0), track("loose", null, 0)]), []);
 });
