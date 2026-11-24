@@ -65,8 +65,11 @@ async function ready() {
   fail("the service did not start");
 }
 
-const mails = () =>
-  fs.existsSync(mailbox) ? fs.readFileSync(mailbox, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
+/** The emails sent so far: the whole lines of the mailbox (the SMTP sink may be writing one). */
+const mails = () => {
+  const text = fs.existsSync(mailbox) ? fs.readFileSync(mailbox, "utf8") : "";
+  return text.slice(0, text.lastIndexOf("\n") + 1).split("\n").filter(Boolean).map((line) => JSON.parse(line));
+};
 
 async function codeFor(to, after) {
   for (let step = 0; step < 300; step += 1) {
