@@ -7,9 +7,11 @@ import type { SampleList } from "../helpers/samples";
 import { emptyMetadata, readsEveryField, withEveryField } from "../helpers/metadata";
 import { inferredMetadata } from "../helpers/rename";
 import { isAudioFile } from "../helpers/formats";
+import { expiredInQuarantine, inQuarantine } from "../helpers/quarantine";
 import { isPlaylistFile } from "../helpers/playlists";
 import { applyCovers, applyScanResults, checksumOf, omitRecords, type Covered, type ScanResult } from "../helpers/snapshot";
 import { collectFolderPaths, sameTrackFiles } from "../helpers/tracks";
+import type { WalkedFile } from "@cloudauthn/vfs-sync";
 import type { GroupingMode, LibraryView, ListedTrack, RootSource, RootWorkspace, Track } from "../types";
 import { coverFrom, coversIn, internSnapshot, namesIn, withCovers } from "./covers";
 import { refName } from "../helpers/cover";
@@ -142,7 +144,7 @@ export async function hydrateRoot(
       // A server's library gives every song at once (its tags as one sees them): none is
       // inspected on its own. The walk still gives the playlists.
       const [walked, missingCovers, listed] = await Promise.all([
-        source.walk(),
+        walkOutOfQuarantine(source),
         coversIn(vfs, namesIn(snapshot)),
         source.tracks?.().catch((error: unknown) => {
           console.error(`jackbird: could not list the songs of ${rootLabel}; each is read instead`, error);
@@ -515,13 +517,29 @@ export async function rescanRoot(rootId: string): Promise<void> {
   });
 }
 
+/**
+ * A folder's files, its quarantine left out (helpers/quarantine.ts: songs deleted, waiting 30 days).
+ * Read whole (`purge`), what has waited its 30 days there is deleted for good, in the background.
+ */
+async function walkOutOfQuarantine(source: RootSource, purge = true): Promise<WalkedFile[]> {
+  const walked = await source.walk();
+  const held = walked.filter((entry) => inQuarantine(entry.path)).map((entry) => entry.path);
+  if (purge && held.length > 0 && !source.readOnly && !source.ipod) {
+    const expired = expiredInQuarantine(held, new Date());
+    void (async () => {
+      for (const path of expired) await source.vfs.delete(path).catch((error: unknown) => console.error(`jackbird: could not delete ${path} from the quarantine`, error));
+    })();
+  }
+  return held.length > 0 ? walked.filter((entry) => !inQuarantine(entry.path)) : walked;
+}
+
 async function resyncRootIfNeeded(rootId: string): Promise<void> {
   const root = $toRaw(library).roots.find((item) => item.id === rootId);
   if (!root || root.loadingMetadata) {
     return;
   }
 
-  const walked = await root.source.walk();
+  const walked = await walkOutOfQuarantine(root.source, false);
   // Playlists made or deleted elsewhere since: read them again.
   const playlistPaths = walked.map((entry) => entry.path).filter(isPlaylistFile);
   const knownPlaylists = new Set((root.playlists ?? []).map((playlist) => playlist.path));
@@ -556,7 +574,7 @@ export function closeRoot(rootId: string): void {
 
   dropFromQueue((item) => item.rootId === rootId);
   roots[index].source.close();
-  // Offered again in "Open a source…"'s Folder tab; not a folder read only, which cannot be reopened.
+  // Offered again in "Open"'s Folder tab; not a folder read only, which cannot be reopened.
   if (!roots[index].source.readOnly) rememberClosed({ label: roots[index].label, saved: roots[index].source.saved });
 
   const nextRoots = roots.filter((root) => root.id !== rootId);

@@ -117,9 +117,9 @@ async function openPreferences(page, section = "Account") {
     pages.push(page);
     page.on("pageerror", (error) => console.log("pageerror:", error.message));
     await page.goto(base);
-    await page.getByRole("button", { name: /^(Open a source…|Choose a folder of .+…)$/ }).first().click();
+    await page.getByRole("button", { name: /^(Open|Choose a folder of .+…)$/ }).first().click();
     // With more than one tab (Folder, and iPod in a browser: RECORD/2026-11-14.ipod-sync.WIP.md, W4)
-    // "Open a source…" opens its dialog first: its Folder tab's key for the server's folders goes on to
+    // "Open" opens its dialog first: its Folder tab's key for the server's folders goes on to
     // the chooser (the device's own, the browser's picker, is offered beside it since 2026-11-25).
     const chooser = page.getByRole("button", { name: /^Choose a folder of .+…$/ });
     if (await chooser.first().isVisible({ timeout: 2000 }).catch(() => false)) await chooser.first().click();

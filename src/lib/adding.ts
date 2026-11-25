@@ -1,4 +1,4 @@
-// "Open a source…" (E6b-D11): which source the music comes from, then that source's own
+// "Open" (E6b-D11): which source the music comes from, then that source's own
 // steps. A folder of this device (the browser's picker, the system's dialog, or, on a phone, its
 // own folders), a folder of the server spoken to now (its owners), or a jackbird server by its
 // address, whose family library and open folders join the library. The view is
@@ -22,7 +22,7 @@ import { currentServer, homeServer, librarySource, serviceAt, serviceRoots, shar
 
 export type SourceKind = "device" | "serverFolder" | "server";
 
-/** The tabs of "Open a source…": a folder, a server, an iPod (the desktop app). */
+/** The tabs of "Open": a folder, a server, an iPod (the desktop app). */
 export type SourceTab = "folder" | "server" | "ipod";
 
 export const adding = $reactive({
@@ -121,7 +121,7 @@ export function tabsHere(): SourceTab[] {
 }
 
 /**
- * Whether "Open a source…" has an iPod tab: the desktop app on a computer (the iPods plugged
+ * Whether "Open" has an iPod tab: the desktop app on a computer (the iPods plugged
  * in), or a browser on a computer that can open a folder (the iPod's drive, picked: W4).
  */
 export function ipodTabHere(): boolean {
@@ -143,7 +143,7 @@ export function tabLabel(tab: SourceTab): string {
 }
 
 /**
- * "Open a source…" (the owner's design, 2026-11-12): a dialog with a tab for folders and one
+ * "Open" (the owner's design, 2026-11-12): a dialog with a tab for folders and one
  * for servers. Where there is only one folder to choose and no server (the web), straight to it.
  */
 export function openAdding(): void {

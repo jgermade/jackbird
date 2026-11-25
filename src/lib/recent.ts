@@ -1,6 +1,6 @@
 // The folders closed lately (the owner's request, 2026-11-12): what the session kept of each (a
 // directory handle, a path, a server's root, a phone's folder) and its label, newest first, so
-// "Open a source…"'s Folder tab offers them again. Kept in IndexedDB beside the session
+// "Open"'s Folder tab offers them again. Kept in IndexedDB beside the session
 // (./rootSessionStore), which can hold the browser's directory handles. Reopening one asks its
 // source as a restart would (./sources' restoreSource).
 // See RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-12).

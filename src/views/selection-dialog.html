@@ -50,7 +50,8 @@
   const writingText = (): string => (writing.total > 1 ? t("editor.progress", { at: writing.at, total: writing.total, name: writing.name }) : writing.name)
   const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
-  const { activeRoot, dialogTracks, removeSelectedTracks } = await import("../lib/workspace")
+  const { activeRoot, dialogTracks } = await import("../lib/workspace")
+  const { deleteDialogTracks, deleteWay } = await import("../lib/deleting")
   const { canRename, readPlan, readSelected, renamePlan, renameSelected, renamer, setRenameDirection, setRenamePattern } = await import("../lib/rename")
   const { RENAME_PRESETS, completeField, fieldQuery, fieldsFor, fillPattern, patternReader, readSubject } = await import("../helpers/rename")
   const { nameDiff } = await import("../helpers/namediff")
@@ -311,9 +312,15 @@
   }
 
   // Delete: the tab is the confirmation, so its key removes at once.
-  const remove = () => {
-    removeSelectedTracks()
-    closeSelection()
+  // Delete: to the server's trash, into the folder's quarantine, or only out of the list (lib/deleting.ts).
+  const way = (): "trash" | "quarantine" | "list" => deleteWay(activeRoot.value.data?.source)
+  const DANGER = {
+    trash: { title: "danger.trashTitle", body: "danger.trashBody", key: "danger.trash" },
+    quarantine: { title: "danger.quarantineTitle", body: "danger.quarantineBody", key: "danger.quarantine" },
+    list: { title: "danger.title", body: "danger.body", key: "danger.remove" }
+  } as const
+  const remove = async () => {
+    if (await deleteDialogTracks()) closeSelection()
   }
 </script>
 
@@ -508,8 +515,9 @@
     </div>
 
     <div :else class="danger">
-      <h3 class="danger-title">{{ t("danger.title") }}</h3>
-      <p>{{ tn("danger.body", tracks().length) }}</p>
+      <h3 class="danger-title">{{ t(DANGER[way()].title) }}</h3>
+      <p>{{ tn(DANGER[way()].body, tracks().length) }}</p>
+      <p :if="library.errorMessage" class="failure" role="alert">{{ library.errorMessage }}</p>
     </div>
 
     <!-- The cover's picture crop, over this dialog's body (lib/picture.ts). -->
@@ -539,7 +547,7 @@
       </span>
       <span :elseif="ui.selectionTab === 'danger'" class="keys">
         <Key variant="ghost" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
-        <Key variant="danger" :disabled="tracks().length === 0" @click="remove()">{{ tn("danger.remove", tracks().length) }}</Key>
+        <Key variant="danger" :disabled="library.saving || tracks().length === 0" @click="remove()">{{ library.saving ? t("danger.deleting") : tn(DANGER[way()].key, tracks().length) }}</Key>
       </span>
       <span :else class="keys">
         <Key variant="ghost" @click="closeSelection()">{{ t("selection.close") }}</Key>

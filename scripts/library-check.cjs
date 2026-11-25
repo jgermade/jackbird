@@ -115,7 +115,7 @@ async function addMusic(page) {
 
 /** Opens the owner's music, shared with one, from "Shared with me". */
 async function openShared(page) {
-  await page.getByRole("button", { name: "Open a source…" }).first().click();
+  await page.getByRole("button", { name: "Open", exact: true }).first().click();
   await page.getByRole("button", { name: "Owner's music", exact: true }).click();
   await page.getByRole("button", { name: "Close Owner's music" }).waitFor({ timeout: 15000 });
 }

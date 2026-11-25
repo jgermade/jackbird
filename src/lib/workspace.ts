@@ -378,19 +378,23 @@ export function goToGroup(trackId: string, group: "album" | "artist"): void {
   updateActive((root) => ({ ...root, view, activeRowKey: key }));
 }
 
-/** Drops the selected tracks from the library (not from disk): they come back when the folder is opened again. */
-export function removeSelectedTracks(): void {
+/** The dialog's tracks (a track's menu's, or the selection), as ids. */
+export function dialogTrackIdsNow(): string[] {
   const root = current();
-  if (!root) {
-    return;
-  }
+  return root ? [...dialogTrackIds(root.selectedTrackIds, $toRaw(ui).selectionTargets)] : [];
+}
+
+/**
+ * Takes tracks out of the active root as shown, and out of the queue (if the one playing goes, the
+ * next one plays): once their files are gone (lib/deleting.ts), or, where nothing can be deleted,
+ * only from the list (their files come back the next time the folder is read). Opened from a
+ * track's menu, the selection stays, but for any of them.
+ */
+export function dropTracks(trackIds: readonly string[]): void {
+  const root = current();
+  const gone = new Set(trackIds);
+  if (!root || gone.size === 0) return;
   const targets = $toRaw(ui).selectionTargets;
-  const gone = new Set(dialogTrackIds(root.selectedTrackIds, targets));
-  if (gone.size === 0) {
-    return;
-  }
-  // They leave the queue first (if the one playing goes, the next one plays), then the library. Those
-  // of a track's menu leave the selection as it is, but for any of them in it.
   dropFromQueue((item) => item.rootId === root.id && gone.has(item.trackId));
   const kept = (item: RootWorkspace): RootWorkspace => {
     if (!targets) return clearedSelection(item);
@@ -400,8 +404,8 @@ export function removeSelectedTracks(): void {
   };
   updateActive((item) => ({ ...kept(item), tracks: item.tracks.filter((track) => !gone.has(track.id)) }));
   ui.selectionTargets = null;
-  library.infoMessage = tn("message.removed", gone.size);
 }
+
 
 /** Plays the album sheet's tracks from `trackId`; the one already playing pauses or resumes. */
 export function playFromDetail(trackId: string): void {
