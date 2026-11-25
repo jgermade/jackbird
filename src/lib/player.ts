@@ -869,6 +869,14 @@ export function playNext(items: QueueItem[], sourceLabel: string): void {
   apply(playNextIn(was, items, sourceLabel), !was.queue);
 }
 
+/**
+ * Tracks as the queue, suggested (as a disc played is, not queued on purpose), `sourceLabel` its
+ * name, the first loaded paused: nothing starts by itself (the landing page's demo).
+ */
+export function cueTracks(items: QueueItem[], sourceLabel: string): void {
+  if (items.length > 0) apply(replaceWith(items, 0, sourceLabel), true);
+}
+
 /** Tracks at the end of the queue; with nothing queued, as `playNext`. */
 export function addToQueue(items: QueueItem[], sourceLabel: string): void {
   const was = position();

@@ -1,7 +1,7 @@
 <script :setup lang="ts">
   // The queue as a list, in the queue's dialog (computers) and its panel
-  // (phones), in four parts, one after another (their headings for screen
-  // readers only): the tracks played (dimmed), the one playing (its cover
+  // (phones), in four parts, one after another, each under its heading (shown since
+  // 2026-11-25): the tracks played (dimmed), the one playing (its cover
   // larger, its bars), the ones queued on purpose, and the ones suggested (the
   // rest of a disc played; a little dimmed). Each row: the
   // title, "artist - album" under it, and its length in its codec's colour (as
@@ -260,7 +260,7 @@
        :aria-activedescendant="focused >= 0 ? itemId(focused) : null" @keydown="onKey($event)">
     <!-- The four parts, their headings for screen readers only; each drawn a window at a time. -->
     <div :each="part in parts()" :key="part.id" class="part" role="group" :aria-labelledby="`queue-head-${part.id}`">
-      <h3 class="head" :id="`queue-head-${part.id}`">{{ t(part.label) }}</h3>
+      <h3 class="head mm-legend" :id="`queue-head-${part.id}`">{{ t(part.label) }}</h3>
       <ol class="rows" role="none" :data-part="part.id">
         <li :each="entry in inPart(part.id)" :key="entry.index" :window="rowPx()" :id="itemId(entry.index)" :data-index="entry.index" role="option" class="item"
             :class.played="entry.state === 'played'" :class.suggested="entry.state === 'suggested'" :class.current="entry.state === 'current'"
@@ -302,16 +302,10 @@
   .queue { margin: 0; padding: 0; outline: none; }
   .queue:focus-visible .focused { box-shadow: inset 0 0 0 2px var(--mm-accent); }
   .rows { margin: 0; padding: 0; list-style: none; }
-  /* Each part's heading names its group for screen readers; on screen the parts follow one another. */
-  .head {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
+  /* Each part's heading, on screen (the owner, 2026-11-25: what plays next on purpose and what is
+     only suggested could not be told apart): a legend over its rows. */
+  .head { margin: 0; padding: var(--mm-space-3) var(--mm-space-2) var(--mm-space-1); }
+  .part:first-child .head { padding-top: var(--mm-space-2); }
   .item {
     position: relative;
     display: grid;

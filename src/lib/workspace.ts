@@ -20,7 +20,7 @@ import { albumKey, artistKey, buildViewRows, trackPlace, type ViewLabels } from 
 import type { LibraryView, Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
-import { addToQueue, dropFromQueue, nowPlaying, playNext, playTracks, togglePlay } from "./player";
+import { addToQueue, cueTracks, dropFromQueue, nowPlaying, playNext, playTracks, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
 import { ui } from "./ui";
@@ -556,7 +556,8 @@ export function folderTracks(rowKey: string): { label: string; trackIds: string[
 export function queueWhatIsShown(): void {
   const { root, scope } = derive();
   if (!root || scope.tracks.length === 0) return;
-  addToQueue(queueOf(root.id, playOrder(scope).map((track) => track.id), scope.label).items, scope.label);
+  // Suggested, as a disc played is: nothing of it was queued on purpose.
+  cueTracks(queueOf(root.id, playOrder(scope).map((track) => track.id), scope.label).items, scope.label);
 }
 
 export function queueFolder(rowKey: string, where: "next" | "end"): void {
