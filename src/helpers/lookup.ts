@@ -405,3 +405,42 @@ export function changedFields(plans: readonly LookupPlan[]): LookupField[] {
   const changed = new Set(plans.flatMap((plan) => plan.changes.map((change) => change.field)));
   return order.filter((field) => changed.has(field));
 }
+
+/** Discogs' API. */
+export const DISCOGS = "https://api.discogs.com";
+
+/** The address of Discogs' release search for an album (and its artist, if known). */
+export function discogsSearchUrl(album: string, artist: string, limit = 10): string {
+  const query = new URLSearchParams({ type: "release" });
+  if (album.trim()) query.set("release_title", album.trim());
+  if (artist.trim()) query.set("artist", artist.trim());
+  query.set("per_page", String(limit));
+  return `${DISCOGS}/database/search?${query}`;
+}
+
+/** The address of a Discogs release. */
+export function discogsReleaseUrl(id: string): string {
+  return `${DISCOGS}/releases/${encodeURIComponent(id)}`;
+}
+
+/** Discogs' header for a personal token; none without one. */
+export function discogsHeaders(token: string): Record<string, string> {
+  return token.trim() ? { Authorization: `Discogs token=${token.trim()}` } : {};
+}
+
+/** How long to wait between two requests to a source: MusicBrainz one a second; Discogs 25 a minute, 60 with a token. */
+export function paceOf(source: LookupSource, token = ""): number {
+  if (source === "musicbrainz") return 1100;
+  return token.trim() ? 1050 : 2450;
+}
+
+/**
+ * The candidates of several sources in one list: the best fit first, each source's own order among
+ * equals, the sources taking turns where their fits are equal.
+ */
+export function mergeCandidates<T extends { fit: number }>(lists: readonly (readonly T[])[]): T[] {
+  return lists
+    .flatMap((list) => list.map((item, at) => ({ item, at })))
+    .sort((left, right) => right.item.fit - left.item.fit || left.at - right.at)
+    .map(({ item }) => item);
+}

@@ -2,7 +2,7 @@
   // The rename tab's third way, "From a database" (lib/lookup.ts): the album and artist to look
   // for, the releases found (best fit first), then the one chosen: per file what changes, a box
   // per field to write. Its key, in the dialog's foot, writes them. See
-  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-25, "the album lookup", L2).
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-25, "the album lookup", L2 and L3).
 
   const Field = await import("../../theme/default/components/field.html")
   const Key = await import("../../theme/default/components/key.html")
@@ -10,12 +10,12 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
   const Reel = await import("../../theme/default/components/reel.html")
   const { t, tn } = await import("../lib/i18n")
-  const { chooseRelease, leaveRelease, lookup, searchReleases, syncLookup, toggleField } = await import("../lib/lookup")
+  const { SOURCES, chooseRelease, leaveRelease, lookup, searchReleases, sourceName, syncLookup, toggleField, toggleSource } = await import("../lib/lookup")
   const { changedFields } = await import("../helpers/lookup")
   const { dialogTracks } = await import("../lib/workspace")
 
   type Field = "title" | "artist" | "album" | "albumArtist" | "trackNumber" | "discNumber" | "year" | "genre"
-  type Candidate = { release: { id: string; title: string; artist: string; year: string; country: string; format: string; trackCount: number | null }; fit: number }
+  type Candidate = { release: { source: "musicbrainz" | "discogs"; id: string; title: string; artist: string; year: string; country: string; format: string; trackCount: number | null }; fit: number }
   type Plan = { trackId: string; track: { disc: number; number: number; title: string } | null; changes: { field: Field; from: string; to: string }[] }
   const LABELS: Record<Field, string> = {
     title: "field.title",
@@ -62,14 +62,20 @@
       </Key>
     </span>
   </form>
+  <!-- Where to look: MusicBrainz, Discogs, or both (L3); one at least. -->
+  <div class="sources" role="group" :aria-label="t('lookup.sources')">
+    <span class="sources-label">{{ t("lookup.sources") }}</span>
+    <span :each="source in SOURCES" :key="source"><Checkbox :id="`lookup-source-${source}`" :model="lookup.sources.includes(source)" :disabled="lookup.sources.length === 1 && lookup.sources.includes(source)" @change="toggleSource(source, $event.detail)">{{ sourceName(source) }}</Checkbox></span>
+  </div>
   <p class="hint">{{ t("lookup.source") }}</p>
+  <p :if="lookup.sources.includes('discogs') && !lookup.discogsToken" class="hint">{{ t("lookup.discogsHint") }}</p>
   <p :if="lookup.error" class="failure" role="alert">{{ lookup.error }}</p>
 
   <!-- The release chosen: per file what changes, a box per field. -->
   <div :if="chosen()" class="chosen">
     <div class="chosen-head">
       <Key size="sm" variant="ghost" @click="leaveRelease()">‹ {{ t("lookup.back") }}</Key>
-      <span class="chosen-name"><b>{{ chosen().release.title }}</b> · {{ chosen().release.artist }}<span :if="chosen().release.year"> · {{ chosen().release.year }}</span></span>
+      <span class="chosen-name"><span class="badge" :data-source="chosen().release.source">{{ sourceName(chosen().release.source) }}</span><b>{{ chosen().release.title }}</b> · {{ chosen().release.artist }}<span :if="chosen().release.year"> · {{ chosen().release.year }}</span></span>
       <span class="fit">{{ t("lookup.fit", { fit: String(chosen().fit) }) }}</span>
     </div>
     <p :if="fields().length === 0" class="hint">{{ t("lookup.nothing") }}</p>
@@ -95,11 +101,11 @@
 
   <!-- The releases found, best fit first. -->
   <ul :elseif="candidates().length > 0" class="candidates">
-    <li :each="candidate in candidates()" :key="candidate.release.id">
-      <button type="button" class="candidate" :disabled="!!lookup.busy" @click="chooseRelease(candidate.release.id)">
-        <span class="candidate-title">{{ candidate.release.title }}</span>
+    <li :each="candidate in candidates()" :key="`${candidate.release.source}:${candidate.release.id}`">
+      <button type="button" class="candidate" :disabled="!!lookup.busy" @click="chooseRelease(candidate.release.source, candidate.release.id)">
+        <span class="candidate-title"><span class="badge" :data-source="candidate.release.source">{{ sourceName(candidate.release.source) }}</span>{{ candidate.release.title }}</span>
         <span class="candidate-facts">{{ facts(candidate) }}</span>
-        <span class="fit">{{ t("lookup.fit", { fit: String(candidate.fit) }) }}</span>
+        <span class="fit">{{ candidate.release.trackCount === null ? t("lookup.fitUnknown") : t("lookup.fit", { fit: String(candidate.fit) }) }}</span>
       </button>
     </li>
   </ul>
@@ -133,6 +139,10 @@
   .candidate-title { grid-area: title; overflow: hidden; font-weight: var(--mm-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
   .candidate-facts { grid-area: facts; overflow: hidden; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); text-overflow: ellipsis; white-space: nowrap; }
   .candidate .fit { grid-area: fit; align-self: center; }
+  .sources { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-2) var(--mm-space-4); }
+  .sources-label { color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
+  /* Which database a release is from. */
+  .badge { display: inline-block; margin-right: var(--mm-space-2); padding: 0 var(--mm-space-1); border-radius: var(--mm-radius-key); background: var(--mm-sunken); color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); vertical-align: 1px; }
   .fit { color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); white-space: nowrap; }
   .chosen { display: grid; gap: var(--mm-space-3); }
   .chosen-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-2) var(--mm-space-3); }

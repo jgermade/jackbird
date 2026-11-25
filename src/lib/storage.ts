@@ -38,6 +38,10 @@ export const STORAGE_KEYS = {
   peakFall: "jackbird.peakFall",
   /** Each iPod's library last shown, Apple's or Rockbox's, by its name (W7, RECORD/2026-11-14.ipod-sync.WIP.md): a JSON object. */
   ipodLibraries: "jackbird.ipodLibraries",
+  /** Where the rename tab looks an album up: musicbrainz, discogs or both, comma-separated (lib/lookup.ts). */
+  lookupSources: "jackbird.lookupSources",
+  /** Discogs' personal token, optional (lib/lookup.ts): sent to api.discogs.com alone. */
+  discogsToken: "jackbird.discogsToken",
   /** The last session's tabs (id and name, a JSON list), read at once on start (src/lib/session.ts). */
   sessionTabs: "jackbird.sessionTabs"
 } as const;

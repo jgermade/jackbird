@@ -47,6 +47,13 @@
   // The sessions open on one's account: a key of the account's head opens them over the section
   // (the owner, 2026-11-25), not a list under the passkeys.
   let sessionsOpen = false
+  // Discogs' token for the album lookup (lib/lookup.ts), optional: typed here, kept in this browser.
+  const { lookup: lookupState, setDiscogsToken } = await import("../lib/lookup")
+  let discogsDraft: string = lookupState.discogsToken
+  const forgetDiscogs = () => {
+    setDiscogsToken("")
+    discogsDraft = ""
+  }
   const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
   const { importing } = await import("../lib/importing")
   const { loadSharing, shareWith, shareWithEveryone, sharing } = await import("../lib/sharing")
@@ -221,6 +228,19 @@
         </div>
         <SlideSwitch :label="t('preferences.songsInViews')" :model="preferences.songsInViews" @change="setSongsInViews($event.detail)" />
       </section>
+      <section class="pref discogs">
+        <div class="text">
+          <h3 class="mm-legend is-ink">{{ t("preferences.discogs") }}</h3>
+          <p>{{ t("preferences.discogsAbout") }}</p>
+        </div>
+        <div class="row">
+          <Field :label="t('preferences.discogsField')" control="discogs-token">
+            <TextInput id="discogs-token" type="password" autocomplete="off" :model="discogsDraft" @input="discogsDraft = $event.detail" />
+          </Field>
+          <Key size="sm" :disabled="discogsDraft.trim() === lookupState.discogsToken" @click="setDiscogsToken(discogsDraft)">{{ t("preferences.discogsSave") }}</Key>
+          <Key :if="lookupState.discogsToken" size="sm" variant="ghost" @click="forgetDiscogs()">{{ t("preferences.discogsForget") }}</Key>
+        </div>
+      </section>
     </div>
     <div :if="section() === 'sound'" class="prefs">
       <!-- How one song follows another, in every player (helpers/transition.ts). -->
@@ -393,6 +413,7 @@
   .preferences-dialog { display: contents; }
   .prefs { display: grid; gap: var(--mm-space-5); }
   .pref + .pref { padding-top: var(--mm-space-5); border-top: var(--mm-border-width) solid var(--mm-border); }
+  .pref.discogs { display: grid; gap: var(--mm-space-3); }
   /* The text beside its switch, the switch level with the heading: a text that changes with the
      switch (Library) grows downwards and never moves it. */
   .pref.inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--mm-space-3); }

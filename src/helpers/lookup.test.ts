@@ -5,15 +5,20 @@ import type { Track } from "../types.ts";
 import { track } from "./fixtures.test-support.ts";
 import {
   changedFields,
+  discogsHeaders,
   discogsRelease,
+  discogsReleaseUrl,
+  discogsSearchUrl,
   discogsSearch,
   lookupPlan,
   lookupTerms,
+  mergeCandidates,
   musicBrainzRelease,
   musicBrainzReleaseUrl,
   musicBrainzSearch,
   musicBrainzSearchUrl,
   pairTracks,
+  paceOf,
   parseDiscogsPosition,
   parseDuration,
   scoreRelease,
@@ -339,5 +344,33 @@ describe("applying the plan", () => {
     assert.equal(after.year, "1997");
     assert.equal(before.year, "1990");
     assert.deepEqual(changedFields([{ trackId: "a", track: null, changes: [changes[1], changes[0]] }, { trackId: "b", track: null, changes: [] }]), ["title", "year"]);
+  });
+});
+
+describe("asking Discogs", () => {
+  it("searches releases by title and artist", () => {
+    assert.equal(discogsSearchUrl(" OK Computer ", "Radiohead"), "https://api.discogs.com/database/search?type=release&release_title=OK+Computer&artist=Radiohead&per_page=10");
+    assert.equal(discogsSearchUrl("", "Björk", 5), "https://api.discogs.com/database/search?type=release&artist=Bj%C3%B6rk&per_page=5");
+    assert.equal(discogsReleaseUrl("1475007"), "https://api.discogs.com/releases/1475007");
+  });
+
+  it("sends a token only when there is one", () => {
+    assert.deepEqual(discogsHeaders(" abc "), { Authorization: "Discogs token=abc" });
+    assert.deepEqual(discogsHeaders(""), {});
+  });
+
+  it("keeps each source's pace", () => {
+    assert.equal(paceOf("musicbrainz"), 1100);
+    assert.equal(paceOf("discogs"), 2450);
+    assert.equal(paceOf("discogs", "abc"), 1050);
+  });
+});
+
+describe("candidates of several sources", () => {
+  it("puts the best fit first, and the sources in turn among equals", () => {
+    const a = [{ id: "a1", fit: 50 }, { id: "a2", fit: 90 }];
+    const b = [{ id: "b1", fit: 90 }, { id: "b2", fit: 10 }];
+    assert.deepEqual(mergeCandidates([a, b]).map((one) => one.id), ["b1", "a2", "a1", "b2"]);
+    assert.deepEqual(mergeCandidates([]), []);
   });
 });
