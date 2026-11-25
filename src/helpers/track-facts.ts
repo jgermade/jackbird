@@ -5,7 +5,7 @@
  * RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-17).
  */
 
-import type { Track } from "../types.ts";
+import type { IdField, Track } from "../types.ts";
 import { formatBytes, formatDuration } from "./format.ts";
 import { codecLabel } from "./formats.ts";
 
@@ -15,11 +15,33 @@ export type FactKey =
   | "field.title" | "field.artist" | "field.album" | "field.albumArtist" | "field.track" | "field.disc" | "field.compilation"
   | "field.year" | "field.genre" | "field.composer" | "field.bpm" | "field.comment" | "field.lyrics"
   | "info.relativePath" | "info.fileName" | "info.format" | "info.duration" | "info.bitrate" | "info.sampleRate"
-  | "info.channels" | "info.mono" | "info.stereo" | "info.bits" | "editor.size" | "info.fullChecksum" | "info.audioChecksum" | "info.lastVerified";
+  | "info.channels" | "info.mono" | "info.stereo" | "info.bits" | "editor.size" | "info.fullChecksum" | "info.audioChecksum" | "info.lastVerified"
+  | `id.${IdField}`;
 
-export type Fact = { label: string; text: string; mono?: boolean; long?: boolean };
+/** `href`: where the fact can be looked at (an id's page in its database). */
+export type Fact = { label: string; text: string; mono?: boolean; long?: boolean; href?: string };
 
-export type TrackFacts = { tags: Fact[]; where: Fact[]; quality: Fact[]; file: Fact[] };
+export type TrackFacts = { tags: Fact[]; where: Fact[]; quality: Fact[]; file: Fact[]; ids: Fact[] };
+
+/** The ids shown, in this order, and the page of each in its database (none for jackbird's own). */
+const ID_PAGES: [IdField, ((id: string) => string) | null][] = [
+  ["mbAlbumId", (id) => `https://musicbrainz.org/release/${id}`],
+  ["mbReleaseGroupId", (id) => `https://musicbrainz.org/release-group/${id}`],
+  ["mbAlbumArtistId", (id) => `https://musicbrainz.org/artist/${id}`],
+  ["mbReleaseTrackId", (id) => `https://musicbrainz.org/track/${id}`],
+  ["mbRecordingId", (id) => `https://musicbrainz.org/recording/${id}`],
+  ["discogsReleaseId", (id) => `https://www.discogs.com/release/${id}`],
+  ["jackbirdTrackId", null]
+];
+
+/** The ids a track carries (L5), and only those: a link to each one's page, jackbird's own without. */
+export function idFacts(metadata: Partial<Record<IdField, string>>, t: (key: FactKey) => string): Fact[] {
+  return ID_PAGES.flatMap(([field, page]) => {
+    const id = metadata[field]?.trim();
+    if (!id) return [];
+    return [{ label: t(`id.${field}`), text: id, mono: true, ...(page ? { href: page(encodeURIComponent(id)) } : {}) }];
+  });
+}
 
 /** A track's facts, labelled by `t`, numbers and dates in `language`'s way; "-" (`common.none`) where one is unknown. */
 export function trackFacts(track: Track, t: (key: FactKey) => string, language: string): TrackFacts {
@@ -59,11 +81,12 @@ export function trackFacts(track: Track, t: (key: FactKey) => string, language: 
       { label: t("info.fullChecksum"), text: track.fullChecksum || track.checksum || none, mono: true },
       { label: t("info.audioChecksum"), text: track.audioChecksum || none, mono: true },
       { label: t("info.lastVerified"), text: track.lastVerifiedAt ? new Date(track.lastVerifiedAt).toLocaleString(language) : none }
-    ]
+    ],
+    ids: idFacts(tags, t)
   };
 }
 
-/** A track's facts in one list, in the selection dialog's order: tags, where, quality, file. */
+/** A track's facts in one list, in the selection dialog's order: tags, where, quality, file, ids. */
 export function allFacts(facts: TrackFacts): Fact[] {
-  return [...facts.tags, ...facts.where, ...facts.quality, ...facts.file];
+  return [...facts.tags, ...facts.where, ...facts.quality, ...facts.file, ...facts.ids];
 }

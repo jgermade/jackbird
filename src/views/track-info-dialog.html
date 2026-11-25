@@ -33,7 +33,9 @@
       { key: "quality", title: t("trackInfo.quality"), facts: found.quality },
       { key: "tags", title: t("trackInfo.tags"), facts: found.tags },
       { key: "where", title: t("trackInfo.where"), facts: [{ label: t("trackInfo.source"), text: root()?.label ?? "" }, { label: t("trackInfo.folder"), text: folderOf(shown.relativePath), mono: true }, ...found.where] },
-      { key: "file", title: t("trackInfo.file"), facts: found.file }
+      { key: "file", title: t("trackInfo.file"), facts: found.file },
+      // Its ids (MusicBrainz', Discogs', jackbird's), when it has any.
+      ...(found.ids.length > 0 ? [{ key: "ids", title: t("trackInfo.ids"), facts: found.ids }] : [])
     ]
   }
   const close = () => (ui.trackInfo = null)
@@ -63,7 +65,7 @@
         <dl class="facts">
           <div :each="fact in section.facts" :key="fact.label">
             <dt>{{ fact.label }}</dt>
-            <dd :class.mono="!!fact.mono" :class.long="!!fact.long">{{ fact.text }}</dd>
+            <dd :class.mono="!!fact.mono" :class.long="!!fact.long"><a :if="fact.href" :href="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.text }}</a><span :else>{{ fact.text }}</span></dd>
           </div>
         </dl>
       </section>
@@ -103,4 +105,8 @@
   @media (max-width: 720px) {
     .facts div { grid-template-columns: minmax(0, 1fr); gap: 0; }
   }
+  /* An id's page in its database (helpers/track-facts.ts): the accent's ink, underlined lightly. */
+  dd a { color: var(--mm-accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  dd a:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; border-radius: 2px; }
+  @media (hover: hover) { dd a:hover { text-decoration-thickness: 2px; } }
 </style>
