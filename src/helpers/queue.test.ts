@@ -284,11 +284,31 @@ describe("shuffleUpcoming", () => {
     // Math.random's stand-in: always the first place, so each swap brings the front one back.
     const mixed = shuffleUpcoming(position, () => 0);
     assert.deepEqual(ids(mixed), ["music:a", "music:b", "music:d", "music:e", "music:c"]);
+    assert.ok(mixed.queue?.items.slice(2).every((one) => one.queued && one.mixed));
     assert.equal(mixed.index, 1);
     assert.equal(current(mixed), "music:b");
     assert.equal(marks(mixed), "qqq");
     assert.equal(mixed.queue?.sourceLabel, "");
     assert.equal(position.queue?.sourceLabel, "Jazz");
+  });
+
+  it("keeps the ones queued on purpose first, in their order, and mixes only the rest", () => {
+    // b playing; c and d put to play next; e, f and g suggested.
+    const position: QueuePosition = {
+      queue: { items: [item("music", "a"), item("music", "b"), queued("music", "c"), queued("music", "d"), item("music", "e"), item("music", "f"), item("music", "g")], sourceLabel: "Jazz" },
+      index: 1
+    };
+    const mixed = shuffleUpcoming(position, () => 0);
+    assert.deepEqual(ids(mixed), ["music:a", "music:b", "music:c", "music:d", "music:f", "music:g", "music:e"]);
+    assert.equal(marks(mixed), "qqqqq");
+    assert.equal(mixed.queue?.sourceLabel, "");
+    // Pressed again: the mixed ones are mixed anew, the ones put there on purpose still first.
+    const again = shuffleUpcoming(mixed, () => 0);
+    assert.deepEqual(ids(again), ["music:a", "music:b", "music:c", "music:d", "music:g", "music:e", "music:f"]);
+    assert.deepEqual(again.queue?.items.slice(2).map((one) => !!one.mixed), [false, false, true, true, true]);
+    // One put to play next after a Shuffle keeps its place at the next.
+    const added = playNextIn(again, [item("music", "h")], "");
+    assert.deepEqual(ids(shuffleUpcoming(added, () => 0)).slice(2, 5), ["music:h", "music:c", "music:d"]);
   });
 
   it("keeps every track, and leaves no queue as none", () => {

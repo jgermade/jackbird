@@ -215,6 +215,11 @@ export type QueueItem = {
   trackId: string;
   /** Put in the queue on purpose (Play next, Add to queue), not suggested by a disc played. */
   queued?: boolean;
+  /**
+   * Queued by Shuffle, not by the person (helpers/queue.ts `shuffleUpcoming`): shown with the queued
+   * ones, mixed again by the next Shuffle, where the ones put there on purpose keep their place.
+   */
+  mixed?: boolean;
 };
 
 /**
