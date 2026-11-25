@@ -349,11 +349,18 @@
             <span class="band"><Stripes variant="band" /></span>
           </div>
         </div>
-        <!-- The album's menu, at the card's top right corner. -->
+        <!-- At the card's top right corner: play it, shuffle it (glyphs alone, as its ⋮: the owner,
+             2026-11-25), and its menu. -->
         <span class="album-menu">
+          <Key size="sm" variant="ghost" square :label="t('lists.playLabel', { name: album.title })" :title="t('lists.play')" @click="playTrackIds(albumOf(album).trackIds, album.title)">
+            <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
+          </Key>
+          <Key size="sm" variant="ghost" square :label="t('lists.shuffleLabel', { name: album.title })" :title="t('lists.shuffle')" @click="shuffleTrackIds(albumOf(album).trackIds)">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3.5 0 3.5 7 7 7H14M2 11.5h2.5c1.3 0 2.1-.9 2.8-2M9 6.5c.6-1.1 1.4-2 2.5-2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
+          </Key>
           <Menu :label="t('menu.folder', { title: album.title })" :items="() => albumMenu()" @select="onAlbumMenu(albumOf(album), $event.detail)" />
         </span>
-        <div class="album-head">
+        <div class="album-head with-keys">
           <h3>{{ album.title }}</h3>
           <p class="artist">{{ album.artist || t("album.unknownArtist") }}</p>
           <div :if="album.year || album.genre" class="tags">
@@ -500,7 +507,9 @@
   .no-cover .band { position: absolute; top: 30%; right: 0; left: 0; height: 14%; }
   .album-head { grid-area: head; display: grid; align-content: start; gap: var(--mm-space-2); min-width: 0; padding-right: var(--mm-space-6); }
   /* Its ⋮ in the card's top right corner, the title kept clear of it (above). */
-  .album-menu { position: absolute; top: var(--mm-space-2); right: var(--mm-space-2); line-height: 0; }
+  .album-menu { position: absolute; top: var(--mm-space-2); right: var(--mm-space-2); display: flex; line-height: 0; }
+  /* An album's corner holds three glyphs (play, shuffle, ⋮): its title kept clear of them. */
+  .album-head.with-keys { padding-right: calc(3 * (var(--mm-control-sm) + .375rem)); }
   .album-head h3 { font-size: var(--mm-text-xl); }
   .album-discs { grid-area: discs; display: grid; align-content: start; min-width: 0; }
   .artist { margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-lg); }
