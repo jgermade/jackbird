@@ -1,10 +1,13 @@
-import type { EditableMetadata, Track, TrackMetadata } from "../types.ts";
+import type { EditableMetadata, IdField, Track, TrackMetadata } from "../types.ts";
+
+/** The fields the edit dialog shows: every one but the ids (which travel in the files). */
+type FormField = Exclude<keyof TrackMetadata, IdField>;
 
 /** Which fields differ across a set of tracks. */
-export type VariedFields = Record<keyof TrackMetadata, boolean>;
+export type VariedFields = Record<FormField, boolean>;
 
-/** A text field of the tags (every field but the cover). */
-export type TextField = Exclude<keyof TrackMetadata, "coverDataUrl">;
+/** A text field of the tags (every field but the cover and the ids). */
+export type TextField = Exclude<FormField, "coverDataUrl">;
 
 /** The text fields, the six the tags started with first. */
 export const TEXT_FIELDS: readonly TextField[] = ["title", "artist", "album", "year", "genre", "trackNumber", "discNumber", "albumArtist", "compilation", "composer", "comment", "lyrics", "bpm"];
@@ -94,6 +97,8 @@ export function getVariedFields(tracks: Track[]): VariedFields {
  */
 export function mergeDraft(original: TrackMetadata, draft: EditableMetadata, varied: VariedFields, confirmed: readonly string[] = []): TrackMetadata {
   const merged = {
+    // What the form does not hold (the ids) as the track has it.
+    ...original,
     // No cover in the draft keeps each track's own where they varied, unless it was removed on purpose (confirmed).
     coverDataUrl: varied.coverDataUrl && draft.coverDataUrl === null && !confirmed.includes("coverDataUrl") ? original.coverDataUrl : draft.coverDataUrl
   } as TrackMetadata;

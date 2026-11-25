@@ -100,6 +100,27 @@ pub struct FieldsJson {
     /// Beats per minute.
     #[serde(default)]
     pub bpm: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mb_album_id: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mb_release_group_id: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mb_album_artist_id: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mb_release_track_id: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mb_recording_id: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub discogs_release_id: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub jackbird_track_id: String,
 }
 
 impl From<&Fields> for FieldsJson {
@@ -118,6 +139,13 @@ impl From<&Fields> for FieldsJson {
             comment: fields.comment.clone(),
             lyrics: fields.lyrics.clone(),
             bpm: fields.bpm.clone(),
+            mb_album_id: fields.mb_album_id.clone(),
+            mb_release_group_id: fields.mb_release_group_id.clone(),
+            mb_album_artist_id: fields.mb_album_artist_id.clone(),
+            mb_release_track_id: fields.mb_release_track_id.clone(),
+            mb_recording_id: fields.mb_recording_id.clone(),
+            discogs_release_id: fields.discogs_release_id.clone(),
+            jackbird_track_id: fields.jackbird_track_id.clone(),
         }
     }
 }
@@ -138,6 +166,13 @@ impl From<&FieldsJson> for Fields {
             comment: fields.comment.clone(),
             lyrics: fields.lyrics.clone(),
             bpm: fields.bpm.clone(),
+            mb_album_id: fields.mb_album_id.clone(),
+            mb_release_group_id: fields.mb_release_group_id.clone(),
+            mb_album_artist_id: fields.mb_album_artist_id.clone(),
+            mb_release_track_id: fields.mb_release_track_id.clone(),
+            mb_recording_id: fields.mb_recording_id.clone(),
+            discogs_release_id: fields.discogs_release_id.clone(),
+            jackbird_track_id: fields.jackbird_track_id.clone(),
         }
     }
 }
@@ -199,6 +234,27 @@ pub struct Layer {
     /// The beats per minute it sets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bpm: Option<String>,
+    /// The id it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_album_id: Option<String>,
+    /// The id it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_release_group_id: Option<String>,
+    /// The id it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_album_artist_id: Option<String>,
+    /// The id it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_release_track_id: Option<String>,
+    /// The id it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_recording_id: Option<String>,
+    /// The id it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discogs_release_id: Option<String>,
+    /// The id it sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jackbird_track_id: Option<String>,
     /// What it does to the cover.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<CoverLayer>,
@@ -226,6 +282,28 @@ impl Layer {
             comment: self.comment.clone().or_else(|| under.comment.clone()),
             lyrics: self.lyrics.clone().or_else(|| under.lyrics.clone()),
             bpm: self.bpm.clone().or_else(|| under.bpm.clone()),
+            mb_album_id: self.mb_album_id.clone().or_else(|| under.mb_album_id.clone()),
+            mb_release_group_id: self
+                .mb_release_group_id
+                .clone()
+                .or_else(|| under.mb_release_group_id.clone()),
+            mb_album_artist_id: self
+                .mb_album_artist_id
+                .clone()
+                .or_else(|| under.mb_album_artist_id.clone()),
+            mb_release_track_id: self
+                .mb_release_track_id
+                .clone()
+                .or_else(|| under.mb_release_track_id.clone()),
+            mb_recording_id: self.mb_recording_id.clone().or_else(|| under.mb_recording_id.clone()),
+            discogs_release_id: self
+                .discogs_release_id
+                .clone()
+                .or_else(|| under.discogs_release_id.clone()),
+            jackbird_track_id: self
+                .jackbird_track_id
+                .clone()
+                .or_else(|| under.jackbird_track_id.clone()),
             cover: self.cover.clone().or_else(|| under.cover.clone()),
         }
     }
@@ -247,6 +325,13 @@ impl Layer {
             comment: pick(&self.comment, &file.comment),
             lyrics: pick(&self.lyrics, &file.lyrics),
             bpm: pick(&self.bpm, &file.bpm),
+            mb_album_id: pick(&self.mb_album_id, &file.mb_album_id),
+            mb_release_group_id: pick(&self.mb_release_group_id, &file.mb_release_group_id),
+            mb_album_artist_id: pick(&self.mb_album_artist_id, &file.mb_album_artist_id),
+            mb_release_track_id: pick(&self.mb_release_track_id, &file.mb_release_track_id),
+            mb_recording_id: pick(&self.mb_recording_id, &file.mb_recording_id),
+            discogs_release_id: pick(&self.discogs_release_id, &file.discogs_release_id),
+            jackbird_track_id: pick(&self.jackbird_track_id, &file.jackbird_track_id),
         }
     }
 }
@@ -1175,6 +1260,13 @@ impl Library {
             comment: layer.comment.clone(),
             lyrics: layer.lyrics.clone(),
             bpm: layer.bpm.clone(),
+            mb_album_id: layer.mb_album_id.clone(),
+            mb_release_group_id: layer.mb_release_group_id.clone(),
+            mb_album_artist_id: layer.mb_album_artist_id.clone(),
+            mb_release_track_id: layer.mb_release_track_id.clone(),
+            mb_recording_id: layer.mb_recording_id.clone(),
+            discogs_release_id: layer.discogs_release_id.clone(),
+            jackbird_track_id: layer.jackbird_track_id.clone(),
             cover: match &layer.cover {
                 None => CoverEdit::Keep,
                 Some(CoverLayer::Remove) => CoverEdit::Remove,
@@ -1256,6 +1348,37 @@ impl Library {
         set(&mut layer.comment, &edit.comment, &under.comment);
         set(&mut layer.lyrics, &edit.lyrics, &under.lyrics);
         set(&mut layer.bpm, &edit.bpm, &under.bpm);
+        set(&mut layer.mb_album_id, &edit.mb_album_id, &under.mb_album_id);
+        set(
+            &mut layer.mb_release_group_id,
+            &edit.mb_release_group_id,
+            &under.mb_release_group_id,
+        );
+        set(
+            &mut layer.mb_album_artist_id,
+            &edit.mb_album_artist_id,
+            &under.mb_album_artist_id,
+        );
+        set(
+            &mut layer.mb_release_track_id,
+            &edit.mb_release_track_id,
+            &under.mb_release_track_id,
+        );
+        set(
+            &mut layer.mb_recording_id,
+            &edit.mb_recording_id,
+            &under.mb_recording_id,
+        );
+        set(
+            &mut layer.discogs_release_id,
+            &edit.discogs_release_id,
+            &under.discogs_release_id,
+        );
+        set(
+            &mut layer.jackbird_track_id,
+            &edit.jackbird_track_id,
+            &under.jackbird_track_id,
+        );
         match &edit.cover {
             CoverEdit::Keep => {}
             CoverEdit::Set(cover) => {

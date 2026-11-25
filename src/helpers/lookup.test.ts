@@ -11,6 +11,7 @@ import {
   discogsRelease,
   discogsReleaseUrl,
   discogsSearchUrl,
+  isLookupId,
   discogsSearch,
   lookupPlan,
   lookupTerms,
@@ -78,9 +79,10 @@ describe("reading MusicBrainz", () => {
       title: "Paranoid Android",
       artist: "Radiohead",
       lengthMs: release.tracks[1].lengthMs,
-      recordingId: release.tracks[1].recordingId
+      recordingId: release.tracks[1].recordingId,
+      releaseTrackId: release.tracks[1].releaseTrackId
     });
-    assert.ok(release.tracks.every((one) => one.lengthMs && one.recordingId));
+    assert.ok(release.tracks.every((one) => one.lengthMs && one.recordingId && one.releaseTrackId && one.releaseTrackId !== one.recordingId));
   });
 
   it("joins an artist credit, numbers several discs and takes the group's genre and date", () => {
@@ -268,8 +270,21 @@ describe("the lookup's plan", () => {
       file("OK/xx.mp3", { trackNumber: "40" }, null)
     ];
     const plans = lookupPlan(pairTracks(files, release), release);
-    assert.deepEqual(plans[0].changes, [{ field: "trackNumber", from: "1", to: "1/12" }]);
-    assert.deepEqual(plans[1].changes.map((change) => [change.field, change.to]), [
+    const text = (plan: (typeof plans)[number]) => plan.changes.filter((change) => !isLookupId(change.field));
+    assert.deepEqual(text(plans[0]), [{ field: "trackNumber", from: "1", to: "1/12" }]);
+    // The ids of a MusicBrainz release: its own, its group's, its artist's, the track's and the recording's.
+    const ids = Object.fromEntries(plans[0].changes.filter((change) => isLookupId(change.field)).map((change) => [change.field, change.to]));
+    assert.deepEqual(ids, {
+      mbAlbumId: release.id,
+      mbReleaseGroupId: release.releaseGroupId,
+      mbAlbumArtistId: release.artistId,
+      mbReleaseTrackId: release.tracks[0].releaseTrackId,
+      mbRecordingId: release.tracks[0].recordingId
+    });
+    // An id the file has already is no change.
+    const again = lookupPlan(pairTracks([file("OK/01.mp3", { ...files[0].metadata, trackNumber: "1/12", ...ids }, okLengths[0])], release), release);
+    assert.deepEqual(again[0].changes, []);
+    assert.deepEqual(text(plans[1]).map((change) => [change.field, change.to]), [
       ["title", "Paranoid Android"],
       ["artist", "Radiohead"],
       ["album", "OK Computer"],
@@ -303,7 +318,9 @@ describe("the lookup's plan", () => {
     assert.deepEqual(lookupPlan(pairTracks(files, release), release)[0].changes, [
       { field: "album", from: "", to: "Two" },
       { field: "trackNumber", from: "1", to: "1/2" },
-      { field: "discNumber", from: "2", to: "2/2" }
+      { field: "discNumber", from: "2", to: "2/2" },
+      // A Discogs release: its id alone.
+      { field: "discogsReleaseId", from: "", to: "1" }
     ]);
   });
 });

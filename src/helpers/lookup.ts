@@ -5,7 +5,7 @@
  * change. No requests here: `lib/lookup.ts` makes them.
  */
 
-import type { Track, TrackMetadata } from "../types.ts";
+import type { IdField, Track, TrackMetadata } from "../types.ts";
 
 export type LookupSource = "musicbrainz" | "discogs";
 
@@ -19,6 +19,8 @@ export type ReleaseTrack = {
   lengthMs: number | null;
   /** MusicBrainz's recording. */
   recordingId?: string;
+  /** MusicBrainz's track of the release (its place on it, not the recording). */
+  releaseTrackId?: string;
 };
 
 /** A release as either source gives it: a search's summary (no `tracks`) or the whole of it. */
@@ -127,7 +129,8 @@ export function musicBrainzRelease(json: unknown): Release {
         title: text(track.title) || text(recording.title),
         artist: credit(track["artist-credit"]) || credit(recording["artist-credit"]) || artist,
         lengthMs: length,
-        ...(text(recording.id) ? { recordingId: text(recording.id) } : {})
+        ...(text(recording.id) ? { recordingId: text(recording.id) } : {}),
+        ...(text(track.id) ? { releaseTrackId: text(track.id) } : {})
       };
     })
   );
@@ -324,7 +327,12 @@ export function scoreRelease(files: readonly LookupFile[], release: Release): nu
 const round = (value: number): number => Math.round(value * 1000) / 1000;
 
 /** The tags a release gives, and only those: each file keeps the rest. */
-export type LookupField = "title" | "artist" | "album" | "albumArtist" | "trackNumber" | "discNumber" | "year" | "genre";
+export type LookupField = "title" | "artist" | "album" | "albumArtist" | "trackNumber" | "discNumber" | "year" | "genre" | LookupId;
+
+/** The ids a release gives (L5): MusicBrainz' release, group, album artist, track and recording; Discogs' release. */
+export type LookupId = Exclude<IdField, "jackbirdTrackId">;
+export const LOOKUP_IDS: readonly LookupId[] = ["mbAlbumId", "mbReleaseGroupId", "mbAlbumArtistId", "mbReleaseTrackId", "mbRecordingId", "discogsReleaseId"];
+export const isLookupId = (field: LookupField): field is LookupId => (LOOKUP_IDS as readonly string[]).includes(field);
 export type LookupChange = { field: LookupField; from: string; to: string };
 export type LookupPlan = { trackId: string; track: ReleaseTrack | null; changes: LookupChange[] };
 
@@ -347,11 +355,18 @@ export function lookupPlan(pairs: readonly TrackPair[], release: Release): Looku
       trackNumber: `${track.number}/${onDisc.get(track.disc) ?? track.number}`,
       discNumber: release.discCount > 1 ? `${track.disc}/${release.discCount}` : "",
       year: release.year,
-      genre: release.genre
+      genre: release.genre,
+      // The ids, from the release's own source (the other's left as the file has them).
+      mbAlbumId: release.source === "musicbrainz" ? release.id : "",
+      mbReleaseGroupId: release.source === "musicbrainz" ? (release.releaseGroupId ?? "") : "",
+      mbAlbumArtistId: release.source === "musicbrainz" ? (release.artistId ?? "") : "",
+      mbReleaseTrackId: track.releaseTrackId ?? "",
+      mbRecordingId: track.recordingId ?? "",
+      discogsReleaseId: release.source === "discogs" ? release.id : ""
     };
     const changes = (Object.keys(wanted) as LookupField[]).flatMap((field): LookupChange[] => {
       const to = wanted[field].trim();
-      const from = (file.metadata[field as keyof TrackMetadata] as string).trim();
+      const from = ((file.metadata[field as keyof TrackMetadata] as string | undefined) ?? "").trim();
       return to && to !== from ? [{ field, from, to }] : [];
     });
     return { trackId: file.id, track, changes };
@@ -401,7 +416,7 @@ export function withChanges(metadata: TrackMetadata, changes: readonly LookupCha
 
 /** The fields some file of the plan would change, in the plan's order. */
 export function changedFields(plans: readonly LookupPlan[]): LookupField[] {
-  const order: LookupField[] = ["title", "artist", "album", "albumArtist", "trackNumber", "discNumber", "year", "genre"];
+  const order: LookupField[] = ["title", "artist", "album", "albumArtist", "trackNumber", "discNumber", "year", "genre", ...LOOKUP_IDS];
   const changed = new Set(plans.flatMap((plan) => plan.changes.map((change) => change.field)));
   return order.filter((field) => changed.has(field));
 }

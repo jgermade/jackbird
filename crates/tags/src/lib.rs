@@ -66,12 +66,26 @@ pub enum Field {
     Lyrics,
     /// Beats per minute, a whole number: ID3's `TBPM`, Vorbis' `BPM`.
     Bpm,
+    /// MusicBrainz' release (`TXXX:MusicBrainz Album Id`, `MUSICBRAINZ_ALBUMID`).
+    MbAlbumId,
+    /// MusicBrainz' release group (`TXXX:MusicBrainz Release Group Id`, `MUSICBRAINZ_RELEASEGROUPID`).
+    MbReleaseGroupId,
+    /// MusicBrainz' album artist (`TXXX:MusicBrainz Album Artist Id`, `MUSICBRAINZ_ALBUMARTISTID`).
+    MbAlbumArtistId,
+    /// MusicBrainz' track of the release (`TXXX:MusicBrainz Release Track Id`, `MUSICBRAINZ_RELEASETRACKID`).
+    MbReleaseTrackId,
+    /// MusicBrainz' recording (`UFID` owned by `http://musicbrainz.org`, `MUSICBRAINZ_TRACKID`).
+    MbRecordingId,
+    /// Discogs' release (`TXXX:DISCOGS_RELEASE_ID`, `DISCOGS_RELEASE_ID`).
+    DiscogsReleaseId,
+    /// jackbird's own identity of the song, given once (`TXXX:jackbird track_id`, `JACKBIRD_TRACK_ID`).
+    JackbirdTrackId,
 }
 
 impl Field {
     /// Every field, in the wire's order (`crates/tags-wasm`): the six the
     /// engine started with, then those added after them.
-    pub const ALL: [Field; 13] = [
+    pub const ALL: [Field; 20] = [
         Field::Title,
         Field::Artist,
         Field::Album,
@@ -85,6 +99,13 @@ impl Field {
         Field::Comment,
         Field::Lyrics,
         Field::Bpm,
+        Field::MbAlbumId,
+        Field::MbReleaseGroupId,
+        Field::MbAlbumArtistId,
+        Field::MbReleaseTrackId,
+        Field::MbRecordingId,
+        Field::DiscogsReleaseId,
+        Field::JackbirdTrackId,
     ];
 }
 
@@ -118,6 +139,20 @@ pub struct Fields {
     pub lyrics: String,
     /// Beats per minute.
     pub bpm: String,
+    /// MusicBrainz' release (`TXXX:MusicBrainz Album Id`, `MUSICBRAINZ_ALBUMID`).
+    pub mb_album_id: String,
+    /// MusicBrainz' release group (`TXXX:MusicBrainz Release Group Id`, `MUSICBRAINZ_RELEASEGROUPID`).
+    pub mb_release_group_id: String,
+    /// MusicBrainz' album artist (`TXXX:MusicBrainz Album Artist Id`, `MUSICBRAINZ_ALBUMARTISTID`).
+    pub mb_album_artist_id: String,
+    /// MusicBrainz' track of the release (`TXXX:MusicBrainz Release Track Id`, `MUSICBRAINZ_RELEASETRACKID`).
+    pub mb_release_track_id: String,
+    /// MusicBrainz' recording (`UFID` owned by `http://musicbrainz.org`, `MUSICBRAINZ_TRACKID`).
+    pub mb_recording_id: String,
+    /// Discogs' release (`TXXX:DISCOGS_RELEASE_ID`, `DISCOGS_RELEASE_ID`).
+    pub discogs_release_id: String,
+    /// jackbird's own identity of the song, given once (`TXXX:jackbird track_id`, `JACKBIRD_TRACK_ID`).
+    pub jackbird_track_id: String,
 }
 
 impl Fields {
@@ -137,6 +172,13 @@ impl Fields {
             Field::Comment => &self.comment,
             Field::Lyrics => &self.lyrics,
             Field::Bpm => &self.bpm,
+            Field::MbAlbumId => &self.mb_album_id,
+            Field::MbReleaseGroupId => &self.mb_release_group_id,
+            Field::MbAlbumArtistId => &self.mb_album_artist_id,
+            Field::MbReleaseTrackId => &self.mb_release_track_id,
+            Field::MbRecordingId => &self.mb_recording_id,
+            Field::DiscogsReleaseId => &self.discogs_release_id,
+            Field::JackbirdTrackId => &self.jackbird_track_id,
         }
     }
 
@@ -155,6 +197,13 @@ impl Fields {
             Field::Comment => self.comment = value,
             Field::Lyrics => self.lyrics = value,
             Field::Bpm => self.bpm = value,
+            Field::MbAlbumId => self.mb_album_id = value,
+            Field::MbReleaseGroupId => self.mb_release_group_id = value,
+            Field::MbAlbumArtistId => self.mb_album_artist_id = value,
+            Field::MbReleaseTrackId => self.mb_release_track_id = value,
+            Field::MbRecordingId => self.mb_recording_id = value,
+            Field::DiscogsReleaseId => self.discogs_release_id = value,
+            Field::JackbirdTrackId => self.jackbird_track_id = value,
         }
     }
 }
@@ -251,6 +300,20 @@ pub struct Edit {
     pub lyrics: Option<String>,
     /// The new beats per minute.
     pub bpm: Option<String>,
+    /// The new mb album id.
+    pub mb_album_id: Option<String>,
+    /// The new mb release group id.
+    pub mb_release_group_id: Option<String>,
+    /// The new mb album artist id.
+    pub mb_album_artist_id: Option<String>,
+    /// The new mb release track id.
+    pub mb_release_track_id: Option<String>,
+    /// The new mb recording id.
+    pub mb_recording_id: Option<String>,
+    /// The new discogs release id.
+    pub discogs_release_id: Option<String>,
+    /// The new jackbird track id.
+    pub jackbird_track_id: Option<String>,
     /// What happens to the cover.
     pub cover: CoverEdit,
 }
@@ -272,6 +335,13 @@ impl Edit {
             comment: Some(fields.comment.clone()),
             lyrics: Some(fields.lyrics.clone()),
             bpm: Some(fields.bpm.clone()),
+            mb_album_id: Some(fields.mb_album_id.clone()),
+            mb_release_group_id: Some(fields.mb_release_group_id.clone()),
+            mb_album_artist_id: Some(fields.mb_album_artist_id.clone()),
+            mb_release_track_id: Some(fields.mb_release_track_id.clone()),
+            mb_recording_id: Some(fields.mb_recording_id.clone()),
+            discogs_release_id: Some(fields.discogs_release_id.clone()),
+            jackbird_track_id: Some(fields.jackbird_track_id.clone()),
             cover: CoverEdit::Keep,
         }
     }
@@ -292,6 +362,13 @@ impl Edit {
             Field::Comment => self.comment.as_deref(),
             Field::Lyrics => self.lyrics.as_deref(),
             Field::Bpm => self.bpm.as_deref(),
+            Field::MbAlbumId => self.mb_album_id.as_deref(),
+            Field::MbReleaseGroupId => self.mb_release_group_id.as_deref(),
+            Field::MbAlbumArtistId => self.mb_album_artist_id.as_deref(),
+            Field::MbReleaseTrackId => self.mb_release_track_id.as_deref(),
+            Field::MbRecordingId => self.mb_recording_id.as_deref(),
+            Field::DiscogsReleaseId => self.discogs_release_id.as_deref(),
+            Field::JackbirdTrackId => self.jackbird_track_id.as_deref(),
         }
     }
 }

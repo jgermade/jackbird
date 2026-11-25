@@ -10,7 +10,7 @@ import { editFor } from "../../helpers/cover.ts";
 import { internCoverBytes } from "../covers.ts";
 import { emptyMetadata } from "../../helpers/metadata.ts";
 import type { AudioProps, TrackMetadata } from "../../types.ts";
-import type { WireLayout, WireTags } from "../../helpers/tagwire.ts";
+import { ID_FIELDS, type WireLayout, type WireTags } from "../../helpers/tagwire.ts";
 import { layoutOf, readBlob, readOf, writeOf } from "./engine.ts";
 import { TagError } from "./error.ts";
 import type { Engine } from "./wasm.ts";
@@ -118,6 +118,8 @@ function metadataOf(tags: WireTags): TrackMetadata {
     comment: tags.fields.comment,
     lyrics: tags.fields.lyrics,
     bpm: tags.fields.bpm,
+    // The ids the file has, and only those (helpers/tagwire.ts ID_FIELDS).
+    ...Object.fromEntries(ID_FIELDS.flatMap((id) => (tags.fields[id] ? [[id, tags.fields[id]]] : []))),
     // Kept once, by reference (lib/covers.ts): never made into a data URL to be read back.
     coverDataUrl: tags.cover ? internCoverBytes(tags.cover) : null
   };

@@ -16,6 +16,7 @@ mod picture;
 mod sync;
 mod tag;
 mod text;
+mod user;
 
 pub use comment::{Comment, decode_comment, encode_comment};
 pub use error::Error;
@@ -23,6 +24,7 @@ pub use picture::{Picture, decode_picture, encode_picture};
 pub use sync::{resynchronise, unsynchronise};
 pub use tag::{Frame, Tag, Version, read, tag_len, write};
 pub use text::{decode_text, encode_text};
+pub use user::{FileId, UserText, decode_file_id, decode_user_text, encode_file_id, encode_user_text};
 
 #[cfg(test)]
 mod tests;

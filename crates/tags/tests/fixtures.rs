@@ -26,6 +26,11 @@ struct Case {
     write: String,
 }
 
+/// A field added after the fixtures (the ids): absent where a file has none.
+fn optional(case: &Value, key: &str) -> String {
+    case["fields"][key].as_str().unwrap_or_default().to_owned()
+}
+
 fn cases() -> Vec<Case> {
     let json: Value = serde_json::from_str(&fs::read_to_string(root().join("cases.json")).unwrap()).unwrap();
     json["cases"]
@@ -57,6 +62,13 @@ fn cases() -> Vec<Case> {
                     comment: case["fields"]["comment"].as_str().unwrap_or_default().to_owned(),
                     lyrics: case["fields"]["lyrics"].as_str().unwrap_or_default().to_owned(),
                     bpm: case["fields"]["bpm"].as_str().unwrap_or_default().to_owned(),
+                    mb_album_id: optional(case, "mbAlbumId"),
+                    mb_release_group_id: optional(case, "mbReleaseGroupId"),
+                    mb_album_artist_id: optional(case, "mbAlbumArtistId"),
+                    mb_release_track_id: optional(case, "mbReleaseTrackId"),
+                    mb_recording_id: optional(case, "mbRecordingId"),
+                    discogs_release_id: optional(case, "discogsReleaseId"),
+                    jackbird_track_id: optional(case, "jackbirdTrackId"),
                 },
                 cover: case["cover"].as_object().map(|cover| Cover {
                     data: fs::read(root().join(cover["file"].as_str().unwrap())).unwrap(),
@@ -162,6 +174,13 @@ fn every_field_at_once() {
         comment: "Un comentario ✓".into(),
         lyrics: "Primera línea\nSegunda".into(),
         bpm: "124".into(),
+        mb_album_id: "6a09041b-0f79-3278-88d9-0552dd28d37f".into(),
+        mb_release_group_id: "b1392450-e666-3926-a536-22c65f834433".into(),
+        mb_album_artist_id: "a74b1b7f-71a5-4011-9441-d0b5e4122711".into(),
+        mb_release_track_id: "f62bbec0-cb4a-3519-b584-923b7fd5ac75".into(),
+        mb_recording_id: "4a7fea2e-545b-4c63-bc9a-9943cc3a29d7".into(),
+        discogs_release_id: "1475007".into(),
+        jackbird_track_id: "0f8e6c1a-2b3d-4e5f-8a9b-0c1d2e3f4a5b".into(),
     };
     for case in writable() {
         let out = write(&case.bytes, &Edit::all(&wanted)).unwrap_or_else(|error| panic!("{}: {error}", case.name));

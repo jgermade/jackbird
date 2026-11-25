@@ -23,7 +23,15 @@ export type TrackMetadata = {
   /** Beats per minute, a whole number as text (`TBPM`, `BPM`); "" when not known. */
   bpm: string;
   coverDataUrl: string | null;
-};
+} & Partial<Record<IdField, string>>;
+
+/**
+ * The ids a file may carry (the owner, 2026-11-25): MusicBrainz' release, release group, album
+ * artist, track and recording, Discogs' release (as Picard writes them), and jackbird's own identity
+ * of the song (`TXXX:jackbird track_id`, `JACKBIRD_TRACK_ID`). Absent: as the file has it, untouched
+ * by a save; "": removed.
+ */
+export type IdField = "mbAlbumId" | "mbReleaseGroupId" | "mbAlbumArtistId" | "mbReleaseTrackId" | "mbRecordingId" | "discogsReleaseId" | "jackbirdTrackId";
 
 export type Track = {
   id: string;

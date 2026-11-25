@@ -9,6 +9,7 @@
 import { $reactive, $toRaw } from "jq79";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "../helpers/metadata";
 import { menuDialogTargets } from "../helpers/selection";
+import { withTrackId } from "../helpers/track-id";
 import type { EditableMetadata, MetaRecord, Track } from "../types";
 import { can } from "./account";
 import { computeBpms } from "./bpm";
@@ -162,7 +163,12 @@ export async function saveMetadata(items: readonly { track: Track; metadata: Tra
     // The track that could not be saved, and why: the ones before it are saved and recorded.
     let failed: { track: Track; reason: string; stale?: boolean } | null = null;
 
-    for (const [index, { track, metadata }] of items.entries()) {
+    for (const [index, item] of items.entries()) {
+      const track = item.track;
+      // jackbird's own id, given the first time it writes the file's tags, kept after (helpers/track-id.ts);
+      // not in one's own version of a family library's song, which is no file's.
+      const own = inLibrary() && $toRaw(editor).scope === "mine";
+      const metadata = own ? item.metadata : withTrackId(item.metadata, track.metadata);
       writingFile(index + 1, items.length, track.name);
       try {
         // In the family library (F4), the version read goes with it: a song changed since is refused.

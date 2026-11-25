@@ -5,15 +5,17 @@ import { WIRE_FIELDS, decodeError, decodeLayout, decodeSplice, decodeTags, encod
 const u32 = (value: number) => [value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, value >>> 24];
 const run = (bytes: number[]) => [...u32(bytes.length), ...bytes];
 const text = (value: string) => run([...new TextEncoder().encode(value)]);
+/** The seven ids, empty (after the thirteen text fields). */
+const IDS = Array.from({ length: 7 }, () => text("")).flat();
 
 describe("decodeTags", () => {
   it("reads the format, the fields in order and the cover, as crates/tags-wasm writes them", () => {
     // The bytes of wire.rs' test `writes_tags_errors_and_regions`.
-    const bytes = Uint8Array.from([1, ...text("T"), ...text(""), ...text(""), ...text("1959"), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), 1, ...text("image/jpeg"), ...run([1, 2]), 0]);
+    const bytes = Uint8Array.from([1, ...text("T"), ...text(""), ...text(""), ...text("1959"), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...text(""), ...IDS, 1, ...text("image/jpeg"), ...run([1, 2]), 0]);
     const tags = decodeTags(bytes);
     assert.deepEqual(tags, {
       format: "flac",
-      fields: { title: "T", artist: "", album: "", year: "1959", genre: "", track: "", disc: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "" },
+      fields: { title: "T", artist: "", album: "", year: "1959", genre: "", track: "", disc: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "", mbAlbumId: "", mbReleaseGroupId: "", mbAlbumArtistId: "", mbReleaseTrackId: "", mbRecordingId: "", discogsReleaseId: "", jackbirdTrackId: "" },
       cover: { mime: "image/jpeg", data: Uint8Array.of(1, 2) },
       audio: null
     });
@@ -23,10 +25,10 @@ describe("decodeTags", () => {
   });
 
   it("reads an MP3 without a cover, and UTF-8", () => {
-    const bytes = Uint8Array.from([0, ...text("Título"), ...text("Artist"), ...text(""), ...text(""), ...text("(17)"), ...text("3/12"), ...text("1/2"), ...text("Various Artists"), ...text("1"), ...text("Composer"), ...text("A comment"), ...text("Line one\nLine two"), ...text("128"), 0, 1, ...u32(1000), ...u32(128), ...u32(44100), 2, 16, 1]);
+    const bytes = Uint8Array.from([0, ...text("Título"), ...text("Artist"), ...text(""), ...text(""), ...text("(17)"), ...text("3/12"), ...text("1/2"), ...text("Various Artists"), ...text("1"), ...text("Composer"), ...text("A comment"), ...text("Line one\nLine two"), ...text("128"), ...text("6a09041b"), ...text(""), ...text(""), ...text(""), ...text("4a7fea2e"), ...text("1475007"), ...text("j-1"), 0, 1, ...u32(1000), ...u32(128), ...u32(44100), 2, 16, 1]);
     assert.deepEqual(decodeTags(bytes), {
       format: "mp3",
-      fields: { title: "Título", artist: "Artist", album: "", year: "", genre: "(17)", track: "3/12", disc: "1/2", albumArtist: "Various Artists", compilation: "1", composer: "Composer", comment: "A comment", lyrics: "Line one\nLine two", bpm: "128" },
+      fields: { title: "Título", artist: "Artist", album: "", year: "", genre: "(17)", track: "3/12", disc: "1/2", albumArtist: "Various Artists", compilation: "1", composer: "Composer", comment: "A comment", lyrics: "Line one\nLine two", bpm: "128", mbAlbumId: "6a09041b", mbReleaseGroupId: "", mbAlbumArtistId: "", mbReleaseTrackId: "", mbRecordingId: "4a7fea2e", discogsReleaseId: "1475007", jackbirdTrackId: "j-1" },
       cover: null,
       audio: { durationMs: 1000, bitrate: 128, sampleRate: 44100, channels: 2, bits: 16, vbr: true }
     });
@@ -89,11 +91,11 @@ describe("encodeLayout and encodeRead", () => {
 describe("encodeWrite", () => {
   it("writes the fields given, in order, then the cover, the layout and the head", () => {
     const head = Uint8Array.of(0x66, 0x4c, 0x61, 0x43);
-    const bytes = encodeWrite({ fields: { title: "Título", album: "", year: "1959", track: "3/12", disc: "2/2", albumArtist: "Various Artists", compilation: "1", composer: "Composer", lyrics: "Words", bpm: "120" }, cover: { set: { mime: "image/png", data: Uint8Array.of(9, 8, 7) } } }, flac, head);
+    const bytes = encodeWrite({ fields: { title: "Título", album: "", year: "1959", track: "3/12", disc: "2/2", albumArtist: "Various Artists", compilation: "1", composer: "Composer", lyrics: "Words", bpm: "120", mbAlbumId: "album-id", mbRecordingId: "recording-id", discogsReleaseId: "1475007", jackbirdTrackId: "" }, cover: { set: { mime: "image/png", data: Uint8Array.of(9, 8, 7) } } }, flac, head);
     // The request of wire.rs' test `reads_a_write_request`.
     assert.deepEqual(
       bytes,
-      Uint8Array.from([1, ...text("Título"), 0, 1, ...text(""), 1, ...text("1959"), 0, 1, ...text("3/12"), 1, ...text("2/2"), 1, ...text("Various Artists"), 1, ...text("1"), 1, ...text("Composer"), 0, 1, ...text("Words"), 1, ...text("120"), 1, ...text("image/png"), ...run([9, 8, 7]), ...LAYOUT, 0x66, 0x4c, 0x61, 0x43])
+      Uint8Array.from([1, ...text("Título"), 0, 1, ...text(""), 1, ...text("1959"), 0, 1, ...text("3/12"), 1, ...text("2/2"), 1, ...text("Various Artists"), 1, ...text("1"), 1, ...text("Composer"), 0, 1, ...text("Words"), 1, ...text("120"), 1, ...text("album-id"), 0, 0, 0, 1, ...text("recording-id"), 1, ...text("1475007"), 1, ...text(""), 1, ...text("image/png"), ...run([9, 8, 7]), ...LAYOUT, 0x66, 0x4c, 0x61, 0x43])
     );
   });
 

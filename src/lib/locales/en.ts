@@ -185,6 +185,8 @@ export const en = {
   "lookup.coverLoading": "Fetching its cover…",
   "lookup.coverNone": "This release has no cover in the Cover Art Archive.",
   "lookup.coverDiscogs": "Discogs' covers cannot be fetched from here (their server does not allow it); a MusicBrainz release of the album may have one.",
+  "lookup.ids": "Its ids",
+  "lookup.idsAbout": "{source}'s ids for the release and each track, kept in the files (as Picard writes them): a later lookup, and other taggers, know the songs by them.",
   "lookup.search": "Search",
   "lookup.source": "Only the album and artist typed are sent to the databases chosen.",
   "lookup.back": "Releases",

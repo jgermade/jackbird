@@ -1,8 +1,8 @@
 //! MP3: the fields and the cover over an ID3v2 tag's frames.
 
 use jackbird_id3::{
-    self as id3, Comment, Frame, Picture, Version, decode_comment, decode_picture, decode_text, encode_comment,
-    encode_picture, encode_text,
+    self as id3, Comment, FileId, Frame, Picture, UserText, Version, decode_comment, decode_file_id, decode_picture,
+    decode_text, decode_user_text, encode_comment, encode_file_id, encode_picture, encode_text, encode_user_text,
 };
 
 use crate::year::{self, Timestamp};
@@ -52,7 +52,58 @@ fn managed(field: Field) -> &'static [&'static str] {
         Field::Comment => &["COMM"],
         Field::Lyrics => &["USLT"],
         Field::Bpm => &["TBPM"],
+        // One frame of these each, told by its description or its owner (see `keyed`).
+        Field::MbAlbumId
+        | Field::MbReleaseGroupId
+        | Field::MbAlbumArtistId
+        | Field::MbReleaseTrackId
+        | Field::DiscogsReleaseId
+        | Field::JackbirdTrackId => &["TXXX"],
+        Field::MbRecordingId => &["UFID"],
     }
+}
+
+/// Where an id is kept: a `TXXX` of this description, or the `UFID` of this owner (as Picard keeps
+/// MusicBrainz' ids; jackbird's own beside them).
+#[derive(Clone, Copy)]
+enum Key {
+    Text(&'static str),
+    Owner(&'static str),
+}
+
+/// The `TXXX` or `UFID` a field is, if it is one.
+fn keyed(field: Field) -> Option<Key> {
+    Some(match field {
+        Field::MbAlbumId => Key::Text("MusicBrainz Album Id"),
+        Field::MbReleaseGroupId => Key::Text("MusicBrainz Release Group Id"),
+        Field::MbAlbumArtistId => Key::Text("MusicBrainz Album Artist Id"),
+        Field::MbReleaseTrackId => Key::Text("MusicBrainz Release Track Id"),
+        Field::MbRecordingId => Key::Owner("http://musicbrainz.org"),
+        Field::DiscogsReleaseId => Key::Text("DISCOGS_RELEASE_ID"),
+        Field::JackbirdTrackId => Key::Text("jackbird track_id"),
+        _ => return None,
+    })
+}
+
+/// The frame a keyed field is (the first readable one: a `TXXX` of its description, told without
+/// case; the `UFID` of its owner; `TXX` and `UFI` in v2.2) and its value.
+fn shown_keyed(version: Version, unsynchronised: bool, frames: &[Frame], key: Key) -> Option<(usize, String)> {
+    frames.iter().enumerate().find_map(|(index, frame)| {
+        let value = match key {
+            Key::Text(description) if frame.id == "TXXX" || (version == Version::V22 && frame.id == "TXX") => {
+                let text = decode_user_text(&frame.content(version, unsynchronised).ok()?).ok()?;
+                text.description
+                    .eq_ignore_ascii_case(description)
+                    .then_some(text.value)?
+            }
+            Key::Owner(owner) if frame.id == "UFID" || (version == Version::V22 && frame.id == "UFI") => {
+                let id = decode_file_id(&frame.content(version, unsynchronised).ok()?).ok()?;
+                (id.owner == owner).then(|| String::from_utf8_lossy(&id.identifier).into_owned())?
+            }
+            _ => return None,
+        };
+        Some((index, value))
+    })
 }
 
 /// Whether a field's frames have a language and a description (`COMM`, `USLT`): the field is the
@@ -91,6 +142,9 @@ fn text_of(version: Version, unsynchronised: bool, frame: &Frame) -> Option<Stri
 /// The frame a field is read from (the first readable one of its ids, in
 /// order of preference) and its text.
 fn shown(version: Version, unsynchronised: bool, frames: &[Frame], field: Field) -> Option<(usize, String)> {
+    if let Some(key) = keyed(field) {
+        return shown_keyed(version, unsynchronised, frames, key);
+    }
     if described(field) {
         return shown_comment(version, unsynchronised, frames, field).map(|(index, comment)| (index, comment.text));
     }
@@ -154,6 +208,13 @@ fn fields_of(version: Version, unsynchronised: bool, frames: &[Frame]) -> Fields
         comment: text(Field::Comment),
         lyrics: text(Field::Lyrics),
         bpm: text(Field::Bpm),
+        mb_album_id: text(Field::MbAlbumId),
+        mb_release_group_id: text(Field::MbReleaseGroupId),
+        mb_album_artist_id: text(Field::MbAlbumArtistId),
+        mb_release_track_id: text(Field::MbReleaseTrackId),
+        mb_recording_id: text(Field::MbRecordingId),
+        discogs_release_id: text(Field::DiscogsReleaseId),
+        jackbird_track_id: text(Field::JackbirdTrackId),
     }
 }
 
@@ -229,6 +290,35 @@ pub(crate) fn write(
 
     for (field, value) in changes {
         let family = managed(*field);
+        if let Some(key) = keyed(*field) {
+            // An id: its own frame replaced, or removed when emptied; the other TXXX and UFID stay.
+            let at = shown_keyed(version, unsynchronised, &frames, key).map(|(index, _)| index);
+            if value.is_empty() {
+                if let Some(index) = at {
+                    frames.remove(index);
+                }
+                continue;
+            }
+            let content = match key {
+                Key::Text(description) => encode_user_text(
+                    &UserText {
+                        description: description.to_owned(),
+                        value: value.clone(),
+                    },
+                    version,
+                ),
+                Key::Owner(owner) => encode_file_id(&FileId {
+                    owner: owner.to_owned(),
+                    identifier: value.as_bytes().to_vec(),
+                }),
+            };
+            let frame = make(family[0], content);
+            match at {
+                Some(index) => frames[index] = frame,
+                None => frames.push(frame),
+            }
+            continue;
+        }
         if described(*field) {
             // The comment (or the lyrics): its frame replaced, its language and description kept,
             // or removed when emptied; the other comments stay as they are.
@@ -352,16 +442,23 @@ pub(crate) fn check_kept(
     let version = before.version;
     let changed: Vec<&str> = changes
         .iter()
-        .filter(|(field, _)| !described(*field))
+        .filter(|(field, _)| !described(*field) && keyed(*field).is_none())
         .flat_map(|(field, _)| managed(*field).iter().copied())
         .collect();
-    // A changed comment (or lyrics) touches its own frame alone: the other comments are checked.
+    // A changed comment (or lyrics, or id) touches its own frame alone: the other comments, TXXX
+    // and UFID are checked.
     let touched = |tag: &id3::Tag| -> Vec<usize> {
         changes
             .iter()
-            .filter(|(field, _)| described(*field))
             .filter_map(|(field, _)| {
-                shown_comment(tag.version, tag.unsynchronised_v24(), &tag.frames, *field).map(|(index, _)| index)
+                let (version, unsynchronised) = (tag.version, tag.unsynchronised_v24());
+                if let Some(key) = keyed(*field) {
+                    shown_keyed(version, unsynchronised, &tag.frames, key).map(|(index, _)| index)
+                } else if described(*field) {
+                    shown_comment(version, unsynchronised, &tag.frames, *field).map(|(index, _)| index)
+                } else {
+                    None
+                }
             })
             .collect()
     };

@@ -123,8 +123,9 @@ function e0Frames(version) {
 const EMPTY = { title: "", artist: "", album: "", year: "", genre: "", track: "", disc: "", albumArtist: "", compilation: "", composer: "", comment: "", lyrics: "", bpm: "" };
 /** E0's first six frames: the six fields the engine started with. */
 const E0_SIX = { ...EMPTY, title: "Before", artist: "Artist", album: "Album", year: "1959", genre: "Jazz", track: "3/12" };
-/** All of E0's: TPOS, TPE2 and TCMP too, and its COMM and USLT (read since the composer, comment and lyrics fields). */
-const E0_FIELDS = { ...E0_SIX, disc: "1/2", albumArtist: "Album Artist", compilation: "1", comment: "A comment", lyrics: "La la la" };
+/** All of E0's: TPOS, TPE2 and TCMP too, its COMM and USLT (read since the composer, comment and lyrics
+ *  fields), and its UFID of MusicBrainz (read since the ids, 2026-11-25). */
+const E0_FIELDS = { ...E0_SIX, disc: "1/2", albumArtist: "Album Artist", compilation: "1", comment: "A comment", lyrics: "La la la", mbRecordingId: "0b6c2b4e-1a2b-4c3d-9e8f-001122334455" };
 const COVER1 = { file: "covers/cover1.jpg", mime: "image/jpeg" };
 
 const id3v1 = bytes("TAG", "Before".padEnd(30, " "), "Artist".padEnd(30, " "), "Album".padEnd(30, " "), "1959", "v1 comment".padEnd(28, " "), [0, 3, 8]);
@@ -193,7 +194,7 @@ const fullBlocks = [
   picture(4, "image/jpeg", "back", cover("cover2.jpg"), [24, 24, 24]),
   block(1, new Uint8Array(512)),
 ];
-const FLAC_FIELDS = { ...EMPTY, title: "Before", artist: "One", album: "Album", year: "1959", genre: "Jazz", track: "3", disc: "1", albumArtist: "Album Artist", comment: "Hi", lyrics: "La la la" };
+const FLAC_FIELDS = { ...EMPTY, title: "Before", artist: "One", album: "Album", year: "1959", genre: "Jazz", track: "3", disc: "1", albumArtist: "Album Artist", comment: "Hi", lyrics: "La la la", mbRecordingId: "0b6c2b4e-1a2b-4c3d-9e8f-001122334455" };
 
 // ---------------------------------------------------------------- cases
 

@@ -728,6 +728,13 @@ fn fields_and_edits_by_field() {
         comment: "m".into(),
         lyrics: "w".into(),
         bpm: "128".into(),
+        mb_album_id: "ma".into(),
+        mb_release_group_id: "mg".into(),
+        mb_album_artist_id: "mr".into(),
+        mb_release_track_id: "mt".into(),
+        mb_recording_id: "mc".into(),
+        discogs_release_id: "dr".into(),
+        jackbird_track_id: "jt".into(),
     };
     let edit = Edit::all(&fields);
     for field in Field::ALL {
@@ -969,4 +976,157 @@ fn reads_and_writes_the_bpm_in_a_flac() {
     )
     .unwrap();
     assert_eq!(read(&gone).unwrap().fields.bpm, "");
+}
+
+// ---------------------------------------------------------------- the ids (L5)
+
+fn txxx(description: &str, value: &str) -> Frame {
+    let text = id3::UserText {
+        description: description.into(),
+        value: value.into(),
+    };
+    Frame::new("TXXX", id3::encode_user_text(&text, Version::V23))
+}
+
+fn ufid(owner: &str, identifier: &str) -> Frame {
+    let id = id3::FileId {
+        owner: owner.into(),
+        identifier: identifier.as_bytes().to_vec(),
+    };
+    Frame::new("UFID", id3::encode_file_id(&id))
+}
+
+fn ids_edit(value: &str) -> Edit {
+    Edit {
+        mb_album_id: Some(format!("{value}-album")),
+        mb_release_group_id: Some(format!("{value}-group")),
+        mb_album_artist_id: Some(format!("{value}-artist")),
+        mb_release_track_id: Some(format!("{value}-track")),
+        mb_recording_id: Some(format!("{value}-recording")),
+        discogs_release_id: Some("1475007".into()),
+        jackbird_track_id: Some(format!("{value}-jackbird")),
+        ..Edit::default()
+    }
+}
+
+#[test]
+fn reads_the_ids_as_picard_writes_them_and_tells_txxx_apart_by_description() {
+    let source = file(
+        Version::V23,
+        &[
+            txxx("ASIN", "B000002UJQ"),
+            txxx("musicbrainz album id", "6a09041b"),
+            txxx("MusicBrainz Release Group Id", "b1392450"),
+            ufid("http://www.cddb.com/id3/taginfo1.html", "other"),
+            ufid("http://musicbrainz.org", "4a7fea2e"),
+            txxx("DISCOGS_RELEASE_ID", "1475007"),
+            txxx("jackbird track_id", "j-1"),
+        ],
+    );
+    let fields = read(&source).unwrap().fields;
+    assert_eq!(fields.mb_album_id, "6a09041b");
+    assert_eq!(fields.mb_release_group_id, "b1392450");
+    assert_eq!(fields.mb_recording_id, "4a7fea2e");
+    assert_eq!(fields.discogs_release_id, "1475007");
+    assert_eq!(fields.jackbird_track_id, "j-1");
+    assert_eq!(fields.mb_album_artist_id, "");
+}
+
+#[test]
+fn writes_each_id_in_its_own_frame_and_keeps_the_other_txxx_and_ufid_byte_for_byte() {
+    for version in [Version::V23, Version::V24] {
+        let asin = txxx("ASIN", "B000002UJQ");
+        let cddb = ufid("http://www.cddb.com/id3/taginfo1.html", "other");
+        let source = file(
+            version,
+            &[asin.clone(), txxx("MusicBrainz Album Id", "old"), cddb.clone()],
+        );
+        let out = write(&source, &ids_edit("new")).unwrap();
+        let fields = read(&out).unwrap().fields;
+        assert_eq!(fields.mb_album_id, "new-album", "{version:?}");
+        assert_eq!(fields.mb_release_group_id, "new-group");
+        assert_eq!(fields.mb_album_artist_id, "new-artist");
+        assert_eq!(fields.mb_release_track_id, "new-track");
+        assert_eq!(fields.mb_recording_id, "new-recording");
+        assert_eq!(fields.discogs_release_id, "1475007");
+        assert_eq!(fields.jackbird_track_id, "new-jackbird");
+        let frames = frames_of(&out);
+        // The old album id replaced in place; the others kept as they were.
+        assert_eq!(frames[0], asin);
+        assert_eq!(frames[2], cddb);
+        assert_eq!(frames.iter().filter(|frame| frame.id == "TXXX").count(), 7);
+        assert_eq!(frames.iter().filter(|frame| frame.id == "UFID").count(), 2);
+    }
+}
+
+#[test]
+fn removes_only_the_id_emptied() {
+    let asin = txxx("ASIN", "B000002UJQ");
+    let source = file(
+        Version::V23,
+        &[
+            asin.clone(),
+            txxx("jackbird track_id", "j-1"),
+            ufid("http://musicbrainz.org", "r"),
+        ],
+    );
+    let out = write(
+        &source,
+        &Edit {
+            jackbird_track_id: Some(String::new()),
+            mb_recording_id: Some(String::new()),
+            ..Edit::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(frames_of(&out), vec![asin]);
+}
+
+fn vorbis(entries: &[&str]) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend(3u32.to_le_bytes());
+    body.extend(b"jkb");
+    body.extend(u32::try_from(entries.len()).unwrap().to_le_bytes());
+    for entry in entries {
+        body.extend(u32::try_from(entry.len()).unwrap().to_le_bytes());
+        body.extend(entry.as_bytes());
+    }
+    let streaminfo = jackbird_flac::Block {
+        kind: 0,
+        body: vec![0; 34],
+    };
+    let comments = jackbird_flac::Block { kind: 4, body };
+    let mut bytes = jackbird_flac::write(&[streaminfo, comments]).unwrap();
+    bytes.extend_from_slice(&[0xff, 0xf8, 1, 2]);
+    bytes
+}
+
+#[test]
+fn reads_and_writes_the_ids_in_a_flacs_comments() {
+    let source = vorbis(&["TITLE=Airbag", "MUSICBRAINZ_ALBUMID=old", "ASIN=B000002UJQ"]);
+    assert_eq!(read(&source).unwrap().fields.mb_album_id, "old");
+    let out = write(&source, &ids_edit("new")).unwrap();
+    let fields = read(&out).unwrap().fields;
+    assert_eq!(
+        [
+            fields.mb_album_id.as_str(),
+            fields.mb_release_group_id.as_str(),
+            fields.mb_album_artist_id.as_str(),
+            fields.mb_release_track_id.as_str(),
+            fields.mb_recording_id.as_str(),
+            fields.discogs_release_id.as_str(),
+            fields.jackbird_track_id.as_str(),
+            fields.title.as_str(),
+        ],
+        [
+            "new-album",
+            "new-group",
+            "new-artist",
+            "new-track",
+            "new-recording",
+            "1475007",
+            "new-jackbird",
+            "Airbag"
+        ]
+    );
 }

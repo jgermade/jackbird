@@ -186,6 +186,8 @@ export const es: Record<MessageKey, string> = {
   "lookup.coverLoading": "Trayendo su carátula…",
   "lookup.coverNone": "Esta edición no tiene carátula en el Cover Art Archive.",
   "lookup.coverDiscogs": "Las carátulas de Discogs no se pueden traer desde aquí (su servidor no lo permite); una edición del álbum en MusicBrainz puede tenerla.",
+  "lookup.ids": "Sus identificadores",
+  "lookup.idsAbout": "Los identificadores de {source} de la edición y de cada pista, guardados en los archivos (como los escribe Picard): una búsqueda posterior, y otros programas, reconocen las canciones por ellos.",
   "lookup.search": "Buscar",
   "lookup.source": "Solo se envían el álbum y el artista escritos a las bases de datos elegidas.",
   "lookup.back": "Ediciones",

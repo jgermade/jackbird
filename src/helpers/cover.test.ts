@@ -105,3 +105,17 @@ describe("fromBase64", () => {
     assert.equal(fromBase64("%%%"), null);
   });
 });
+
+describe("editFor, the ids", () => {
+  it("writes an id given that differs, removes one emptied, and leaves one absent as the file has it", () => {
+    const previous = { ...emptyMetadata(), mbAlbumId: "old", jackbirdTrackId: "j-1", mbRecordingId: "r" };
+    const edit = editFor(previous, { ...emptyMetadata(), mbAlbumId: "new", jackbirdTrackId: "j-1", discogsReleaseId: "1475007", mbRecordingId: "" });
+    assert.equal(edit.fields.mbAlbumId, "new");
+    assert.equal(edit.fields.discogsReleaseId, "1475007");
+    assert.equal(edit.fields.mbRecordingId, "");
+    assert.equal("jackbirdTrackId" in edit.fields, false);
+    // Absent (a form that does not hold them): nothing written.
+    assert.equal("mbAlbumArtistId" in edit.fields, false);
+    assert.equal("mbReleaseGroupId" in editFor(previous, emptyMetadata()).fields, false);
+  });
+});

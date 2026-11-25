@@ -11,7 +11,7 @@
   const Reel = await import("../../theme/default/components/reel.html")
   const { t, tn } = await import("../lib/i18n")
   const { SOURCES, chooseRelease, leaveRelease, lookup, searchReleases, sourceName, syncLookup, toggleCover, toggleField, toggleSource } = await import("../lib/lookup")
-  const { changedFields } = await import("../helpers/lookup")
+  const { changedFields, isLookupId } = await import("../helpers/lookup")
   const { dialogTracks } = await import("../lib/workspace")
 
   type Field = "title" | "artist" | "album" | "albumArtist" | "trackNumber" | "discNumber" | "year" | "genre"
@@ -34,8 +34,14 @@
   const candidates = (): Candidate[] => lookup.candidates.data
   const chosen = () => lookup.chosen?.data ?? null
   const plans = (): Plan[] => (chosen()?.plans ?? []) as Plan[]
-  const fields = (): Field[] => changedFields(plans()) as Field[]
+  // The fields as columns; the ids (L5) under one box, not shown one by one: they travel in the files.
+  const fields = (): Field[] => changedFields(plans()).filter((field) => !isLookupId(field)) as Field[]
+  const ids = (): string[] => changedFields(plans()).filter((field) => isLookupId(field))
   const ticked = (field: Field): boolean => lookup.fields.includes(field)
+  const idsTicked = (): boolean => ids().length > 0 && ids().every((id) => lookup.fields.includes(id as never))
+  const tickIds = (on: boolean) => {
+    for (const id of ids()) toggleField(id as never, on)
+  }
   const nameOf = (trackId: string): string => dialogTracks.value.data.find((track) => track.id === trackId)?.name ?? trackId
   const changeOf = (plan: Plan, field: Field) => plan.changes.find((change) => change.field === field) ?? null
   const unpaired = (): number => plans().filter((plan) => !plan.track).length
@@ -86,9 +92,10 @@
     <p :elseif="lookup.cover.state === 'loading'" class="hint" role="status"><Reel :size="12" speed="fast" /> {{ t("lookup.coverLoading") }}</p>
     <p :elseif="lookup.cover.state === 'none'" class="hint">{{ t("lookup.coverNone") }}</p>
     <p :elseif="lookup.cover.state === 'discogs'" class="hint">{{ t("lookup.coverDiscogs") }}</p>
-    <p :if="fields().length === 0 && lookup.cover.state !== 'ready'" class="hint">{{ t("lookup.nothing") }}</p>
-    <div :elseif="fields().length > 0" class="fields">
+    <p :if="fields().length === 0 && ids().length === 0 && lookup.cover.state !== 'ready'" class="hint">{{ t("lookup.nothing") }}</p>
+    <div :elseif="fields().length > 0 || ids().length > 0" class="fields">
       <span :each="field in fields()" :key="field"><Checkbox :id="`lookup-field-${field}`" :model="ticked(field)" @change="toggleField(field, $event.detail)">{{ t(LABELS[field]) }}</Checkbox></span>
+      <span :if="ids().length > 0" :title="t('lookup.idsAbout', { source: sourceName(chosen().release.source) })"><Checkbox id="lookup-field-ids" :model="idsTicked()" @change="tickIds($event.detail)">{{ t("lookup.ids") }}</Checkbox></span>
     </div>
     <p :if="unpaired() > 0" class="hint">{{ tn("lookup.unpaired", unpaired()) }}</p>
     <div class="mm-table-wrap">

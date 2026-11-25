@@ -260,6 +260,13 @@ impl Library {
         layer.comment = pick(&fields.comment, &under.comment);
         layer.lyrics = pick(&fields.lyrics, &under.lyrics);
         layer.bpm = pick(&fields.bpm, &under.bpm);
+        layer.mb_album_id = pick(&fields.mb_album_id, &under.mb_album_id);
+        layer.mb_release_group_id = pick(&fields.mb_release_group_id, &under.mb_release_group_id);
+        layer.mb_album_artist_id = pick(&fields.mb_album_artist_id, &under.mb_album_artist_id);
+        layer.mb_release_track_id = pick(&fields.mb_release_track_id, &under.mb_release_track_id);
+        layer.mb_recording_id = pick(&fields.mb_recording_id, &under.mb_recording_id);
+        layer.discogs_release_id = pick(&fields.discogs_release_id, &under.discogs_release_id);
+        layer.jackbird_track_id = pick(&fields.jackbird_track_id, &under.jackbird_track_id);
         self.put_own_layer(person, song.id, &layer)
     }
 

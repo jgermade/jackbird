@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import type { WireEdit } from "../../helpers/tagwire.ts";
+import { ID_FIELDS, type WireEdit } from "../../helpers/tagwire.ts";
 import { layoutOf, readBlob, readOf, writeOf } from "./engine.ts";
 import { TagError } from "./error.ts";
 import { instantiate, type Engine } from "./wasm.ts";
@@ -30,6 +30,7 @@ const bytesOf = (name: string) => new Uint8Array(readFileSync(new URL(name, fixt
 const sha1 = (bytes: Uint8Array) => createHash("sha1").update(bytes).digest("hex");
 const engine: Engine = await instantiate(readFileSync(fileURLToPath(new URL("./engine.wasm", import.meta.url))));
 const keep = { keep: true } as const;
+const NO_IDS = Object.fromEntries(ID_FIELDS.map((id) => [id, ""]));
 
 // The engine as the app drives it, on whole files.
 const read = (bytes: Uint8Array) => readOf(engine, bytes, layoutOf(engine, bytes));
@@ -51,7 +52,8 @@ describe("the tag engine as wasm, on the fixtures", () => {
         assert.equal(layout.format, fixture.format);
         const tags = read(bytes);
         assert.equal(tags.format, fixture.format);
-        assert.deepEqual(tags.fields, fixture.fields);
+        // cases.json names the ids a file has; the engine gives every field, the others empty.
+        assert.deepEqual(tags.fields, { ...NO_IDS, ...fixture.fields });
         if (fixture.cover) {
           assert.equal(tags.cover?.mime, fixture.cover.mime);
           assert.equal(sha1(tags.cover!.data), fixture.cover.sha1);
@@ -63,7 +65,7 @@ describe("the tag engine as wasm, on the fixtures", () => {
       it("reads the same from a Blob, its head and tail only", async () => {
         const tags = await readBlob(engine, new Blob([bytes]));
         assert.equal(tags?.format, fixture.format);
-        assert.deepEqual(tags?.fields, fixture.fields);
+        assert.deepEqual(tags?.fields, { ...NO_IDS, ...fixture.fields });
         assert.equal(tags?.cover ? sha1(tags.cover.data) : null, fixture.cover?.sha1 ?? null);
       });
 
@@ -81,7 +83,7 @@ describe("the tag engine as wasm, on the fixtures", () => {
         }
         const out = save();
         const back = read(out);
-        assert.deepEqual(back.fields, { ...fixture.fields, title: "New title" });
+        assert.deepEqual(back.fields, { ...NO_IDS, ...fixture.fields, title: "New title" });
         const after = region(out);
         assert.equal(sha1(out.subarray(after.start, after.end)), fixture.region.sha1);
       });
