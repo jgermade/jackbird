@@ -1,0 +1,151 @@
+<script :setup lang="ts">
+  // The rename tab's third way, "From a database" (lib/lookup.ts): the album and artist to look
+  // for, the releases found (best fit first), then the one chosen: per file what changes, a box
+  // per field to write. Its key, in the dialog's foot, writes them. See
+  // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-25, "the album lookup", L2).
+
+  const Field = await import("../../theme/default/components/field.html")
+  const Key = await import("../../theme/default/components/key.html")
+  const Checkbox = await import("../../theme/default/components/checkbox.html")
+  const TextInput = await import("../../theme/default/components/text-input.html")
+  const Reel = await import("../../theme/default/components/reel.html")
+  const { t, tn } = await import("../lib/i18n")
+  const { chooseRelease, leaveRelease, lookup, searchReleases, syncLookup, toggleField } = await import("../lib/lookup")
+  const { changedFields } = await import("../helpers/lookup")
+  const { dialogTracks } = await import("../lib/workspace")
+
+  type Field = "title" | "artist" | "album" | "albumArtist" | "trackNumber" | "discNumber" | "year" | "genre"
+  type Candidate = { release: { id: string; title: string; artist: string; year: string; country: string; format: string; trackCount: number | null }; fit: number }
+  type Plan = { trackId: string; track: { disc: number; number: number; title: string } | null; changes: { field: Field; from: string; to: string }[] }
+  const LABELS: Record<Field, string> = {
+    title: "field.title",
+    artist: "field.artist",
+    album: "field.album",
+    albumArtist: "field.albumArtist",
+    trackNumber: "field.track",
+    discNumber: "field.disc",
+    year: "field.year",
+    genre: "field.genre"
+  }
+
+  // Afresh for other tracks than the last ones looked up for.
+  $: syncLookup(dialogTracks.value.data)
+  // Read through functions: the store's values are boxed (lib/opaque.ts).
+  const candidates = (): Candidate[] => lookup.candidates.data
+  const chosen = () => lookup.chosen?.data ?? null
+  const plans = (): Plan[] => (chosen()?.plans ?? []) as Plan[]
+  const fields = (): Field[] => changedFields(plans()) as Field[]
+  const ticked = (field: Field): boolean => lookup.fields.includes(field)
+  const nameOf = (trackId: string): string => dialogTracks.value.data.find((track) => track.id === trackId)?.name ?? trackId
+  const changeOf = (plan: Plan, field: Field) => plan.changes.find((change) => change.field === field) ?? null
+  const unpaired = (): number => plans().filter((plan) => !plan.track).length
+  const facts = (candidate: Candidate): string =>
+    [candidate.release.artist, candidate.release.year, candidate.release.country, candidate.release.format, candidate.release.trackCount === null ? "" : tn("tracks.count", candidate.release.trackCount)].filter(Boolean).join(" · ")
+  const search = (event: Event) => {
+    event.preventDefault()
+    void searchReleases()
+  }
+</script>
+
+<div class="lookup">
+  <form class="terms" @submit="search($event)">
+    <Field :label="t('field.album')" control="lookup-album">
+      <TextInput id="lookup-album" autocomplete="off" :model="lookup.album" @input="lookup.album = $event.detail" />
+    </Field>
+    <Field :label="t('field.artist')" control="lookup-artist">
+      <TextInput id="lookup-artist" autocomplete="off" :model="lookup.artist" @input="lookup.artist = $event.detail" />
+    </Field>
+    <span class="search-key">
+      <Key type="submit" :disabled="!!lookup.busy || (!lookup.album.trim() && !lookup.artist.trim())">
+        <Reel :if="lookup.busy === 'search'" :size="12" speed="fast" />
+        {{ t("lookup.search") }}
+      </Key>
+    </span>
+  </form>
+  <p class="hint">{{ t("lookup.source") }}</p>
+  <p :if="lookup.error" class="failure" role="alert">{{ lookup.error }}</p>
+
+  <!-- The release chosen: per file what changes, a box per field. -->
+  <div :if="chosen()" class="chosen">
+    <div class="chosen-head">
+      <Key size="sm" variant="ghost" @click="leaveRelease()">‹ {{ t("lookup.back") }}</Key>
+      <span class="chosen-name"><b>{{ chosen().release.title }}</b> · {{ chosen().release.artist }}<span :if="chosen().release.year"> · {{ chosen().release.year }}</span></span>
+      <span class="fit">{{ t("lookup.fit", { fit: String(chosen().fit) }) }}</span>
+    </div>
+    <p :if="fields().length === 0" class="hint">{{ t("lookup.nothing") }}</p>
+    <div :else class="fields">
+      <span :each="field in fields()" :key="field"><Checkbox :id="`lookup-field-${field}`" :model="ticked(field)" @change="toggleField(field, $event.detail)">{{ t(LABELS[field]) }}</Checkbox></span>
+    </div>
+    <p :if="unpaired() > 0" class="hint">{{ tn("lookup.unpaired", unpaired()) }}</p>
+    <div class="mm-table-wrap">
+      <table class="mm-table preview">
+        <thead><tr><th>{{ t("rename.name") }}</th><th :each="field in fields()" :key="field" :class.off="!ticked(field)">{{ t(LABELS[field]) }}</th></tr></thead>
+        <tbody>
+          <tr :each="plan in plans()" :key="plan.trackId" :class.unchanged="!plan.track">
+            <td class="mono">{{ nameOf(plan.trackId) }}</td>
+            <td :each="field in fields()" :key="field" :class.off="!ticked(field)">
+              <span :if="changeOf(plan, field)" class="change"><span :if="changeOf(plan, field).from" class="removed">{{ changeOf(plan, field).from }}</span> <span class="added">{{ changeOf(plan, field).to }}</span></span>
+              <span :else class="same">—</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- The releases found, best fit first. -->
+  <ul :elseif="candidates().length > 0" class="candidates">
+    <li :each="candidate in candidates()" :key="candidate.release.id">
+      <button type="button" class="candidate" :disabled="!!lookup.busy" @click="chooseRelease(candidate.release.id)">
+        <span class="candidate-title">{{ candidate.release.title }}</span>
+        <span class="candidate-facts">{{ facts(candidate) }}</span>
+        <span class="fit">{{ t("lookup.fit", { fit: String(candidate.fit) }) }}</span>
+      </button>
+    </li>
+  </ul>
+  <p :elseif="lookup.searched && !lookup.busy" class="hint">{{ t("lookup.none") }}</p>
+  <p :if="lookup.busy === 'release'" class="hint" role="status"><Reel :size="12" speed="fast" /> {{ t("lookup.reading") }}</p>
+</div>
+
+<style scoped>
+  .lookup { display: grid; gap: var(--mm-space-3); }
+  .terms { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: var(--mm-space-3); align-items: end; }
+  .hint { display: flex; align-items: center; gap: var(--mm-space-2); margin: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); }
+  .failure { margin: 0; padding: var(--mm-space-2) var(--mm-space-3); border-left: 3px solid var(--mm-bad-led); border-radius: var(--mm-radius-key); background: var(--mm-bad-soft); color: var(--mm-bad); font-size: var(--mm-text-sm); }
+  .candidates { display: grid; gap: 1px; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--mm-border); border-radius: var(--mm-radius-key); list-style: none; background: var(--mm-border); }
+  .candidate {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "title fit" "facts fit";
+    gap: 0 var(--mm-space-3);
+    width: 100%;
+    padding: var(--mm-space-2) var(--mm-space-3);
+    border: 0;
+    background: var(--mm-surface);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .candidate:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: -2px; }
+  @media (hover: hover) { .candidate:hover { background: var(--mm-hover); } }
+  .candidate:disabled { cursor: progress; }
+  .candidate-title { grid-area: title; overflow: hidden; font-weight: var(--mm-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+  .candidate-facts { grid-area: facts; overflow: hidden; color: var(--mm-fg-muted); font-size: var(--mm-text-xs); text-overflow: ellipsis; white-space: nowrap; }
+  .candidate .fit { grid-area: fit; align-self: center; }
+  .fit { color: var(--mm-fg-muted); font: var(--mm-text-xs) var(--mm-font-mono); white-space: nowrap; }
+  .chosen { display: grid; gap: var(--mm-space-3); }
+  .chosen-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-2) var(--mm-space-3); }
+  .chosen-name { flex: 1; min-width: 0; }
+  .fields { display: flex; flex-wrap: wrap; gap: var(--mm-space-2) var(--mm-space-4); }
+  .preview td { overflow-wrap: anywhere; }
+  .preview .off { opacity: .4; }
+  .preview tr.unchanged td { color: var(--mm-fg-subtle); }
+  .removed { border-radius: 2px; background: var(--mm-bad-soft); color: var(--mm-bad); text-decoration: line-through; }
+  .added { border-radius: 2px; background: var(--mm-ok-soft); color: var(--mm-ok); }
+  .same { color: var(--mm-fg-subtle); }
+  .mono { font-family: var(--mm-font-mono); font-size: var(--mm-text-xs); }
+  @container (max-width: 30rem) {
+    .terms { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>

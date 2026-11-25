@@ -23,6 +23,8 @@
   const SubModal = await import("../../theme/default/components/sub-modal.html")
   const PictureCrop = await import("./picture-crop.html")
   const PictureKeys = await import("./picture-keys.html")
+  const LookupPanel = await import("./lookup-panel.html")
+  const { applyLookup, lookup, lookupCount } = await import("../lib/lookup")
   const { blobToDataUrl, closePicture, openPicture, picture } = await import("../lib/picture")
 
   const { audioLine, formatBytes } = await import("../helpers/format")
@@ -215,9 +217,15 @@
   type Read = { trackId: string; from: string; tags: Record<string, string>; status: "ok" | "same" | "nomatch" }
   const directions = () => [
     { value: "toName", label: t("rename.toName") },
-    { value: "fromName", label: t("rename.fromName") }
+    { value: "fromName", label: t("rename.fromName") },
+    { value: "lookup", label: t("rename.lookup") }
   ]
   const fromName = (): boolean => renamer.direction === "fromName"
+  // From a database (views/lookup-panel.html): written, the tab turns to "Tags → name", the new names shown.
+  const looking = (): boolean => renamer.direction === "lookup"
+  const writeLookup = async () => {
+    if (await applyLookup()) setRenameDirection("toName")
+  }
   const reads = (): Read[] => readPlan.value.data
   // The pattern's fields, once each, as the preview's columns: the tag each sets, and its name.
   const READ_COLUMNS: Record<string, { tag: string; label: string }> = {
@@ -450,7 +458,8 @@
     <div :elseif="ui.selectionTab === 'rename'" class="rename">
       <!-- Which way: the tags give the name, or the name (and its folders) gives the tags. -->
       <Choice :label="t('rename.direction')" :options="directions()" :model="renamer.direction" @change="setRenameDirection($event.detail)" />
-      <div class="rename-head">
+      <LookupPanel :if="looking()" />
+      <div :else class="rename-head">
         <Field :label="t('rename.pattern')" control="rename-pattern">
           <div class="pattern-field" @input="lookForField()" @click="lookForField()" @keydown="onPatternKey($event)" @focusout="closeFields()">
             <TextInput id="rename-pattern" autocomplete="off" :model="renamer.pattern" @input="setRenamePattern($event.detail)" />
@@ -482,7 +491,7 @@
           </tbody>
         </table>
       </div>
-      <div :else class="mm-table-wrap">
+      <div :elseif="!looking()" class="mm-table-wrap">
         <table class="mm-table preview">
           <thead><tr><th>{{ t("rename.from") }}</th><th>{{ t("rename.to") }}</th><th></th></tr></thead>
           <tbody>
@@ -515,6 +524,10 @@
         <span :elseif="inLibrary()" class="scope-note">{{ t("editor.forMeOnly") }}</span>
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
         <Key variant="primary" :disabled="library.saving || tracks().length === 0" @click="saveEdits()">{{ library.saving ? t("editor.saving") : t("editor.save") }}</Key>
+      </span>
+      <span :elseif="ui.selectionTab === 'rename' && looking()" class="keys">
+        <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
+        <Key variant="primary" :disabled="library.saving || reading() || !!lookup.busy || lookupCount() === 0" @click="writeLookup()">{{ library.saving ? t("editor.saving") : tn("rename.read", lookupCount()) }}</Key>
       </span>
       <span :elseif="ui.selectionTab === 'rename' && fromName()" class="keys">
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>

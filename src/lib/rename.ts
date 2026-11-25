@@ -21,13 +21,16 @@ import { updateRoots } from "./roots";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
 import { ui } from "./ui";
 
-/** Which way the rename tab works: the tags give the file's name, or the name (and its folders) gives the tags. */
-export type RenameDirection = "toName" | "fromName";
+/**
+ * Which way the rename tab works: the tags give the file's name, the name (and its folders) gives
+ * the tags, or a database gives them (lib/lookup.ts).
+ */
+export type RenameDirection = "toName" | "fromName" | "lookup";
 
 /** The pattern being typed, as last used (or the first preset), and the way it is used, as last chosen. */
 export const renamer = $reactive({
   pattern: readStored(STORAGE_KEYS.renamePattern) || RENAME_PRESETS[0],
-  direction: (readStored(STORAGE_KEYS.renameDirection) === "fromName" ? "fromName" : "toName") as RenameDirection
+  direction: (["fromName", "lookup"].includes(readStored(STORAGE_KEYS.renameDirection) ?? "") ? readStored(STORAGE_KEYS.renameDirection) : "toName") as RenameDirection
 });
 
 /** Sets the way the rename tab works, and keeps it for the next time. */

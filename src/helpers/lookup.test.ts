@@ -4,15 +4,20 @@ import { describe, it } from "node:test";
 import type { Track } from "../types.ts";
 import { track } from "./fixtures.test-support.ts";
 import {
+  changedFields,
   discogsRelease,
   discogsSearch,
   lookupPlan,
+  lookupTerms,
   musicBrainzRelease,
+  musicBrainzReleaseUrl,
   musicBrainzSearch,
+  musicBrainzSearchUrl,
   pairTracks,
   parseDiscogsPosition,
   parseDuration,
   scoreRelease,
+  withChanges,
   type Release
 } from "./lookup.ts";
 
@@ -292,5 +297,47 @@ describe("the lookup's plan", () => {
       { field: "trackNumber", from: "1", to: "1/2" },
       { field: "discNumber", from: "2", to: "2/2" }
     ]);
+  });
+});
+
+describe("asking MusicBrainz", () => {
+  it("searches by album and artist, quoted and escaped", () => {
+    assert.equal(
+      musicBrainzSearchUrl(' OK "Computer" ', "Radio\\head"),
+      `https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent('release:"OK \\"Computer\\"" AND artist:"Radio\\\\head"')}&fmt=json&limit=10`
+    );
+    assert.equal(musicBrainzSearchUrl("Album", "", 5), `https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent('release:"Album"')}&fmt=json&limit=5`);
+  });
+
+  it("asks for a release with its recordings", () => {
+    assert.equal(musicBrainzReleaseUrl("a b"), "https://musicbrainz.org/ws/2/release/a%20b?inc=recordings+artist-credits+release-groups+genres&fmt=json");
+  });
+});
+
+describe("what to look up", () => {
+  it("takes the album and the album artist the files share", () => {
+    const files = [file("x/OK/1.mp3", { album: "OK Computer", artist: "Radiohead", albumArtist: "Radiohead" }, null), file("x/OK/2.mp3", { album: "OK Computer", artist: "Guest" }, null)];
+    assert.deepEqual(lookupTerms(files), { album: "OK Computer", artist: "Radiohead" });
+  });
+
+  it("falls back on the folder's name, and on nothing where they differ", () => {
+    const files = [file("x/Some Album/1.mp3", { artist: "A" }, null), file("x/Some Album/2.mp3", { artist: "B" }, null)];
+    assert.deepEqual(lookupTerms(files), { album: "Some Album", artist: "" });
+    assert.deepEqual(lookupTerms([file("a/1.mp3", {}, null), file("b/2.mp3", {}, null)]), { album: "", artist: "" });
+  });
+});
+
+describe("applying the plan", () => {
+  it("changes only the fields ticked, and lists the fields that change", () => {
+    const before = file("a.mp3", { title: "old", year: "1990" }, null).metadata;
+    const changes = [
+      { field: "title" as const, from: "old", to: "New" },
+      { field: "year" as const, from: "1990", to: "1997" }
+    ];
+    const after = withChanges(before, changes, ["year"]);
+    assert.equal(after.title, "old");
+    assert.equal(after.year, "1997");
+    assert.equal(before.year, "1990");
+    assert.deepEqual(changedFields([{ trackId: "a", track: null, changes: [changes[1], changes[0]] }, { trackId: "b", track: null, changes: [] }]), ["title", "year"]);
   });
 });

@@ -357,3 +357,51 @@ export function lookupPlan(pairs: readonly TrackPair[], release: Release): Looku
     return { trackId: file.id, track, changes };
   });
 }
+
+/** MusicBrainz's web service, its JSON. */
+export const MUSICBRAINZ = "https://musicbrainz.org/ws/2";
+
+/** A value as a phrase of a Lucene query: in quotes, its quotes and backslashes escaped. */
+const phrase = (value: string): string => `"${value.replace(/["\\]/g, (char) => `\\${char}`)}"`;
+
+/** The address of MusicBrainz's release search for an album (and its artist, if known). */
+export function musicBrainzSearchUrl(album: string, artist: string, limit = 10): string {
+  const query = [album.trim() && `release:${phrase(album.trim())}`, artist.trim() && `artist:${phrase(artist.trim())}`].filter(Boolean).join(" AND ");
+  return `${MUSICBRAINZ}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=${limit}`;
+}
+
+/** The address of a MusicBrainz release with what `musicBrainzRelease` reads. */
+export function musicBrainzReleaseUrl(id: string): string {
+  return `${MUSICBRAINZ}/release/${encodeURIComponent(id)}?inc=recordings+artist-credits+release-groups+genres&fmt=json`;
+}
+
+/**
+ * What to look up for the files: the album and artist they share (the album artist before each
+ * track's), else, with no album tag, the name of the folder that holds them all.
+ */
+export function lookupTerms(files: readonly Pick<Track, "relativePath" | "metadata">[]): { album: string; artist: string } {
+  const shared = (read: (file: (typeof files)[number]) => string): string => {
+    const values = new Set(files.map((file) => read(file).trim()).filter(Boolean));
+    return values.size === 1 ? [...values][0] : "";
+  };
+  const folders = new Set(files.map((file) => file.relativePath.split("/").slice(0, -1).pop() ?? ""));
+  const folder = folders.size === 1 ? [...folders][0] : "";
+  return {
+    album: shared((file) => file.metadata.album) || folder,
+    artist: shared((file) => file.metadata.albumArtist) || shared((file) => file.metadata.artist)
+  };
+}
+
+/** A file's tags with the plan's changes of the fields ticked. */
+export function withChanges(metadata: TrackMetadata, changes: readonly LookupChange[], fields: readonly LookupField[]): TrackMetadata {
+  const next = { ...metadata };
+  for (const change of changes) if (fields.includes(change.field)) next[change.field] = change.to;
+  return next;
+}
+
+/** The fields some file of the plan would change, in the plan's order. */
+export function changedFields(plans: readonly LookupPlan[]): LookupField[] {
+  const order: LookupField[] = ["title", "artist", "album", "albumArtist", "trackNumber", "discNumber", "year", "genre"];
+  const changed = new Set(plans.flatMap((plan) => plan.changes.map((change) => change.field)));
+  return order.filter((field) => changed.has(field));
+}
