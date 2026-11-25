@@ -9,6 +9,8 @@
 import { $reactive, $toRaw } from "jq79";
 import {
   changedFields,
+  coverArtUrl,
+  coverWanted,
   discogsHeaders,
   discogsRelease,
   discogsReleaseUrl,
@@ -23,6 +25,7 @@ import {
   musicBrainzSearchUrl,
   paceOf,
   pairTracks,
+  scaledSize,
   scoreRelease,
   withChanges,
   type LookupField,
@@ -63,7 +66,14 @@ export const lookup = $reactive({
   /** The release chosen, read whole, and its plan for the dialog's tracks. */
   chosen: null as Opaque<{ release: Release; fit: number; plans: LookupPlan[] }> | null,
   /** The fields to write, of those that change. */
-  fields: [] as LookupField[]
+  fields: [] as LookupField[],
+  /**
+   * The release's cover (L4): the Cover Art Archive's front picture of a MusicBrainz release, as a
+   * data URL once fetched ("none": it has none; "discogs": Discogs' pictures cannot be read from a
+   * page, as their server does not allow it). Written with the fields when ticked; ticked at first
+   * only where none of the files has a cover.
+   */
+  cover: { state: "" as "" | "loading" | "ready" | "none" | "discogs", dataUrl: "", on: false }
 });
 
 /** Looks in a source or not; one at least stays. Kept for the next time. */
@@ -140,6 +150,7 @@ export function resetLookup(): void {
   lookup.candidates = new Opaque([]);
   lookup.chosen = null;
   lookup.fields = [];
+  lookup.cover = { state: "", dataUrl: "", on: false };
 }
 
 /** One source's releases for the terms, with their fit for the files. */
@@ -182,6 +193,8 @@ export async function chooseRelease(source: LookupSource, id: string): Promise<v
     const plans = lookupPlan(pairTracks(files, release), release);
     lookup.chosen = new Opaque({ release, fit: Math.round(scoreRelease(files, release) * 100), plans });
     lookup.fields = changedFields(plans);
+    lookup.cover = { state: source === "musicbrainz" ? "loading" : "discogs", dataUrl: "", on: false };
+    if (source === "musicbrainz") void fetchCover(release.id, coverWanted(files));
   } catch (error) {
     lookup.error = reason(error);
   } finally {
@@ -189,10 +202,57 @@ export async function chooseRelease(source: LookupSource, id: string): Promise<v
   }
 }
 
+/** The largest side a cover is kept at, as the edit dialog's picture (views/selection-dialog.html). */
+const COVER_MAX = 1000;
+
+/** A picture scaled down to COVER_MAX at most, as a JPEG data URL. */
+async function scaledDataUrl(blob: Blob): Promise<string> {
+  const bitmap = await createImageBitmap(blob);
+  const size = scaledSize(bitmap.width, bitmap.height, COVER_MAX);
+  const canvas = document.createElement("canvas");
+  canvas.width = size.width;
+  canvas.height = size.height;
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, size.width, size.height);
+  bitmap.close();
+  const scaled = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+  return blobToDataUrl(scaled ?? blob);
+}
+
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+/** The chosen MusicBrainz release's front picture, if it has one; dropped if another is chosen meanwhile. */
+async function fetchCover(releaseId: string, wanted: boolean): Promise<void> {
+  const still = () => $toRaw(lookup).chosen?.data.release.id === releaseId;
+  try {
+    const response = await fetch(coverArtUrl(releaseId), { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!still()) return;
+    if (!response.ok) {
+      lookup.cover = { state: "none", dataUrl: "", on: false };
+      return;
+    }
+    const dataUrl = await scaledDataUrl(await response.blob());
+    if (still()) lookup.cover = { state: "ready", dataUrl, on: wanted };
+  } catch {
+    if (still()) lookup.cover = { state: "none", dataUrl: "", on: false };
+  }
+}
+
+/** Ticks or unticks the cover. */
+export function toggleCover(on: boolean): void {
+  if (lookup.cover.state === "ready") lookup.cover = { ...lookup.cover, on };
+}
+
 /** Back to the candidates. */
 export function leaveRelease(): void {
   lookup.chosen = null;
   lookup.fields = [];
+  lookup.cover = { state: "", dataUrl: "", on: false };
 }
 
 /** Ticks or unticks a field to write. */
@@ -205,7 +265,8 @@ export function toggleField(field: LookupField, on: boolean): void {
 export function lookupCount(): number {
   // Read through the store (not $toRaw): the key's count follows the boxes.
   const fields = [...lookup.fields];
-  return (lookup.chosen?.data.plans ?? []).filter((plan) => plan.changes.some((change) => fields.includes(change.field))).length;
+  const cover = lookup.cover.on && lookup.cover.state === "ready";
+  return (lookup.chosen?.data.plans ?? []).filter((plan) => (cover && plan.track) || plan.changes.some((change) => fields.includes(change.field))).length;
 }
 
 /**
@@ -217,9 +278,14 @@ export async function applyLookup(): Promise<boolean> {
   if (!chosen) return false;
   const fields = [...$toRaw(lookup).fields];
   const byId = new Map(tracks().map((track) => [track.id, track]));
+  const cover = $toRaw(lookup).cover;
+  const coverUrl = cover.on && cover.state === "ready" ? cover.dataUrl : null;
   const items = chosen.plans.flatMap((plan) => {
     const track = byId.get(plan.trackId);
-    return track && plan.changes.some((change) => fields.includes(change.field)) ? [{ track, metadata: withChanges(track.metadata, plan.changes, fields) }] : [];
+    if (!track || !(plan.changes.some((change) => fields.includes(change.field)) || (coverUrl && plan.track))) return [];
+    const metadata = withChanges(track.metadata, plan.changes, fields);
+    // The cover to every file paired with a track of the release.
+    return [{ track, metadata: coverUrl && plan.track ? { ...metadata, coverDataUrl: coverUrl } : metadata }];
   });
   return items.length > 0 && saveMetadata(items);
 }

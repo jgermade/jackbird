@@ -10,7 +10,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
   const Reel = await import("../../theme/default/components/reel.html")
   const { t, tn } = await import("../lib/i18n")
-  const { SOURCES, chooseRelease, leaveRelease, lookup, searchReleases, sourceName, syncLookup, toggleField, toggleSource } = await import("../lib/lookup")
+  const { SOURCES, chooseRelease, leaveRelease, lookup, searchReleases, sourceName, syncLookup, toggleCover, toggleField, toggleSource } = await import("../lib/lookup")
   const { changedFields } = await import("../helpers/lookup")
   const { dialogTracks } = await import("../lib/workspace")
 
@@ -78,8 +78,16 @@
       <span class="chosen-name"><span class="badge" :data-source="chosen().release.source">{{ sourceName(chosen().release.source) }}</span><b>{{ chosen().release.title }}</b> · {{ chosen().release.artist }}<span :if="chosen().release.year"> · {{ chosen().release.year }}</span></span>
       <span class="fit">{{ t("lookup.fit", { fit: String(chosen().fit) }) }}</span>
     </div>
-    <p :if="fields().length === 0" class="hint">{{ t("lookup.nothing") }}</p>
-    <div :else class="fields">
+    <!-- Its cover (L4): the Cover Art Archive's, with its box; else why there is none. -->
+    <div :if="lookup.cover.state === 'ready'" class="cover-pick">
+      <img class="cover" :src="lookup.cover.dataUrl" :alt="t('album.coverOf', { title: chosen().release.title })" />
+      <Checkbox id="lookup-cover" :model="lookup.cover.on" @change="toggleCover($event.detail)">{{ t("lookup.cover") }}</Checkbox>
+    </div>
+    <p :elseif="lookup.cover.state === 'loading'" class="hint" role="status"><Reel :size="12" speed="fast" /> {{ t("lookup.coverLoading") }}</p>
+    <p :elseif="lookup.cover.state === 'none'" class="hint">{{ t("lookup.coverNone") }}</p>
+    <p :elseif="lookup.cover.state === 'discogs'" class="hint">{{ t("lookup.coverDiscogs") }}</p>
+    <p :if="fields().length === 0 && lookup.cover.state !== 'ready'" class="hint">{{ t("lookup.nothing") }}</p>
+    <div :elseif="fields().length > 0" class="fields">
       <span :each="field in fields()" :key="field"><Checkbox :id="`lookup-field-${field}`" :model="ticked(field)" @change="toggleField(field, $event.detail)">{{ t(LABELS[field]) }}</Checkbox></span>
     </div>
     <p :if="unpaired() > 0" class="hint">{{ tn("lookup.unpaired", unpaired()) }}</p>
@@ -147,6 +155,8 @@
   .chosen { display: grid; gap: var(--mm-space-3); }
   .chosen-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-2) var(--mm-space-3); }
   .chosen-name { flex: 1; min-width: 0; }
+  .cover-pick { display: flex; align-items: center; gap: var(--mm-space-3); }
+  .cover { width: 4rem; height: 4rem; border-radius: var(--mm-radius-key); object-fit: cover; box-shadow: 0 0 0 1px var(--mm-border); }
   .fields { display: flex; flex-wrap: wrap; gap: var(--mm-space-2) var(--mm-space-4); }
   .preview td { overflow-wrap: anywhere; }
   .preview .off { opacity: .4; }

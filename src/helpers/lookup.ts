@@ -444,3 +444,19 @@ export function mergeCandidates<T extends { fit: number }>(lists: readonly (read
     .sort((left, right) => right.item.fit - left.item.fit || left.at - right.at)
     .map(({ item }) => item);
 }
+
+/** The Cover Art Archive's front picture of a MusicBrainz release (250, 500 or 1200 pixels wide). */
+export function coverArtUrl(releaseId: string, size: 250 | 500 | 1200 = 1200): string {
+  return `https://coverartarchive.org/release/${encodeURIComponent(releaseId)}/front-${size}`;
+}
+
+/** Whether a release's cover is offered ticked: only when none of the files has one. */
+export function coverWanted(files: readonly Pick<Track, "metadata">[]): boolean {
+  return files.every((file) => !file.metadata.coverDataUrl);
+}
+
+/** The side a picture is scaled to, at most `max` on its longer side, never larger than it is. */
+export function scaledSize(width: number, height: number, max: number): { width: number; height: number } {
+  const ratio = Math.min(1, max / Math.max(width, height, 1));
+  return { width: Math.max(1, Math.round(width * ratio)), height: Math.max(1, Math.round(height * ratio)) };
+}

@@ -5,6 +5,8 @@ import type { Track } from "../types.ts";
 import { track } from "./fixtures.test-support.ts";
 import {
   changedFields,
+  coverArtUrl,
+  coverWanted,
   discogsHeaders,
   discogsRelease,
   discogsReleaseUrl,
@@ -21,6 +23,7 @@ import {
   paceOf,
   parseDiscogsPosition,
   parseDuration,
+  scaledSize,
   scoreRelease,
   withChanges,
   type Release
@@ -372,5 +375,23 @@ describe("candidates of several sources", () => {
     const b = [{ id: "b1", fit: 90 }, { id: "b2", fit: 10 }];
     assert.deepEqual(mergeCandidates([a, b]).map((one) => one.id), ["b1", "a2", "a1", "b2"]);
     assert.deepEqual(mergeCandidates([]), []);
+  });
+});
+
+describe("a release's cover", () => {
+  it("is the Cover Art Archive's front picture", () => {
+    assert.equal(coverArtUrl("6a09041b"), "https://coverartarchive.org/release/6a09041b/front-1200");
+    assert.equal(coverArtUrl("a b", 500), "https://coverartarchive.org/release/a%20b/front-500");
+  });
+
+  it("is offered ticked only where no file has one", () => {
+    assert.equal(coverWanted([file("a.mp3", {}, null), file("b.mp3", {}, null)]), true);
+    assert.equal(coverWanted([file("a.mp3", {}, null), file("b.mp3", { coverDataUrl: "jackbird-cover:x" }, null)]), false);
+  });
+
+  it("is scaled down to the editor's size, never up", () => {
+    assert.deepEqual(scaledSize(1200, 1200, 1000), { width: 1000, height: 1000 });
+    assert.deepEqual(scaledSize(1200, 600, 1000), { width: 1000, height: 500 });
+    assert.deepEqual(scaledSize(500, 500, 1000), { width: 500, height: 500 });
   });
 });
