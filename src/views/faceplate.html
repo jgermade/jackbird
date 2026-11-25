@@ -77,29 +77,29 @@
         :add-label="folderLabel" :add-disabled="library.loading || !canAdd()" @add="openAdding()"
         @change="selectRoot($event.detail)" @close="closeRoot($event.detail)">
     <template :slot.end>
-      <!-- Adding another folder, once one is open: before that, the welcome offers it. Two keys of
-           glyphs alone, so the tabs keep the bar's room on a phone: + and a box of music with another
-           behind it (a folder, a server, an iPod), + and a note (songs to one's own music, so not while someone's shared
-           music is in view). -->
+      <!-- Opening another source, once one is open: before that, the welcome offers it. A key of
+           glyphs alone, so the tabs keep the bar's room on a phone: an open folder (a source opened
+           as a tab of its own, nothing added to anything: the owner, 2026-11-25). The key that adds
+           music to the tab open is at the bar's right end, beside the search. -->
       <span :if="hasRoots && canAdd()" class="open-folder" :class.has-roots="hasRoots">
         <Key size="sm" :disabled="library.loading" :label="folderLabel" :title="folderLabel" @click="openAdding()">
           <Reel :if="library.loading" :size="12" speed="fast" />
           <span :else class="glyphs">
-            <svg class="plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
-            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.25" y="4" width="11" height="10.75" rx="1" /><path d="M3.75 1.5h10a1 1 0 0 1 1 1v9.75M8.25 6.5v4M8.25 6.5l1.75.65" /><circle cx="6.75" cy="10.5" r="1.5" /></svg>
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.75 12.75V3.5a.75.75 0 0 1 .75-.75h3.25l1.5 1.5h5.5a.75.75 0 0 1 .75.75v1.75" /><path d="M1.75 12.75 3.6 7.25h11.15l-1.85 5.5z" /></svg>
           </span>
           <span :if="folderText" class="folder-text">{{ folderText }}</span>
         </Key>
       </span>
-      <!-- Not over someone's music shared with one: songs go to one's own (lib/importing.ts, uploadPath). -->
+    </template>
+    <template :slot.aside>
+      <!-- Adding music to the source open (its tab), beside the search (the owner, 2026-11-25). Not over
+           someone's music shared with one: songs go to one's own (lib/importing.ts, uploadPath). -->
       <Key :if="importing.available && can('editor') && !inSharedMusic()" size="sm" popup="dialog" :label="t('import.open')" :title="t('import.open')" @click="openImport()">
         <span class="glyphs">
           <svg class="plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" stroke="none" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" stroke="none" /></svg>
         </span>
       </Key>
-    </template>
-    <template :slot.aside>
       <!-- The search of the open tab (lib/search.ts), always in view at the bar's right end: a latching
            key, down while the search is open; pressed again, it closes it. -->
       <Key :if="library.activeRootId" size="sm" square :pressed="search.open" :label="t('search.open')" :title="t('search.openKeys')" @click="toggleSearch()">

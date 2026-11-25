@@ -10,8 +10,8 @@ export const en = {
   "common.none": "-",
 
   "picker.scanning": "Scanning…",
-  "picker.addRoot": "Add a library",
-  "picker.openLibrary": "Open library",
+  "picker.addRoot": "Open a source…",
+  "picker.openLibrary": "Open a source…",
 
   "roots.close": "Close {name}",
   "roots.fallbackName": "Root {number}",
@@ -438,7 +438,7 @@ export const en = {
   "message.queued.other": "{count} tracks added to the queue.",
   "message.saved": "Metadata saved to {target}.",
   "message.saveFailed": "Could not save the changes.",
-  "sources.eyebrow": "Add to the library",
+  "sources.eyebrow": "Open a source",
   "sources.device": "A folder of this device",
   "sources.deviceHint": "Its songs are read where they are.",
   "sources.serverFolder": "A folder of {server}",

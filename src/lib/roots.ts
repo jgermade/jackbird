@@ -440,7 +440,7 @@ export async function hydrateRoot(
 }
 
 /** Asks for a folder and opens it: one of this device, or of `server`'s machine (E6b-D11). */
-export async function openFolder(server?: ServiceClient, options: { ipod?: boolean } = {}): Promise<void> {
+export async function openFolder(server?: ServiceClient, options: { ipod?: boolean; device?: boolean } = {}): Promise<void> {
   library.loading = true;
   library.errorMessage = null;
   library.infoMessage = null;
@@ -556,7 +556,7 @@ export function closeRoot(rootId: string): void {
 
   dropFromQueue((item) => item.rootId === rootId);
   roots[index].source.close();
-  // Offered again in "Add to the library…"'s Folder tab; not a folder read only, which cannot be reopened.
+  // Offered again in "Open a source…"'s Folder tab; not a folder read only, which cannot be reopened.
   if (!roots[index].source.readOnly) rememberClosed({ label: roots[index].label, saved: roots[index].source.saved });
 
   const nextRoots = roots.filter((root) => root.id !== rootId);

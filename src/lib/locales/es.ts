@@ -11,8 +11,8 @@ export const es: Record<MessageKey, string> = {
   "common.none": "-",
 
   "picker.scanning": "Escaneando...",
-  "picker.addRoot": "Añadir biblioteca",
-  "picker.openLibrary": "Abrir biblioteca",
+  "picker.addRoot": "Abrir origen…",
+  "picker.openLibrary": "Abrir origen…",
 
   "roots.close": "Cerrar {name}",
   "roots.fallbackName": "Root {number}",
@@ -439,7 +439,7 @@ export const es: Record<MessageKey, string> = {
   "message.queued.other": "{count} pistas añadidas a la cola.",
   "message.saved": "Metadatos guardados en {target}.",
   "message.saveFailed": "No se pudieron guardar los cambios.",
-  "sources.eyebrow": "Añadir a la biblioteca",
+  "sources.eyebrow": "Abrir un origen",
   "sources.device": "Una carpeta de este dispositivo",
   "sources.deviceHint": "Sus canciones se leen donde están.",
   "sources.serverFolder": "Una carpeta de {server}",
