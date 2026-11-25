@@ -14,6 +14,7 @@
 import { $reactive } from "jq79";
 import { compactHeightFor, compactSize, isCompactShortcut, parseCompactState, pipSize, type Bounds, type CompactState } from "../helpers/compact";
 import { onSpace } from "./hotkeys";
+import { preferences } from "./preferences";
 import { isDesktop, isEmbed, isPhone } from "./platform";
 import { readStored, STORAGE_KEYS, writeStored } from "./storage";
 
@@ -420,6 +421,33 @@ function onShortcut(event: KeyboardEvent): void {
 }
 
 /**
+ * The mini player opened by itself, where the floating window is (C1b): when the tab is left
+ * (another tab, the window minimised) while music plays, as long as the preference is on. A page
+ * may only ask for that window from a click, or from this media session action, which Chromium
+ * gives a page playing audio as it is hidden (its automatic picture-in-picture); it closes the
+ * window itself when the tab is back. No browser offers it when the window merely loses the focus
+ * and stays in sight.
+ */
+function followAutoMini(): void {
+  const session = typeof navigator !== "undefined" ? navigator.mediaSession : undefined;
+  if (!session) return;
+  const apply = () => {
+    try {
+      session.setActionHandler(
+        "enterpictureinpicture" as MediaSessionAction,
+        preferences.autoMini ? () => void turn(async () => {
+          if (compact.mode === "full") await floatOpen();
+        }) : null
+      );
+    } catch {
+      // A browser that does not know the action.
+    }
+  };
+  apply();
+  preferences.$on("autoMini", apply);
+}
+
+/**
  * At the start: the shortcut, and in the desktop app the mode it was closed in (the window opens
  * at its full size and turns compact in its first frames), and the following of its place.
  */
@@ -428,6 +456,7 @@ export function startCompact(): void {
   compact.onTop = saved.onTop;
   compact.list = saved.list;
   document.addEventListener("keydown", onShortcut);
+  if (compactPlace === "pip") followAutoMini();
   if (compactPlace !== "window") return;
   void followWindow().catch(() => undefined);
   if (saved.on) {

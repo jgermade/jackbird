@@ -24,6 +24,8 @@ export const STORAGE_KEYS = {
   songsInFolders: "jackbird.songsInFolders",
   /** Whether the library shows the songs in its other views ("on" when it does; off by default). */
   songsInViews: "jackbird.songsInViews",
+  /** Whether the mini player opens by itself when the tab is left while playing ("off" when not; on by default: src/lib/compact.ts). */
+  autoMini: "jackbird.autoMini",
   /** The library's views whose keys are shown, comma-separated (src/helpers/shown-views.ts). */
   shownViews: "jackbird.shownViews",
   /** How one song follows another: normal, gapless or crossfade (src/helpers/transition.ts). */

@@ -25,7 +25,8 @@
   const SubModal = await import("../../theme/default/components/sub-modal.html")
 
   const { languageName, t, tn } = await import("../lib/i18n")
-  const { LANGUAGES, preferences, showView, setCrossfadeSeconds, setDensity, setLanguage, setPeakFall, setSongsInFolders, setSongsInViews, setSpectrumLook, setThemeChoice, setTransition } = await import("../lib/preferences")
+  const { compactPlace } = await import("../lib/compact")
+  const { LANGUAGES, preferences, setAutoMini, showView, setCrossfadeSeconds, setDensity, setLanguage, setPeakFall, setSongsInFolders, setSongsInViews, setSpectrumLook, setThemeChoice, setTransition } = await import("../lib/preferences")
   const { CROSSFADE_MAX, CROSSFADE_MIN, TRANSITIONS, transitionOf } = await import("../helpers/transition")
   const { DENSITIES, densityOf } = await import("../helpers/density")
   const { PEAK_FALLS, SPECTRUM_LOOKS, peakFallOf, spectrumLookOf } = await import("../helpers/spectrum")
@@ -188,6 +189,15 @@
           <span class="caption" aria-hidden="true">{{ t("preferences.peakFall") }}</span>
           <Choice :label="t('preferences.peakFall')" :model="preferences.peakFall" :options="peakFalls()" @change="setPeakFall(peakFallOf($event.detail))" />
         </div>
+      </section>
+      <!-- The mini player opened by itself when the tab is left while playing (lib/compact.ts):
+           only where it floats in a window of its own (Chromium's desktop browsers). -->
+      <section :if="compactPlace === 'pip'" class="pref inline">
+        <div class="text toggles" @click="setAutoMini(!preferences.autoMini)">
+          <h3 class="mm-legend is-ink">{{ t("preferences.autoMini") }}</h3>
+          <p>{{ preferences.autoMini ? t("preferences.autoMiniOn") : t("preferences.autoMiniOff") }}</p>
+        </div>
+        <SlideSwitch :label="t('preferences.autoMini')" :model="preferences.autoMini" @change="setAutoMini($event.detail)" />
       </section>
       <section class="pref">
         <Field :label="t('preferences.language')" control="preferences-language" :hint="t('preferences.languageHint')">

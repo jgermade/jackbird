@@ -73,7 +73,9 @@ export const preferences = $reactive({
   spectrumLook: spectrumLookOf(readStored(STORAGE_KEYS.spectrumLook)),
   peakFall: peakFallOf(readStored(STORAGE_KEYS.peakFall)),
   transition: transitionOf(readStored(STORAGE_KEYS.transition)),
-  crossfadeSeconds: crossfadeSecondsOf(readStored(STORAGE_KEYS.crossfadeSeconds))
+  crossfadeSeconds: crossfadeSecondsOf(readStored(STORAGE_KEYS.crossfadeSeconds)),
+  /** The mini player opened by itself when the tab is left while playing (lib/compact.ts): on until turned off. */
+  autoMini: readStored(STORAGE_KEYS.autoMini) !== "off"
 });
 
 function apply(): void {
@@ -129,6 +131,12 @@ export function setSongsInFolders(on: boolean): void {
 export function setSongsInViews(on: boolean): void {
   preferences.songsInViews = on;
   writeStored(STORAGE_KEYS.songsInViews, on ? "on" : "off");
+}
+
+/** Whether the mini player opens by itself when the tab is left while playing. */
+export function setAutoMini(on: boolean): void {
+  preferences.autoMini = on;
+  writeStored(STORAGE_KEYS.autoMini, on ? "on" : "off");
 }
 
 /** Shows a view's key in the library's head, or hides it; the last one shown stays. */
