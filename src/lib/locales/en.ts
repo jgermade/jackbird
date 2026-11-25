@@ -746,6 +746,9 @@ export const en = {
 
   "import.eyebrow": "Your music",
   "import.title": "Add music",
+  "import.aboutFolder": "The songs you pick are copied into {name}, in their folders; a file of the same name already there is left as it is.",
+  "import.filesCopy": "Copy songs",
+  "import.folderCopy": "Copy a folder",
   "import.about": "Songs are copied into the library once each; the files you pick are not changed. The same song brought again with other tags is kept as a suggestion beside it.",
   "import.files": "Upload songs",
   "import.folder": "Upload a folder",

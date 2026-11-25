@@ -20,7 +20,7 @@
   const macWindow: boolean = isDesktop && !isPhone && /Mac/.test(navigator.userAgent)
   const { t, tn } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
-  const { importing, openImport } = await import("../lib/importing")
+  const { addTarget, importing, openImport } = await import("../lib/importing")
   const { search, toggleSearch } = await import("../lib/search")
   const { library } = await import("../lib/library")
   const { closeRoot, selectRoot } = await import("../lib/roots")
@@ -28,7 +28,7 @@
   // Something to add: a folder, a server, or someone's music shared with one (SH-D6, a listener's too).
   const canAdd = (): boolean => sourcesHere().length > 0 || adding.shared.length > 0
   const sourceTabs = () => tabsHere().map((tab) => ({ id: tab, label: tabLabel(tab) }))
-  const { inSharedMusic, openSelection } = await import("../lib/editor")
+  const { openSelection } = await import("../lib/editor")
   const { activeRoot, clearSelection } = await import("../lib/workspace")
   // The display's spectrum: 24 bands above 640px, 12 below.
   const { watchMedia } = await import("../lib/media")
@@ -92,9 +92,9 @@
       </span>
     </template>
     <template :slot.aside>
-      <!-- Adding music to the source open (its tab), beside the search (the owner, 2026-11-25). Not over
-           someone's music shared with one: songs go to one's own (lib/importing.ts, uploadPath). -->
-      <Key :if="importing.available && can('editor') && !inSharedMusic()" size="sm" popup="dialog" :label="t('import.open')" :title="t('import.open')" @click="openImport()">
+      <!-- Adding music to the tab in front, beside the search (the owner, 2026-11-25): uploaded to the
+           family library, copied into a folder; not shown where it cannot add (lib/importing.ts addTarget). -->
+      <Key :if="addTarget() !== null" size="sm" popup="dialog" :label="t('import.open')" :title="t('import.open')" @click="openImport()">
         <span class="glyphs">
           <svg class="plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
           <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5V3.75l7.25-1.5v8.75" /><circle cx="4.5" cy="12.5" r="1.6" fill="currentColor" stroke="none" /><circle cx="11.75" cy="11" r="1.6" fill="currentColor" stroke="none" /></svg>

@@ -1,4 +1,5 @@
-// Adding music to the family library (F1): files or folders uploaded from
+// Adding music to the tab in front (the owner, 2026-11-25: `addTarget`): to a folder, its files
+// copied into it; to the family library (F1): files or folders uploaded from
 // this device (editors and up), or a folder of the service's machine imported
 // there (owners), with progress and what became of each file. When it ends,
 // the library's root is read again. The view is views/import-dialog.html.
@@ -14,10 +15,13 @@ import { $reactive, $toRaw } from "jq79";
 import { isAudioFile } from "../helpers/formats";
 import { isHomeAddress } from "../helpers/instance";
 import { folderUpload, isHandheld, type FolderUpload } from "../helpers/picked";
+import type { RootSource } from "../types";
 import { t } from "./i18n";
 import { library } from "./library";
 import { isDesktop, isPhone } from "./platform";
+import { can } from "./account";
 import { refreshRoot } from "./roots";
+import { activeRoot } from "./workspace";
 import {
   currentServer,
   homeAddresses,
@@ -72,6 +76,23 @@ function refreshLibrary(): void {
   const root = $toRaw(library).roots.find((item) => item.source.kind === "library" && item.source.server === server && item.source.shelf === undefined);
   if (root) void refreshRoot(root.id);
 }
+
+/**
+ * Where "Add music" adds (the owner, 2026-11-25): to the tab in front. Its family library (one's own
+ * music in it, editors and up): uploaded, as ever; a folder of this device or of a server that can be
+ * written (editors and up): the files copied into it. Elsewhere (someone's music shared with one, a
+ * folder only read, an iPod, nothing open): nowhere, and the key is not shown.
+ */
+export type AddTarget = "library" | "folder" | null;
+export function addTarget(): AddTarget {
+  const source = activeRoot.value.data?.source;
+  if (!source || !can("editor")) return null;
+  if (source.kind === "library") return source.shelf === undefined ? "library" : null;
+  return source.readOnly || source.ipod ? null : "folder";
+}
+
+/** The tab "Add music" adds to: its name. */
+export const addTargetName = (): string => activeRoot.value.data?.label ?? "";
 
 export function openImport(): void {
   importing.open = true;
@@ -129,7 +150,7 @@ async function homeRoute(): Promise<string | null> {
 }
 
 /** Uploads songs one at a time, with the dialog's progress and report; the library read again after. */
-async function uploadSongs(songs: Song[]): Promise<void> {
+async function uploadSongs(songs: Song[], toServer = true, after: () => void = refreshLibrary): Promise<void> {
   const report = emptyReport();
   importing.busy = true;
   importing.error = "";
@@ -142,7 +163,7 @@ async function uploadSongs(songs: Song[]): Promise<void> {
   importing.bytesSent = 0;
   importing.bytesTotal = sized ? songs.reduce((sum, song) => sum + (song.size ?? 0), 0) : 0;
   try {
-    let at = songs.length > 0 ? await homeRoute() : null;
+    let at = toServer && songs.length > 0 ? await homeRoute() : null;
     importing.home = at !== null;
     for (const song of songs) {
       let answer: Uploaded;
@@ -169,7 +190,7 @@ async function uploadSongs(songs: Song[]): Promise<void> {
       importing.bytesSent = 0;
     }
     importing.report = report;
-    refreshLibrary();
+    after();
   } finally {
     importing.busy = false;
     importing.home = false;
@@ -177,8 +198,42 @@ async function uploadSongs(songs: Song[]): Promise<void> {
   }
 }
 
-/** Uploads the songs among `files` (chosen in the page: songs, or a folder's files). */
+/**
+ * Copies a song into the folder in front, where it was in what was picked: "existing" where a file of
+ * that name is there already (left as it is), else written (streamed where the folder can).
+ */
+async function copyIntoFolder(vfs: RootSource["vfs"], relative: string, file: File, sent: (bytes: number) => void): Promise<Uploaded> {
+  const path = uploadPath(relative);
+  if (await vfs.stat(path)) return { result: "existing", path };
+  const folder = path.slice(0, Math.max(0, path.lastIndexOf("/")));
+  if (folder) await vfs.mkdir?.(folder);
+  if (vfs.writeStream) {
+    const out = await vfs.writeStream(path);
+    let bytes = 0;
+    await file.stream().pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(chunk, controller) { bytes += chunk.byteLength; sent(bytes); controller.enqueue(chunk); } })).pipeTo(out);
+  } else {
+    await vfs.write(path, new Uint8Array(await file.arrayBuffer()));
+    sent(file.size);
+  }
+  return { result: "added", path };
+}
+
+/**
+ * Adds the songs among `files` (chosen in the page: songs, or a folder's files) to the tab in front:
+ * uploaded to the family library, or copied into the folder (`addTarget`).
+ */
 export function uploadFiles(files: File[]): Promise<void> {
+  const root = activeRoot.value.data;
+  if (addTarget() === "folder" && root) {
+    const vfs = root.source.vfs;
+    const songs = files
+      .filter((file) => isAudioFile(file.name))
+      .map((file): Song => {
+        const relative = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+        return { name: file.name, size: file.size, send: (_at, sent) => copyIntoFolder(vfs, relative, file, sent) };
+      });
+    return uploadSongs(songs, false, () => void refreshRoot(root.id));
+  }
   const songs = files
     .filter((file) => isAudioFile(file.name))
     .map((file): Song => {

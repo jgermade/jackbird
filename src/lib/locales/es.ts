@@ -747,6 +747,9 @@ export const es: Record<MessageKey, string> = {
 
   "import.eyebrow": "Tu música",
   "import.title": "Añadir música",
+  "import.aboutFolder": "Las canciones que elijas se copian a {name}, en sus carpetas; un archivo del mismo nombre que ya esté se deja como está.",
+  "import.filesCopy": "Copiar canciones",
+  "import.folderCopy": "Copiar una carpeta",
   "import.about": "Las canciones se copian a la biblioteca una sola vez; los archivos que eliges no cambian. La misma canción traída de nuevo con otras etiquetas se guarda como sugerencia junto a ella.",
   "import.files": "Subir canciones",
   "import.folder": "Subir una carpeta",

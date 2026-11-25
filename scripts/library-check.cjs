@@ -289,7 +289,8 @@ async function report(page) {
     if (deleted !== 204) fail(`the delete answered ${deleted}`);
     await owner.getByRole("button", { name: "Open preferences" }).first().click();
     await owner.getByRole("tab", { name: "Server", exact: true }).click();
-    await owner.getByRole("radio", { name: "Trash" }).click();
+    // The trash and the backups: keys of the server's head, each over the details (2026-11-25).
+    await owner.getByRole("button", { name: "Trash", exact: true }).click();
     await owner.getByText("ape.mp3", { exact: true }).waitFor({ timeout: 15000 });
     await owner.getByRole("button", { name: "Restore" }).first().click();
     await owner.getByText("The trash is empty.").first().waitFor({ timeout: 15000 });
@@ -297,9 +298,11 @@ async function report(page) {
     const back = await editor.evaluate(async () => (await (await fetch("/api/library/walk")).json()).some((entry) => entry.path === "ape.mp3"));
     if (!back) fail("the song did not come back from the trash");
     console.log("a song deleted into the trash and restored");
-    await owner.getByRole("radio", { name: "Backups" }).click();
+    await owner.keyboard.press("Escape");
+    await owner.getByRole("button", { name: "Backups", exact: true }).click();
     await owner.getByRole("button", { name: "Take one now" }).click();
     await owner.getByText("Snapshot taken.").waitFor({ timeout: 15000 });
+    await owner.keyboard.press("Escape");
     await owner.keyboard.press("Escape");
 
     // ── F4: away from home with restic (where it is installed): backed up, wiped, restored.
