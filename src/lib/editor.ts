@@ -8,6 +8,7 @@
 
 import { $reactive, $toRaw } from "jq79";
 import { computeCommonMetadata, emptyMetadata, getVariedFields, mergeDraft } from "../helpers/metadata";
+import { menuDialogTargets } from "../helpers/selection";
 import type { EditableMetadata, MetaRecord, Track } from "../types";
 import { can } from "./account";
 import { computeBpms } from "./bpm";
@@ -19,7 +20,7 @@ import { flushMeta } from "./meta";
 import { doneWriting, writingFile } from "./progress";
 import { updateRoots } from "./roots";
 import { ui, type SelectionTab } from "./ui";
-import { activeRoot, selectUnlessChosen, selectedTracks } from "./workspace";
+import { activeRoot, dialogTracks } from "./workspace";
 
 /**
  * The form. Filled when the dialog opens and changed only by typing, so
@@ -56,11 +57,14 @@ export function canChange(): boolean {
 
 /**
  * Opens the selection's dialog on `tab`, the form filled with the values its
- * tracks share. Switching tabs afterwards keeps what was typed.
+ * tracks share. Switching tabs afterwards keeps what was typed. `targets`: the
+ * tracks of a track's menu, when not the selection (see openSelectionFor).
  */
-export function openSelection(tab: SelectionTab = "edit"): void {
-  const tracks = selectedTracks.value.data;
+export function openSelection(tab: SelectionTab = "edit", targets: string[] | null = null): void {
+  ui.selectionTargets = targets;
+  const tracks = dialogTracks.value.data;
   if (tracks.length === 0) {
+    ui.selectionTargets = null;
     return;
   }
   editor.form = computeCommonMetadata(tracks);
@@ -76,12 +80,11 @@ export function openSelection(tab: SelectionTab = "edit"): void {
 
 /**
  * Opens the selection's dialog on `tab` from a track's menu: on the
- * selection when the track is in it, else on that track alone, which becomes
- * the selection.
+ * selection when the track is in it, else on that track alone, the selection
+ * left as it is (the owner, 2026-11-25).
  */
 export function openSelectionFor(trackId: string, tab: SelectionTab): void {
-  selectUnlessChosen(trackId);
-  openSelection(tab);
+  openSelection(tab, menuDialogTargets(activeRoot.value.data?.selectedTrackIds ?? [], trackId));
 }
 
 export function closeSelection(): void {
@@ -131,7 +134,7 @@ async function showAsItIsNow(rootId: string, track: Track): Promise<void> {
   updateRoots((roots) =>
     roots.map((item) => (item.id === rootId ? { ...item, tracks: item.tracks.map((one) => (one.id === track.id ? fresh : one)) } : item))
   );
-  editor.form = computeCommonMetadata(selectedTracks.value.data);
+  editor.form = computeCommonMetadata(dialogTracks.value.data);
   editor.confirmed = [];
 }
 
@@ -217,7 +220,7 @@ export async function saveMetadata(items: readonly { track: Track; metadata: Tra
 
 /** Saves the edit dialog's form to the selected tracks (saveMetadata), and closes it when it all worked. */
 export async function saveEdits(): Promise<void> {
-  const tracks = selectedTracks.value.data;
+  const tracks = dialogTracks.value.data;
   if (tracks.length === 0 || library.saving) return;
   const draft: EditableMetadata = { ...$toRaw(editor).form };
   const confirmed = [...$toRaw(editor).confirmed];
@@ -240,7 +243,7 @@ export async function saveEdits(): Promise<void> {
  */
 export async function calculateBpm(): Promise<void> {
   const root = activeRoot.value.data;
-  const tracks = selectedTracks.value.data;
+  const tracks = dialogTracks.value.data;
   if (!root || tracks.length === 0) return;
   library.errorMessage = null;
   const single = tracks.length === 1;

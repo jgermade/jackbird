@@ -13,7 +13,7 @@ import { levelsOf, openOnEntering, openOnLeaving, type Levels } from "../helpers
 import { listCards, type ListCard } from "../helpers/lists";
 import { shuffledOrder } from "../helpers/order";
 import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
-import { nextSelection, selectMany } from "../helpers/selection";
+import { dialogTrackIds, nextSelection, selectMany } from "../helpers/selection";
 import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
 import { albumKey, artistKey, buildViewRows, trackPlace, type ViewLabels } from "../helpers/views";
@@ -165,6 +165,18 @@ export const selectedTracks = $computed((): Opaque<Track[]> => {
   }
   const selected = new Set(root.selectedTrackIds);
   return new Opaque(root.tracks.filter((track) => selected.has(track.id)));
+});
+
+/**
+ * The tracks the selection dialog works on (boxed): those of a track's menu (`ui.selectionTargets`),
+ * else the selection; in the library's order.
+ */
+export const dialogTracks = $computed((): Opaque<Track[]> => {
+  const { root } = derive();
+  const targets = ui.selectionTargets ? [...$toRaw(ui.selectionTargets)] : null;
+  if (!root) return new Opaque([]);
+  const ids = new Set(dialogTrackIds(root.selectedTrackIds, targets));
+  return new Opaque(ids.size === 0 ? [] : root.tracks.filter((track) => ids.has(track.id)));
 });
 
 /** The active root as a plain object. */
@@ -357,13 +369,25 @@ export function goToGroup(trackId: string, group: "album" | "artist"): void {
 /** Drops the selected tracks from the library (not from disk): they come back when the folder is opened again. */
 export function removeSelectedTracks(): void {
   const root = current();
-  if (!root || root.selectedTrackIds.length === 0) {
+  if (!root) {
     return;
   }
-  const gone = new Set(root.selectedTrackIds);
-  // They leave the queue first (if the one playing goes, the next one plays), then the library.
+  const targets = $toRaw(ui).selectionTargets;
+  const gone = new Set(dialogTrackIds(root.selectedTrackIds, targets));
+  if (gone.size === 0) {
+    return;
+  }
+  // They leave the queue first (if the one playing goes, the next one plays), then the library. Those
+  // of a track's menu leave the selection as it is, but for any of them in it.
   dropFromQueue((item) => item.rootId === root.id && gone.has(item.trackId));
-  updateActive((item) => ({ ...clearedSelection(item), tracks: item.tracks.filter((track) => !gone.has(track.id)) }));
+  const kept = (item: RootWorkspace): RootWorkspace => {
+    if (!targets) return clearedSelection(item);
+    const selected = item.selectedTrackIds.filter((id) => !gone.has(id));
+    const keep = (id: string | null): string | null => (id && !gone.has(id) ? id : null);
+    return { ...item, selectedTrackIds: selected, selectedTrackId: keep(item.selectedTrackId), selectionAnchorTrackId: keep(item.selectionAnchorTrackId) };
+  };
+  updateActive((item) => ({ ...kept(item), tracks: item.tracks.filter((track) => !gone.has(track.id)) }));
+  ui.selectionTargets = null;
   library.infoMessage = tn("message.removed", gone.size);
 }
 
@@ -525,15 +549,6 @@ export function queueFolder(rowKey: string, where: "next" | "end"): void {
   }
   const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
   queue(playOrder(scope), scope.label, where);
-}
-
-/** Makes a track the selection, unless it is in it already. */
-export function selectUnlessChosen(trackId: string): void {
-  const root = current();
-  if (!root || root.selectedTrackIds.includes(trackId)) {
-    return;
-  }
-  updateActive((item) => ({ ...item, selectedTrackId: trackId, selectedTrackIds: [trackId], selectionAnchorTrackId: trackId }));
 }
 
 /**

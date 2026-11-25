@@ -48,7 +48,7 @@
   const writingText = (): string => (writing.total > 1 ? t("editor.progress", { at: writing.at, total: writing.total, name: writing.name }) : writing.name)
   const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
-  const { activeRoot, removeSelectedTracks, selectedTracks } = await import("../lib/workspace")
+  const { activeRoot, dialogTracks, removeSelectedTracks } = await import("../lib/workspace")
   const { canRename, readPlan, readSelected, renamePlan, renameSelected, renamer, setRenameDirection, setRenamePattern } = await import("../lib/rename")
   const { RENAME_PRESETS, completeField, fieldQuery, fieldsFor, fillPattern, patternReader, readSubject } = await import("../helpers/rename")
   const { nameDiff } = await import("../helpers/namediff")
@@ -91,9 +91,9 @@
 
   // Read through functions, not `$:` copies: the selection is boxed (see
   // Opaque in lib/workspace.ts) and must not land in this store.
-  const tracks = (): Track[] => selectedTracks.value.data
+  const tracks = (): Track[] => dialogTracks.value.data
   const single = (): Track | null => (tracks().length === 1 ? tracks()[0] : null)
-  const varied = () => getVariedFields(selectedTracks.value.data)
+  const varied = () => getVariedFields(dialogTracks.value.data)
 
   // In the order Info, Edit, Rename, Delete, each with its stripe colour: green, orange, orange, red.
   // A listener's are Info alone (S3).
@@ -143,7 +143,7 @@
       return true
     }
   })()
-  $: coverAsked = coverAskFor(selectedTracks.value.data)
+  $: coverAsked = coverAskFor(dialogTracks.value.data)
   const editCover = async (file?: File) => {
     if (severalAlbums() && !coverForAll) return
     const current = editor.form.coverDataUrl
