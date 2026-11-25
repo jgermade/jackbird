@@ -40,7 +40,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-again.outputs.page_url }}
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -83,9 +83,27 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      # deploy-pages looks the artifact up by name among all of the run's, every attempt's included:
+      # on a re-run, attempt 1's `github-pages` is still there and it finds two (release run 50).
+      # One name per attempt, then.
       - uses: actions/upload-pages-artifact@v4
         with:
           path: site
+          name: github-pages-${{ github.run_attempt }}
 
+      # Right after the upload, the artifacts' list may not show it yet ("No artifacts named …",
+      # release run 51): a second try a little later.
       - id: deployment
-        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
+
+      - if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+
+      - id: deployment-again
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
