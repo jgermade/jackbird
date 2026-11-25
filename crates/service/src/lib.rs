@@ -13,7 +13,8 @@
 //! network), since without a session nothing but signing in is. Either way:
 //!
 //! - a request from another site is refused (`Sec-Fetch-Site: cross-site`, or an `Origin` that is
-//!   not the service's), and one that changes anything must come from its own page (or carry an
+//!   not the service's), but for a link or a redirect from it opening a page (a top-level `GET`
+//!   navigation, to a document: nothing another site can read or change anything with), and one that changes anything must come from its own page (or carry an
 //!   `Authorization`, which no other site can set);
 //! - the desktop app's page, its interface while it is installed (S2), is the one other origin
 //!   answered, with CORS for itself alone;
@@ -646,7 +647,13 @@ async fn guard(State(service): State<Arc<Service>>, mut request: Request, next: 
         .as_deref()
         .filter(|origin| DESKTOP_ORIGINS.contains(origin))
         .map(str::to_owned);
-    if desktop.is_none() && headers.get("sec-fetch-site").map(HeaderValue::as_bytes) == Some(b"cross-site") {
+    // A link or a redirect from another site opening the page itself (the address bar's own
+    // navigation): a top-level GET, which no other site can read nor change anything with.
+    let header_is = |name: &str, value: &[u8]| headers.get(name).map(HeaderValue::as_bytes) == Some(value);
+    let navigation = matches!(*request.method(), Method::GET | Method::HEAD)
+        && header_is("sec-fetch-mode", b"navigate")
+        && header_is("sec-fetch-dest", b"document");
+    if desktop.is_none() && !navigation && header_is("sec-fetch-site", b"cross-site") {
         return refuse("a request from another site");
     }
     if origin
