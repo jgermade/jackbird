@@ -47,13 +47,15 @@
   const selectedCount = (): number => activeRoot.value.data?.selectedTrackIds.length ?? 0
 
   // A server's library (one's own music, music shared with one): the server's glyph before its
-  // name, as Preferences' Server tab has it; an iPod: its own, as its foot has it (ipod-foot.html).
+  // name, as Preferences' Server tab has it; an iPod: its own, as its foot has it (ipod-foot.html);
+  // any other folder (the device's, or one opened on a server): a folder, as Preferences' Library.
   const SERVER_ICON = "M3 2.25h10v5.5H3zM8 7.75v3.5M2.5 13.25h11M5.5 5h.01"
   const IPOD_ICON = "M4.75 1.75h6.5v12.5h-6.5zM6 10a2 2 0 1 0 4 0a2 2 0 1 0-4 0"
+  const FOLDER_ICON = "M1.75 3.25h4.5l1.5 1.5h6.5v8H1.75z"
   $: tabs = library.roots.map((root) => ({
     id: root.id,
     label: root.label,
-    icon: root.source?.ipod ? IPOD_ICON : root.source?.kind === "library" ? SERVER_ICON : undefined,
+    icon: root.source?.ipod ? IPOD_ICON : root.source?.kind === "library" ? SERVER_ICON : FOLDER_ICON,
     meta: root.loadingMetadata ? `${root.loadedCount}/${root.total ?? root.tracks.length}` : String(root.tracks.length),
     closeLabel: t("roots.close", { name: root.label })
   }))
