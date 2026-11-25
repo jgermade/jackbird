@@ -261,3 +261,19 @@ export function restoreQueue(saved: QueuePosition, openRoots: ReadonlySet<string
   const dropped = dropItems(saved, (item) => !openRoots.has(item.rootId));
   return { queue: dropped.queue, index: dropped.index };
 }
+
+/**
+ * Shuffle, an action (the owner, 2026-11-25): the tracks after the current one in an order of
+ * chance, all of them now queued on purpose (none suggested by the list any more), and the queue no
+ * longer named after the list it came from. The played ones and the current one stay where they are.
+ */
+export function shuffleUpcoming(position: QueuePosition, random: () => number = Math.random): QueuePosition {
+  const { queue, index } = position;
+  if (!queue) return position;
+  const after = queue.items.slice(index + 1).map(marked);
+  for (let at = after.length - 1; at > 0; at -= 1) {
+    const other = Math.floor(random() * (at + 1));
+    [after[at], after[other]] = [after[other], after[at]];
+  }
+  return { queue: { items: [...queue.items.slice(0, index + 1), ...after], sourceLabel: "" }, index };
+}

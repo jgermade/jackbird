@@ -18,6 +18,7 @@ import {
   restoreQueue,
   sameItem,
   settle,
+  shuffleUpcoming,
   type QueuePosition
 } from "./queue.ts";
 
@@ -274,5 +275,26 @@ describe("the queued and the suggested parts", () => {
     assert.equal(marks(down), "sss");
     assert.equal(marks(moveTo(list, 2, 2, true)), "qqs");
     assert.equal(moveTo(list, 2, 2), list);
+  });
+});
+
+describe("shuffleUpcoming", () => {
+  it("mixes the tracks after the current one, all of them queued now, and drops the list's name", () => {
+    const position: QueuePosition = { queue: queueOf("music", ["a", "b", "c", "d", "e"], "Jazz"), index: 1 };
+    // Math.random's stand-in: always the first place, so each swap brings the front one back.
+    const mixed = shuffleUpcoming(position, () => 0);
+    assert.deepEqual(ids(mixed), ["music:a", "music:b", "music:d", "music:e", "music:c"]);
+    assert.equal(mixed.index, 1);
+    assert.equal(current(mixed), "music:b");
+    assert.equal(marks(mixed), "qqq");
+    assert.equal(mixed.queue?.sourceLabel, "");
+    assert.equal(position.queue?.sourceLabel, "Jazz");
+  });
+
+  it("keeps every track, and leaves no queue as none", () => {
+    const mixed = shuffleUpcoming(playing);
+    assert.deepEqual([...ids(mixed)].sort(), [...ids(playing)].sort());
+    assert.deepEqual(ids(mixed).slice(0, 2), ids(playing).slice(0, 2));
+    assert.deepEqual(shuffleUpcoming({ queue: null, index: -1 }), { queue: null, index: -1 });
   });
 });

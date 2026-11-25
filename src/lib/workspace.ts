@@ -434,12 +434,13 @@ export function detailPlayList(): { trackIds: string[]; label: string } {
   return { trackIds: playOrder(scope).map((track) => track.id), label: scope.label };
 }
 
-/** Plays tracks of the active root in an order of chance, `label` the queue's name. */
-export function shuffleTrackIds(trackIds: readonly string[], label: string): void {
+/** Plays tracks of the active root in an order of chance, the queue named after no list. */
+export function shuffleTrackIds(trackIds: readonly string[]): void {
   const root = current();
   if (!root || trackIds.length === 0) return;
   const order = shuffledOrder(trackIds.length, Math.floor(Math.random() * trackIds.length));
-  playTrackIds(order.map((at) => trackIds[at]), label);
+  // Mixed, it is no longer the list in its order: the queue is not named after it (the owner, 2026-11-25).
+  playTrackIds(order.map((at) => trackIds[at]), "");
 }
 
 /** Plays a list's songs from one of them (Details' Lists): the one playing pauses or resumes. */

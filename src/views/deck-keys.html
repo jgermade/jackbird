@@ -63,7 +63,8 @@
     else if (id === "played") clearPlayed()
     else if (id === "new") clearQueue()
   }
-  $: queueLabel = current ? t("queue.open", { source: current.sourceLabel || t("queue.title"), position: current.position, total: current.total }) : t("queue.title")
+  // A queue named after no list (mixed: lib/player.ts shuffleQueue) is "Queue, track 1 of 4".
+  $: queueLabel = !current ? t("queue.title") : current.sourceLabel ? t("queue.open", { source: current.sourceLabel, position: current.position, total: current.total }) : t("queue.openUnnamed", { position: current.position, total: current.total })
 </script>
 
 <div class="deck-keys" :class.footer="place === 'footer'" :class.compact="place === 'compact'">

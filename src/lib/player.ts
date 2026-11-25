@@ -25,6 +25,7 @@ import {
   removeAt,
   replaceWith,
   restoreQueue,
+  shuffleUpcoming,
   type QueuePosition
 } from "../helpers/queue";
 import { bufferedTo, rangesOf } from "../helpers/buffered";
@@ -1134,11 +1135,18 @@ export function turnRepeat(): void {
   void sendNext();
 }
 
-/** The shuffle key: a new shuffled order, the track playing first; off, the queue's own order. */
-export function toggleShuffle(): void {
-  playback.shuffle = !playback.shuffle;
-  const total = $toRaw(playback).queue?.items.length ?? 0;
-  playback.order = playback.shuffle ? shuffledOrder(total, playback.index) : [];
+/**
+ * The shuffle key, an action (the owner, 2026-11-25): what is left in the queue mixed, all of it
+ * queued now and the queue no longer named after its list (helpers/queue.ts `shuffleUpcoming`).
+ * Each press mixes again; no mode is left on (`playback.shuffle` stays off, its order empty).
+ */
+export function shuffleQueue(): void {
+  const next = shuffleUpcoming(position());
+  $batch(() => {
+    playback.shuffle = false;
+    playback.order = [];
+  });
+  apply(next);
   void sendNext();
 }
 
