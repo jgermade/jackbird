@@ -15,6 +15,7 @@ export const es: Record<MessageKey, string> = {
   "picker.openLibrary": "Abrir",
 
   "roots.close": "Cerrar {name}",
+  "roots.myMusic": "Mi música",
   "roots.fallbackName": "Root {number}",
 
   "landing.title": "Tu biblioteca, donde ya está",

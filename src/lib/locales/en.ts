@@ -15,6 +15,7 @@ export const en = {
 
   "roots.close": "Close {name}",
   "roots.fallbackName": "Root {number}",
+  "roots.myMusic": "My music",
 
   "landing.title": "Your library, right where it is",
   "landing.body": "Open a music folder to browse its albums, review their metadata and edit covers without uploading your files anywhere.",
