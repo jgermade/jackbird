@@ -15,6 +15,7 @@ export const en = {
 
   "roots.close": "Close {name}",
   "roots.fallbackName": "Root {number}",
+  "roots.myMusic": "My music",
 
   "landing.title": "Your library, right where it is",
   "landing.body": "Open a music folder to browse its albums, review their metadata and edit covers without uploading your files anywhere.",
@@ -258,6 +259,7 @@ export const en = {
   "likes.list": "Liked songs",
   "lists.allSongs": "All songs",
   "lists.play": "Play",
+  "lists.playAll": "Play all",
   "lists.shuffle": "Shuffle",
   "lists.playLabel": "Play {name}",
   "lists.shuffleLabel": "Shuffle {name}",
@@ -431,6 +433,9 @@ export const en = {
   "preferences.views": "Views",
   "preferences.viewsHint": "The ways to list the library, as keys at its top. Those down are shown.",
   "preferences.songsInViews": "Songs in the other views",
+  "preferences.autoMini": "Floating player when leaving",
+  "preferences.autoMiniOn": "Leaving the tab while music plays floats the player in a window of its own; coming back closes it.",
+  "preferences.autoMiniOff": "The player floats only from its key.",
   "preferences.songsInViewsOn": "Playlists, artists and albums show their songs.",
   "preferences.songsInViewsOff": "Playlists, artists and albums show the groups only: their songs are in Details. On a phone, a group opens in Details, and the trail above it goes back to the library.",
   "preferences.sections": "Sections",

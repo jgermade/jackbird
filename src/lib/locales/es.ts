@@ -15,6 +15,7 @@ export const es: Record<MessageKey, string> = {
   "picker.openLibrary": "Abrir",
 
   "roots.close": "Cerrar {name}",
+  "roots.myMusic": "Mi música",
   "roots.fallbackName": "Root {number}",
 
   "landing.title": "Tu biblioteca, donde ya está",
@@ -259,6 +260,7 @@ export const es: Record<MessageKey, string> = {
   "likes.list": "Me gusta",
   "lists.allSongs": "Todas las canciones",
   "lists.play": "Reproducir",
+  "lists.playAll": "Reproducir todo",
   "lists.shuffle": "Aleatorio",
   "lists.playLabel": "Reproducir {name}",
   "lists.shuffleLabel": "Reproducir {name} en aleatorio",
@@ -433,6 +435,9 @@ export const es: Record<MessageKey, string> = {
   "preferences.viewsHint": "Las formas de ver la biblioteca, como teclas en su parte superior. Se muestran las que están pulsadas.",
   "preferences.songsInViews": "Canciones en el resto de vistas",
   "preferences.songsInViewsOn": "Listas, artistas y álbumes muestran sus canciones.",
+  "preferences.autoMini": "Reproductor flotante al salir",
+  "preferences.autoMiniOn": "Al dejar la pestaña mientras suena música el reproductor flota en su propia ventana; al volver se cierra.",
+  "preferences.autoMiniOff": "El reproductor solo flota desde su tecla.",
   "preferences.songsInViewsOff": "Listas, artistas y álbumes muestran solo los grupos: sus canciones se ven en Detalle. En el móvil, un grupo se abre en Detalle y la ruta de arriba vuelve a la biblioteca.",
   "preferences.sections": "Secciones",
   "preferences.section.general": "General",

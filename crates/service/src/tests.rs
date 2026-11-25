@@ -182,6 +182,33 @@ async fn the_guards_keep_other_sites_and_other_names_out() {
             .0,
         StatusCode::FORBIDDEN
     );
+    // A link from another site opening the page: answered. The same headers on anything but a
+    // top-level GET to a document (a frame, a post), refused.
+    let from_elsewhere = |method: Method, path: &'static str, dest: &'static str| {
+        call(method, path)
+            .header("sec-fetch-site", "cross-site")
+            .header("sec-fetch-mode", "navigate")
+            .header("sec-fetch-dest", dest)
+    };
+    for path in ["/", "/api/roots"] {
+        assert_ne!(
+            from_elsewhere(Method::GET, path, "document").on(&app).await.0,
+            StatusCode::FORBIDDEN,
+            "{path}"
+        );
+    }
+    assert_eq!(
+        from_elsewhere(Method::GET, "/", "iframe").on(&app).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        from_elsewhere(Method::POST, "/api/roots", "document")
+            .json(json!({ "path": library() }))
+            .on(&app)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
     let open = json!({ "path": library() });
     let (status, body) = call(Method::POST, "/api/roots")
         .header("origin", "http://localhost:9999")

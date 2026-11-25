@@ -10,7 +10,8 @@
   label = '',
   title = '',
   popup = '',
-  expanded = null
+  expanded = null,
+  join = ''
 }: Props" lang="ts">
   // A key: the theme's button. It travels 1px down when pressed, and a
   // latching key (`pressed` given) stays down, with its LED lit if it has one.
@@ -28,7 +29,11 @@
   // `label` is its accessible name. A key that opens something says so:
   // `popup` (`menu`, `dialog`…) and `expanded` (whether it is open) become
   // `aria-haspopup` and `aria-expanded`. An `armed` key is ready to go: its edge
-  // is the accent's orange (play, while a song is loaded and paused).
+  // is the accent's orange (play, while a song is loaded and paused). `join`
+  // (`start` or `end`) sets it against a key beside it, as one split key: the
+  // corners on that side square, and a hairline between the two.
+  //
+  //   <span class="split"><Key variant="primary" join="start">Play all</Key><Key variant="primary" square join="end" label="Shuffle">…</Key></span>
   //
   // **Part of the default theme**: imports only `Led`, and draws only with
   // `tokens.css`. See `RECORD/2026-11-03.deck-design-system.WIP.md`.
@@ -46,6 +51,7 @@
     title?: string
     popup?: string
     expanded?: boolean | "" | null
+    join?: "" | "start" | "end"
   }
 
   const Led = await import("./led.html")
@@ -66,7 +72,7 @@
 
 <button class="key"
         :type="type"
-        :class="`variant-${variant} size-${size}`"
+        :class="`variant-${variant} size-${size}${join ? ` join-${join}` : ''}`"
         :class.square="isSquare"
         :class.armed="isArmed"
         :aria-pressed="latching ? String(isPressed) : null"
@@ -163,5 +169,9 @@
 
   .size-sm { --h: var(--mm-control-sm); padding: 0 var(--mm-space-2); font-size: var(--mm-text-label-sm); }
   .size-lg { --h: var(--mm-control-lg); padding: 0 var(--mm-space-4); }
-  .square { padding: 0; width: calc(var(--h) + .375rem); }
+  /* A glyph alone; `--mm-key-square-width`, set around it, widens one (a split key's main half). */
+  .square { padding: 0; width: var(--mm-key-square-width, calc(var(--h) + .375rem)); }
+  /* Two keys as one split key: the joined side squared, one hairline between them (the end's). */
+  .join-start { border-start-end-radius: 0; border-end-end-radius: 0; }
+  .join-end { margin-inline-start: calc(-1 * var(--mm-border-width)); border-start-start-radius: 0; border-end-start-radius: 0; border-inline-start-color: color-mix(in srgb, currentColor 35%, transparent); }
 </style>

@@ -1,4 +1,4 @@
-<script :setup="{ tab = '' }: Props" lang="ts">
+<script :setup="{ tab = '', sheet = false }: Props" lang="ts">
   // People and sign-in (S3), for owners and admins: the tab of the server's details
   // (views/server-details.html, which chooses it: people.tab) among
   // people (with sign-in off, profiles; with it on, invited by email), their
@@ -10,7 +10,9 @@
 
   // `tab`: the one section to show (the log, the trash or the backups, opened over the details
   // from a key of their head); none: the one `people.tab` says.
-  type Props = { tab?: string }
+  // `sheet`: shown in Details, outside any dialog, where adding or changing someone opens a Modal of
+  // its own; elsewhere (Preferences) a SubModal of the dialog it sits in.
+  type Props = { tab?: string; sheet?: boolean | "" }
 
   const Field = await import("../../theme/default/components/field.html")
   const Key = await import("../../theme/default/components/key.html")
@@ -18,6 +20,8 @@
   const SlideSwitch = await import("../../theme/default/components/slide-switch.html")
   const TextInput = await import("../../theme/default/components/text-input.html")
   const CodeInput = await import("../../theme/default/components/code-input.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const SubModal = await import("../../theme/default/components/sub-modal.html")
 
   const { t } = await import("../lib/i18n")
   const { preferences } = await import("../lib/preferences")
@@ -103,7 +107,7 @@
     } else if (editing !== null) {
       const person = people.list.find((one) => one.id === editing)
       const quota = quotaBytes()
-      await updatePerson(
+      const saved = await updatePerson(
         editing,
         {
           name: name.trim(),
@@ -113,7 +117,14 @@
         },
         t("people.invited")
       )
+      if (saved) editing = null
     }
+  }
+  const asSheet = (): boolean => sheet === "" || sheet === true
+  const formTitle = (): string =>
+    editing === 0 ? t("people.addTitle") : (people.list.find((one) => one.id === editing)?.name ?? "")
+  const closeForm = () => {
+    editing = null
   }
   const remove = async () => {
     if (editing !== null && editing !== 0) {
@@ -176,27 +187,57 @@
           </button>
         </li>
       </ul>
-      <Key :if="editing === null" variant="secondary" @click="edit(0)">{{ t("people.addTitle") }}</Key>
-      <form :if="editing !== null" class="form" @submit="save($event)">
-        <Field :label="t('people.name')" control="person-name">
-          <TextInput id="person-name" :model="name" :disabled="!editable()" @input="name = $event.detail" />
-        </Field>
-        <Field :label="t('people.email')" control="person-email">
-          <TextInput id="person-email" type="email" :model="email" :disabled="!editable()" @input="email = $event.detail" />
-        </Field>
-        <Field :label="t('people.role')" control="person-role">
-          <Select id="person-role" :model="chosenRole" :options="roles()" @change="chosenRole = $event.detail" />
-        </Field>
-        <!-- What their music may take on the server; empty, no limit (uploads past it are refused). -->
-        <Field :if="editing !== 0" :label="t('people.quota')" control="person-quota" :hint="t('people.quotaHint')">
-          <TextInput id="person-quota" :model="quotaGb" inputmode="decimal" :disabled="!editable()" :placeholder="t('people.noQuota')" @input="quotaGb = $event.detail" />
-        </Field>
-        <div class="keys">
-          <Key type="submit" variant="primary" :disabled="people.busy || !editable() || !name.trim() || quotaBytes() === undefined">{{ editing === 0 ? t("people.add") : t("people.save") }}</Key>
-          <Key :if="editing !== 0" variant="danger" :disabled="people.busy || !editable()" @click="remove()">{{ t("people.remove") }}</Key>
-          <Key variant="ghost" @click="editing = null">{{ t("signin.cancel") }}</Key>
-        </div>
-      </form>
+      <Key variant="secondary" @click="edit(0)">{{ t("people.addTitle") }}</Key>
+      <!-- Adding or changing someone: a sheet over the list (a SubModal of the dialog this sits in;
+           in Details, which has none, a Modal). -->
+      <SubModal :if="!asSheet()" :open="editing !== null" :title="formTitle()" width="30rem" :close-label="t('signin.cancel')" @close="closeForm()">
+        <form class="form" @submit="save($event)">
+          <!-- The list's own is under the veil while this is open. -->
+          <p :if="people.error" class="failure">{{ people.error }}</p>
+          <Field :label="t('people.name')" control="person-name">
+            <TextInput id="person-name" :model="name" :disabled="!editable()" @input="name = $event.detail" />
+          </Field>
+          <Field :label="t('people.email')" control="person-email">
+            <TextInput id="person-email" type="email" :model="email" :disabled="!editable()" @input="email = $event.detail" />
+          </Field>
+          <Field :label="t('people.role')" control="person-role">
+            <Select id="person-role" :model="chosenRole" :options="roles()" @change="chosenRole = $event.detail" />
+          </Field>
+          <!-- What their music may take on the server; empty, no limit (uploads past it are refused). -->
+          <Field :if="editing !== 0" :label="t('people.quota')" control="person-quota" :hint="t('people.quotaHint')">
+            <TextInput id="person-quota" :model="quotaGb" inputmode="decimal" :disabled="!editable()" :placeholder="t('people.noQuota')" @input="quotaGb = $event.detail" />
+          </Field>
+          <div class="keys">
+            <Key type="submit" variant="primary" :disabled="people.busy || !editable() || !name.trim() || quotaBytes() === undefined">{{ editing === 0 ? t("people.add") : t("people.save") }}</Key>
+            <Key :if="editing !== 0" variant="danger" :disabled="people.busy || !editable()" @click="remove()">{{ t("people.remove") }}</Key>
+            <Key variant="ghost" @click="closeForm()">{{ t("signin.cancel") }}</Key>
+          </div>
+        </form>
+      </SubModal>
+      <Modal :else :open="editing !== null" :title="formTitle()" :close-label="t('signin.cancel')" @close="closeForm()">
+        <form class="form" @submit="save($event)">
+          <!-- The list's own is under the veil while this is open. -->
+          <p :if="people.error" class="failure">{{ people.error }}</p>
+          <Field :label="t('people.name')" control="person-name">
+            <TextInput id="person-name" :model="name" :disabled="!editable()" @input="name = $event.detail" />
+          </Field>
+          <Field :label="t('people.email')" control="person-email">
+            <TextInput id="person-email" type="email" :model="email" :disabled="!editable()" @input="email = $event.detail" />
+          </Field>
+          <Field :label="t('people.role')" control="person-role">
+            <Select id="person-role" :model="chosenRole" :options="roles()" @change="chosenRole = $event.detail" />
+          </Field>
+          <!-- What their music may take on the server; empty, no limit (uploads past it are refused). -->
+          <Field :if="editing !== 0" :label="t('people.quota')" control="person-quota" :hint="t('people.quotaHint')">
+            <TextInput id="person-quota" :model="quotaGb" inputmode="decimal" :disabled="!editable()" :placeholder="t('people.noQuota')" @input="quotaGb = $event.detail" />
+          </Field>
+          <div class="keys">
+            <Key type="submit" variant="primary" :disabled="people.busy || !editable() || !name.trim() || quotaBytes() === undefined">{{ editing === 0 ? t("people.add") : t("people.save") }}</Key>
+            <Key :if="editing !== 0" variant="danger" :disabled="people.busy || !editable()" @click="remove()">{{ t("people.remove") }}</Key>
+            <Key variant="ghost" @click="closeForm()">{{ t("signin.cancel") }}</Key>
+          </div>
+        </form>
+      </Modal>
     </section>
 
     <section :if="shows('signin')" class="tab">

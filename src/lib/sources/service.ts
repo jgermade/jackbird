@@ -12,6 +12,7 @@ import type { VFSAdapter, VFSListEntry, VFSStat } from "@cloudauthn/vfs-sync";
 import type { Inspection, ListedTrack, MediaHandle, RootSource, TrackMetadata } from "../../types";
 import { isLoopbackAddress, savedOnServer } from "../../helpers/instance";
 import { TagError } from "../tags";
+import { t } from "../i18n";
 
 type Failure = { code?: string; message?: string };
 
@@ -297,7 +298,8 @@ export async function librarySource(client: ServiceClient = current, shared?: Sh
   const shelf = shared?.shelf;
   const info = await json<{ name: string; owner?: string }>(`library?${inShelf("", shelf)}`).catch(() => null);
   if (!info) return null;
-  const vfs = libraryVfs(client, shared ? shared.name || info.owner || info.name : info.name, shelf);
+  // One's own music is "My music"; someone's shared with one, named after them.
+  const vfs = libraryVfs(client, shared ? shared.name || info.owner || info.name : t("roots.myMusic"), shelf);
   const inLibrary = (path = ""): string => inShelf(path, shelf);
   return {
     kind: "library",

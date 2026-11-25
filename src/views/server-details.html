@@ -187,7 +187,7 @@
     </div>
   </div>
 
-  <PeoplePanels :else />
+  <PeoplePanels :else :sheet="asSheet()" />
 
   <SubModal :if="!asSheet()" :open="!!serverView.panel" :title="panelTitle()" width="36rem" :close-label="t('sources.close')" @close="closePanel()">
     <PeoplePanels :if="serverView.panel" :tab="serverView.panel" />

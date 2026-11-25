@@ -43,7 +43,8 @@ export async function restoreSession(): Promise<void> {
       }
       await hydrateRoot(source, {
         rootId: saved.id,
-        rootLabel: saved.label,
+        // One's own music on a server is named as it is now ("My music"), not as it was kept.
+        rootLabel: source.kind === "library" && source.shelf === undefined ? undefined : saved.label,
         groupingMode: saved.groupingMode,
         setActive: false,
         expandedAlbums: saved.expandedAlbums ?? [],
