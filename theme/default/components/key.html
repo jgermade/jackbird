@@ -169,7 +169,8 @@
 
   .size-sm { --h: var(--mm-control-sm); padding: 0 var(--mm-space-2); font-size: var(--mm-text-label-sm); }
   .size-lg { --h: var(--mm-control-lg); padding: 0 var(--mm-space-4); }
-  .square { padding: 0; width: calc(var(--h) + .375rem); }
+  /* A glyph alone; `--mm-key-square-width`, set around it, widens one (a split key's main half). */
+  .square { padding: 0; width: var(--mm-key-square-width, calc(var(--h) + .375rem)); }
   /* Two keys as one split key: the joined side squared, one hairline between them (the end's). */
   .join-start { border-start-end-radius: 0; border-end-end-radius: 0; }
   .join-end { margin-inline-start: calc(-1 * var(--mm-border-width)); border-start-start-radius: 0; border-end-start-radius: 0; border-inline-start-color: color-mix(in srgb, currentColor 35%, transparent); }
