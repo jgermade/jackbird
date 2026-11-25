@@ -10,7 +10,7 @@ import { canChange, openSelectionFor } from "./editor";
 import { askRemove, askSend, canSendFrom } from "./ipod";
 import { isFavourite, toggleFavourite } from "./mine";
 import { t, tn } from "./i18n";
-import { moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
+import { exportList, moveInPlaylist, openPlaylistDialog, removeFromPlaylist } from "./playlists";
 import { ui } from "./ui";
 import { activeRoot, folderTracks, goToGroup, menuTargetCount, menuTargets, playFromTree, playTrackIds, queueFolder, queueTracks, revealTrack, setCurrentRow } from "./workspace";
 
@@ -30,6 +30,8 @@ const ICONS: Record<string, string> = {
   edit: "M9.6 2.9 13.1 6.4 5.85 13.65H2.35v-3.5L9.6 2.9zM8.35 4.15l3.5 3.5",
   info: "M8 1.75a6.25 6.25 0 1 0 0 12.5 6.25 6.25 0 0 0 0-12.5zM8 7.25v4M8 4.75v.01",
   rename: "M2.5 5.5h7v5h-7zM12 3v10M10.5 3h3M10.5 13h3",
+  renameList: "M2.5 5.5h7v5h-7zM12 3v10M10.5 3h3M10.5 13h3",
+  export: "M8 2v8M5 7l3 3 3-3M2.75 10.5v3h10.5v-3",
   remove: "M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.75 9h6.5l.75-9",
   details: "M3.5 1.75h9v12.5h-9zM5.75 5.25h4.5M5.75 8h4.5M5.75 10.75h3",
   delete: "M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.75 9h6.5l.75-9",
@@ -50,7 +52,7 @@ function styled(items: MenuItem[]): MenuItem[] {
 }
 
 /** The items that change the folders: only for editors and up (S3); a listener's menus leave them out. */
-const CHANGES = new Set(["playlist", "edit", "rename", "remove", "delete", "up", "down", "out"]);
+const CHANGES = new Set(["playlist", "edit", "rename", "renameList", "remove", "delete", "up", "down", "out"]);
 /** In the family library, anyone edits their own version and keeps their own playlists (F3). */
 const LIBRARY_CHANGES = new Set(["rename", "remove"]);
 
@@ -218,6 +220,40 @@ export function onFolderMenu(rowKey: string, choice: string): void {
     case "details":
       setCurrentRow(rowKey);
       ui.pane = "details";
+      break;
+  }
+}
+
+/** A list's card in Details (its ⋮): its songs queued, and, a playlist's file, renamed or deleted; any list exported. */
+export function listMenu(list: { kind: "all" | "liked" | "playlist"; trackIds: readonly string[] }): MenuItem[] {
+  const none = list.trackIds.length === 0;
+  const items: MenuItem[] = [
+    { id: "next", label: tn("menu.playNext", 1), disabled: none },
+    { id: "queue", label: tn("menu.addToQueue", 1), disabled: none }
+  ];
+  if (list.kind === "playlist") items.push({ id: "renameList", label: t("menu.renamePlaylist"), rule: true });
+  items.push({ id: "export", label: t("menu.exportPlaylist"), rule: list.kind !== "playlist", disabled: none });
+  if (list.kind === "playlist") items.push({ id: "delete", label: t("menu.deletePlaylist"), danger: true, rule: true });
+  return allowed(items);
+}
+
+/** Does what a list's card menu item says. */
+export function onListMenu(list: { name: string; path?: string; trackIds: readonly string[] }, choice: string): void {
+  const root = activeRoot.value.data;
+  if (!root) return;
+  switch (choice) {
+    case "next":
+    case "queue":
+      queueTracks(list.trackIds, choice === "next" ? "next" : "end");
+      break;
+    case "renameList":
+      if (list.path) openPlaylistDialog({ mode: "rename", rootId: root.id, path: list.path, name: list.name });
+      break;
+    case "delete":
+      if (list.path) openPlaylistDialog({ mode: "delete", rootId: root.id, path: list.path, name: list.name });
+      break;
+    case "export":
+      exportList(root.id, list.name, list.trackIds);
       break;
   }
 }

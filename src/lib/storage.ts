@@ -24,6 +24,8 @@ export const STORAGE_KEYS = {
   songsInFolders: "jackbird.songsInFolders",
   /** Whether the library shows the songs in its other views ("on" when it does; off by default). */
   songsInViews: "jackbird.songsInViews",
+  /** The library's views whose keys are shown, comma-separated (src/helpers/shown-views.ts). */
+  shownViews: "jackbird.shownViews",
   /** How one song follows another: normal, gapless or crossfade (src/helpers/transition.ts). */
   transition: "jackbird.transition",
   /** The crossfade's length, in whole seconds from 1 to 12. */

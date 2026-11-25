@@ -19,6 +19,7 @@
   <Key variant="ghost" :disabled="playlistForm.busy" @click="closePlaylistDialog()">{{ t("editor.cancel") }}</Key>
   <Key :if="mode() === 'delete'" variant="danger" :disabled="!playlistReady()" @click="submit()">{{ t("playlist.delete") }}</Key>
   <Key :elseif="mode() === 'queue'" variant="primary" :disabled="!playlistReady()" @click="submit()">{{ t("playlist.save") }}</Key>
+  <Key :elseif="mode() === 'rename'" variant="primary" :disabled="!playlistReady()" @click="submit()">{{ t("playlist.rename") }}</Key>
   <Key :else variant="primary" :disabled="!playlistReady()" @click="submit()">{{ t("playlist.create") }}</Key>
 </span>
 

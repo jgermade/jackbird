@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
 import { parseM3u, serializeM3u } from "./m3u.ts";
-import { LIKED_PATH, decodePlaylist, entryFor, isLiked, isLikedPath, isPlaylistFile, likedOf, moveEntry, toggledLike, newPlaylistPath, pathTaken, renamedEntries, withoutEntry, withPlaylist } from "./playlists.ts";
+import { LIKED_PATH, decodePlaylist, entryFor, isLiked, isLikedPath, isPlaylistFile, likedOf, moveEntry, toggledLike, newPlaylistPath, pathTaken, renamedPlaylistPath, renamedEntries, withoutEntry, withPlaylist } from "./playlists.ts";
 
 const a = { path: "A.mp3", raw: "A.mp3" };
 const b = { path: "B.mp3", raw: "B.mp3", title: "B" };
@@ -101,5 +101,13 @@ describe("liked", () => {
     const unliked = toggledLike([twice], song);
     assert.equal(unliked.path, "liked.m3u8");
     assert.deepEqual(unliked.entries, [a]);
+  });
+});
+
+describe("renamedPlaylistPath", () => {
+  it("keeps a renamed playlist where it was, as .m3u8", () => {
+    assert.equal(renamedPlaylistPath("Playlists/Road.m3u8", " Road: Trip "), "Playlists/Road_ Trip.m3u8");
+    assert.equal(renamedPlaylistPath("Mix.m3u", "Calm"), "Calm.m3u8");
+    assert.equal(renamedPlaylistPath("Playlists/Road.m3u8", "  ..  "), null);
   });
 });

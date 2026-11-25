@@ -52,7 +52,7 @@
   }
 </script>
 
-<form :if="mode() === 'add' || mode() === 'queue'" class="body" @submit="submit($event)">
+<form :if="mode() === 'add' || mode() === 'queue' || mode() === 'rename'" class="body" @submit="submit($event)">
   <section :if="mode() === 'add'" class="choices">
     <h3 class="mm-legend">{{ t("playlist.existing", { folder: folderName() }) }}</h3>
     <p :if="existing().length === 0" class="hint">{{ t("playlist.none", { folder: folderName() }) }}</p>
@@ -65,7 +65,7 @@
       </li>
     </ul>
   </section>
-  <Field :label="mode() === 'add' ? t('playlist.newName') : t('playlist.name')" control="playlist-name" :hint="nameHint()" :error="nameError()">
+  <Field :label="mode() === 'add' ? t('playlist.newName') : t('playlist.name')" control="playlist-name" :hint="mode() === 'rename' ? '' : nameHint()" :error="nameError()">
     <TextInput id="playlist-name" :model="playlistForm.name" :placeholder="t('playlist.namePlaceholder')" describedby="playlist-name-note" :invalid="!!nameError()" @input="typed($event.detail)" />
   </Field>
   <Field :if="mode() === 'queue' && library.roots.length > 1" :label="t('playlist.folder')" control="playlist-folder">

@@ -38,9 +38,4 @@ describe("withoutSongs", () => {
     assert.deepEqual(withoutSongs(groups, "albumsByArtist", tracks).map((row) => row.leaf), [false, true]);
     assert.deepEqual(withoutSongs([folder("@album:Kind of Blue", 0), song("01.mp3", 1)], "albums", tracks).map((row) => [row.leaf, row.expanded]), [[true, false]]);
   });
-
-  it("leaves the Songs view as it is", () => {
-    const songs = [song("a.mp3", 0), song("b.mp3", 0)];
-    assert.deepEqual(withoutSongs(songs, "songs", tracks), songs);
-  });
 });

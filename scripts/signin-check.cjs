@@ -94,8 +94,8 @@ async function signInByCode(page, email) {
   await page.locator("#signin-email").fill(email);
   await page.screenshot({ path: path.join(home, "signin-dialog.png") });
   await page.getByRole("button", { name: "Send me a code" }).click();
+  // The code's six cells send it once full (theme/default/components/code-input.html): no key to press.
   await page.locator("#signin-code").fill(await codeFor(email, sent));
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("dialog", { name: "Sign in" }).waitFor({ state: "hidden", timeout: 15000 });
 }
 

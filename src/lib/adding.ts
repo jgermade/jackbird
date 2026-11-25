@@ -213,8 +213,10 @@ export async function addServer(typed: string, email = ""): Promise<void> {
     if ((info as { name?: string } | null)?.name !== "jackbird-service") throw new Error(t("instance.notJackbird", { address }));
     const client = serviceAt(address);
     adding.open = false;
-    await followServer(client);
+    // The sign-in shows once the code is asked for (its step then the code's), not before.
+    await followServer(client, { quiet: true });
     if (!account.me && account.signin && account.smtp && email.trim()) await askCode(email.trim());
+    if (!account.me && currentServer() === client) account.needed = true;
     if (!account.me && !(await whenSignedIn())) return;
     const open = new Set($toRaw(library).roots.map((root) => root.source.saved));
     let first: string | null = null;
