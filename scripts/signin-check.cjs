@@ -117,10 +117,11 @@ async function openPreferences(page, section = "Account") {
     pages.push(page);
     page.on("pageerror", (error) => console.log("pageerror:", error.message));
     await page.goto(base);
-    await page.getByRole("button", { name: /^(Open library|Add a folder|Add a library|Choose a folder( of .+)?…)$/ }).first().click();
+    await page.getByRole("button", { name: /^(Open|Choose a folder of .+…)$/ }).first().click();
     // With more than one tab (Folder, and iPod in a browser: RECORD/2026-11-14.ipod-sync.WIP.md, W4)
-    // "Add a library" opens its dialog first: its Folder tab's key goes on to the chooser.
-    const chooser = page.getByRole("button", { name: /^Choose a folder( of .+)?…$/ });
+    // "Open" opens its dialog first: its Folder tab's key for the server's folders goes on to
+    // the chooser (the device's own, the browser's picker, is offered beside it since 2026-11-25).
+    const chooser = page.getByRole("button", { name: /^Choose a folder of .+…$/ });
     if (await chooser.first().isVisible({ timeout: 2000 }).catch(() => false)) await chooser.first().click();
     await page.getByRole("button", { name: /^Music/ }).click();
     await page.getByRole("button", { name: "Open this folder" }).click();
@@ -182,6 +183,14 @@ async function openPreferences(page, section = "Account") {
     await editing.getByRole("button", { name: "Add a passkey on this device" }).click();
     await editing.getByText("Laptop").waitFor({ timeout: 15000 });
     await editing.waitForTimeout(500);
+    // The sessions open: a key of the account's head, over the section (2026-11-25).
+    await editing.getByRole("button", { name: /^Sessions open \(\d+\)$/ }).click();
+    await editing.getByRole("button", { name: "Sign out there" }).first().waitFor({ timeout: 5000 }).catch(() => undefined);
+    await editing.screenshot({ path: path.join(home, "sessions.png") });
+    const sessions = await editing.getByRole("button", { name: "Sign out there" }).count();
+    console.log("editor: the sessions key lists", sessions, "session(s)");
+    if (sessions < 1) fail("the sessions key lists none");
+    await editing.keyboard.press("Escape");
     await editing.screenshot({ path: path.join(home, "account.png") });
     await Promise.all([editing.waitForEvent("load"), editing.getByRole("button", { name: "Sign out", exact: true }).click()]);
     await editing.getByRole("button", { name: "Sign in with a passkey" }).click();
@@ -216,7 +225,8 @@ async function openPreferences(page, section = "Account") {
     // ── The owner's log.
     // People and sign-in: tabs of Preferences, Server.
     await openPreferences(page, "Server");
-    await page.getByRole("radio", { name: "Changes" }).click();
+    // The log: a key of the server's head, opening it over the details (2026-11-25).
+    await page.getByRole("button", { name: "Changes", exact: true }).click();
     await page.getByText(/Luis edited the tags of/).first().waitFor({ timeout: 15000 });
     console.log("owner: the log shows Luis's save");
 

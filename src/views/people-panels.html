@@ -1,4 +1,4 @@
-<script :setup lang="ts">
+<script :setup="{ tab = '' }: Props" lang="ts">
   // People and sign-in (S3), for owners and admins: the tab of the server's details
   // (views/server-details.html, which chooses it: people.tab) among
   // people (with sign-in off, profiles; with it on, invited by email), their
@@ -7,6 +7,10 @@
   // code to their own address) and off; and the log of changes. A view over
   // lib/people.ts; the service decides. See
   // RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-09, 10:45 to 11:57).
+
+  // `tab`: the one section to show (the log, the trash or the backups, opened over the details
+  // from a key of their head); none: the one `people.tab` says.
+  type Props = { tab?: string }
 
   const Field = await import("../../theme/default/components/field.html")
   const Key = await import("../../theme/default/components/key.html")
@@ -153,6 +157,7 @@
   // Read through a function: `:model` binds both ways and `a?.b ?? c` is no assignment target;
   // the choice comes back through `change`.
   const onNetwork = (): boolean => people.settings?.network ?? false
+  const shows = (section: string): boolean => (tab || people.tab) === section
 </script>
 
 <div class="people-panels">
@@ -160,7 +165,7 @@
     <p :if="people.error" class="failure">{{ people.error }}</p>
     <p :if="people.notice" class="notice">{{ people.notice }}</p>
 
-    <section :if="people.tab === 'people'" class="tab">
+    <section :if="shows('people')" class="tab">
       <p class="hint">{{ account.signin ? t("people.emailHint") : t("people.profilesHint") }}</p>
       <ul class="list">
         <li :each="person in people.list" :key="person.id">
@@ -194,7 +199,7 @@
       </form>
     </section>
 
-    <section :if="people.tab === 'signin'" class="tab">
+    <section :if="shows('signin')" class="tab">
       <p class="state">{{ account.signin ? t("signin.on") : t("signin.off") }}</p>
 
       <h3 class="mm-legend is-ink">{{ t("smtp.title") }}</h3>
@@ -266,7 +271,7 @@
       </div>
     </section>
 
-    <section :if="people.tab === 'trash'" class="tab">
+    <section :if="shows('trash')" class="tab">
       <p class="hint">{{ t("trash.about") }}</p>
       <p :if="people.trash.length === 0" class="hint">{{ t("trash.empty") }}</p>
       <ul :else class="log">
@@ -281,7 +286,7 @@
       </div>
     </section>
 
-    <section :if="people.tab === 'backups'" class="tab">
+    <section :if="shows('backups')" class="tab">
       <p class="hint">{{ t("backups.about", { folder: people.backups?.folder ?? "" }) }}</p>
       <h3 class="mm-legend is-ink">{{ t("backups.snapshots") }}</h3>
       <p class="hint">{{ (people.backups?.snapshots.length ?? 0) > 0 ? people.backups?.snapshots.slice().reverse().join(" · ") : t("backups.none") }}</p>
@@ -300,7 +305,7 @@
       </div>
     </section>
 
-    <section :if="people.tab === 'log'" class="tab">
+    <section :if="shows('log')" class="tab">
       <p :if="people.log.length === 0" class="hint">{{ t("log.empty") }}</p>
       <ul :else class="log">
         <li :each="change in people.log" :key="`${change.at}-${change.path}-${change.action}`">

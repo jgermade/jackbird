@@ -5,7 +5,7 @@
  * RECORD/2026-08-11.musikmatch-rust-migration.WIP.md (2026-11-07 20:16, E2-D7).
  */
 import type { TrackMetadata } from "../types.ts";
-import type { WireCover, WireEdit } from "./tagwire.ts";
+import { ID_FIELDS, type WireCover, type WireEdit } from "./tagwire.ts";
 
 /** How many bytes go to `String.fromCharCode` at once: well under any engine's argument limit. */
 const CHUNK = 0x8000;
@@ -94,7 +94,7 @@ export function refName(value: string | null | undefined): string | null {
  * The edit that saves `metadata` over a track whose tags were `previous`:
  * the first six fields (the engine leaves alone those that do not change, and
  * removes the empty ones), and the disc, album artist, compilation, composer, comment, BPM and
- * lyrics when they change; the cover kept when it is the track's own, removed when
+ * lyrics when they change, and an id given when it differs; the cover kept when it is the track's own, removed when
  * the form has none, else set.
  */
 export function editFor(previous: TrackMetadata, metadata: TrackMetadata): WireEdit {
@@ -111,6 +111,11 @@ export function editFor(previous: TrackMetadata, metadata: TrackMetadata): WireE
   const later = { disc: "discNumber", albumArtist: "albumArtist", compilation: "compilation", composer: "composer", comment: "comment", lyrics: "lyrics", bpm: "bpm" } as const;
   for (const [wire, field] of Object.entries(later) as [keyof typeof later, (typeof later)[keyof typeof later]][]) {
     if (metadata[field] !== previous[field]) fields[wire] = metadata[field];
+  }
+  // The ids: only one given, and only when it differs (absent: the file's is left as it is).
+  for (const id of ID_FIELDS) {
+    const now = metadata[id];
+    if (now !== undefined && now !== (previous[id] ?? "")) fields[id] = now;
   }
   if (metadata.coverDataUrl === previous.coverDataUrl) {
     return { fields, cover: { keep: true } };

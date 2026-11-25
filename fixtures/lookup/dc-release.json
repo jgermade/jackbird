@@ -1,0 +1,807 @@
+{
+ "id": 1475007,
+ "status": "Accepted",
+ "year": 2008,
+ "resource_url": "https://api.discogs.com/releases/1475007",
+ "uri": "https://www.discogs.com/release/1475007-Radiohead-OK-Computer",
+ "artists": [
+  {
+   "name": "Radiohead",
+   "anv": "",
+   "join": "",
+   "role": "",
+   "tracks": "",
+   "id": 3840,
+   "resource_url": "https://api.discogs.com/artists/3840",
+   "thumbnail_url": "https://i.discogs.com/1rOFEc5UAgD22TTmUwBfBmyRCGM3vdM8ghTG-C2iQtU/rs:fit/g:sm/q:90/h:600/w:446/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9BLTM4NDAt/MTc2MTY5NDAxNy03/ODM0LnBuZw.jpeg"
+  }
+ ],
+ "artists_sort": "Radiohead",
+ "labels": [
+  {
+   "name": "Parlophone",
+   "catno": "7243 8 55229 2 5",
+   "entity_type": "1",
+   "entity_type_name": "Label",
+   "id": 2294,
+   "resource_url": "https://api.discogs.com/labels/2294",
+   "thumbnail_url": "https://i.discogs.com/sSHvafK_7vhXYlIb4uG3obiCcc90uaIuTpImRS8a5LU/rs:fit/g:sm/q:90/h:554/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTIyOTQt/MTYxNTE5Njk3OS03/NTM4LmpwZWc.jpeg"
+  },
+  {
+   "name": "Parlophone",
+   "catno": "CDNODATA 02",
+   "entity_type": "1",
+   "entity_type_name": "Label",
+   "id": 2294,
+   "resource_url": "https://api.discogs.com/labels/2294",
+   "thumbnail_url": "https://i.discogs.com/sSHvafK_7vhXYlIb4uG3obiCcc90uaIuTpImRS8a5LU/rs:fit/g:sm/q:90/h:554/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTIyOTQt/MTYxNTE5Njk3OS03/NTM4LmpwZWc.jpeg"
+  }
+ ],
+ "series": [
+  {
+   "name": "Legendarische Doorbraakalbums",
+   "catno": "4",
+   "entity_type": "2",
+   "entity_type_name": "Series",
+   "id": 406448,
+   "resource_url": "https://api.discogs.com/labels/406448",
+   "thumbnail_url": "https://i.discogs.com/uAmCcjWSMW27xaUFfQKjDc-i3Ds3w_6TBQMkp0rR94Q/rs:fit/g:sm/q:90/h:355/w:595/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTQwNjQ0/OC0xMzY5MTU3Mjc4/LTI1NjEuanBlZw.jpeg"
+  }
+ ],
+ "companies": [
+  {
+   "name": "EMI Records Ltd.",
+   "catno": "",
+   "entity_type": "13",
+   "entity_type_name": "Phonographic Copyright (p)",
+   "id": 63404,
+   "resource_url": "https://api.discogs.com/labels/63404",
+   "thumbnail_url": "https://i.discogs.com/j7eyUKOPLq2XGa0eivsfFHGTqKWym8ph7yn0NR19rVA/rs:fit/g:sm/q:90/h:195/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTYzNDA0/LTE2MTQ1MzQ5Mzgt/OTgyMi5qcGVn.jpeg"
+  },
+  {
+   "name": "EMI Records Ltd.",
+   "catno": "",
+   "entity_type": "14",
+   "entity_type_name": "Copyright (c)",
+   "id": 63404,
+   "resource_url": "https://api.discogs.com/labels/63404",
+   "thumbnail_url": "https://i.discogs.com/j7eyUKOPLq2XGa0eivsfFHGTqKWym8ph7yn0NR19rVA/rs:fit/g:sm/q:90/h:195/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTYzNDA0/LTE2MTQ1MzQ5Mzgt/OTgyMi5qcGVn.jpeg"
+  },
+  {
+   "name": "EMI",
+   "catno": "",
+   "entity_type": "10",
+   "entity_type_name": "Manufactured By",
+   "id": 26126,
+   "resource_url": "https://api.discogs.com/labels/26126",
+   "thumbnail_url": "https://i.discogs.com/kyUkdCkRdB9c0UbyACsewybDBqUqAVAU6ndQAp2VII4/rs:fit/g:sm/q:90/h:331/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTI2MTI2/LTEyMDY0Njg0NTEu/anBlZw.jpeg"
+  },
+  {
+   "name": "EMI",
+   "catno": "",
+   "entity_type": "9",
+   "entity_type_name": "Distributed By",
+   "id": 26126,
+   "resource_url": "https://api.discogs.com/labels/26126",
+   "thumbnail_url": "https://i.discogs.com/kyUkdCkRdB9c0UbyACsewybDBqUqAVAU6ndQAp2VII4/rs:fit/g:sm/q:90/h:331/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTI2MTI2/LTEyMDY0Njg0NTEu/anBlZw.jpeg"
+  },
+  {
+   "name": "Warner/Chappell Music Ltd.",
+   "catno": "",
+   "entity_type": "21",
+   "entity_type_name": "Published By",
+   "id": 263775,
+   "resource_url": "https://api.discogs.com/labels/263775",
+   "thumbnail_url": "https://i.discogs.com/SbSsNLpy-j-CEjoYvYDiRmUbLMud3BEG_khtarNLQ7k/rs:fit/g:sm/q:90/h:42/w:461/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTI2Mzc3/NS0xNjMxNTE1OTI2/LTI3NTkuanBlZw.jpeg"
+  },
+  {
+   "name": "Mayfair Studios",
+   "catno": "",
+   "entity_type": "27",
+   "entity_type_name": "Mixed At",
+   "id": 264962,
+   "resource_url": "https://api.discogs.com/labels/264962",
+   "thumbnail_url": "https://i.discogs.com/a1i9ztUDNoXshTTmFgq_8ZWv7xFRFU-sOuAZSu0RJWY/rs:fit/g:sm/q:90/h:378/w:453/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTI2NDk2/Mi0xNjM5MjgzMjE5/LTYwODEuanBlZw.jpeg"
+  },
+  {
+   "name": "Abbey Road Studios",
+   "catno": "",
+   "entity_type": "27",
+   "entity_type_name": "Mixed At",
+   "id": 217694,
+   "resource_url": "https://api.discogs.com/labels/217694",
+   "thumbnail_url": "https://i.discogs.com/XDYTZcjSSoTI3eUuMARX4Yjr7f6Ajl1tGgCYQr24Qms/rs:fit/g:sm/q:90/h:600/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTIxNzY5/NC0xNTI0Njg3MDc3/LTM2NzEucG5n.jpeg"
+  },
+  {
+   "name": "Air Lyndhurst Hall",
+   "catno": "",
+   "entity_type": "27",
+   "entity_type_name": "Mixed At",
+   "id": 269971,
+   "resource_url": "https://api.discogs.com/labels/269971",
+   "thumbnail_url": "https://i.discogs.com/rWGThJyZwzdZ2IAxS3UIbEiZwMpNuAzzHNO_OUoqnZk/rs:fit/g:sm/q:90/h:366/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTI2OTk3/MS0xNjg5MTE3MTQ4/LTc1NzkuanBlZw.jpeg"
+  },
+  {
+   "name": "Courtyard Studio",
+   "catno": "",
+   "entity_type": "27",
+   "entity_type_name": "Mixed At",
+   "id": 280622,
+   "resource_url": "https://api.discogs.com/labels/280622",
+   "thumbnail_url": "https://i.discogs.com/KwBS2wgKPxA7ZYgZpbzvb__SuIFcdPIEEeFNbgLbYyc/rs:fit/g:sm/q:90/h:266/w:373/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTI4MDYy/Mi0xMzI0OTAyNDIx/LnBuZw.jpeg"
+  },
+  {
+   "name": "The Church, London",
+   "catno": "",
+   "entity_type": "27",
+   "entity_type_name": "Mixed At",
+   "id": 273118,
+   "resource_url": "https://api.discogs.com/labels/273118",
+   "thumbnail_url": "https://i.discogs.com/wrxGx_QAUyzv2NzWOWhoJ5ZXtKmrvfBXQUn7sZVsPyg/rs:fit/g:sm/q:90/h:343/w:378/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTI3MzEx/OC0xNjA2MjE2NjU2/LTIwMDEuanBlZw.jpeg"
+  },
+  {
+   "name": "Abbey Road Studios",
+   "catno": "",
+   "entity_type": "29",
+   "entity_type_name": "Mastered At",
+   "id": 217694,
+   "resource_url": "https://api.discogs.com/labels/217694",
+   "thumbnail_url": "https://i.discogs.com/XDYTZcjSSoTI3eUuMARX4Yjr7f6Ajl1tGgCYQr24Qms/rs:fit/g:sm/q:90/h:600/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTIxNzY5/NC0xNTI0Njg3MDc3/LTM2NzEucG5n.jpeg"
+  },
+  {
+   "name": "Novodisc O.D. Group S.A.",
+   "catno": "",
+   "entity_type": "31",
+   "entity_type_name": "Glass Mastered At",
+   "id": 324102,
+   "resource_url": "https://api.discogs.com/labels/324102",
+   "thumbnail_url": "https://i.discogs.com/uVY2uWlZo04FP0IC0FXvKd4WXyMEwLXSWxJ60OtQim8/rs:fit/g:sm/q:90/h:600/w:586/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9MLTMyNDEw/Mi0xNjIyNTQyNjg5/LTU0NjQuanBlZw.jpeg"
+  }
+ ],
+ "formats": [
+  {
+   "name": "CD",
+   "qty": "1",
+   "descriptions": [
+    "Album",
+    "Reissue"
+   ],
+   "text": "O-Card"
+  }
+ ],
+ "data_quality": "Correct",
+ "community": {
+  "have": 246,
+  "want": 899,
+  "rating": {
+   "count": 19,
+   "average": 4.47
+  },
+  "submitter": {
+   "username": "grassprietje",
+   "resource_url": "https://api.discogs.com/users/grassprietje"
+  },
+  "contributors": [
+   {
+    "username": "grassprietje",
+    "resource_url": "https://api.discogs.com/users/grassprietje"
+   },
+   {
+    "username": "simfonik",
+    "resource_url": "https://api.discogs.com/users/simfonik"
+   },
+   {
+    "username": "ivo6",
+    "resource_url": "https://api.discogs.com/users/ivo6"
+   },
+   {
+    "username": "SillyKees",
+    "resource_url": "https://api.discogs.com/users/SillyKees"
+   },
+   {
+    "username": "DiscogsUpdateBot",
+    "resource_url": "https://api.discogs.com/users/DiscogsUpdateBot"
+   },
+   {
+    "username": "AndyWhelan",
+    "resource_url": "https://api.discogs.com/users/AndyWhelan"
+   },
+   {
+    "username": "oceanographer",
+    "resource_url": "https://api.discogs.com/users/oceanographer"
+   },
+   {
+    "username": "_jules",
+    "resource_url": "https://api.discogs.com/users/_jules"
+   },
+   {
+    "username": "DJBARM",
+    "resource_url": "https://api.discogs.com/users/DJBARM"
+   },
+   {
+    "username": "ficrom1334",
+    "resource_url": "https://api.discogs.com/users/ficrom1334"
+   },
+   {
+    "username": "heaven83",
+    "resource_url": "https://api.discogs.com/users/heaven83"
+   },
+   {
+    "username": "Same.Old.Me",
+    "resource_url": "https://api.discogs.com/users/Same.Old.Me"
+   }
+  ],
+  "data_quality": "Correct",
+  "status": "Accepted"
+ },
+ "format_quantity": 1,
+ "date_added": "2008-09-26T12:53:01-07:00",
+ "date_changed": "2021-09-19T06:25:02-07:00",
+ "num_for_sale": 7,
+ "lowest_price": 3.29,
+ "master_id": 21491,
+ "master_url": "https://api.discogs.com/masters/21491",
+ "title": "OK Computer",
+ "country": "Belgium",
+ "released": "2008-07-12",
+ "notes": "Audio recordings made using the canned applause? mobile.\nGuitars by Rickenbacker and Plank, drums by Premier, cymbals by Zildjan, all other instruments at retail price.\n\nMastered at Abbey Road.\nAudio fixing and dubbing done at Mayfair, Abbey Road, Air Lyndhurst, Courtyard and The Church using the wonders of a digital and analogue age.\n\nAll songs are published by Warner Chappell Ltd.\nLyrics used by kind permission even though we wrote them.\nSample from Flight Of The Condor used with permission. All rights reserved.\n\n℗ 1997 The copyright in this sound recording is owned by EMI Records Ltd.\n©1997 EMI Records Ltd.\nMade in Holland.\nPrinted in the EU\nPlace of manufacture as stated on label\n\n\"Fitter Happier\" features a sample from the film \"Three Days Of The Condor\".\n\nReleased in a regular jewel case with clear tray, housed in a cardboard \"DeMorgen Legendarische Doorbraakalbums\" o-card.\nThe o-card erronously lists only 11 tracks.\n\nCDNODATA 02 is credited as a UK cat#.",
+ "released_formatted": "12 Jul 2008",
+ "identifiers": [
+  {
+   "type": "Barcode",
+   "value": "5 413662 904305",
+   "description": "O-card"
+  },
+  {
+   "type": "Barcode",
+   "value": "04",
+   "description": "Series volume addition"
+  },
+  {
+   "type": "Barcode",
+   "value": "7 24385 52292 5",
+   "description": "Jewel case"
+  },
+  {
+   "type": "Label Code",
+   "value": "LC 0299"
+  },
+  {
+   "type": "Rights Society",
+   "value": "bel BIEM"
+  },
+  {
+   "type": "Price Code",
+   "value": "070",
+   "description": "I"
+  },
+  {
+   "type": "Price Code",
+   "value": "PM 520",
+   "description": "F"
+  },
+  {
+   "type": "Matrix / Runout",
+   "value": "NOVODISC O.D. GROUP S.A. 724385522925 #2"
+  },
+  {
+   "type": "Mastering SID Code",
+   "value": "IFPI LH63"
+  },
+  {
+   "type": "Mould SID Code",
+   "value": "none"
+  }
+ ],
+ "videos": [
+  {
+   "uri": "https://www.youtube.com/watch?v=fHiGbolFFGw",
+   "title": "Radiohead - Paranoid Android",
+   "description": "‘Paranoid Android’ is taken from ‘OK Computer’ out on XL Recordings. Buy & stream it here: https://radiohead.ffm.to/okcomputer\n\nDirector: Magnus Carlsson Producer: Peter Gustaffson Production company: Wegelius Animation AB Commissioner: Dilly Gent\n\nFollow",
+   "duration": 393,
+   "embed": true
+  },
+  {
+   "uri": "https://www.youtube.com/watch?v=1uYWYWPc9HU",
+   "title": "Radiohead - Karma Police",
+   "description": "‘Karma Police’ is taken from ‘OK Computer’ out on XL Recordings. Buy & stream it here: https://radiohead.ffm.to/okcomputer\n\nDirector: Jonathan Glazer Producer: Nick Morris Cinematography: Steve Keith-Roach Production company: Academy Music Video Ltd Commi",
+   "duration": 263,
+   "embed": true
+  },
+  {
+   "uri": "https://www.youtube.com/watch?v=u5CVsCnxyXg",
+   "title": "Radiohead - No Surprises",
+   "description": "‘No Surprises’ is taken from ‘OK Computer’ out on XL Recordings. Buy & stream it here: https://radiohead.ffm.to/okcomputer\n\nDirector: Grant Gee Producer: Phil Barnes Cinematography: Dan Landin Production company: Kudos (Music Video) Commissioner: Dilly Ge",
+   "duration": 228,
+   "embed": true
+  }
+ ],
+ "genres": [
+  "Rock"
+ ],
+ "styles": [
+  "Alternative Rock"
+ ],
+ "tracklist": [
+  {
+   "position": "1",
+   "type_": "track",
+   "title": "Airbag",
+   "duration": "4:44"
+  },
+  {
+   "position": "2",
+   "type_": "track",
+   "title": "Paranoid Android",
+   "duration": "6:23"
+  },
+  {
+   "position": "3",
+   "type_": "track",
+   "title": "Subterranean Homesick Alien",
+   "duration": "4:27"
+  },
+  {
+   "position": "4",
+   "type_": "track",
+   "title": "Exit Music (For A Film)",
+   "duration": "4:24"
+  },
+  {
+   "position": "5",
+   "type_": "track",
+   "title": "Let Down",
+   "duration": "4:59"
+  },
+  {
+   "position": "6",
+   "type_": "track",
+   "title": "Karma Police",
+   "duration": "4:21"
+  },
+  {
+   "position": "7",
+   "type_": "track",
+   "title": "Fitter Happier",
+   "duration": "1:57"
+  },
+  {
+   "position": "8",
+   "type_": "track",
+   "title": "Electioneering",
+   "duration": "3:50"
+  },
+  {
+   "position": "9",
+   "type_": "track",
+   "title": "Climbing Up The Walls",
+   "duration": "4:45"
+  },
+  {
+   "position": "10",
+   "type_": "track",
+   "title": "No Surprises",
+   "duration": "3:48"
+  },
+  {
+   "position": "11",
+   "type_": "track",
+   "title": "Lucky",
+   "duration": "4:19"
+  },
+  {
+   "position": "12",
+   "type_": "track",
+   "title": "The Tourist",
+   "duration": "5:24"
+  }
+ ],
+ "extraartists": [
+  {
+   "name": "Radiohead",
+   "anv": "",
+   "join": "",
+   "role": "Arranged By [Strings]",
+   "tracks": "",
+   "id": 3840,
+   "resource_url": "https://api.discogs.com/artists/3840"
+  },
+  {
+   "name": "Matt Bale",
+   "anv": "",
+   "join": "",
+   "role": "Artwork [Additional Complicated Artwork Skills Supplied By]",
+   "tracks": "",
+   "id": 2277287,
+   "resource_url": "https://api.discogs.com/artists/2277287"
+  },
+  {
+   "name": "Mr. Barry",
+   "anv": "",
+   "join": "",
+   "role": "Artwork [Additional Complicated Artwork Skills Supplied By]",
+   "tracks": "",
+   "id": 2277285,
+   "resource_url": "https://api.discogs.com/artists/2277285"
+  },
+  {
+   "name": "Charlie Myatt",
+   "anv": "",
+   "join": "",
+   "role": "Booking [Performing Monkey Bookings Taken By]",
+   "tracks": "",
+   "id": 2277061,
+   "resource_url": "https://api.discogs.com/artists/2277061"
+  },
+  {
+   "name": "Nick Ingman",
+   "anv": "",
+   "join": "",
+   "role": "Conductor [Strings]",
+   "tracks": "",
+   "id": 289278,
+   "resource_url": "https://api.discogs.com/artists/289278"
+  },
+  {
+   "name": "Nigel Godrich",
+   "anv": "",
+   "join": "",
+   "role": "Edited By [Audio Levels Balanced]",
+   "tracks": "",
+   "id": 169094,
+   "resource_url": "https://api.discogs.com/artists/169094"
+  },
+  {
+   "name": "Chris Scard",
+   "anv": "",
+   "join": "",
+   "role": "Engineer [Studio Assistant]",
+   "tracks": "",
+   "id": 373479,
+   "resource_url": "https://api.discogs.com/artists/373479"
+  },
+  {
+   "name": "Gerard Navarro",
+   "anv": "",
+   "join": "",
+   "role": "Engineer [Studio Assistant]",
+   "tracks": "",
+   "id": 400614,
+   "resource_url": "https://api.discogs.com/artists/400614"
+  },
+  {
+   "name": "Jon Bailey",
+   "anv": "",
+   "join": "",
+   "role": "Engineer [Studio Assistant]",
+   "tracks": "",
+   "id": 446281,
+   "resource_url": "https://api.discogs.com/artists/446281"
+  },
+  {
+   "name": "Andi Watson",
+   "anv": "",
+   "join": "",
+   "role": "Lighting, Set Designer [Stage Design, Smoke And Production]",
+   "tracks": "",
+   "id": 2091925,
+   "resource_url": "https://api.discogs.com/artists/2091925"
+  },
+  {
+   "name": "Radiohead",
+   "anv": "",
+   "join": "",
+   "role": "Lyrics By",
+   "tracks": "",
+   "id": 3840,
+   "resource_url": "https://api.discogs.com/artists/3840"
+  },
+  {
+   "name": "Keith Wozencroft",
+   "anv": "",
+   "join": "",
+   "role": "Management [Artistic Freedom In The Market Place Maintained By]",
+   "tracks": "",
+   "id": 1952980,
+   "resource_url": "https://api.discogs.com/artists/1952980"
+  },
+  {
+   "name": "Perry Watts-Russell",
+   "anv": "",
+   "join": "",
+   "role": "Management [Artistic Freedom In The Market Place Maintained By]",
+   "tracks": "",
+   "id": 2035542,
+   "resource_url": "https://api.discogs.com/artists/2035542"
+  },
+  {
+   "name": "Tony Wadsworth",
+   "anv": "",
+   "join": "",
+   "role": "Management [Artistic Freedom In The Market Place Maintained By]",
+   "tracks": "",
+   "id": 846876,
+   "resource_url": "https://api.discogs.com/artists/846876"
+  },
+  {
+   "name": "Big Al (21)",
+   "anv": "",
+   "join": "",
+   "role": "Management [Cash Dealings, Other Assistance]",
+   "tracks": "",
+   "id": 2277288,
+   "resource_url": "https://api.discogs.com/artists/2277288"
+  },
+  {
+   "name": "Carol Baxter",
+   "anv": "",
+   "join": "",
+   "role": "Management [International Ambassador]",
+   "tracks": "",
+   "id": 3010872,
+   "resource_url": "https://api.discogs.com/artists/3010872"
+  },
+  {
+   "name": "Julie Calland",
+   "anv": "",
+   "join": "",
+   "role": "Management [Office Run By]",
+   "tracks": "",
+   "id": 1933491,
+   "resource_url": "https://api.discogs.com/artists/1933491"
+  },
+  {
+   "name": "Brian Message",
+   "anv": "",
+   "join": "",
+   "role": "Management [Patiently Managed By]",
+   "tracks": "",
+   "id": 1641243,
+   "resource_url": "https://api.discogs.com/artists/1641243"
+  },
+  {
+   "name": "Bryce Edge",
+   "anv": "",
+   "join": "",
+   "role": "Management [Patiently Managed By]",
+   "tracks": "",
+   "id": 1641244,
+   "resource_url": "https://api.discogs.com/artists/1641244"
+  },
+  {
+   "name": "Chris Hufford",
+   "anv": "",
+   "join": "",
+   "role": "Management [Patiently Managed By]",
+   "tracks": "",
+   "id": 256673,
+   "resource_url": "https://api.discogs.com/artists/256673"
+  },
+  {
+   "name": "Courtyard Management",
+   "anv": "Courtyard",
+   "join": "",
+   "role": "Management [Patiently Managed By]",
+   "tracks": "",
+   "id": 2456219,
+   "resource_url": "https://api.discogs.com/artists/2456219"
+  },
+  {
+   "name": "Chris Blair",
+   "anv": "Chris'King Fader'Blair",
+   "join": "",
+   "role": "Mastered By",
+   "tracks": "",
+   "id": 336941,
+   "resource_url": "https://api.discogs.com/artists/336941"
+  },
+  {
+   "name": "Colin Greenwood",
+   "anv": "",
+   "join": "",
+   "role": "Music By",
+   "tracks": "",
+   "id": 365785,
+   "resource_url": "https://api.discogs.com/artists/365785"
+  },
+  {
+   "name": "Ed O'Brien",
+   "anv": "",
+   "join": "",
+   "role": "Music By",
+   "tracks": "",
+   "id": 365794,
+   "resource_url": "https://api.discogs.com/artists/365794"
+  },
+  {
+   "name": "Jonny Greenwood",
+   "anv": "",
+   "join": "",
+   "role": "Music By",
+   "tracks": "",
+   "id": 152377,
+   "resource_url": "https://api.discogs.com/artists/152377"
+  },
+  {
+   "name": "Phil Selway",
+   "anv": "",
+   "join": "",
+   "role": "Music By",
+   "tracks": "",
+   "id": 365781,
+   "resource_url": "https://api.discogs.com/artists/365781"
+  },
+  {
+   "name": "Thom Yorke",
+   "anv": "",
+   "join": "",
+   "role": "Music By",
+   "tracks": "",
+   "id": 4854,
+   "resource_url": "https://api.discogs.com/artists/4854"
+  },
+  {
+   "name": "Stanley Donwood",
+   "anv": "",
+   "join": "",
+   "role": "Other [Website Maintenance]",
+   "tracks": "",
+   "id": 0,
+   "resource_url": ""
+  },
+  {
+   "name": "Stanley Donwood",
+   "anv": "",
+   "join": "",
+   "role": "Photography By [Pictures Done By]",
+   "tracks": "",
+   "id": 718181,
+   "resource_url": "https://api.discogs.com/artists/718181"
+  },
+  {
+   "name": "The White Chocolate Farm",
+   "anv": "",
+   "join": "",
+   "role": "Photography By [Pictures Done By]",
+   "tracks": "",
+   "id": 2066256,
+   "resource_url": "https://api.discogs.com/artists/2066256"
+  },
+  {
+   "name": "Nigel Godrich",
+   "anv": "",
+   "join": "",
+   "role": "Producer [Committed To Tape]",
+   "tracks": "",
+   "id": 169094,
+   "resource_url": "https://api.discogs.com/artists/169094"
+  },
+  {
+   "name": "Radiohead",
+   "anv": "",
+   "join": "",
+   "role": "Producer [Committed To Tape]",
+   "tracks": "",
+   "id": 3840,
+   "resource_url": "https://api.discogs.com/artists/3840"
+  },
+  {
+   "name": "Caffy St Luce",
+   "anv": "",
+   "join": "",
+   "role": "Product Manager [Media Handling]",
+   "tracks": "",
+   "id": 3010873,
+   "resource_url": "https://api.discogs.com/artists/3010873"
+  },
+  {
+   "name": "Dilly Gent",
+   "anv": "",
+   "join": "",
+   "role": "Realization [Video Realisation]",
+   "tracks": "",
+   "id": 1657058,
+   "resource_url": "https://api.discogs.com/artists/1657058"
+  },
+  {
+   "name": "Adam Cummings",
+   "anv": "",
+   "join": "",
+   "role": "Technician [Additional Guitar Stuff]",
+   "tracks": "",
+   "id": 778419,
+   "resource_url": "https://api.discogs.com/artists/778419"
+  },
+  {
+   "name": "Duncan Swift (2)",
+   "anv": "",
+   "join": "",
+   "role": "Technician [Guitar Maintenance, Deck Chairs]",
+   "tracks": "",
+   "id": 4787988,
+   "resource_url": "https://api.discogs.com/artists/4787988"
+  },
+  {
+   "name": "Plank (3)",
+   "anv": "",
+   "join": "",
+   "role": "Technician [Instrument Modifications, Stage Managing, Equipment Shifting Into Difficult Places]",
+   "tracks": "",
+   "id": 913223,
+   "resource_url": "https://api.discogs.com/artists/913223"
+  },
+  {
+   "name": "Jim Warren",
+   "anv": "",
+   "join": "",
+   "role": "Technician [Performance Sound Enhancement For The Audience Balanced By]",
+   "tracks": "",
+   "id": 259712,
+   "resource_url": "https://api.discogs.com/artists/259712"
+  },
+  {
+   "name": "Tree (37)",
+   "anv": "",
+   "join": "",
+   "role": "Technician [Sound Reference And Physics Teaching]",
+   "tracks": "",
+   "id": 8246665,
+   "resource_url": "https://api.discogs.com/artists/8246665"
+  },
+  {
+   "name": "Tim Greaves (2)",
+   "anv": "",
+   "join": "",
+   "role": "Tour Manager",
+   "tracks": "",
+   "id": 1933488,
+   "resource_url": "https://api.discogs.com/artists/1933488"
+  }
+ ],
+ "images": [
+  {
+   "type": "primary",
+   "uri": "https://i.discogs.com/KsSwp6uuZS3rMo-W-DmSoj9d2VBAwJU07zdknP_uKjE/rs:fit/g:sm/q:90/h:520/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE0/OC5qcGVn.jpeg",
+   "resource_url": "https://i.discogs.com/KsSwp6uuZS3rMo-W-DmSoj9d2VBAwJU07zdknP_uKjE/rs:fit/g:sm/q:90/h:520/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE0/OC5qcGVn.jpeg",
+   "uri150": "https://i.discogs.com/hIY28oPw3nWsPfWJIHgz4HWRqF6ubBDicLwYnLQA10k/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE0/OC5qcGVn.jpeg",
+   "width": 600,
+   "height": 520
+  },
+  {
+   "type": "secondary",
+   "uri": "https://i.discogs.com/pLHtowU8_e-qv8Kv4teSP6rrZXYpUxJ8wAqQguR5d_0/rs:fit/g:sm/q:90/h:520/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE1/OS5qcGVn.jpeg",
+   "resource_url": "https://i.discogs.com/pLHtowU8_e-qv8Kv4teSP6rrZXYpUxJ8wAqQguR5d_0/rs:fit/g:sm/q:90/h:520/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE1/OS5qcGVn.jpeg",
+   "uri150": "https://i.discogs.com/q_Ai58ou9BBRcE__oryAA6og03AfIImh7PKUu2H4DRg/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE1/OS5qcGVn.jpeg",
+   "width": 600,
+   "height": 520
+  },
+  {
+   "type": "secondary",
+   "uri": "https://i.discogs.com/C40T0Y8tDUm5C2V9a10NHn7_AzDs_YopOtGDB-18ldE/rs:fit/g:sm/q:90/h:594/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTEy/NC5qcGVn.jpeg",
+   "resource_url": "https://i.discogs.com/C40T0Y8tDUm5C2V9a10NHn7_AzDs_YopOtGDB-18ldE/rs:fit/g:sm/q:90/h:594/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTEy/NC5qcGVn.jpeg",
+   "uri150": "https://i.discogs.com/oqOrTV8BpU8F5pVsv-NXCPOkU0QN333mFj-0xQfUbAA/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTEy/NC5qcGVn.jpeg",
+   "width": 600,
+   "height": 594
+  },
+  {
+   "type": "secondary",
+   "uri": "https://i.discogs.com/HTldh5b_2sWK4A4cmzdAwJPXpUwJTH6mSzI-G4kYSrc/rs:fit/g:sm/q:90/h:463/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTEz/My5qcGVn.jpeg",
+   "resource_url": "https://i.discogs.com/HTldh5b_2sWK4A4cmzdAwJPXpUwJTH6mSzI-G4kYSrc/rs:fit/g:sm/q:90/h:463/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTEz/My5qcGVn.jpeg",
+   "uri150": "https://i.discogs.com/kwgs-Pc_UFaILM-sN_C5MVw47WA6c_BW7GQvtJ6gu6Y/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTEz/My5qcGVn.jpeg",
+   "width": 600,
+   "height": 463
+  },
+  {
+   "type": "secondary",
+   "uri": "https://i.discogs.com/Q1I_jLhuGUy7gj2u-7eDOZ-cz2RqD3pxwS2JuMfO-SU/rs:fit/g:sm/q:90/h:592/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE0/MC5qcGVn.jpeg",
+   "resource_url": "https://i.discogs.com/Q1I_jLhuGUy7gj2u-7eDOZ-cz2RqD3pxwS2JuMfO-SU/rs:fit/g:sm/q:90/h:592/w:600/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE0/MC5qcGVn.jpeg",
+   "uri150": "https://i.discogs.com/Fp7bt_LgwXqXsmZvQ2HlmpztHg4aM-ttMqhdcLDeOXY/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE0/MC5qcGVn.jpeg",
+   "width": 600,
+   "height": 592
+  }
+ ],
+ "thumb": "https://i.discogs.com/hIY28oPw3nWsPfWJIHgz4HWRqF6ubBDicLwYnLQA10k/rs:fit/g:sm/q:40/h:150/w:150/czM6Ly9kaXNjb2dz/LWRhdGFiYXNlLWlt/YWdlcy9SLTE0NzUw/MDctMTIyMjQ1OTE0/OC5qcGVn.jpeg",
+ "estimated_weight": 85,
+ "blocked_from_sale": false,
+ "is_offensive": false
+}

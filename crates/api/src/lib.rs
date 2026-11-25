@@ -124,6 +124,34 @@ pub struct Metadata {
     /// Beats per minute.
     #[serde(default)]
     pub bpm: String,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`): absent, the file's is
+    /// left as it is (an older interface, or `.meta/`, sends none); empty, it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_album_id: Option<String>,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`): absent, the file's is
+    /// left as it is (an older interface, or `.meta/`, sends none); empty, it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_release_group_id: Option<String>,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`): absent, the file's is
+    /// left as it is (an older interface, or `.meta/`, sends none); empty, it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_album_artist_id: Option<String>,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`): absent, the file's is
+    /// left as it is (an older interface, or `.meta/`, sends none); empty, it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_release_track_id: Option<String>,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`): absent, the file's is
+    /// left as it is (an older interface, or `.meta/`, sends none); empty, it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mb_recording_id: Option<String>,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`): absent, the file's is
+    /// left as it is (an older interface, or `.meta/`, sends none); empty, it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discogs_release_id: Option<String>,
+    /// An id (MusicBrainz', Discogs', jackbird's own: `jackbird_tags::Field`): absent, the file's is
+    /// left as it is (an older interface, or `.meta/`, sends none); empty, it is removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jackbird_track_id: Option<String>,
     /// The cover, as a data URL.
     pub cover_data_url: Option<String>,
 }
@@ -173,6 +201,13 @@ pub fn metadata_of(fields: jackbird_tags::Fields, cover_data_url: Option<String>
         comment: fields.comment,
         lyrics: fields.lyrics,
         bpm: fields.bpm,
+        mb_album_id: Some(fields.mb_album_id).filter(|id| !id.is_empty()),
+        mb_release_group_id: Some(fields.mb_release_group_id).filter(|id| !id.is_empty()),
+        mb_album_artist_id: Some(fields.mb_album_artist_id).filter(|id| !id.is_empty()),
+        mb_release_track_id: Some(fields.mb_release_track_id).filter(|id| !id.is_empty()),
+        mb_recording_id: Some(fields.mb_recording_id).filter(|id| !id.is_empty()),
+        discogs_release_id: Some(fields.discogs_release_id).filter(|id| !id.is_empty()),
+        jackbird_track_id: Some(fields.jackbird_track_id).filter(|id| !id.is_empty()),
         cover_data_url,
     }
 }
@@ -356,11 +391,14 @@ pub fn cover_of(url: &str) -> Option<Cover> {
 
 /// The edit that writes `metadata` over the tags the library held (`previous`), as
 /// `editFor` (`src/helpers/cover.ts`) makes it in the browser: the six first fields whole, and
-/// the disc, the album artist, the compilation, the composer, the comment and the lyrics only when
-/// they changed (a library read before they were known holds them empty, which must not empty the
+/// the disc, the album artist, the compilation, the composer, the comment, the lyrics, the bpm and
+/// the ids only when they changed (a library read before they were known holds them empty, which must not empty the
 /// file's).
 pub fn edit_for(previous: &Metadata, metadata: Metadata) -> Edit {
     let changed = |before: &String, now: String| (*before != now).then_some(now);
+    // An id: only one given, and only when it differs from the library's.
+    let given =
+        |before: &Option<String>, now: Option<String>| now.filter(|now| before.as_deref().unwrap_or_default() != now);
     let cover = match (&previous.cover_data_url, &metadata.cover_data_url) {
         (before, now) if before == now => CoverEdit::Keep,
         (_, None) => CoverEdit::Remove,
@@ -380,6 +418,13 @@ pub fn edit_for(previous: &Metadata, metadata: Metadata) -> Edit {
         comment: changed(&previous.comment, metadata.comment),
         lyrics: changed(&previous.lyrics, metadata.lyrics),
         bpm: changed(&previous.bpm, metadata.bpm),
+        mb_album_id: given(&previous.mb_album_id, metadata.mb_album_id),
+        mb_release_group_id: given(&previous.mb_release_group_id, metadata.mb_release_group_id),
+        mb_album_artist_id: given(&previous.mb_album_artist_id, metadata.mb_album_artist_id),
+        mb_release_track_id: given(&previous.mb_release_track_id, metadata.mb_release_track_id),
+        mb_recording_id: given(&previous.mb_recording_id, metadata.mb_recording_id),
+        discogs_release_id: given(&previous.discogs_release_id, metadata.discogs_release_id),
+        jackbird_track_id: given(&previous.jackbird_track_id, metadata.jackbird_track_id),
         cover,
     }
 }
@@ -403,6 +448,13 @@ mod tests {
             comment: String::new(),
             lyrics: String::new(),
             bpm: String::new(),
+            mb_album_id: None,
+            mb_release_group_id: None,
+            mb_album_artist_id: None,
+            mb_release_track_id: None,
+            mb_recording_id: None,
+            discogs_release_id: None,
+            jackbird_track_id: None,
             cover_data_url: cover.map(Into::into),
         }
     }
@@ -463,5 +515,49 @@ mod tests {
         assert_eq!(cover_of("data:;base64,AQ==").unwrap().mime, "image/jpeg");
         assert_eq!(cover_of("data:image/png;name=a;base64,AQ==").unwrap().mime, "image/png");
         assert!(cover_of("data:image/png,raw").is_none());
+    }
+
+    #[test]
+    fn an_id_absent_is_left_as_it_is_and_one_given_is_written_only_when_it_differs() {
+        let previous = Metadata {
+            mb_album_id: Some("old".into()),
+            jackbird_track_id: Some("j-1".into()),
+            ..metadata(None)
+        };
+        let edit = edit_for(
+            &previous,
+            Metadata {
+                mb_album_id: Some("new".into()),
+                jackbird_track_id: Some("j-1".into()),
+                discogs_release_id: Some(String::new()),
+                ..metadata(None)
+            },
+        );
+        assert_eq!(edit.mb_album_id.as_deref(), Some("new"));
+        assert_eq!(edit.jackbird_track_id, None);
+        assert_eq!(edit.mb_recording_id, None);
+        // Empty where the library had none: nothing to remove.
+        assert_eq!(edit.discogs_release_id, None);
+        assert_eq!(
+            edit_for(
+                &previous,
+                Metadata {
+                    mb_album_id: Some(String::new()),
+                    ..metadata(None)
+                }
+            )
+            .mb_album_id
+            .as_deref(),
+            Some("")
+        );
+        // Read: an empty id is none.
+        let read = metadata_of(
+            jackbird_tags::Fields {
+                mb_recording_id: "r".into(),
+                ..Default::default()
+            },
+            None,
+        );
+        assert_eq!((read.mb_recording_id.as_deref(), read.mb_album_id), (Some("r"), None));
     }
 }

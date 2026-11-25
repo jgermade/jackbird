@@ -7,20 +7,20 @@
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
-import { byCaret, followFolder } from "../helpers/follow";
+import { byCaret, followFolder, oneTopOpen } from "../helpers/follow";
 import { withoutSongs } from "../helpers/folders";
 import { levelsOf, openOnEntering, openOnLeaving, type Levels } from "../helpers/levels";
 import { listCards, type ListCard } from "../helpers/lists";
 import { shuffledOrder } from "../helpers/order";
 import { detailScope, scopeCrumbs, type Crumb, type Scope } from "../helpers/scope";
-import { nextSelection, selectMany } from "../helpers/selection";
+import { dialogTrackIds, nextSelection, selectMany } from "../helpers/selection";
 import { collectFolderPaths, orderDetailPlaylist } from "../helpers/tracks";
 import { buildWizardRows, treeKeyAction } from "../helpers/tree";
 import { albumKey, artistKey, buildViewRows, trackPlace, type ViewLabels } from "../helpers/views";
 import type { LibraryView, Track, RootWorkspace, WizardTreeRow } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
-import { addToQueue, dropFromQueue, nowPlaying, playNext, playTracks, togglePlay } from "./player";
+import { addToQueue, cueTracks, dropFromQueue, nowPlaying, playNext, playTracks, togglePlay } from "./player";
 import { preferences } from "./preferences";
 import { updateRoots } from "./roots";
 import { ui } from "./ui";
@@ -167,6 +167,18 @@ export const selectedTracks = $computed((): Opaque<Track[]> => {
   return new Opaque(root.tracks.filter((track) => selected.has(track.id)));
 });
 
+/**
+ * The tracks the selection dialog works on (boxed): those of a track's menu (`ui.selectionTargets`),
+ * else the selection; in the library's order.
+ */
+export const dialogTracks = $computed((): Opaque<Track[]> => {
+  const { root } = derive();
+  const targets = ui.selectionTargets ? [...$toRaw(ui.selectionTargets)] : null;
+  if (!root) return new Opaque([]);
+  const ids = new Set(dialogTrackIds(root.selectedTrackIds, targets));
+  return new Opaque(ids.size === 0 ? [] : root.tracks.filter((track) => ids.has(track.id)));
+});
+
 /** The active root as a plain object. */
 function current(): RootWorkspace | null {
   return derive().root;
@@ -278,12 +290,19 @@ export function clearSelection(): void {
 export function toggleFolder(folder: string): void {
   const id = library.activeRootId;
   if (id) autoOpened.set(id, byCaret(autoOpened.get(id) ?? [], folder));
-  updateActive((root) => ({
-    ...root,
-    expandedAlbums: root.expandedAlbums.includes(folder)
-      ? root.expandedAlbums.filter((value) => value !== folder)
-      : [...root.expandedAlbums, folder]
-  }));
+  const tops = artistTops();
+  updateActive((root) => {
+    if (root.expandedAlbums.includes(folder)) return { ...root, expandedAlbums: root.expandedAlbums.filter((value) => value !== folder) };
+    // An artist opened in Albums by artist: the others close.
+    const opened = [...root.expandedAlbums, folder];
+    return { ...root, expandedAlbums: tops.includes(folder) ? oneTopOpen(opened, tops, folder) : opened };
+  });
+}
+
+/** In Albums by artist, its artists' keys (the groups at the top), which open one at a time; else none. */
+function artistTops(): string[] {
+  const { root, rows } = derive();
+  return root?.view === "albumsByArtist" ? rows.filter((row) => row.kind === "album" && row.depth === 0).map((row) => row.album) : [];
 }
 
 /** The folders of each root a click opened (not their caret): they close as the current row leaves them. */
@@ -305,8 +324,13 @@ export function followRow(rowKey: string): void {
     if (up.kind === "album") ancestors.push(up.album);
   }
   const next = followFolder({ expanded: root.expandedAlbums, auto: autoOpened.get(root.id) ?? [] }, row.kind === "album" ? row.album : null, ancestors);
-  autoOpened.set(root.id, next.auto);
-  updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: next.expanded }));
+  // Albums by artist: the artist holding the row (the farthest folder up, or the row itself) the
+  // only one open (the owner, 2026-11-25).
+  const tops = artistTops();
+  const artist = ancestors.at(-1) ?? (row.kind === "album" ? row.album : null);
+  const expanded = tops.length > 0 ? oneTopOpen(next.expanded, tops, artist) : next.expanded;
+  autoOpened.set(root.id, next.auto.filter((key) => expanded.includes(key)));
+  updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: expanded }));
 }
 
 /**
@@ -354,18 +378,34 @@ export function goToGroup(trackId: string, group: "album" | "artist"): void {
   updateActive((root) => ({ ...root, view, activeRowKey: key }));
 }
 
-/** Drops the selected tracks from the library (not from disk): they come back when the folder is opened again. */
-export function removeSelectedTracks(): void {
+/** The dialog's tracks (a track's menu's, or the selection), as ids. */
+export function dialogTrackIdsNow(): string[] {
   const root = current();
-  if (!root || root.selectedTrackIds.length === 0) {
-    return;
-  }
-  const gone = new Set(root.selectedTrackIds);
-  // They leave the queue first (if the one playing goes, the next one plays), then the library.
-  dropFromQueue((item) => item.rootId === root.id && gone.has(item.trackId));
-  updateActive((item) => ({ ...clearedSelection(item), tracks: item.tracks.filter((track) => !gone.has(track.id)) }));
-  library.infoMessage = tn("message.removed", gone.size);
+  return root ? [...dialogTrackIds(root.selectedTrackIds, $toRaw(ui).selectionTargets)] : [];
 }
+
+/**
+ * Takes tracks out of the active root as shown, and out of the queue (if the one playing goes, the
+ * next one plays): once their files are gone (lib/deleting.ts), or, where nothing can be deleted,
+ * only from the list (their files come back the next time the folder is read). Opened from a
+ * track's menu, the selection stays, but for any of them.
+ */
+export function dropTracks(trackIds: readonly string[]): void {
+  const root = current();
+  const gone = new Set(trackIds);
+  if (!root || gone.size === 0) return;
+  const targets = $toRaw(ui).selectionTargets;
+  dropFromQueue((item) => item.rootId === root.id && gone.has(item.trackId));
+  const kept = (item: RootWorkspace): RootWorkspace => {
+    if (!targets) return clearedSelection(item);
+    const selected = item.selectedTrackIds.filter((id) => !gone.has(id));
+    const keep = (id: string | null): string | null => (id && !gone.has(id) ? id : null);
+    return { ...item, selectedTrackIds: selected, selectedTrackId: keep(item.selectedTrackId), selectionAnchorTrackId: keep(item.selectionAnchorTrackId) };
+  };
+  updateActive((item) => ({ ...kept(item), tracks: item.tracks.filter((track) => !gone.has(track.id)) }));
+  ui.selectionTargets = null;
+}
+
 
 /** Plays the album sheet's tracks from `trackId`; the one already playing pauses or resumes. */
 export function playFromDetail(trackId: string): void {
@@ -392,12 +432,19 @@ export function playTrackIds(trackIds: readonly string[], label: string): void {
   if (root && trackIds.length > 0) playTracks(queueOf(root.id, [...trackIds], label).items, 0, label);
 }
 
-/** Plays tracks of the active root in an order of chance, `label` the queue's name. */
-export function shuffleTrackIds(trackIds: readonly string[], label: string): void {
+/** What Details shows (its scope), as it plays: its tracks' ids in the sheet's order, and its name. */
+export function detailPlayList(): { trackIds: string[]; label: string } {
+  const scope = derive().scope;
+  return { trackIds: playOrder(scope).map((track) => track.id), label: scope.label };
+}
+
+/** Plays tracks of the active root in an order of chance, the queue named after no list. */
+export function shuffleTrackIds(trackIds: readonly string[]): void {
   const root = current();
   if (!root || trackIds.length === 0) return;
   const order = shuffledOrder(trackIds.length, Math.floor(Math.random() * trackIds.length));
-  playTrackIds(order.map((at) => trackIds[at]), label);
+  // Mixed, it is no longer the list in its order: the queue is not named after it (the owner, 2026-11-25).
+  playTrackIds(order.map((at) => trackIds[at]), "");
 }
 
 /** Plays a list's songs from one of them (Details' Lists): the one playing pauses or resumes. */
@@ -514,7 +561,8 @@ export function folderTracks(rowKey: string): { label: string; trackIds: string[
 export function queueWhatIsShown(): void {
   const { root, scope } = derive();
   if (!root || scope.tracks.length === 0) return;
-  addToQueue(queueOf(root.id, playOrder(scope).map((track) => track.id), scope.label).items, scope.label);
+  // Suggested, as a disc played is: nothing of it was queued on purpose.
+  cueTracks(queueOf(root.id, playOrder(scope).map((track) => track.id), scope.label).items, scope.label);
 }
 
 export function queueFolder(rowKey: string, where: "next" | "end"): void {
@@ -525,15 +573,6 @@ export function queueFolder(rowKey: string, where: "next" | "end"): void {
   }
   const scope = detailScope({ ...root, activeRowKey: rowKey }, rows);
   queue(playOrder(scope), scope.label, where);
-}
-
-/** Makes a track the selection, unless it is in it already. */
-export function selectUnlessChosen(trackId: string): void {
-  const root = current();
-  if (!root || root.selectedTrackIds.includes(trackId)) {
-    return;
-  }
-  updateActive((item) => ({ ...item, selectedTrackId: trackId, selectedTrackIds: [trackId], selectionAnchorTrackId: trackId }));
 }
 
 /**

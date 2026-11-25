@@ -242,6 +242,7 @@ fn save_gives_the_engines_bytes_in_place_or_beside() {
                 comment: "A comment".into(),
                 lyrics: "Some words".into(),
                 bpm: String::new(),
+                ..Fields::default()
             })
         },
         Edit {

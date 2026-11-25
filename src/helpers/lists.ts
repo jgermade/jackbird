@@ -35,6 +35,8 @@ export type ListEntry = {
   title: string;
   /** Who and which album, under its title. */
   sub: string;
+  /** Its own cover, by reference (`jackbird-cover:<name>`); none for a song without one, or missing. */
+  cover?: string;
   missing: boolean;
 };
 
@@ -59,7 +61,7 @@ const byWhom = (track: CardTrack): string => [track.metadata.artist.trim(), trac
 function card(key: string, name: string, kind: ListCard["kind"], found: (CardTrack | undefined)[], titles: string[], path?: string): ListCard {
   const entries = found.map((track, index): ListEntry =>
     track
-      ? { key: track.id, index, trackId: track.id, title: track.metadata.title || track.name, sub: byWhom(track), missing: false }
+      ? { key: track.id, index, trackId: track.id, title: track.metadata.title || track.name, sub: byWhom(track), ...(track.metadata.coverDataUrl ? { cover: track.metadata.coverDataUrl } : {}), missing: false }
       : { key: `#${index}`, index, title: titles[index] ?? "", sub: "", missing: true }
   );
   const songs = found.filter((track): track is CardTrack => !!track);

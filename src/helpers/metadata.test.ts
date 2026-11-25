@@ -123,3 +123,14 @@ describe("the fields that came later", () => {
     assert.equal(isCompilation({ compilation: "" }), false);
   });
 });
+
+describe("mergeDraft, the ids", () => {
+  it("keeps each track's ids, which the form does not hold", () => {
+    const original = { ...track("a.mp3", { title: "Old" }).metadata, mbAlbumId: "a1", jackbirdTrackId: "j-1" };
+    const draft = { ...emptyMetadata(), title: "New" };
+    const merged = mergeDraft(original, draft, getVariedFields([track("a.mp3")]));
+    assert.equal(merged.title, "New");
+    assert.equal(merged.mbAlbumId, "a1");
+    assert.equal(merged.jackbirdTrackId, "j-1");
+  });
+});

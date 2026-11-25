@@ -1,4 +1,4 @@
-// "Add to the library…" (E6b-D11): which source the music comes from, then that source's own
+// "Open" (E6b-D11): which source the music comes from, then that source's own
 // steps. A folder of this device (the browser's picker, the system's dialog, or, on a phone, its
 // own folders), a folder of the server spoken to now (its owners), or a jackbird server by its
 // address, whose family library and open folders join the library. The view is
@@ -22,7 +22,7 @@ import { currentServer, homeServer, librarySource, serviceAt, serviceRoots, shar
 
 export type SourceKind = "device" | "serverFolder" | "server";
 
-/** The tabs of "Add to the library…": a folder, a server, an iPod (the desktop app). */
+/** The tabs of "Open": a folder, a server, an iPod (the desktop app). */
 export type SourceTab = "folder" | "server" | "ipod";
 
 export const adding = $reactive({
@@ -86,10 +86,12 @@ export function serverName(): string {
 /** The sources this runtime offers now, in order. */
 export function sourcesHere(): SourceKind[] {
   const kinds: SourceKind[] = [];
-  // The browser's folders when no service serves the page; the desktop's; an Android phone's, through
-  // its own folder picker, which grants the app that folder alone (E6b-D9, 2026-11-12).
+  // The desktop's folders; an Android phone's, through its own folder picker, which grants the app
+  // that folder alone (E6b-D9, 2026-11-12); the browser's, where it can open one, whether a service
+  // serves the page or not: the folders of the device one listens on (the owner, 2026-11-25).
   const android = isPhone && /Android/.test(navigator.userAgent);
-  if ((isDesktop && (!isPhone || android)) || (!isDesktop && adding.served === false)) kinds.push("device");
+  const browser = !isDesktop && adding.served !== null && (adding.served === false || deviceAccess() !== "none");
+  if ((isDesktop && (!isPhone || android)) || browser) kinds.push("device");
   // A folder of the server in front, for its owners: the page's own server, or one the app added
   // (the desktop's installed service is its "device" already).
   const server = currentServer();
@@ -119,7 +121,7 @@ export function tabsHere(): SourceTab[] {
 }
 
 /**
- * Whether "Add to the library…" has an iPod tab: the desktop app on a computer (the iPods plugged
+ * Whether "Open" has an iPod tab: the desktop app on a computer (the iPods plugged
  * in), or a browser on a computer that can open a folder (the iPod's drive, picked: W4).
  */
 export function ipodTabHere(): boolean {
@@ -141,7 +143,7 @@ export function tabLabel(tab: SourceTab): string {
 }
 
 /**
- * "Add to the library…" (the owner's design, 2026-11-12): a dialog with a tab for folders and one
+ * "Open" (the owner's design, 2026-11-12): a dialog with a tab for folders and one
  * for servers. Where there is only one folder to choose and no server (the web), straight to it.
  */
 export function openAdding(): void {
@@ -187,8 +189,9 @@ export async function addFrom(kind: SourceKind): Promise<void> {
     return;
   }
   adding.open = false;
-  // A folder of this device or of the server in front: lib/sources picks the right dialog.
-  await openFolder(kind === "serverFolder" ? currentServer() : undefined);
+  // A folder of this device or of the server in front: lib/sources picks the right dialog. In a
+  // browser, this device's is the browser's picker, even on a page a service serves.
+  await openFolder(kind === "serverFolder" ? currentServer() : undefined, { device: kind === "device" && !isDesktop });
 }
 
 /**

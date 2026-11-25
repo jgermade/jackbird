@@ -28,3 +28,13 @@ export function followFolder(state: Opened, folder: string | null, ancestors: re
 export function byCaret(auto: readonly string[], folder: string): string[] {
   return auto.filter((key) => key !== folder);
 }
+
+/**
+ * Albums by artist keeps one artist open (the owner, 2026-11-25): of the groups at the top
+ * (`tops`), only `keep` (the one holding the current row) stays among the folders open; the
+ * albums under any of them keep their own state. With no `keep`, the top ones all close.
+ */
+export function oneTopOpen(expanded: readonly string[], tops: readonly string[], keep: string | null): string[] {
+  const closing = new Set(tops.filter((key) => key !== keep));
+  return expanded.filter((key) => !closing.has(key));
+}

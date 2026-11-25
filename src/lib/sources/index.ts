@@ -15,10 +15,13 @@ import type { ServiceClient } from "./service";
  * Asks for a folder to open: the browser's picker, the system's dialog, or the service's; with
  * `server`, a folder of that server's machine (E6b-D11). Null when the person cancels.
  */
-export async function pickSource(server?: ServiceClient, options: { ipod?: boolean } = {}): Promise<RootSource | null> {
+export async function pickSource(server?: ServiceClient, options: { ipod?: boolean; device?: boolean } = {}): Promise<RootSource | null> {
   // An iPod in a browser (W4, RECORD/2026-11-14.ipod-sync.WIP.md): the drive is this computer's,
   // even where a service serves the page, so the browser's own picker.
   if (options.ipod && !isDesktop) return pickInBrowser(true);
+  // A folder of the device one listens on, from a browser: the browser's picker, even where a
+  // service serves the page (the owner, 2026-11-25).
+  if (options.device && !isDesktop) return pickInBrowser(false);
   // A folder of the phone (E6b-D9): Android's own folder picker, which grants that folder alone.
   if (isPhone && !server) return (await import("./phone")).pickPhoneFolder();
   if (server) {
@@ -79,5 +82,6 @@ export async function restoreSource(saved: FileSystemDirectoryHandle | string): 
     }
     return (await isService()) ? (await import("./service")).restoreServiceSource(saved) : null;
   }
-  return isDesktop || (await isService()) ? null : restoreBrowserSource(saved);
+  // A folder the browser's picker gave (a handle), served page or not (the owner, 2026-11-25).
+  return isDesktop ? null : restoreBrowserSource(saved);
 }

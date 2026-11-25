@@ -437,3 +437,54 @@ fn reads_a_comments_description_and_a_bad_language_as_written_eng() {
     assert_eq!(&written[1..4], b"eng");
     assert!(crate::decode_comment(&[0, b'e']).is_err());
 }
+
+#[test]
+fn a_user_text_round_trips_in_every_encoding() {
+    for version in [Version::V23, Version::V24] {
+        for (description, value) in [
+            ("MusicBrainz Album Id", "6a09041b-0f79-3278-88d9-0552dd28d37f"),
+            ("jackbird track_id", "a1b2"),
+            ("Ölgaard", "日本"),
+        ] {
+            let text = UserText {
+                description: description.into(),
+                value: value.into(),
+            };
+            let content = encode_user_text(&text, version);
+            assert_eq!(decode_user_text(&content).unwrap(), text, "{version:?} {description}");
+        }
+    }
+}
+
+#[test]
+fn a_user_text_joins_several_values_and_needs_an_encoding() {
+    // v2.4: several values, separated by $00.
+    let content = [&[0u8][..], b"ARTISTS\0Ann\0Bo"].concat();
+    let read = decode_user_text(&content).unwrap();
+    assert_eq!((read.description.as_str(), read.value.as_str()), ("ARTISTS", "Ann/Bo"));
+    assert!(decode_user_text(&[]).is_err());
+}
+
+#[test]
+fn a_file_id_round_trips_and_is_cut_at_64_bytes() {
+    let id = FileId {
+        owner: "http://musicbrainz.org".into(),
+        identifier: b"4a7fea2e-545b-4c63-bc9a-9943cc3a29d7".to_vec(),
+    };
+    assert_eq!(decode_file_id(&encode_file_id(&id)).unwrap(), id);
+    let long = FileId {
+        owner: "x".into(),
+        identifier: vec![7; 80],
+    };
+    assert_eq!(decode_file_id(&encode_file_id(&long)).unwrap().identifier.len(), 64);
+    assert_eq!(
+        decode_file_id(&encode_file_id(&FileId {
+            owner: "ñ€".into(),
+            identifier: vec![]
+        }))
+        .unwrap()
+        .owner,
+        "ñ?"
+    );
+    assert!(decode_file_id(b"no terminator").is_err());
+}

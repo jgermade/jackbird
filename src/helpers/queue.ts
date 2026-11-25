@@ -261,3 +261,27 @@ export function restoreQueue(saved: QueuePosition, openRoots: ReadonlySet<string
   const dropped = dropItems(saved, (item) => !openRoots.has(item.rootId));
   return { queue: dropped.queue, index: dropped.index };
 }
+
+/**
+ * Shuffle, an action (the owner, 2026-11-25): the tracks after the current one in an order of
+ * chance, all of them now queued on purpose (none suggested by the list any more), and the queue no
+ * longer named after the list it came from. The played ones and the current one stay where they are,
+ * and so do the ones queued on purpose (Play next, Add to queue: first, in their order; the owner,
+ * 2026-11-25): only the rest is mixed, after them, marked `mixed` so that the next Shuffle mixes it
+ * again (each press mixes anew) and never the ones put there on purpose.
+ */
+export function shuffleUpcoming(position: QueuePosition, random: () => number = Math.random): QueuePosition {
+  const { queue, index } = position;
+  if (!queue) return position;
+  const after = queue.items.slice(index + 1);
+  // Put there by the person: kept, first, in their order. The rest (suggested, or mixed by an
+  // earlier Shuffle) is mixed after them.
+  const onPurpose = (item: QueueItem): boolean => !!item.queued && !item.mixed;
+  const kept = after.filter(onPurpose);
+  const rest = after.filter((item) => !onPurpose(item)).map((item): QueueItem => ({ ...marked(item), mixed: true }));
+  for (let at = rest.length - 1; at > 0; at -= 1) {
+    const other = Math.floor(random() * (at + 1));
+    [rest[at], rest[other]] = [rest[other], rest[at]];
+  }
+  return { queue: { items: [...queue.items.slice(0, index + 1), ...kept, ...rest], sourceLabel: "" }, index };
+}

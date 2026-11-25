@@ -261,6 +261,14 @@ fn tracks_of(root: &Path) -> Answer<IpodTracks> {
                     // The iPod's database has no lyrics (they live in the file's tags).
                     lyrics: String::new(),
                     bpm: if t.bpm == 0 { String::new() } else { t.bpm.to_string() },
+                    // Its database keeps no ids (they live in the file's tags).
+                    mb_album_id: None,
+                    mb_release_group_id: None,
+                    mb_album_artist_id: None,
+                    mb_release_track_id: None,
+                    mb_recording_id: None,
+                    discogs_release_id: None,
+                    jackbird_track_id: None,
                     cover_data_url: cover,
                 },
                 // Its length, bit rate and type as its database keeps them; no sample rate there.

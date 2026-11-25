@@ -28,6 +28,11 @@ export const ui = $reactive({
   queueOpen: false,
   selectionOpen: false,
   selectionTab: "edit" as SelectionTab,
+  /**
+   * The tracks the selection dialog works on when a track's menu opened it on a track not selected
+   * (helpers/selection.ts `menuDialogTargets`): the selection is left as it is. Null: the selection.
+   */
+  selectionTargets: null as string[] | null,
   playlist: null as PlaylistDialog | null,
   pane: "library" as Pane,
   /** Bumped when a track is shown in the library (lib/workspace.ts `revealTrack`): the list scrolls to its row. */

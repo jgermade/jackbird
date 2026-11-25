@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { chosenState, nextSelection, selectMany } from "./selection.ts";
+import { chosenState, dialogTrackIds, menuDialogTargets, nextSelection, selectMany } from "./selection.ts";
 
 const order = ["a", "b", "c", "d", "e"];
 const none = { selected: [], anchor: null };
@@ -60,5 +60,19 @@ describe("chosenState", () => {
     assert.equal(chosenState(["a", "x"], ["a", "b"]), "some");
     assert.equal(chosenState(["x"], ["a", "b"]), "none");
     assert.equal(chosenState(["x"], []), "none");
+  });
+});
+
+describe("the selection dialog's tracks", () => {
+  it("follows the selection when the menu's track is in it", () => {
+    assert.equal(menuDialogTargets(["a", "b"], "b"), null);
+    assert.deepEqual(dialogTrackIds(["a", "b"], menuDialogTargets(["a", "b"], "b")), ["a", "b"]);
+  });
+
+  it("works on the menu's track alone when it is not, the selection left as it is", () => {
+    const selected = ["a", "b"];
+    assert.deepEqual(menuDialogTargets(selected, "c"), ["c"]);
+    assert.deepEqual(dialogTrackIds(selected, ["c"]), ["c"]);
+    assert.deepEqual(selected, ["a", "b"]);
   });
 });

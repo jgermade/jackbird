@@ -30,6 +30,14 @@ fn keys(field: Field) -> &'static [&'static str] {
         Field::Comment => &["COMMENT", "DESCRIPTION"],
         Field::Lyrics => &["LYRICS", "UNSYNCEDLYRICS"],
         Field::Bpm => &["BPM"],
+        // The ids, as Picard writes them (and jackbird's own).
+        Field::MbAlbumId => &["MUSICBRAINZ_ALBUMID"],
+        Field::MbReleaseGroupId => &["MUSICBRAINZ_RELEASEGROUPID"],
+        Field::MbAlbumArtistId => &["MUSICBRAINZ_ALBUMARTISTID"],
+        Field::MbReleaseTrackId => &["MUSICBRAINZ_RELEASETRACKID"],
+        Field::MbRecordingId => &["MUSICBRAINZ_TRACKID"],
+        Field::DiscogsReleaseId => &["DISCOGS_RELEASE_ID"],
+        Field::JackbirdTrackId => &["JACKBIRD_TRACK_ID"],
     }
 }
 
@@ -71,6 +79,13 @@ fn fields_of(comments: &Comments) -> Fields {
         comment: comments.get("COMMENT").unwrap_or_else(|| get("DESCRIPTION")),
         lyrics: comments.get("LYRICS").unwrap_or_else(|| get("UNSYNCEDLYRICS")),
         bpm: get("BPM"),
+        mb_album_id: get("MUSICBRAINZ_ALBUMID"),
+        mb_release_group_id: get("MUSICBRAINZ_RELEASEGROUPID"),
+        mb_album_artist_id: get("MUSICBRAINZ_ALBUMARTISTID"),
+        mb_release_track_id: get("MUSICBRAINZ_RELEASETRACKID"),
+        mb_recording_id: get("MUSICBRAINZ_TRACKID"),
+        discogs_release_id: get("DISCOGS_RELEASE_ID"),
+        jackbird_track_id: get("JACKBIRD_TRACK_ID"),
     }
 }
 

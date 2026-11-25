@@ -209,6 +209,13 @@ fn edit(reader: &mut Reader<'_>) -> Result<Edit, String> {
         comment: next(),
         lyrics: next(),
         bpm: next(),
+        mb_album_id: next(),
+        mb_release_group_id: next(),
+        mb_album_artist_id: next(),
+        mb_release_track_id: next(),
+        mb_recording_id: next(),
+        discogs_release_id: next(),
+        jackbird_track_id: next(),
         cover,
     })
 }
@@ -243,7 +250,7 @@ mod tests {
     use super::*;
 
     /// An edit as `tagwire.ts` encodes it.
-    fn encoded(fields: [Option<&str>; 13], cover: &[u8]) -> Vec<u8> {
+    fn encoded(fields: [Option<&str>; 20], cover: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
         for value in fields {
             match value {
@@ -288,6 +295,13 @@ mod tests {
                 None,
                 Some("Words"),
                 Some("120"),
+                Some("album-id"),
+                None,
+                None,
+                None,
+                Some("recording-id"),
+                Some("1475007"),
+                Some(""),
             ],
             &cover,
         );
@@ -310,6 +324,13 @@ mod tests {
                 comment: None,
                 lyrics: Some("Words".into()),
                 bpm: Some("120".into()),
+                mb_album_id: Some("album-id".into()),
+                mb_release_group_id: None,
+                mb_album_artist_id: None,
+                mb_release_track_id: None,
+                mb_recording_id: Some("recording-id".into()),
+                discogs_release_id: Some("1475007".into()),
+                jackbird_track_id: Some(String::new()),
                 cover: CoverEdit::Set(Cover {
                     data: vec![9, 8, 7],
                     mime: "image/png".into()
@@ -318,7 +339,7 @@ mod tests {
         );
         assert_eq!(layout, layout_flac());
         assert_eq!(head, b"fLaC...");
-        let mut request = encoded([None; 13], &[2]);
+        let mut request = encoded([None; 20], &[2]);
         request.extend_from_slice(&[255, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0]);
         let (edit, layout, head) = write_request(&request).unwrap();
         assert_eq!(edit.cover, CoverEdit::Remove);
@@ -342,7 +363,7 @@ mod tests {
         assert!(write_request(&[]).unwrap_err().contains("ends early"));
         assert!(write_request(&[3]).unwrap_err().contains("field marked 3"));
         assert!(
-            write_request(&encoded([None; 13], &[5]))
+            write_request(&encoded([None; 20], &[5]))
                 .unwrap_err()
                 .contains("cover marked 5")
         );
@@ -373,8 +394,9 @@ mod tests {
         };
         let mut expected = vec![1, 1, 0, 0, 0, b'T', 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0];
         expected.extend_from_slice(b"1959");
-        // genre, track, disc, album artist, compilation, composer, comment, lyrics and bpm: empty.
-        expected.extend_from_slice(&[0; 36]);
+        // genre, track, disc, album artist, compilation, composer, comment, lyrics, bpm and the seven
+        // ids: empty.
+        expected.extend_from_slice(&[0; 64]);
         expected.extend_from_slice(&[1, 10, 0, 0, 0]);
         expected.extend_from_slice(b"image/jpeg");
         expected.extend_from_slice(&[2, 0, 0, 0, 1, 2]);
@@ -397,7 +419,8 @@ mod tests {
             fields: Fields::default(),
             cover: None,
         };
-        assert_eq!(tags(&untagged, None), [vec![0], vec![0; 52], vec![0], vec![0]].concat());
+        // Twenty empty fields, four bytes each.
+        assert_eq!(tags(&untagged, None), [vec![0], vec![0; 80], vec![0], vec![0]].concat());
         let mut expected = vec![6, 0, 0, 0];
         expected.extend_from_slice(b"id3v22");
         let message = Error::Id3v22.to_string();

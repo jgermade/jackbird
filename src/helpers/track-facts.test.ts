@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { track } from "./fixtures.test-support.ts";
-import { allFacts, trackFacts } from "./track-facts.ts";
+import { allFacts, idFacts, trackFacts } from "./track-facts.ts";
 
 // The key itself as its text: what is asked for shows in the result.
 const t = (key: string): string => key;
@@ -61,5 +61,28 @@ describe("trackFacts", () => {
     const all = allFacts(facts);
     assert.equal(all.length, facts.tags.length + facts.where.length + facts.quality.length + facts.file.length);
     assert.deepEqual(all.map((fact) => fact.label).slice(12, 16), ["field.lyrics", "info.relativePath", "info.fileName", "info.format"]);
+  });
+});
+
+describe("a track's ids", () => {
+  it("shows the ones it has, each linked to its page, jackbird's own without a link", () => {
+    const facts = idFacts({ mbAlbumId: "6a09041b", mbRecordingId: " 4a7fea2e ", discogsReleaseId: "1475007", jackbirdTrackId: "j-1", mbReleaseGroupId: "" }, t);
+    assert.deepEqual(facts, [
+      { label: "id.mbAlbumId", text: "6a09041b", mono: true, href: "https://musicbrainz.org/release/6a09041b" },
+      { label: "id.mbRecordingId", text: "4a7fea2e", mono: true, href: "https://musicbrainz.org/recording/4a7fea2e" },
+      { label: "id.discogsReleaseId", text: "1475007", mono: true, href: "https://www.discogs.com/release/1475007" },
+      { label: "id.jackbirdTrackId", text: "j-1", mono: true }
+    ]);
+    assert.deepEqual(idFacts({}, t), []);
+    assert.deepEqual(idFacts({ mbReleaseGroupId: "g", mbAlbumArtistId: "a", mbReleaseTrackId: "t" }, t).map((fact) => fact.href), [
+      "https://musicbrainz.org/release-group/g",
+      "https://musicbrainz.org/artist/a",
+      "https://musicbrainz.org/track/t"
+    ]);
+  });
+
+  it("follows the other facts in the selection's list", () => {
+    const facts = trackFacts(track("a.mp3", { mbAlbumId: "x" }), t, "en");
+    assert.equal(allFacts(facts).at(-1)?.label, "id.mbAlbumId");
   });
 });

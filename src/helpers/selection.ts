@@ -47,3 +47,17 @@ export function chosenState(selected: readonly string[], trackIds: readonly stri
   const count = trackIds.filter((id) => chosen.has(id)).length;
   return count === 0 ? "none" : count === trackIds.length ? "all" : "some";
 }
+
+/**
+ * The tracks a track's menu opens the selection dialog on: none of its own (the dialog follows the
+ * selection) when the track is in the selection, else that track alone, leaving the selection
+ * as it is.
+ */
+export function menuDialogTargets(selected: readonly string[], trackId: string): string[] | null {
+  return selected.includes(trackId) ? null : [trackId];
+}
+
+/** The tracks the selection dialog works on: its own targets (from a track's menu), else the selection. */
+export function dialogTrackIds(selected: readonly string[], targets: readonly string[] | null): readonly string[] {
+  return targets ?? selected;
+}

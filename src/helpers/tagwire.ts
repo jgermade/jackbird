@@ -8,7 +8,9 @@ import type { AudioProps } from "../types.ts";
  */
 
 /** The fields, in the engine's order (`Field::ALL`). */
-export const WIRE_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "albumArtist", "compilation", "composer", "comment", "lyrics", "bpm"] as const;
+/** The ids, after the text fields (`Field::MbAlbumId` … `Field::JackbirdTrackId`): named as `TrackMetadata`'s. */
+export const ID_FIELDS = ["mbAlbumId", "mbReleaseGroupId", "mbAlbumArtistId", "mbReleaseTrackId", "mbRecordingId", "discogsReleaseId", "jackbirdTrackId"] as const;
+export const WIRE_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "albumArtist", "compilation", "composer", "comment", "lyrics", "bpm", ...ID_FIELDS] as const;
 
 export type WireField = (typeof WIRE_FIELDS)[number];
 

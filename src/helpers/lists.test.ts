@@ -53,7 +53,7 @@ describe("listCards", () => {
       { key: "A/a.mp3", index: 0, trackId: "A/a.mp3", title: "Alpha", sub: "Ana", missing: false },
       { key: "#1", index: 1, title: "away.mp3", sub: "", missing: true },
       { key: "#2", index: 2, title: "Gone - G", sub: "", missing: true },
-      { key: "B/b.mp3", index: 3, trackId: "B/b.mp3", title: "Beta", sub: "Bea - Two", missing: false }
+      { key: "B/b.mp3", index: 3, trackId: "B/b.mp3", title: "Beta", sub: "Bea - Two", cover: "cover-b", missing: false }
     ]);
     assert.deepEqual(road?.trackIds, ["A/a.mp3", "B/b.mp3"]);
     assert.equal(road?.durationMs, 3000);

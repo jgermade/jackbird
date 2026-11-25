@@ -25,6 +25,7 @@ import {
   removeAt,
   replaceWith,
   restoreQueue,
+  shuffleUpcoming,
   type QueuePosition
 } from "../helpers/queue";
 import { bufferedTo, rangesOf } from "../helpers/buffered";
@@ -869,6 +870,14 @@ export function playNext(items: QueueItem[], sourceLabel: string): void {
   apply(playNextIn(was, items, sourceLabel), !was.queue);
 }
 
+/**
+ * Tracks as the queue, suggested (as a disc played is, not queued on purpose), `sourceLabel` its
+ * name, the first loaded paused: nothing starts by itself (the landing page's demo).
+ */
+export function cueTracks(items: QueueItem[], sourceLabel: string): void {
+  if (items.length > 0) apply(replaceWith(items, 0, sourceLabel), true);
+}
+
 /** Tracks at the end of the queue; with nothing queued, as `playNext`. */
 export function addToQueue(items: QueueItem[], sourceLabel: string): void {
   const was = position();
@@ -1126,11 +1135,18 @@ export function turnRepeat(): void {
   void sendNext();
 }
 
-/** The shuffle key: a new shuffled order, the track playing first; off, the queue's own order. */
-export function toggleShuffle(): void {
-  playback.shuffle = !playback.shuffle;
-  const total = $toRaw(playback).queue?.items.length ?? 0;
-  playback.order = playback.shuffle ? shuffledOrder(total, playback.index) : [];
+/**
+ * The shuffle key, an action (the owner, 2026-11-25): what is left in the queue mixed, all of it
+ * queued now and the queue no longer named after its list (helpers/queue.ts `shuffleUpcoming`).
+ * Each press mixes again; no mode is left on (`playback.shuffle` stays off, its order empty).
+ */
+export function shuffleQueue(): void {
+  const next = shuffleUpcoming(position());
+  $batch(() => {
+    playback.shuffle = false;
+    playback.order = [];
+  });
+  apply(next);
   void sendNext();
 }
 

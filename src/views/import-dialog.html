@@ -1,5 +1,6 @@
 <script :setup lang="ts">
-  // Adding music to the family library (F1): songs or a whole folder from
+  // Adding music to the tab in front (lib/importing.ts `addTarget`): into a folder, copied; to the
+  // family library (F1): songs or a whole folder from
   // this device, uploaded (editors and up), or a folder of the server's
   // machine, imported there (owners); its progress (and whether it goes over
   // the server's home network), and what became of the files (added, already
@@ -13,7 +14,10 @@
   const { t } = await import("../lib/i18n")
   const { can } = await import("../lib/account")
   const { chooseMachineFolder } = await import("../lib/folders")
-  const { folderUploadHere, importMachineFolder, importShare, importing, uploadFiles, uploadPhoneFolder } = await import("../lib/importing")
+  const { addTarget, addTargetName, folderUploadHere, importMachineFolder, importShare, importing, uploadFiles, uploadPhoneFolder } = await import("../lib/importing")
+  // Into a folder (the tab in front, 2026-11-25): its name over the dialog, the files copied into it;
+  // Android's folder and the server's machine are the library's ways only.
+  const toFolder = (): boolean => addTarget() === "folder"
   // A folder: a folder input on a computer, Android's own picker in the Android app, none on a
   // phone's browser or the iOS app (the input would choose files there).
   const folderWay = folderUploadHere()
@@ -31,22 +35,22 @@
 </script>
 
 <div class="import-dialog">
-  <Modal :open="importing.open" :eyebrow="t('import.eyebrow')" :title="t('import.title')" size="sm" :close-label="t('people.close')" @close="importing.busy || (importing.open = false)">
+  <Modal :open="importing.open" :eyebrow="toFolder() ? addTargetName() : t('import.eyebrow')" :title="t('import.title')" size="sm" :close-label="t('people.close')" @close="importing.busy || (importing.open = false)">
     <div class="body">
-      <p class="hint">{{ t("import.about") }}</p>
+      <p class="hint">{{ toFolder() ? t("import.aboutFolder", { name: addTargetName() }) : t("import.about") }}</p>
       <div class="keys">
         <label class="pick" :class.disabled="importing.busy">
           <input type="file" multiple accept=".mp3,.flac,audio/mpeg,audio/flac" :disabled="importing.busy" @change="picked($event)" />
-          <span>{{ t("import.files") }}</span>
+          <span>{{ toFolder() ? t("import.filesCopy") : t("import.files") }}</span>
         </label>
         <label :if="folderWay === 'input'" class="pick" :class.disabled="importing.busy">
           <input type="file" webkitdirectory :disabled="importing.busy" @change="picked($event)" />
-          <span>{{ t("import.folder") }}</span>
+          <span>{{ toFolder() ? t("import.folderCopy") : t("import.folder") }}</span>
         </label>
-        <button :elseif="folderWay === 'phone'" type="button" class="pick" :class.disabled="importing.busy" :disabled="importing.busy" @click="uploadPhoneFolder()">
+        <button :elseif="folderWay === 'phone' && !toFolder()" type="button" class="pick" :class.disabled="importing.busy" :disabled="importing.busy" @click="uploadPhoneFolder()">
           <span>{{ t("import.folder") }}</span>
         </button>
-        <Key :if="can('owner')" variant="ghost" :disabled="importing.busy" @click="fromMachine()">{{ t("import.machine") }}</Key>
+        <Key :if="can('owner') && !toFolder()" variant="ghost" :disabled="importing.busy" @click="fromMachine()">{{ t("import.machine") }}</Key>
       </div>
       <div :if="importing.busy" class="progress" role="status">
         <!-- By the songs' sizes, and within the one going, when they are known; else by the songs. -->

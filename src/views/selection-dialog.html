@@ -23,6 +23,8 @@
   const SubModal = await import("../../theme/default/components/sub-modal.html")
   const PictureCrop = await import("./picture-crop.html")
   const PictureKeys = await import("./picture-keys.html")
+  const LookupPanel = await import("./lookup-panel.html")
+  const { applyLookup, lookup, lookupCount } = await import("../lib/lookup")
   const { blobToDataUrl, closePicture, openPicture, picture } = await import("../lib/picture")
 
   const { audioLine, formatBytes } = await import("../helpers/format")
@@ -48,7 +50,8 @@
   const writingText = (): string => (writing.total > 1 ? t("editor.progress", { at: writing.at, total: writing.total, name: writing.name }) : writing.name)
   const { preferences } = await import("../lib/preferences")
   const { ui } = await import("../lib/ui")
-  const { activeRoot, removeSelectedTracks, selectedTracks } = await import("../lib/workspace")
+  const { activeRoot, dialogTracks } = await import("../lib/workspace")
+  const { deleteDialogTracks, deleteWay } = await import("../lib/deleting")
   const { canRename, readPlan, readSelected, renamePlan, renameSelected, renamer, setRenameDirection, setRenamePattern } = await import("../lib/rename")
   const { RENAME_PRESETS, completeField, fieldQuery, fieldsFor, fillPattern, patternReader, readSubject } = await import("../helpers/rename")
   const { nameDiff } = await import("../helpers/namediff")
@@ -91,9 +94,9 @@
 
   // Read through functions, not `$:` copies: the selection is boxed (see
   // Opaque in lib/workspace.ts) and must not land in this store.
-  const tracks = (): Track[] => selectedTracks.value.data
+  const tracks = (): Track[] => dialogTracks.value.data
   const single = (): Track | null => (tracks().length === 1 ? tracks()[0] : null)
-  const varied = () => getVariedFields(selectedTracks.value.data)
+  const varied = () => getVariedFields(dialogTracks.value.data)
 
   // In the order Info, Edit, Rename, Delete, each with its stripe colour: green, orange, orange, red.
   // A listener's are Info alone (S3).
@@ -143,7 +146,7 @@
       return true
     }
   })()
-  $: coverAsked = coverAskFor(selectedTracks.value.data)
+  $: coverAsked = coverAskFor(dialogTracks.value.data)
   const editCover = async (file?: File) => {
     if (severalAlbums() && !coverForAll) return
     const current = editor.form.coverDataUrl
@@ -215,9 +218,15 @@
   type Read = { trackId: string; from: string; tags: Record<string, string>; status: "ok" | "same" | "nomatch" }
   const directions = () => [
     { value: "toName", label: t("rename.toName") },
-    { value: "fromName", label: t("rename.fromName") }
+    { value: "fromName", label: t("rename.fromName") },
+    { value: "lookup", label: t("rename.lookup") }
   ]
   const fromName = (): boolean => renamer.direction === "fromName"
+  // From a database (views/lookup-panel.html): written, the tab turns to "Tags → name", the new names shown.
+  const looking = (): boolean => renamer.direction === "lookup"
+  const writeLookup = async () => {
+    if (await applyLookup()) setRenameDirection("toName")
+  }
   const reads = (): Read[] => readPlan.value.data
   // The pattern's fields, once each, as the preview's columns: the tag each sets, and its name.
   const READ_COLUMNS: Record<string, { tag: string; label: string }> = {
@@ -303,9 +312,15 @@
   }
 
   // Delete: the tab is the confirmation, so its key removes at once.
-  const remove = () => {
-    removeSelectedTracks()
-    closeSelection()
+  // Delete: to the server's trash, into the folder's quarantine, or only out of the list (lib/deleting.ts).
+  const way = (): "trash" | "quarantine" | "list" => deleteWay(activeRoot.value.data?.source)
+  const DANGER = {
+    trash: { title: "danger.trashTitle", body: "danger.trashBody", key: "danger.trash" },
+    quarantine: { title: "danger.quarantineTitle", body: "danger.quarantineBody", key: "danger.quarantine" },
+    list: { title: "danger.title", body: "danger.body", key: "danger.remove" }
+  } as const
+  const remove = async () => {
+    if (await deleteDialogTracks()) closeSelection()
   }
 </script>
 
@@ -408,7 +423,7 @@
         <dl class="info-facts">
           <div :each="fact in facts(single())" :key="fact.label">
             <dt>{{ fact.label }}</dt>
-            <dd :class.mono="!!fact.mono" :class.long="!!fact.long">{{ fact.text }}</dd>
+            <dd :class.mono="!!fact.mono" :class.long="!!fact.long"><a :if="fact.href" :href="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.text }}</a><span :else>{{ fact.text }}</span></dd>
           </div>
         </dl>
         <div :if="inLibrary() && songExtras.download" class="library-extras">
@@ -450,7 +465,8 @@
     <div :elseif="ui.selectionTab === 'rename'" class="rename">
       <!-- Which way: the tags give the name, or the name (and its folders) gives the tags. -->
       <Choice :label="t('rename.direction')" :options="directions()" :model="renamer.direction" @change="setRenameDirection($event.detail)" />
-      <div class="rename-head">
+      <LookupPanel :if="looking()" />
+      <div :else class="rename-head">
         <Field :label="t('rename.pattern')" control="rename-pattern">
           <div class="pattern-field" @input="lookForField()" @click="lookForField()" @keydown="onPatternKey($event)" @focusout="closeFields()">
             <TextInput id="rename-pattern" autocomplete="off" :model="renamer.pattern" @input="setRenamePattern($event.detail)" />
@@ -482,7 +498,7 @@
           </tbody>
         </table>
       </div>
-      <div :else class="mm-table-wrap">
+      <div :elseif="!looking()" class="mm-table-wrap">
         <table class="mm-table preview">
           <thead><tr><th>{{ t("rename.from") }}</th><th>{{ t("rename.to") }}</th><th></th></tr></thead>
           <tbody>
@@ -499,8 +515,9 @@
     </div>
 
     <div :else class="danger">
-      <h3 class="danger-title">{{ t("danger.title") }}</h3>
-      <p>{{ tn("danger.body", tracks().length) }}</p>
+      <h3 class="danger-title">{{ t(DANGER[way()].title) }}</h3>
+      <p>{{ tn(DANGER[way()].body, tracks().length) }}</p>
+      <p :if="library.errorMessage" class="failure" role="alert">{{ library.errorMessage }}</p>
     </div>
 
     <!-- The cover's picture crop, over this dialog's body (lib/picture.ts). -->
@@ -516,6 +533,10 @@
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
         <Key variant="primary" :disabled="library.saving || tracks().length === 0" @click="saveEdits()">{{ library.saving ? t("editor.saving") : t("editor.save") }}</Key>
       </span>
+      <span :elseif="ui.selectionTab === 'rename' && looking()" class="keys">
+        <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
+        <Key variant="primary" :disabled="library.saving || reading() || !!lookup.busy || lookupCount() === 0" @click="writeLookup()">{{ library.saving ? t("editor.saving") : tn("rename.read", lookupCount()) }}</Key>
+      </span>
       <span :elseif="ui.selectionTab === 'rename' && fromName()" class="keys">
         <Key variant="ghost" :disabled="library.saving" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
         <Key variant="primary" :disabled="library.saving || reading() || readCount() === 0" @click="readNames()">{{ library.saving ? t("editor.saving") : tn("rename.read", readCount()) }}</Key>
@@ -526,7 +547,7 @@
       </span>
       <span :elseif="ui.selectionTab === 'danger'" class="keys">
         <Key variant="ghost" @click="closeSelection()">{{ t("editor.cancel") }}</Key>
-        <Key variant="danger" :disabled="tracks().length === 0" @click="remove()">{{ tn("danger.remove", tracks().length) }}</Key>
+        <Key variant="danger" :disabled="library.saving || tracks().length === 0" @click="remove()">{{ library.saving ? t("danger.deleting") : tn(DANGER[way()].key, tracks().length) }}</Key>
       </span>
       <span :else class="keys">
         <Key variant="ghost" @click="closeSelection()">{{ t("selection.close") }}</Key>
@@ -693,4 +714,8 @@
   .suggestions h4 { margin: 0; }
   .suggestions ul { margin: 0; padding-left: var(--mm-space-4); font-size: var(--mm-text-sm); }
   .suggestions small { color: var(--mm-fg-subtle); }
+  /* An id's page in its database (helpers/track-facts.ts): the accent's ink, underlined lightly. */
+  dd a { color: var(--mm-accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  dd a:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; border-radius: 2px; }
+  @media (hover: hover) { dd a:hover { text-decoration-thickness: 2px; } }
 </style>

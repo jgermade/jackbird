@@ -7,6 +7,7 @@
 
 import { $computed, $reactive, $toRaw } from "jq79";
 import { RENAME_PRESETS, planReads, planRenames, type ReadPlan, type RenamePlan } from "../helpers/rename";
+import { dialogTrackIds } from "../helpers/selection";
 import type { MetaRecord, Track, RootWorkspace } from "../types";
 import { t, tn } from "./i18n";
 import { library } from "./library";
@@ -18,14 +19,18 @@ import { followRename } from "./player";
 import { followRenameInPlaylists } from "./playlists";
 import { updateRoots } from "./roots";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
+import { ui } from "./ui";
 
-/** Which way the rename tab works: the tags give the file's name, or the name (and its folders) gives the tags. */
-export type RenameDirection = "toName" | "fromName";
+/**
+ * Which way the rename tab works: the tags give the file's name, the name (and its folders) gives
+ * the tags, or a database gives them (lib/lookup.ts).
+ */
+export type RenameDirection = "toName" | "fromName" | "lookup";
 
 /** The pattern being typed, as last used (or the first preset), and the way it is used, as last chosen. */
 export const renamer = $reactive({
   pattern: readStored(STORAGE_KEYS.renamePattern) || RENAME_PRESETS[0],
-  direction: (readStored(STORAGE_KEYS.renameDirection) === "fromName" ? "fromName" : "toName") as RenameDirection
+  direction: (["fromName", "lookup"].includes(readStored(STORAGE_KEYS.renameDirection) ?? "") ? readStored(STORAGE_KEYS.renameDirection) : "toName") as RenameDirection
 });
 
 /** Sets the way the rename tab works, and keeps it for the next time. */
@@ -41,7 +46,8 @@ export function setRenamePattern(pattern: string): void {
 }
 
 /**
- * The plan for the active root's selection (boxed, see Opaque), derived from
+ * The plan for the selection dialog's tracks (boxed, see Opaque): the active root's selection, or a
+ * track's menu's (`ui.selectionTargets`); derived from
  * the library store itself, not from another computed value.
  */
 export const renamePlan = $computed((): Opaque<RenamePlan[]> => {
@@ -50,7 +56,7 @@ export const renamePlan = $computed((): Opaque<RenamePlan[]> => {
   if (!root) {
     return new Opaque([]);
   }
-  const chosen = new Set(root.selectedTrackIds);
+  const chosen = new Set(dialogTrackIds(root.selectedTrackIds, ui.selectionTargets ? [...$toRaw(ui.selectionTargets)] : null));
   const tracks = root.tracks.filter((track) => chosen.has(track.id));
   return new Opaque(planRenames(tracks, pattern, root.tracks.map((track) => track.relativePath)));
 });
@@ -129,6 +135,8 @@ export async function renameSelected(): Promise<boolean> {
       updateRoots((roots) => roots.map((item) => (item.id === root.id ? renamedRoot(item, done) : item)));
       followRename(root.id, done);
       followRenameInPlaylists(root.id, done);
+      const targets = $toRaw(ui).selectionTargets;
+      if (targets) ui.selectionTargets = targets.map((id) => done.get(id) ?? id);
       await flushMeta(root.id).catch(() => undefined);
     }
     library.saving = false;
@@ -149,7 +157,7 @@ export const readPlan = $computed((): Opaque<ReadPlan[]> => {
   const pattern = renamer.pattern;
   const root = library.roots.find((item) => item.id === library.activeRootId);
   if (!root) return new Opaque([]);
-  const chosen = new Set(root.selectedTrackIds);
+  const chosen = new Set(dialogTrackIds(root.selectedTrackIds, ui.selectionTargets ? [...$toRaw(ui.selectionTargets)] : null));
   return new Opaque(planReads(root.tracks.filter((track) => chosen.has(track.id)), pattern));
 });
 
