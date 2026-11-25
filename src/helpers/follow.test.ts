@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { byCaret, followFolder } from "./follow.ts";
+import { byCaret, followFolder, oneTopOpen } from "./follow.ts";
 
 test("a click opens a folder, as opened by a click", () => {
   assert.deepEqual(followFolder({ expanded: [], auto: [] }, "Jazz", []), { expanded: ["Jazz"], auto: ["Jazz"] });
@@ -21,4 +21,12 @@ test("the folders a click opened close once the current row leaves them", () => 
 test("byCaret makes a folder the person's", () => {
   assert.deepEqual(byCaret(["Jazz", "Pop"], "Jazz"), ["Pop"]);
   assert.deepEqual(byCaret([], "Jazz"), []);
+});
+
+test("Albums by artist keeps the one artist holding the current row open, and the others' albums as they were", () => {
+  assert.deepEqual(oneTopOpen(["a", "a/1", "b", "b/1", "c"], ["a", "b", "c"], "b"), ["a/1", "b", "b/1"]);
+});
+
+test("with no artist to keep, every artist closes", () => {
+  assert.deepEqual(oneTopOpen(["a", "x"], ["a", "b"], null), ["x"]);
 });

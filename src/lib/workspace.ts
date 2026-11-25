@@ -7,7 +7,7 @@
 import { $computed, $toRaw } from "jq79";
 import { groupAlbums, type AlbumGroup } from "../helpers/albums";
 import { queueOf } from "../helpers/queue";
-import { byCaret, followFolder } from "../helpers/follow";
+import { byCaret, followFolder, oneTopOpen } from "../helpers/follow";
 import { withoutSongs } from "../helpers/folders";
 import { levelsOf, openOnEntering, openOnLeaving, type Levels } from "../helpers/levels";
 import { listCards, type ListCard } from "../helpers/lists";
@@ -290,12 +290,19 @@ export function clearSelection(): void {
 export function toggleFolder(folder: string): void {
   const id = library.activeRootId;
   if (id) autoOpened.set(id, byCaret(autoOpened.get(id) ?? [], folder));
-  updateActive((root) => ({
-    ...root,
-    expandedAlbums: root.expandedAlbums.includes(folder)
-      ? root.expandedAlbums.filter((value) => value !== folder)
-      : [...root.expandedAlbums, folder]
-  }));
+  const tops = artistTops();
+  updateActive((root) => {
+    if (root.expandedAlbums.includes(folder)) return { ...root, expandedAlbums: root.expandedAlbums.filter((value) => value !== folder) };
+    // An artist opened in Albums by artist: the others close.
+    const opened = [...root.expandedAlbums, folder];
+    return { ...root, expandedAlbums: tops.includes(folder) ? oneTopOpen(opened, tops, folder) : opened };
+  });
+}
+
+/** In Albums by artist, its artists' keys (the groups at the top), which open one at a time; else none. */
+function artistTops(): string[] {
+  const { root, rows } = derive();
+  return root?.view === "albumsByArtist" ? rows.filter((row) => row.kind === "album" && row.depth === 0).map((row) => row.album) : [];
 }
 
 /** The folders of each root a click opened (not their caret): they close as the current row leaves them. */
@@ -317,8 +324,13 @@ export function followRow(rowKey: string): void {
     if (up.kind === "album") ancestors.push(up.album);
   }
   const next = followFolder({ expanded: root.expandedAlbums, auto: autoOpened.get(root.id) ?? [] }, row.kind === "album" ? row.album : null, ancestors);
-  autoOpened.set(root.id, next.auto);
-  updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: next.expanded }));
+  // Albums by artist: the artist holding the row (the farthest folder up, or the row itself) the
+  // only one open (the owner, 2026-11-25).
+  const tops = artistTops();
+  const artist = ancestors.at(-1) ?? (row.kind === "album" ? row.album : null);
+  const expanded = tops.length > 0 ? oneTopOpen(next.expanded, tops, artist) : next.expanded;
+  autoOpened.set(root.id, next.auto.filter((key) => expanded.includes(key)));
+  updateActive((item) => ({ ...item, activeRowKey: rowKey, expandedAlbums: expanded }));
 }
 
 /**
