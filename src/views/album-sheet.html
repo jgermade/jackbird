@@ -149,7 +149,7 @@
   // list is not an album. Each with its name,
   // how many songs and how long, Play and Shuffle; the rest (queue, rename, export, delete) under its
   // ⋮. Its songs in the list's order, each with its box (no number); one not in the library, marked.
-  type Card = { key: string; name: string; kind: "all" | "liked" | "playlist"; path?: string; entries: { key: string; index: number; trackId?: string; title: string; sub: string; missing: boolean }[]; trackIds: string[]; durationMs: number }
+  type Card = { key: string; name: string; kind: "all" | "liked" | "playlist"; path?: string; entries: { key: string; index: number; trackId?: string; title: string; sub: string; cover?: string; missing: boolean }[]; trackIds: string[]; durationMs: number }
   const lists = (): Card[] => detailLists.value.data
   const listing = (): boolean => view() === "playlists"
   const trackOf = (() => {
@@ -285,6 +285,11 @@
                     <span class="pick-box shown">
                       <SelectBox :if="!entry.missing" :chosen="isChosen(trackOf(entry.trackId))" @pick="pick(trackOf(entry.trackId), $event.detail)" />
                     </span>
+                  </td>
+                  <!-- Its cover (2026-11-25), else an empty frame of its size, so the titles line up. -->
+                  <td class="entry-cover-cell">
+                    <img :if="coverSrc(entry.cover ?? null)" class="entry-cover" :src="coverSrc(entry.cover ?? null)" alt="" draggable="false" />
+                    <span :else class="entry-cover entry-frame" aria-hidden="true"></span>
                   </td>
                   <td>
                     <span class="mm-title">{{ entry.title }}</span>
@@ -542,6 +547,11 @@
   /* Its line under the title: the row as tall as two lines (tokens.css). */
   .list-card .mm-table td { height: var(--mm-row-two); }
   .mm-table tr.missing { cursor: default; opacity: .55; }
+  /* A song's cover in a list, as the library's rows draw theirs (list-row.html `--cover`). */
+  .list-card .entry-cover-cell { --cover: 1.75rem; width: 1%; padding-right: 0; line-height: 0; }
+  @supports (width: round(1rem, 2px)) { .list-card .entry-cover-cell { --cover: round(1.75rem, 2px); } }
+  .entry-cover { display: block; width: var(--cover); height: var(--cover); border-radius: var(--mm-radius-key); object-fit: cover; box-shadow: 0 0 0 1px var(--mm-border); }
+  .entry-frame { background: var(--mm-sunken); box-shadow: inset 0 0 0 1px var(--mm-border); }
   .prompt { display: grid; gap: var(--mm-space-2); max-width: 36rem; padding: var(--mm-space-7) var(--mm-space-5); }
   .prompt h2 { font-size: var(--mm-text-xl); }
   .prompt p { margin: 0; color: var(--mm-fg-muted); }
