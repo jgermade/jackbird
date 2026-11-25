@@ -416,6 +416,12 @@ export function playTrackIds(trackIds: readonly string[], label: string): void {
   if (root && trackIds.length > 0) playTracks(queueOf(root.id, [...trackIds], label).items, 0, label);
 }
 
+/** What Details shows (its scope), as it plays: its tracks' ids in the sheet's order, and its name. */
+export function detailPlayList(): { trackIds: string[]; label: string } {
+  const scope = derive().scope;
+  return { trackIds: playOrder(scope).map((track) => track.id), label: scope.label };
+}
+
 /** Plays tracks of the active root in an order of chance, `label` the queue's name. */
 export function shuffleTrackIds(trackIds: readonly string[], label: string): void {
   const root = current();

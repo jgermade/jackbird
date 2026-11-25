@@ -27,7 +27,7 @@
   const { codecFamily, codecLabel } = await import("../helpers/formats")
   const { openPicture } = await import("../lib/picture")
   const { setArtistPicture } = await import("../lib/artists")
-  const { activeRoot, detail, detailAlbums, detailCrumbs, detailLists, enterLevel, leaveLevel, playFromDetail, playFromList, playTrackIds, selectTrack, selectTracks, setCurrentRow, showWhole, shuffleTrackIds, treeLevels } = await import("../lib/workspace")
+  const { activeRoot, detail, detailAlbums, detailCrumbs, detailLists, detailPlayList, enterLevel, leaveLevel, playFromDetail, playFromList, playTrackIds, queueTracks, selectTrack, selectTracks, setCurrentRow, showWhole, shuffleTrackIds, treeLevels } = await import("../lib/workspace")
   const { ui } = await import("../lib/ui")
   const { chosenState } = await import("../helpers/selection")
   const logoUrl: string = (await import("../assets/brand/jackbird-metal.svg?url")).default
@@ -133,6 +133,25 @@
     const artist = shownArtist()
     return artist ? coverSrc(root()?.metaSnapshot.artists?.[artistName(artist.label)] ?? null) : null
   }
+  // What it shows, played: Play, Shuffle and its ⋮ (lib/workspace.ts `detailPlayList`).
+  const sheetName = (): string => crumbs().at(-1)?.label ?? t(VIEW_LABELS[view()] ?? "views.files")
+  const playShown = () => {
+    const shown = detailPlayList()
+    playTrackIds(shown.trackIds, shown.label)
+  }
+  const shuffleShown = () => {
+    const shown = detailPlayList()
+    shuffleTrackIds(shown.trackIds, shown.label)
+  }
+  const sheetMenu = () => [
+    { id: "next", label: tn("menu.playNext", 1) },
+    { id: "queue", label: tn("menu.addToQueue", 1) },
+    ...(shownArtist() ? [{ id: "picture", label: t("artist.picture", { name: shownArtist().label }), rule: true }] : [])
+  ]
+  const onSheetMenu = (choice: string) => {
+    if (choice === "picture") void editArtistPicture()
+    else if (choice === "next" || choice === "queue") queueTracks(detailPlayList().trackIds, choice === "next" ? "next" : "end")
+  }
   // Their picture: the picture dialog, round, to paste, drop or choose one and crop it (lib/picture.ts).
   const editArtistPicture = async () => {
     const artist = shownArtist()
@@ -237,11 +256,19 @@
           <span :else aria-current="location"><img :if="at === crumbs().length - 1 && artistPictureSrc()" class="crumb-picture" :src="artistPictureSrc()" alt="" />{{ crumb.label }}</span>
         </span>
       </nav>
-      <!-- While it shows an artist: their picture, chosen or removed (lib/artists.ts). -->
-      <span :if="shownArtist()" class="sheet-actions">
-        <Key square size="sm" variant="ghost" :label="t('artist.picture', { name: shownArtist().label })" :title="t('artist.picture', { name: shownArtist().label })" @click="editArtistPicture()">
-          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25" /><circle cx="8" cy="6.5" r="2" /><path d="M4.25 12.5c.75-1.75 2.1-2.6 3.75-2.6s3 .85 3.75 2.6" /></svg>
+      <!-- What it shows, played (the owner, 2026-11-25): Play and Shuffle, as a list's card has them,
+           and its ⋮ (play next, add to the queue; an artist's picture while it shows an artist). Not in
+           Lists, whose cards have their own. -->
+      <span :if="!listing()" class="sheet-actions">
+        <Key size="sm" variant="primary" :label="t('lists.playLabel', { name: sheetName() })" @click="playShown()">
+          <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
+          {{ t("lists.play") }}
         </Key>
+        <Key size="sm" :label="t('lists.shuffleLabel', { name: sheetName() })" @click="shuffleShown()">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3.5 0 3.5 7 7 7H14M2 11.5h2.5c1.3 0 2.1-.9 2.8-2M9 6.5c.6-1.1 1.4-2 2.5-2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
+          {{ t("lists.shuffle") }}
+        </Key>
+        <Menu :label="t('menu.folder', { title: sheetName() })" :items="() => sheetMenu()" @select="onSheetMenu($event.detail)" />
       </span>
       </div>
       <!-- The Lists view: its lists, each a card. -->
@@ -416,7 +443,7 @@
      the ones before it links in the muted ink. */
   /* The breadcrumb, and at its right the details' actions (an artist's picture). */
   .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-3); min-width: 0; }
-  .sheet-actions { display: flex; flex: none; align-items: center; }
+  .sheet-actions { display: flex; flex: none; align-items: center; gap: var(--mm-space-2); }
   /* The artist's picture beside their name: round. */
   .crumb-picture { width: 1.5rem; height: 1.5rem; margin-right: var(--mm-space-2); border-radius: 50%; object-fit: cover; vertical-align: middle; box-shadow: 0 0 0 1px var(--mm-border); }
   .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-1) var(--mm-space-2); min-width: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
