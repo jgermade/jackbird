@@ -260,6 +260,7 @@ export const es: Record<MessageKey, string> = {
   "likes.list": "Me gusta",
   "lists.allSongs": "Todas las canciones",
   "lists.play": "Reproducir",
+  "lists.playAll": "Reproducir todo",
   "lists.shuffle": "Aleatorio",
   "lists.playLabel": "Reproducir {name}",
   "lists.shuffleLabel": "Reproducir {name} en aleatorio",

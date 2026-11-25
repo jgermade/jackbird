@@ -259,6 +259,7 @@ export const en = {
   "likes.list": "Liked songs",
   "lists.allSongs": "All songs",
   "lists.play": "Play",
+  "lists.playAll": "Play all",
   "lists.shuffle": "Shuffle",
   "lists.playLabel": "Play {name}",
   "lists.shuffleLabel": "Shuffle {name}",
