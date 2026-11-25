@@ -22,6 +22,7 @@
   const TextInput = await import("../../theme/default/components/text-input.html")
   const Choice = await import("../../theme/default/components/choice.html")
   const Tabs = await import("../../theme/default/components/tabs.html")
+  const SubModal = await import("../../theme/default/components/sub-modal.html")
 
   const { languageName, t, tn } = await import("../lib/i18n")
   const { LANGUAGES, preferences, showView, setCrossfadeSeconds, setDensity, setLanguage, setPeakFall, setSongsInFolders, setSongsInViews, setSpectrumLook, setThemeChoice, setTransition } = await import("../lib/preferences")
@@ -43,6 +44,9 @@
   const ServerDetails = await import("./server-details.html")
   const { onOwnServer } = await import("../lib/server-details")
   const { describeAgent } = await import("../helpers/agent")
+  // The sessions open on one's account: a key of the account's head opens them over the section
+  // (the owner, 2026-11-25), not a list under the passkeys.
+  let sessionsOpen = false
   const { clearHistory, mine, showOwnVersion } = await import("../lib/mine")
   const { importing } = await import("../lib/importing")
   const { loadSharing, shareWith, shareWithEveryone, sharing } = await import("../lib/sharing")
@@ -260,9 +264,14 @@
     </div>
     <div :if="section() === 'account'" class="prefs">
       <section class="pref account">
-        <div class="text">
-          <h3 class="mm-legend is-ink">{{ t("account.title") }}</h3>
-          <p class="state">{{ t("account.as", { name: account.me?.name ?? "", role: role(account.me?.role ?? "listener") }) }}<span :if="account.me?.email"> · {{ account.me?.email }}</span></p>
+        <div class="account-head">
+          <div class="text">
+            <h3 class="mm-legend is-ink">{{ t("account.title") }}</h3>
+            <p class="state">{{ t("account.as", { name: account.me?.name ?? "", role: role(account.me?.role ?? "listener") }) }}<span :if="account.me?.email"> · {{ account.me?.email }}</span></p>
+          </div>
+          <Key :if="account.signin" size="sm" square popup="dialog" :label="t('account.sessionsOpen', { count: String(account.sessions.length) })" :title="t('account.sessionsOpen', { count: String(account.sessions.length) })" @click="sessionsOpen = true">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="9.5" height="7" rx=".75" /><path d="M4.5 12.5h3.5" /><rect x="11.25" y="6" width="3.25" height="7.5" rx=".6" /></svg>
+          </Key>
         </div>
         <p :if="account.error" class="failure">{{ account.error }}</p>
         <div class="row">
@@ -287,14 +296,15 @@
             <Key size="sm" :disabled="account.busy" @click="newPasskey()">{{ t("account.addPasskey") }}</Key>
           </div>
           <p :else class="hint">{{ t("account.passkeySecure") }}</p>
-          <h4 class="mm-legend">{{ t("account.sessions") }}</h4>
+        </div>
+        <SubModal :open="sessionsOpen" :title="t('account.sessions')" width="36rem" :close-label="t('sources.close')" @close="sessionsOpen = false">
           <ul class="items">
             <li :each="session in account.sessions" :key="session.id">
               <span class="label" :title="session.agent">{{ describeAgent(session.agent, t("account.on")) || "—" }}<small> · {{ t("account.sessionSeen", { date: when(session.seen) }) }}</small></span>
               <Key size="sm" variant="ghost" :disabled="account.busy" @click="endSession(session.id)">{{ t("account.endSession") }}</Key>
             </li>
           </ul>
-        </div>
+        </SubModal>
         <div class="sub">
           <h4 class="mm-legend">{{ t("account.keys") }}</h4>
           <p class="hint">{{ t("account.keysHint") }}</p>
@@ -405,6 +415,9 @@
   .account, .sub { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--mm-space-3); }
   .prefs > * { min-width: 0; }
   .account .state { color: var(--mm-fg); }
+  /* The account, and at its right the key to the sessions open on it (a SubModal). */
+  .account-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--mm-space-3); }
+  .account-head .icon { width: .875rem; height: .875rem; }
   .sub h4 { margin: 0; }
   /* The people one may share one's music with, a box each. */
   .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--mm-space-2); margin: 0; padding: 0; list-style: none; }

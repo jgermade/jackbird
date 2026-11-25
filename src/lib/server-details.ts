@@ -14,9 +14,11 @@ import { setCurrentRow, showWhole } from "./workspace";
 /** Details shows the server's details when a server library's active row is this. */
 export const SERVER_ROW = "@server";
 
-export type ServerTab = "summary" | "people" | "signin" | "log" | "trash" | "backups";
+export type ServerTab = "summary" | "people" | "signin";
+/** What opens over the details from a key of the head: the log, the trash, the backups (the owner, 2026-11-25). */
+export type ServerPanel = "log" | "trash" | "backups";
 
-export const serverView = $reactive({ tab: "summary" as ServerTab });
+export const serverView = $reactive({ tab: "summary" as ServerTab, panel: null as ServerPanel | null });
 
 /** Whether the server spoken to is the page's own: the web a server serves is that server. */
 export const onOwnServer = (): boolean => currentServer().address === "";
@@ -38,6 +40,7 @@ export const showsServerSheet = (root: RootWorkspace | null): boolean => root?.s
 /** The server's details: Preferences, Server on its own page; Details otherwise. */
 export function openServerDetails(): void {
   serverView.tab = "summary";
+  serverView.panel = null;
   if (onOwnServer()) {
     ui.preferencesSection = "server";
     ui.preferencesOpen = true;

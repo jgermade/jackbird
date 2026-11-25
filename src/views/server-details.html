@@ -13,6 +13,8 @@
   const Choice = await import("../../theme/default/components/choice.html")
   const UsageBar = await import("../../theme/default/components/usage-bar.html")
   const PeoplePanels = await import("./people-panels.html")
+  const Modal = await import("../../theme/default/components/modal.html")
+  const SubModal = await import("../../theme/default/components/sub-modal.html")
 
   const { t, tn } = await import("../lib/i18n")
   const { preferences } = await import("../lib/preferences")
@@ -38,7 +40,8 @@
     hidePeople()
   })
 
-  type Tab = "summary" | "people" | "signin" | "log" | "trash" | "backups"
+  type Tab = "summary" | "people" | "signin"
+  type Panel = "log" | "trash" | "backups"
   // Each section's icon, shown alone on a phone (its name is the key's name and tooltip): their
   // names in full do not fit there, and each key stays readable.
   const ICONS = {
@@ -59,21 +62,34 @@
     ...(can("admin")
       ? [
           { value: "people", label: t("people.tabPeople"), icon: ICONS.people },
-          { value: "signin", label: t("people.tabSignin"), icon: ICONS.signin },
-          { value: "log", label: t("people.tabLog"), icon: ICONS.log },
-          ...(importing.available ? [{ value: "trash", label: t("people.tabTrash"), icon: ICONS.trash }] : []),
-          ...(importing.available && can("owner") ? [{ value: "backups", label: t("people.tabBackups"), icon: ICONS.backups }] : [])
+          { value: "signin", label: t("people.tabSignin"), icon: ICONS.signin }
         ]
       : [])
   ]
   const choose = (tab: Tab) => {
     serverView.tab = tab
-    if (tab === "summary") return
-    people.tab = tab
-    if (tab === "log") void loadLog()
-    if (tab === "trash") void loadTrash()
-    if (tab === "backups") void loadBackups()
+    if (tab !== "summary") people.tab = tab
   }
+  // The log, the trash and the backups: keys of glyphs alone in the head, each opening its own
+  // sheet over the details (a SubModal in Preferences; a Modal in Details, which has none to sit in).
+  const panels = (): { value: Panel; label: string; icon: string }[] =>
+    can("admin")
+      ? [
+          { value: "log", label: t("people.tabLog"), icon: ICONS.log },
+          ...(importing.available ? [{ value: "trash" as Panel, label: t("people.tabTrash"), icon: ICONS.trash }] : []),
+          ...(importing.available && can("owner") ? [{ value: "backups" as Panel, label: t("people.tabBackups"), icon: ICONS.backups }] : [])
+        ]
+      : []
+  const openPanel = (panel: Panel) => {
+    serverView.panel = panel
+    if (panel === "log") void loadLog()
+    if (panel === "trash") void loadTrash()
+    if (panel === "backups") void loadBackups()
+  }
+  const closePanel = () => {
+    serverView.panel = null
+  }
+  const panelTitle = (): string => panels().find((panel) => panel.value === serverView.panel)?.label ?? ""
 
   // Space.
   const driveSize = (bytes: number): string => formatDriveSize(bytes, preferences.language)
@@ -119,6 +135,11 @@
       <h3 class="mm-legend is-ink">{{ t("preferences.section.server") }}</h3>
       <p class="host">{{ serverHost() }}</p>
     </div>
+    <span :if="panels().length > 0" class="tools">
+      <Key :each="panel in panels()" :key="panel.value" size="sm" square popup="dialog" :label="panel.label" :title="panel.label" @click="openPanel(panel.value)">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="panel.icon" /></svg>
+      </Key>
+    </span>
   </header>
   <!-- Its sections, as the rename tab's directions (a Choice): on a phone, their icons alone. -->
   <Choice :if="tabs().length > 1" :label="t('server.tabs')" :icons="phone" :options="tabs()" :model="serverView.tab" @change="choose($event.detail)" />
@@ -167,6 +188,13 @@
   </div>
 
   <PeoplePanels :else />
+
+  <SubModal :if="!asSheet()" :open="!!serverView.panel" :title="panelTitle()" width="36rem" :close-label="t('sources.close')" @close="closePanel()">
+    <PeoplePanels :if="serverView.panel" :tab="serverView.panel" />
+  </SubModal>
+  <Modal :else :open="!!serverView.panel" :title="panelTitle()" :close-label="t('sources.close')" @close="closePanel()">
+    <PeoplePanels :if="serverView.panel" :tab="serverView.panel" />
+  </Modal>
 </article>
 
 <style scoped>
@@ -175,6 +203,8 @@
   .server.is-sheet { padding: var(--mm-space-5); }
   .top { display: flex; align-items: center; justify-content: space-between; gap: var(--mm-space-3); min-width: 0; }
   .icon { width: .875rem; height: .875rem; }
+  /* The log, the trash and the backups: keys of glyphs alone, at the head's right end. */
+  .tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--mm-space-2); margin-left: auto; }
   /* Which server, on the right (on its own page, with no Back, alone on the left). */
   .head { display: grid; gap: var(--mm-space-1); min-width: 0; margin-left: auto; text-align: right; }
   .server:not(.is-sheet) .head { margin-left: 0; text-align: left; }

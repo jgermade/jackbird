@@ -568,6 +568,7 @@ export const en = {
   "account.keyName": "The app it is for",
   "account.addKey": "Make a key",
   "account.newKey": "The key, shown only now: {key}",
+  "account.sessionsOpen": "Sessions open ({count})",
   "account.sessions": "Signed in on",
   "account.sessionSeen": "last used {date}",
   "account.on": "on",

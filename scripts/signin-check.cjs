@@ -183,6 +183,14 @@ async function openPreferences(page, section = "Account") {
     await editing.getByRole("button", { name: "Add a passkey on this device" }).click();
     await editing.getByText("Laptop").waitFor({ timeout: 15000 });
     await editing.waitForTimeout(500);
+    // The sessions open: a key of the account's head, over the section (2026-11-25).
+    await editing.getByRole("button", { name: /^Sessions open \(\d+\)$/ }).click();
+    await editing.getByRole("button", { name: "Sign out there" }).first().waitFor({ timeout: 5000 }).catch(() => undefined);
+    await editing.screenshot({ path: path.join(home, "sessions.png") });
+    const sessions = await editing.getByRole("button", { name: "Sign out there" }).count();
+    console.log("editor: the sessions key lists", sessions, "session(s)");
+    if (sessions < 1) fail("the sessions key lists none");
+    await editing.keyboard.press("Escape");
     await editing.screenshot({ path: path.join(home, "account.png") });
     await Promise.all([editing.waitForEvent("load"), editing.getByRole("button", { name: "Sign out", exact: true }).click()]);
     await editing.getByRole("button", { name: "Sign in with a passkey" }).click();
@@ -217,7 +225,8 @@ async function openPreferences(page, section = "Account") {
     // ── The owner's log.
     // People and sign-in: tabs of Preferences, Server.
     await openPreferences(page, "Server");
-    await page.getByRole("radio", { name: "Changes" }).click();
+    // The log: a key of the server's head, opening it over the details (2026-11-25).
+    await page.getByRole("button", { name: "Changes", exact: true }).click();
     await page.getByText(/Luis edited the tags of/).first().waitFor({ timeout: 15000 });
     console.log("owner: the log shows Luis's save");
 

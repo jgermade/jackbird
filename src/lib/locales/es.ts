@@ -569,6 +569,7 @@ export const es: Record<MessageKey, string> = {
   "account.keyName": "La app para la que es",
   "account.addKey": "Crear una clave",
   "account.newKey": "La clave, que solo se muestra ahora: {key}",
+  "account.sessionsOpen": "Sesiones abiertas ({count})",
   "account.sessions": "Sesiones abiertas en",
   "account.sessionSeen": "usada por última vez {date}",
   "account.on": "en",
