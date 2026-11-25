@@ -1,0 +1,288 @@
+{
+ "pagination": {
+  "page": 1,
+  "pages": 51,
+  "per_page": 5,
+  "items": 252,
+  "urls": {
+   "last": "https://api.discogs.com/database/search?artist=Radiohead&release_title=OK+Computer&type=release&per_page=5&page=51",
+   "next": "https://api.discogs.com/database/search?artist=Radiohead&release_title=OK+Computer&type=release&per_page=5&page=2"
+  }
+ },
+ "results": [
+  {
+   "country": "Ukraine",
+   "genre": [
+    "Electronic",
+    "Rock"
+   ],
+   "format": [
+    "Cassette",
+    "Album",
+    "Unofficial Release"
+   ],
+   "style": [
+    "Alternative Rock"
+   ],
+   "id": 8617558,
+   "label": [
+    "Gala Studio",
+    "Gala Records"
+   ],
+   "type": "release",
+   "barcode": [
+    "4 820011 160014 >",
+    "4820011160014",
+    "ДСТУ 3060-95"
+   ],
+   "master_id": 21491,
+   "master_url": "https://api.discogs.com/masters/21491",
+   "uri": "/release/8617558-Radiohead-Ok-%D0%9A%D0%BE%D0%BC%D0%BF%D1%8C%D1%8E%D1%82%D0%B5%D1%80-OK-Computer",
+   "catno": "GS-204",
+   "title": "Radiohead - Ok. Компьютер (OK Computer)",
+   "thumb": "",
+   "cover_image": "",
+   "resource_url": "https://api.discogs.com/releases/8617558",
+   "community": {
+    "want": 710,
+    "have": 7
+   },
+   "format_quantity": 1,
+   "formats": [
+    {
+     "name": "Cassette",
+     "qty": "1",
+     "descriptions": [
+      "Album",
+      "Unofficial Release"
+     ]
+    }
+   ]
+  },
+  {
+   "country": "Belgium",
+   "year": "2008",
+   "format": [
+    "CD",
+    "Album",
+    "Reissue"
+   ],
+   "label": [
+    "Parlophone",
+    "Parlophone",
+    "Legendarische Doorbraakalbums",
+    "EMI Records Ltd.",
+    "EMI Records Ltd.",
+    "EMI",
+    "EMI",
+    "Warner/Chappell Music Ltd.",
+    "Mayfair Studios",
+    "Abbey Road Studios",
+    "Air Lyndhurst Hall",
+    "Courtyard Studio",
+    "The Church, London",
+    "Abbey Road Studios",
+    "Novodisc O.D. Group S.A."
+   ],
+   "type": "release",
+   "genre": [
+    "Rock"
+   ],
+   "style": [
+    "Alternative Rock"
+   ],
+   "id": 1475007,
+   "barcode": [
+    "5 413662 904305",
+    "04",
+    "7 24385 52292 5",
+    "LC 0299",
+    "bel BIEM",
+    "070",
+    "PM 520",
+    "NOVODISC O.D. GROUP S.A. 724385522925 #2",
+    "IFPI LH63",
+    "none"
+   ],
+   "master_id": 21491,
+   "master_url": "https://api.discogs.com/masters/21491",
+   "uri": "/release/1475007-Radiohead-OK-Computer",
+   "catno": "7243 8 55229 2 5",
+   "title": "Radiohead - OK Computer",
+   "thumb": "",
+   "cover_image": "",
+   "resource_url": "https://api.discogs.com/releases/1475007",
+   "community": {
+    "want": 899,
+    "have": 246
+   },
+   "format_quantity": 1,
+   "formats": [
+    {
+     "name": "CD",
+     "qty": "1",
+     "text": "O-Card",
+     "descriptions": [
+      "Album",
+      "Reissue"
+     ]
+    }
+   ]
+  },
+  {
+   "country": "Canada",
+   "year": "1997",
+   "format": [
+    "Cassette",
+    "Album"
+   ],
+   "label": [
+    "Parlophone",
+    "EMI Music Canada"
+   ],
+   "type": "release",
+   "genre": [
+    "Rock"
+   ],
+   "style": [
+    "Alternative Rock"
+   ],
+   "id": 5853971,
+   "barcode": [
+    "7 24385 52294 9"
+   ],
+   "master_id": 21491,
+   "master_url": "https://api.discogs.com/masters/21491",
+   "uri": "/release/5853971-Radiohead-OK-Computer",
+   "catno": "7243 8 55229 4 9",
+   "title": "Radiohead - OK Computer",
+   "thumb": "",
+   "cover_image": "",
+   "resource_url": "https://api.discogs.com/releases/5853971",
+   "community": {
+    "want": 864,
+    "have": 76
+   },
+   "format_quantity": 1,
+   "formats": [
+    {
+     "name": "Cassette",
+     "qty": "1",
+     "descriptions": [
+      "Album"
+     ]
+    }
+   ]
+  },
+  {
+   "country": "US",
+   "year": "2008",
+   "format": [
+    "CDr",
+    "Album",
+    "CDr",
+    "Compilation",
+    "All Media",
+    "Advance",
+    "Promo"
+   ],
+   "label": [
+    "Capitol Records",
+    "Capitol Records, Inc.",
+    "Capitol Records, Inc.",
+    "Capitol Records, Inc."
+   ],
+   "type": "release",
+   "genre": [
+    "Rock"
+   ],
+   "style": [
+    "Alternative Rock"
+   ],
+   "id": 7566153,
+   "barcode": [],
+   "master_id": 21491,
+   "master_url": "https://api.discogs.com/masters/21491",
+   "uri": "/release/7566153-Radiohead-OK-Computer",
+   "catno": "none",
+   "title": "Radiohead - OK Computer",
+   "thumb": "",
+   "cover_image": "",
+   "resource_url": "https://api.discogs.com/releases/7566153",
+   "community": {
+    "want": 616,
+    "have": 16
+   },
+   "format_quantity": 2,
+   "formats": [
+    {
+     "name": "CDr",
+     "qty": "1",
+     "descriptions": [
+      "Album"
+     ]
+    },
+    {
+     "name": "CDr",
+     "qty": "1",
+     "descriptions": [
+      "Compilation"
+     ]
+    },
+    {
+     "name": "All Media",
+     "qty": "1",
+     "text": "Collectors Edition",
+     "descriptions": [
+      "Advance",
+      "Promo"
+     ]
+    }
+   ]
+  },
+  {
+   "country": "Unknown",
+   "genre": [
+    "Electronic",
+    "Rock"
+   ],
+   "format": [
+    "Cassette",
+    "Album",
+    "Unofficial Release"
+   ],
+   "style": [
+    "Alternative Rock"
+   ],
+   "id": 5656095,
+   "label": [
+    "Not On Label (Radiohead)"
+   ],
+   "type": "release",
+   "barcode": [],
+   "master_id": 21491,
+   "master_url": "https://api.discogs.com/masters/21491",
+   "uri": "/release/5656095-Radiohead-OK-Computer",
+   "catno": "none",
+   "title": "Radiohead - OK Computer",
+   "thumb": "",
+   "cover_image": "",
+   "resource_url": "https://api.discogs.com/releases/5656095",
+   "community": {
+    "want": 755,
+    "have": 6
+   },
+   "format_quantity": 1,
+   "formats": [
+    {
+     "name": "Cassette",
+     "qty": "1",
+     "descriptions": [
+      "Album",
+      "Unofficial Release"
+     ]
+    }
+   ]
+  }
+ ]
+}
