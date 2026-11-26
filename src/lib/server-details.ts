@@ -1,7 +1,7 @@
 // The server's details: its space, its machine, its version, and its people and sign-in as tabs
 // (views/server-details.html). On the server's own page (the web it serves) they are Preferences,
 // Server; connected to a server by its address (the apps, or another server), Preferences has no
-// Server section and the foot of Folders (views/server-foot.html) shows them in Details, as an
+// Server section and the foot of its library (views/server-foot.html) shows them in Details, as an
 // iPod's foot shows its sheet, by a row key no tree row has. See
 // RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, plan G).
 
