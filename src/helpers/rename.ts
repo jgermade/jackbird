@@ -12,7 +12,7 @@ import { emptyMetadata } from "./metadata.ts";
 import { inferDiscNumber } from "./tracks.ts";
 
 /** The fields a pattern can use. */
-export const RENAME_FIELDS = ["title", "artist", "album", "year", "genre", "track", "disc", "composer", "comment", "filename"] as const;
+export const RENAME_FIELDS = ["title", "artist", "album", "album_artist", "year", "genre", "track", "disc", "composer", "comment", "filename"] as const;
 
 /** Ready-made patterns; the first is the default. */
 export const RENAME_PRESETS = ["%track% - %title%", "%artist% - %title%", "%track%. %artist% - %title%", "%disc%-%track% %title%"] as const;
@@ -79,6 +79,7 @@ export function fillPattern(pattern: string, track: Named, width = 2): string {
     title: track.metadata.title,
     artist: track.metadata.artist,
     album: track.metadata.album,
+    album_artist: track.metadata.albumArtist,
     year: track.metadata.year,
     genre: track.metadata.genre,
     track: number === null ? "" : String(number).padStart(width, "0"),
@@ -147,7 +148,7 @@ export function planRenames(tracks: readonly Named[], pattern: string, libraryPa
 // ---- the other way: tags from a file's name (and its folders) -------------------------------
 
 /** The tags a pattern's fields set, read from a name. */
-export type ReadTags = Partial<Record<"title" | "artist" | "album" | "year" | "genre" | "trackNumber" | "discNumber" | "composer" | "comment", string>>;
+export type ReadTags = Partial<Record<"title" | "artist" | "album" | "albumArtist" | "year" | "genre" | "trackNumber" | "discNumber" | "composer" | "comment", string>>;
 
 /** What reading a track's name would do: set tags (`ok`), nothing new (`same`), or the name does not match (`nomatch`). */
 export type ReadStatus = "ok" | "same" | "nomatch";
@@ -165,6 +166,7 @@ const TAG_OF: Record<string, keyof ReadTags | null> = {
   title: "title",
   artist: "artist",
   album: "album",
+  album_artist: "albumArtist",
   year: "year",
   genre: "genre",
   track: "trackNumber",

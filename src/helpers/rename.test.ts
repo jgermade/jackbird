@@ -16,6 +16,8 @@ describe("fillPattern", () => {
     assert.equal(fillPattern("%track% - %title%", soWhat), "01 - So What");
     assert.equal(fillPattern("%artist% - %album% (%year%) %genre%", soWhat), "Miles Davis - Kind of Blue (1959) Jazz");
     assert.equal(fillPattern("%filename% [%disc%]", soWhat), "01 so what [1]");
+    assert.equal(fillPattern("%album_artist% - %album%", { ...soWhat, metadata: { ...soWhat.metadata, albumArtist: "Miles Davis Sextet" } }), "Miles Davis Sextet - Kind of Blue");
+    assert.equal(fillPattern("%ALBUM_ARTIST%", soWhat), "");
   });
 
   it("pads the track number to the width it is given, and reads fields in any case", () => {
@@ -115,6 +117,7 @@ describe("readTags: tags from a file's name", () => {
   it("keeps the total a track had, and takes the text between the fields as it is", () => {
     assert.deepEqual(readTags("%track% - %title%", track("A/03 - Song.mp3", { trackNumber: "1/12" })), { trackNumber: "3/12", title: "Song" });
     assert.deepEqual(readTags("[%year%] (%album%) %title%", track("x/[1959] (Kind of Blue) So What.mp3")), { year: "1959", album: "Kind of Blue", title: "So What" });
+    assert.deepEqual(readTags("%album_artist%/%album%/%title%", track("Miles Davis Sextet/Kind of Blue/So What.mp3")), { albumArtist: "Miles Davis Sextet", album: "Kind of Blue", title: "So What" });
   });
 
   it("reads the parent folders a pattern names with /, from the end of the path", () => {
@@ -167,6 +170,7 @@ describe("typing a field: fieldQuery, fieldsFor, completeField", () => {
     assert.deepEqual(fieldsFor(""), [...RENAME_FIELDS]);
     assert.deepEqual(fieldsFor("t"), ["title", "track"]);
     assert.deepEqual(fieldsFor("AR"), ["artist"]);
+    assert.deepEqual(fieldsFor("al"), ["album", "album_artist"]);
     assert.deepEqual(fieldsFor("x"), []);
   });
 
@@ -174,6 +178,7 @@ describe("typing a field: fieldQuery, fieldsFor, completeField", () => {
     assert.deepEqual(completeField("%track% - %ti", 13, "title"), { value: "%track% - %title%", caret: 17 });
     // Typed in the middle: the rest of a name and its closing % are replaced too.
     assert.deepEqual(completeField("%ar% - x", 3, "artist"), { value: "%artist% - x", caret: 8 });
+    assert.deepEqual(completeField("%album_a", 8, "album_artist"), { value: "%album_artist%", caret: 14 });
     assert.deepEqual(completeField("plain", 5, "title"), { value: "plain", caret: 5 });
   });
 });
