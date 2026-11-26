@@ -292,10 +292,14 @@
     </Key></div>
   </header>
 
+  <!-- Its notices float over the list, under the head (the owner, 2026-11-26), taking no room from
+       it; an error or a word, until the next one or its ×. -->
   <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
+    <div class="messages-in">
     <p :if="library.restoring" class="notice"><Reel :size="14" /> {{ t("library.restoring") }}</p>
-    <p :if="library.errorMessage" class="notice is-error" role="alert">{{ library.errorMessage }}</p>
-    <p :if="library.infoMessage" class="notice" role="status">{{ library.infoMessage }}</p>
+    <p :if="library.errorMessage" class="notice is-error" role="alert"><span class="notice-text">{{ library.errorMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.errorMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
+    <p :if="library.infoMessage" class="notice" role="status"><span class="notice-text">{{ library.infoMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.infoMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
+    </div>
   </div>
 
 
@@ -428,20 +432,56 @@
   .rescan { display: flex; gap: .125rem; margin-left: auto; }
   .icon { width: .875rem; height: .875rem; }
 
-  .messages { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-3) var(--mm-space-4) 0; }
+  /* Floating: a line of no height that stays under the head as the list scrolls, the notices hung
+     from it over the rows, each a card with its shadow. */
+  .messages { position: sticky; top: 2.75rem; z-index: 2; height: 0; }
+  .messages-in {
+    position: absolute;
+    inset-inline: var(--mm-space-4);
+    top: var(--mm-space-2);
+    display: grid;
+    gap: var(--mm-space-2);
+    pointer-events: none;
+  }
   .notice {
     display: flex;
     align-items: center;
     gap: var(--mm-space-2);
     margin: 0;
-    padding: var(--mm-space-2) var(--mm-space-3);
-    border-left: 3px solid var(--mm-accent);
+    padding: var(--mm-space-2) var(--mm-space-2) var(--mm-space-2) var(--mm-space-3);
+    border-style: solid;
+    border-width: var(--mm-border-width) var(--mm-border-width) var(--mm-border-width) 3px;
+    border-color: var(--mm-border) var(--mm-border) var(--mm-border) var(--mm-accent);
     border-radius: var(--mm-radius-key);
-    background: var(--mm-sunken);
+    background: var(--mm-surface);
+    box-shadow: var(--mm-shadow-md);
     color: var(--mm-fg);
     font-size: var(--mm-text-sm);
+    pointer-events: auto;
+    animation: notice-in var(--mm-duration) var(--mm-ease);
   }
-  .notice.is-error { border-left-color: var(--mm-bad-led); background: var(--mm-bad-soft); color: var(--mm-bad); }
+  @keyframes notice-in { from { opacity: 0; transform: translateY(-.375rem); } }
+  @media (prefers-reduced-motion: reduce) { .notice { animation: none; } }
+  .notice.is-error { --edge: color-mix(in srgb, var(--mm-bad) 30%, transparent); border-color: var(--edge) var(--edge) var(--edge) var(--mm-bad-led); background: color-mix(in srgb, var(--mm-bad-soft) 92%, var(--mm-surface)); color: var(--mm-bad); }
+  .notice-text { flex: 1 1 auto; min-width: 0; }
+  .dismiss {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: -.25rem 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--mm-radius-key);
+    background: none;
+    color: inherit;
+    opacity: .7;
+    cursor: pointer;
+  }
+  .dismiss svg { width: .875rem; height: .875rem; }
+  @media (hover: hover) { .dismiss:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); } }
+  .dismiss:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 1px; opacity: 1; }
 
 
   .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }

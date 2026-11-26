@@ -27,6 +27,7 @@ export const es: Record<MessageKey, string> = {
   "session.opening": "Abriendo tu música…",
   "faceplate.opening": "Abriendo tu música…",
   "library.restoring": "Restaurando tabs...",
+  "library.dismiss": "Cerrar este aviso",
   "library.loadingMetadata": "Cargando metadatos {loaded}/{total}...",
 
   "tree.label": "Carpetas y pistas",
