@@ -126,7 +126,9 @@
     }
   }
   const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
-  const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey
+  // The current row; on a phone, also the level just left (the owner, 2026-11-26), framed as one in
+  // the list it is back in, while nothing else becomes current (`cameFrom`, below).
+  const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey || (phone && cameFrom !== null && row.key === cameFrom.key && root()?.activeRowKey === cameFrom.active)
 
   // A click on a track plays its folder from it (on the one playing, pauses
   // or resumes); a click on a folder opens or closes it and shows it in the album sheet. Either
@@ -237,6 +239,8 @@
   // same row in beside it; and once it is left (by its ‹ or that swipe), the list scrolls so its
   // row is where that one was.
   let leaving: { key: string; top: number } | null = null
+  // The level left last and the row current once it was: its row framed until another is current.
+  let cameFrom: { key: string; active: string | null } | null = null
   const leave = (row: Row, event: MouseEvent) => {
     const level = (event.currentTarget as HTMLElement | null)?.closest(".level")
     leaving = level ? { key: row.key, top: level.getBoundingClientRect().top } : null
@@ -264,6 +268,7 @@
       // The shallowest level closed, whose row the list now shows.
       const left = before.find((key) => !keys.includes(key))
       before = keys
+      cameFrom = left ? { key: left, active: root()?.activeRowKey ?? null } : null
       requestAnimationFrame(() => requestAnimationFrame(() => {
         if (left) alignLeft(left)
         leaving = null
@@ -292,15 +297,6 @@
     </Key></div>
   </header>
 
-  <!-- Its notices float over the list, under the head (the owner, 2026-11-26), taking no room from
-       it; an error or a word, until the next one or its ×. -->
-  <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
-    <div class="messages-in">
-    <p :if="library.restoring" class="notice"><Reel :size="14" /> {{ t("library.restoring") }}</p>
-    <p :if="library.errorMessage" class="notice is-error" role="alert"><span class="notice-text">{{ library.errorMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.errorMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
-    <p :if="library.infoMessage" class="notice" role="status"><span class="notice-text">{{ library.infoMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.infoMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
-    </div>
-  </div>
 
 
   <p :if="rows().length === 0 && (root() || !library.restoring)" class="no-tracks">{{ emptyText() }}</p>
@@ -399,16 +395,30 @@
                :playing="row.kind === 'track' && row.trackId === playingId()"
                :holds-playing="holdsPlaying(row)"
                :muted="!!row.missing"
+               :current="row.key === levels().at(-1)?.key"
                :row-id="aboveId(row.key)"
                no-toggle />
     </div>
   </div>
   </div>
 
-  <!-- An iPod's root: how full it is, a key to its sheet in Details (W5). -->
-  <IpodFoot />
-  <!-- One's music on a server, in Folders: the server and the space used, a key to its details. -->
-  <ServerFoot />
+  <!-- The bottom, kept in view: the notices, then the foot. -->
+  <div class="bottom">
+    <!-- Its notices float over the list at its bottom, over its foot (the owner, 2026-11-26), taking
+         no room from it nor hiding its head or a level's ‹; an error or a word, until the next one or
+         its ×. -->
+    <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
+      <div class="messages-in">
+      <p :if="library.restoring" class="notice"><Reel :size="14" /> {{ t("library.restoring") }}</p>
+      <p :if="library.errorMessage" class="notice is-error" role="alert"><span class="notice-text">{{ library.errorMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.errorMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
+      <p :if="library.infoMessage" class="notice" role="status"><span class="notice-text">{{ library.infoMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.infoMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
+      </div>
+    </div>
+    <!-- An iPod's root: how full it is, a key to its sheet in Details (W5). -->
+    <IpodFoot />
+    <!-- One's music on a server: the server and the space used, a key to its details. -->
+    <ServerFoot />
+  </div>
 </section>
 
 <style scoped>
@@ -432,13 +442,15 @@
   .rescan { display: flex; gap: .125rem; margin-left: auto; }
   .icon { width: .875rem; height: .875rem; }
 
-  /* Floating: a line of no height that stays under the head as the list scrolls, the notices hung
-     from it over the rows, each a card with its shadow. */
-  .messages { position: sticky; top: 2.75rem; z-index: 2; height: 0; }
+  /* The bottom, kept at the pane's (the feet in it no longer sticky by themselves: it is). The
+     notices: a line of no height over the foot, the notices standing on it over the rows, each a
+     card with its shadow. */
+  .bottom { position: sticky; bottom: 0; z-index: 2; margin-top: auto; }
+  .messages { position: relative; height: 0; }
   .messages-in {
     position: absolute;
     inset-inline: var(--mm-space-4);
-    top: var(--mm-space-2);
+    bottom: var(--mm-space-3);
     display: grid;
     gap: var(--mm-space-2);
     pointer-events: none;
@@ -460,7 +472,7 @@
     pointer-events: auto;
     animation: notice-in var(--mm-duration) var(--mm-ease);
   }
-  @keyframes notice-in { from { opacity: 0; transform: translateY(-.375rem); } }
+  @keyframes notice-in { from { opacity: 0; transform: translateY(.375rem); } }
   @media (prefers-reduced-motion: reduce) { .notice { animation: none; } }
   .notice.is-error { --edge: color-mix(in srgb, var(--mm-bad) 30%, transparent); border-color: var(--edge) var(--edge) var(--edge) var(--mm-bad-led); background: color-mix(in srgb, var(--mm-bad-soft) 92%, var(--mm-surface)); color: var(--mm-bad); }
   .notice-text { flex: 1 1 auto; min-width: 0; }
