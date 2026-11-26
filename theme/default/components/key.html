@@ -171,7 +171,10 @@
   .size-lg { --h: var(--mm-control-lg); padding: 0 var(--mm-space-4); }
   /* A glyph alone; `--mm-key-square-width`, set around it, widens one (a split key's main half). */
   .square { padding: 0; width: var(--mm-key-square-width, calc(var(--h) + .375rem)); }
-  /* Two keys as one split key: the joined side squared, one hairline between them (the end's). */
-  .join-start { border-start-end-radius: 0; border-end-end-radius: 0; }
-  .join-end { margin-inline-start: calc(-1 * var(--mm-border-width)); border-start-start-radius: 0; border-end-start-radius: 0; border-inline-start-color: color-mix(in srgb, currentColor 35%, transparent); }
+  /* Two keys as one split key: the joined side squared, one hairline between them. The start is the
+     main half, so it lies over the end (its shadow and its edge, the hairline, on top); the end
+     comes up only for its focus ring. */
+  .join-start { position: relative; z-index: 1; border-start-end-radius: 0; border-end-end-radius: 0; border-inline-end-color: color-mix(in srgb, currentColor 35%, transparent); }
+  .join-end { margin-inline-start: calc(-1 * var(--mm-border-width)); border-start-start-radius: 0; border-end-start-radius: 0; }
+  .join-end:focus-visible { position: relative; z-index: 2; }
 </style>
