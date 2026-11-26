@@ -222,16 +222,57 @@
     const row = event.currentTarget as HTMLElement
     const width = row.clientWidth
     if (width === 0 || Math.abs(row.scrollLeft) < width / 2) return
-    const open = levels()
-    const page = $self(".page.above") as HTMLElement | null
-    const top = page?.scrollTop ?? 0
-    if (open.length > 0) leaveLevel(open[open.length - 1].key)
-    // Drawn already (a store's write runs its effects at once): back at the start, as far down
-    // as the page that came in was.
+    const last = levels().at(-1)
+    if (!last) return
+    // Its row, in the page that came in, at the height of the level's own row (`alignAbove`): once
+    // left, the list keeps it there (`alignLeft`).
+    const level = $self(".page.current .levels .level:last-child") as HTMLElement | null
+    leaving = level ? { key: last.key, top: level.getBoundingClientRect().top } : null
+    leaveLevel(last.key)
     row.scrollLeft = 0
-    const level = $self(".page.current") as HTMLElement | null
-    if (level) level.scrollTop = top
   }
+
+  // The level and the level above side by side (the owner, 2026-11-26): the level left is a row of
+  // the level above, kept at the height of its own row at the level's top, so a swipe brings the
+  // same row in beside it; and once it is left (by its ‹ or that swipe), the list scrolls so its
+  // row is where that one was.
+  let leaving: { key: string; top: number } | null = null
+  const leave = (row: Row, event: MouseEvent) => {
+    const level = (event.currentTarget as HTMLElement | null)?.closest(".level")
+    leaving = level ? { key: row.key, top: level.getBoundingClientRect().top } : null
+    leaveLevel(row.key)
+  }
+  const aboveId = (rowKey: string): string => `above-${rowDomId(rowKey)}`
+  const alignAbove = () => {
+    const page = $self(".page.above") as HTMLElement | null
+    const current = $self(".page.current .levels .level:last-child") as HTMLElement | null
+    const last = levels().at(-1)
+    const row = last ? document.getElementById(aboveId(last.key)) : null
+    if (!page || !current || !row) return
+    page.scrollTop += row.getBoundingClientRect().top - current.getBoundingClientRect().top
+  }
+  const alignLeft = (key: string) => {
+    const page = $self(".page.current") as HTMLElement | null
+    const row = document.getElementById(rowDomId(key))
+    if (!page || !row) return
+    if (leaving?.key === key) page.scrollTop += row.getBoundingClientRect().top - leaving.top
+    else row.scrollIntoView({ block: "nearest" })
+  }
+  const alignOnLevels = (() => {
+    let before: string[] = []
+    return (keys: string[]): number => {
+      // The shallowest level closed, whose row the list now shows.
+      const left = before.find((key) => !keys.includes(key))
+      before = keys
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (left) alignLeft(left)
+        leaving = null
+        alignAbove()
+      }))
+      return keys.length
+    }
+  })()
+  $: levelsTick = alignOnLevels(levels().map((row) => row.key))
 </script>
 
 <section class="library" :class.paged="phone" :aria-label="t('library.title')">
@@ -269,7 +310,7 @@
          too), and the rest of it, its name, opens it in Details. -->
     <div :if="levels().length > 0" class="levels" :style="`--levels: ${levels().length}`">
       <div :each="(row, at) in levels()" :key="row.key" class="level" :style="`--at: ${at}`">
-        <button type="button" class="back" :aria-label="t('tree.leave', { title: rowLabel(row) })" :title="t('tree.leave', { title: rowLabel(row) })" @click="leaveLevel(row.key)">
+        <button type="button" class="back" :aria-label="t('tree.leave', { title: rowLabel(row) })" :title="t('tree.leave', { title: rowLabel(row) })" @click="leave(row, $event)">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
         </button>
         <ListRow kind="folder"
@@ -354,6 +395,7 @@
                :playing="row.kind === 'track' && row.trackId === playingId()"
                :holds-playing="holdsPlaying(row)"
                :muted="!!row.missing"
+               :row-id="aboveId(row.key)"
                no-toggle />
     </div>
   </div>
