@@ -260,13 +260,13 @@
            and its ⋮ (play next, add to the queue; an artist's picture while it shows an artist). Not in
            Lists, whose cards have their own. -->
       <span :if="!listing()" class="sheet-actions">
-        <!-- One split key (the owner, 2026-11-25): Play all in the accent, and Shuffle beside it as a
-             glyph, a plain key's colour; on a phone both glyphs alone, Play the wider. -->
+        <!-- One split key (the owner, 2026-11-26): Play all and Shuffle beside it as a glyph, both a
+             plain key at the normal size; on a phone both glyphs alone, Play the wider. -->
         <span class="split">
-          <span class="play"><Key size="sm" variant="primary" join="start" :square="phone" :label="t('lists.playLabel', { name: sheetName() })" :title="phone ? t('lists.playAll') : ''" @click="playShown()">
+          <span class="play"><Key join="start" :square="phone" :label="t('lists.playLabel', { name: sheetName() })" :title="phone ? t('lists.playAll') : ''" @click="playShown()">
             <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg>
             <span :if="!phone">{{ t("lists.playAll") }}</span>
-          </Key></span><Key size="sm" join="end" square :label="t('lists.shuffleLabel', { name: sheetName() })" :title="t('lists.shuffle')" @click="shuffleShown()">
+          </Key></span><Key join="end" square :label="t('lists.shuffleLabel', { name: sheetName() })" :title="t('lists.shuffle')" @click="shuffleShown()">
             <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5h2.5c3.5 0 3.5 7 7 7H14M2 11.5h2.5c1.3 0 2.1-.9 2.8-2M9 6.5c.6-1.1 1.4-2 2.5-2H14M12.25 2.75 14 4.5l-1.75 1.75M12.25 9.75 14 11.5l-1.75 1.75" /></svg>
           </Key>
         </span>
@@ -455,7 +455,7 @@
   .sheet-actions { display: flex; flex: none; align-items: center; gap: var(--mm-space-2); }
   .split { display: inline-flex; }
   /* On a phone, Play (a glyph alone there) half as wide again as Shuffle: the main half. */
-  .split .play { display: contents; --mm-key-square-width: calc(1.5 * (var(--mm-control-sm) + .375rem)); }
+  .split .play { display: contents; --mm-key-square-width: calc(1.5 * (var(--mm-control-md) + .375rem)); }
   /* The artist's picture beside their name: round. */
   .crumb-picture { width: 1.5rem; height: 1.5rem; margin-right: var(--mm-space-2); border-radius: 50%; object-fit: cover; vertical-align: middle; box-shadow: 0 0 0 1px var(--mm-border); }
   .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mm-space-1) var(--mm-space-2); min-width: 0; color: var(--mm-fg-muted); font-size: var(--mm-text-sm); }
