@@ -1,6 +1,6 @@
 // What one's own music takes on the server spoken to now, and one's quota (owners and admins set
 // it: uploads past it are refused); owners also see the disk's size and room. Shown at the foot of
-// a server library's Folders (views/server-foot.html) and in Preferences, Server. The service's
+// a server library, in every view (views/server-foot.html) and in Preferences, Server. The service's
 // side is `GET /api/library/usage`. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-19, B).
 
 import { $reactive } from "jq79";

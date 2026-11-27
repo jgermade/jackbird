@@ -26,6 +26,7 @@ export const en = {
   "session.opening": "Opening your music…",
   "faceplate.opening": "Opening your music…",
   "library.restoring": "Restoring tabs…",
+  "library.dismiss": "Close this notice",
   "library.loadingMetadata": "Loading metadata {loaded}/{total}…",
 
   "tree.label": "Folders and tracks",

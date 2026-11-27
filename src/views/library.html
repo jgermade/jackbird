@@ -126,7 +126,9 @@
     }
   }
   const isChosen = (row: Row): boolean => row.kind === "track" && !!row.trackId && !!root()?.selectedTrackIds.includes(row.trackId)
-  const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey
+  // The current row; on a phone, also the level just left (the owner, 2026-11-26), framed as one in
+  // the list it is back in, while nothing else becomes current (`cameFrom`, below).
+  const isCurrent = (row: Row): boolean => row.key === root()?.activeRowKey || (phone && cameFrom !== null && row.key === cameFrom.key && root()?.activeRowKey === cameFrom.active)
 
   // A click on a track plays its folder from it (on the one playing, pauses
   // or resumes); a click on a folder opens or closes it and shows it in the album sheet. Either
@@ -222,16 +224,60 @@
     const row = event.currentTarget as HTMLElement
     const width = row.clientWidth
     if (width === 0 || Math.abs(row.scrollLeft) < width / 2) return
-    const open = levels()
-    const page = $self(".page.above") as HTMLElement | null
-    const top = page?.scrollTop ?? 0
-    if (open.length > 0) leaveLevel(open[open.length - 1].key)
-    // Drawn already (a store's write runs its effects at once): back at the start, as far down
-    // as the page that came in was.
+    const last = levels().at(-1)
+    if (!last) return
+    // Its row, in the page that came in, at the height of the level's own row (`alignAbove`): once
+    // left, the list keeps it there (`alignLeft`).
+    const level = $self(".page.current .levels .level:last-child") as HTMLElement | null
+    leaving = level ? { key: last.key, top: level.getBoundingClientRect().top } : null
+    leaveLevel(last.key)
     row.scrollLeft = 0
-    const level = $self(".page.current") as HTMLElement | null
-    if (level) level.scrollTop = top
   }
+
+  // The level and the level above side by side (the owner, 2026-11-26): the level left is a row of
+  // the level above, kept at the height of its own row at the level's top, so a swipe brings the
+  // same row in beside it; and once it is left (by its ‹ or that swipe), the list scrolls so its
+  // row is where that one was.
+  let leaving: { key: string; top: number } | null = null
+  // The level left last and the row current once it was: its row framed until another is current.
+  let cameFrom: { key: string; active: string | null } | null = null
+  const leave = (row: Row, event: MouseEvent) => {
+    const level = (event.currentTarget as HTMLElement | null)?.closest(".level")
+    leaving = level ? { key: row.key, top: level.getBoundingClientRect().top } : null
+    leaveLevel(row.key)
+  }
+  const aboveId = (rowKey: string): string => `above-${rowDomId(rowKey)}`
+  const alignAbove = () => {
+    const page = $self(".page.above") as HTMLElement | null
+    const current = $self(".page.current .levels .level:last-child") as HTMLElement | null
+    const last = levels().at(-1)
+    const row = last ? document.getElementById(aboveId(last.key)) : null
+    if (!page || !current || !row) return
+    page.scrollTop += row.getBoundingClientRect().top - current.getBoundingClientRect().top
+  }
+  const alignLeft = (key: string) => {
+    const page = $self(".page.current") as HTMLElement | null
+    const row = document.getElementById(rowDomId(key))
+    if (!page || !row) return
+    if (leaving?.key === key) page.scrollTop += row.getBoundingClientRect().top - leaving.top
+    else row.scrollIntoView({ block: "nearest" })
+  }
+  const alignOnLevels = (() => {
+    let before: string[] = []
+    return (keys: string[]): number => {
+      // The shallowest level closed, whose row the list now shows.
+      const left = before.find((key) => !keys.includes(key))
+      before = keys
+      cameFrom = left ? { key: left, active: root()?.activeRowKey ?? null } : null
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (left) alignLeft(left)
+        leaving = null
+        alignAbove()
+      }))
+      return keys.length
+    }
+  })()
+  $: levelsTick = alignOnLevels(levels().map((row) => row.key))
 </script>
 
 <section class="library" :class.paged="phone" :aria-label="t('library.title')">
@@ -251,11 +297,6 @@
     </Key></div>
   </header>
 
-  <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
-    <p :if="library.restoring" class="notice"><Reel :size="14" /> {{ t("library.restoring") }}</p>
-    <p :if="library.errorMessage" class="notice is-error" role="alert">{{ library.errorMessage }}</p>
-    <p :if="library.infoMessage" class="notice" role="status">{{ library.infoMessage }}</p>
-  </div>
 
 
   <p :if="rows().length === 0 && (root() || !library.restoring)" class="no-tracks">{{ emptyText() }}</p>
@@ -269,7 +310,7 @@
          too), and the rest of it, its name, opens it in Details. -->
     <div :if="levels().length > 0" class="levels" :style="`--levels: ${levels().length}`">
       <div :each="(row, at) in levels()" :key="row.key" class="level" :style="`--at: ${at}`">
-        <button type="button" class="back" :aria-label="t('tree.leave', { title: rowLabel(row) })" :title="t('tree.leave', { title: rowLabel(row) })" @click="leaveLevel(row.key)">
+        <button type="button" class="back" :aria-label="t('tree.leave', { title: rowLabel(row) })" :title="t('tree.leave', { title: rowLabel(row) })" @click="leave(row, $event)">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5" /></svg>
         </button>
         <ListRow kind="folder"
@@ -354,15 +395,30 @@
                :playing="row.kind === 'track' && row.trackId === playingId()"
                :holds-playing="holdsPlaying(row)"
                :muted="!!row.missing"
+               :current="row.key === levels().at(-1)?.key"
+               :row-id="aboveId(row.key)"
                no-toggle />
     </div>
   </div>
   </div>
 
-  <!-- An iPod's root: how full it is, a key to its sheet in Details (W5). -->
-  <IpodFoot />
-  <!-- One's music on a server, in Folders: the server and the space used, a key to its details. -->
-  <ServerFoot />
+  <!-- The bottom, kept in view: the notices, then the foot. -->
+  <div class="bottom">
+    <!-- Its notices float over the list at its bottom, over its foot (the owner, 2026-11-26), taking
+         no room from it nor hiding its head or a level's ‹; an error or a word, until the next one or
+         its ×. -->
+    <div :if="library.restoring || library.errorMessage || library.infoMessage" class="messages">
+      <div class="messages-in">
+      <p :if="library.restoring" class="notice"><Reel :size="14" /> {{ t("library.restoring") }}</p>
+      <p :if="library.errorMessage" class="notice is-error" role="alert"><span class="notice-text">{{ library.errorMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.errorMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
+      <p :if="library.infoMessage" class="notice" role="status"><span class="notice-text">{{ library.infoMessage }}</span><button type="button" class="dismiss" :aria-label="t('library.dismiss')" :title="t('library.dismiss')" @click="library.infoMessage = null"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7" /></svg></button></p>
+      </div>
+    </div>
+    <!-- An iPod's root: how full it is, a key to its sheet in Details (W5). -->
+    <IpodFoot />
+    <!-- One's music on a server: the server and the space used, a key to its details. -->
+    <ServerFoot />
+  </div>
 </section>
 
 <style scoped>
@@ -386,20 +442,58 @@
   .rescan { display: flex; gap: .125rem; margin-left: auto; }
   .icon { width: .875rem; height: .875rem; }
 
-  .messages { display: grid; gap: var(--mm-space-1); padding: var(--mm-space-3) var(--mm-space-4) 0; }
+  /* The bottom, kept at the pane's (the feet in it no longer sticky by themselves: it is). The
+     notices: a line of no height over the foot, the notices standing on it over the rows, each a
+     card with its shadow. */
+  .bottom { position: sticky; bottom: 0; z-index: 2; margin-top: auto; }
+  .messages { position: relative; height: 0; }
+  .messages-in {
+    position: absolute;
+    inset-inline: var(--mm-space-4);
+    bottom: var(--mm-space-3);
+    display: grid;
+    gap: var(--mm-space-2);
+    pointer-events: none;
+  }
   .notice {
     display: flex;
     align-items: center;
     gap: var(--mm-space-2);
     margin: 0;
-    padding: var(--mm-space-2) var(--mm-space-3);
-    border-left: 3px solid var(--mm-accent);
+    padding: var(--mm-space-2) var(--mm-space-2) var(--mm-space-2) var(--mm-space-3);
+    border-style: solid;
+    border-width: var(--mm-border-width) var(--mm-border-width) var(--mm-border-width) 3px;
+    border-color: var(--mm-border) var(--mm-border) var(--mm-border) var(--mm-accent);
     border-radius: var(--mm-radius-key);
-    background: var(--mm-sunken);
+    background: var(--mm-surface);
+    box-shadow: var(--mm-shadow-md);
     color: var(--mm-fg);
     font-size: var(--mm-text-sm);
+    pointer-events: auto;
+    animation: notice-in var(--mm-duration) var(--mm-ease);
   }
-  .notice.is-error { border-left-color: var(--mm-bad-led); background: var(--mm-bad-soft); color: var(--mm-bad); }
+  @keyframes notice-in { from { opacity: 0; transform: translateY(.375rem); } }
+  @media (prefers-reduced-motion: reduce) { .notice { animation: none; } }
+  .notice.is-error { --edge: color-mix(in srgb, var(--mm-bad) 30%, transparent); border-color: var(--edge) var(--edge) var(--edge) var(--mm-bad-led); background: color-mix(in srgb, var(--mm-bad-soft) 92%, var(--mm-surface)); color: var(--mm-bad); }
+  .notice-text { flex: 1 1 auto; min-width: 0; }
+  .dismiss {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin: -.25rem 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--mm-radius-key);
+    background: none;
+    color: inherit;
+    opacity: .7;
+    cursor: pointer;
+  }
+  .dismiss svg { width: .875rem; height: .875rem; }
+  @media (hover: hover) { .dismiss:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); } }
+  .dismiss:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 1px; opacity: 1; }
 
 
   .no-tracks { margin: 0; padding: var(--mm-space-6) var(--mm-space-4); color: var(--mm-fg-muted); font-size: var(--mm-text-sm); text-align: center; }
