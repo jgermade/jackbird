@@ -195,13 +195,13 @@ export async function drop(event: DragEvent): Promise<void> {
 
 /**
  * Songs of another tab to copy to `target` (lib/copying.ts): the drop's dialog opens with them, as
- * if they had been dropped there.
+ * if they had been dropped there; `leftOut`, those of them that cannot be copied.
  */
-export function openDropWith(target: DropTarget, songs: DroppedSong[]): void {
+export function openDropWith(target: DropTarget, songs: DroppedSong[], leftOut = 0): void {
   dropping.target = target;
   dropping.refusal = "";
   dropping.songs = songs;
-  dropping.leftOut = 0;
+  dropping.leftOut = leftOut;
   dropping.report = null;
   dropping.error = "";
   dropping.done = 0;

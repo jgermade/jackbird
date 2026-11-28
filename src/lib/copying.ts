@@ -7,6 +7,7 @@
 
 import { $reactive, $toRaw } from "jq79";
 import { tidyTags } from "../helpers/drop";
+import { isAudioFile } from "../helpers/formats";
 import type { RootWorkspace } from "../types";
 import { openDropWith, targetOf, type DropTarget, type DroppedSong } from "./dropping";
 import { fileBytes } from "./file-bytes";
@@ -63,10 +64,17 @@ export function copyTo(toRootId: string): void {
   if (!from || !target || typeof target === "string") return;
   const byId = new Map(from.tracks.map((track) => [track.id, track]));
   const source = from.source;
+  // Only MP3s and FLACs are copied: their tags are written on the way and the library takes only
+  // them. The others (an iPod's AAC songs) are left out before anything starts, and counted.
+  let leftOut = 0;
   const songs: DroppedSong[] = copying.trackIds.flatMap((id) => {
     const track = byId.get(id);
     if (!track) return [];
     const path = track.relativePath;
+    if (!isAudioFile(path)) {
+      leftOut += 1;
+      return [];
+    }
     return [
       {
         name: track.name,
@@ -79,5 +87,5 @@ export function copyTo(toRootId: string): void {
     ];
   });
   copying.open = false;
-  openDropWith(target, songs);
+  openDropWith(target, songs, leftOut);
 }

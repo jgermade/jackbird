@@ -26,6 +26,8 @@
     const filled = readFromNames()
     readNote = filled === 0 ? t("drop.readNone") : tn("drop.readSome", filled)
   }
+  // A copy leaves out only what is not an MP3 or FLAC, and says so in its own words.
+  const leftOutNote = (count: number): string => tn(dropping.copied ? "drop.copyLeftOut" : "drop.leftOut", count)
   const title = (): string => (dropping.reading ? t("drop.reading") : tn(dropping.copied ? "drop.copyTitle" : "drop.title", dropping.songs.length))
   const eyebrow = (): string => t(dropping.copied ? "drop.copyEyebrow" : "drop.eyebrow", { name: dropping.target?.label ?? "" })
   const finished = (): boolean => dropping.report !== null
@@ -41,7 +43,7 @@
     <!-- What was done. -->
     <div :if="finished()" class="report">
       <p class="state">{{ tn("drop.added", dropping.report.added) }}<span :if="dropping.report.existing"> {{ tn("drop.existing", dropping.report.existing) }}</span></p>
-      <p :if="dropping.report.leftOut" class="hint">{{ tn("drop.leftOut", dropping.report.leftOut) }}</p>
+      <p :if="dropping.report.leftOut" class="hint">{{ leftOutNote(dropping.report.leftOut) }}</p>
       <div :if="dropping.report.failed.length" class="failure">
         <p>{{ t("drop.failed") }}</p>
         <ul><li :each="item in dropping.report.failed" :key="item[0]"><span class="path">{{ item[0] }}</span> — {{ item[1] }}</li></ul>
@@ -49,8 +51,8 @@
     </div>
 
     <div :elseif="!dropping.reading" class="body">
-      <p :if="dropping.songs.length === 0" class="hint">{{ t("drop.none") }}</p>
-      <p :if="dropping.leftOut" class="hint">{{ tn("drop.leftOut", dropping.leftOut) }}</p>
+      <p :if="dropping.songs.length === 0" class="hint">{{ t(dropping.copied ? "drop.copyNone" : "drop.none") }}</p>
+      <p :if="dropping.leftOut" class="hint">{{ leftOutNote(dropping.leftOut) }}</p>
 
       <div :if="dropping.songs.length" class="patterns">
         <Field :label="t('drop.pattern')" control="drop-pattern" :hint="t('drop.patternHint')">
