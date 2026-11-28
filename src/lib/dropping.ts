@@ -285,11 +285,14 @@ export async function confirmDrop(): Promise<void> {
   const failed = (song: DroppedSong, error: unknown) => report.failed.push([song.from, error instanceof Error ? error.message : String(error)]);
   try {
     if (target.kind === "server") {
+      // To the target's own server: with "Copy to…" the tab in front (whose server the app speaks
+      // to now) may be another, an iPod or a folder of this machine.
+      const server = root.source.server;
       for (const song of songs) {
         dropping.current = song.name;
         try {
           const sent = (bytes: number) => (dropping.bytesSent = Math.min(bytes, song.size));
-          const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]), undefined, sent);
+          const answer = await uploadToLibrary(pathOf(song), new Blob([(await copyOf(song)).slice()]), undefined, sent, server);
           if (answer.result === "added" || answer.result === "suggested") report.added += 1;
           else if (answer.result === "existing") report.existing += 1;
           else report.failed.push([song.from, answer.why ?? ""]);

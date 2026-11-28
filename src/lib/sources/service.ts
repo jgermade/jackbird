@@ -398,17 +398,19 @@ export type Uploaded = { result: "added" | "existing" | "suggested" | "unreadabl
  * as `fetch`'s. `progress` hears the bytes sent so far as they go. Sent by XMLHttpRequest, not
  * `fetch`: only it tells how much of a request's body has gone, in every engine the app runs in
  * and over HTTP/1.1 (a streamed `fetch` body needs Chromium and HTTP/2; see
- * RECORD/2026-11-03.deck-design-system.WIP.md, 2026-11-19).
+ * RECORD/2026-11-03.deck-design-system.WIP.md, 2026-11-19). To `client`'s library: the server
+ * spoken to now unless given (a copy from another tab goes to its target's own server, which the
+ * tab in front need not be on).
  */
-export function uploadToLibrary(path: string, file: Blob, at?: string, progress?: (sent: number) => void): Promise<Uploaded> {
-  const target = uploadTarget(path, at);
+export function uploadToLibrary(path: string, file: Blob, at?: string, progress?: (sent: number) => void, client: ServiceClient = current): Promise<Uploaded> {
+  const target = uploadTarget(path, at, client);
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     request.open("POST", target.url);
     request.setRequestHeader("content-type", "application/octet-stream");
     if (target.authorization) request.setRequestHeader("authorization", target.authorization);
     if (progress) request.upload.onprogress = (event) => progress(event.loaded);
-    request.onload = () => resolve(uploadAnswer(request.status, request.responseText));
+    request.onload = () => resolve(uploadAnswer(request.status, request.responseText, client));
     request.onerror = () => reject(new TypeError("Failed to fetch"));
     request.onabort = () => reject(new TypeError("The upload was stopped"));
     request.send(file);
@@ -416,16 +418,16 @@ export function uploadToLibrary(path: string, file: Blob, at?: string, progress?
 }
 
 /** Where an upload as `path` goes (at `at`, or the server's own address), and the session's header: the phone's plugin sends it. */
-export function uploadTarget(path: string, at?: string): { url: string; authorization: string | null } {
-  return { url: `${at ?? current.address}/api/library/upload?${inShelf(path)}`, authorization: current.authorization() };
+export function uploadTarget(path: string, at?: string, client: ServiceClient = current): { url: string; authorization: string | null } {
+  return { url: `${at ?? client.address}/api/library/upload?${inShelf(path)}`, authorization: client.authorization() };
 }
 
 /** The service's answer to an upload the plugin sent, read as `uploadToLibrary` reads its own. */
-export async function uploadAnswer(status: number, body: string): Promise<Uploaded> {
+export async function uploadAnswer(status: number, body: string, client: ServiceClient = current): Promise<Uploaded> {
   const response = new Response(body || null, { status, headers: { "content-type": "application/json" } });
   const failure: { code?: string; message?: string } | null = response.ok ? null : await response.clone().json().catch(() => ({}));
   if (failure) {
-    if (status === 401 && (failure.code === "signin" || failure.code === "profile")) unauthorized(failure.code, current);
+    if (status === 401 && (failure.code === "signin" || failure.code === "profile")) unauthorized(failure.code, client);
     throw new TagError(failure.code ?? "io", failure.message ?? String(status));
   }
   return (await response.json()) as Uploaded;
