@@ -1,5 +1,5 @@
 //! The core on a temporary folder: paths kept inside their root; the small
-//! files; and, on every shared fixture (`fixtures/tags/`), inspections that
+//! files; and, on every shared fixture (`fixtures/tags/`, `.m4a` included), inspections that
 //! give `cases.json`'s checksums and tags, and saves that give the same bytes
 //! as the engine's whole-file `write`, in place or beside.
 
@@ -41,17 +41,23 @@ struct Case {
     region_sha1: String,
 }
 
+/// Every fixture: MP3 and FLAC (`cases.json`), then MPEG-4 audio (`cases-m4a.json`, RECORD/2026-11-28.aac-m4a.WIP.md).
 fn cases() -> Vec<Case> {
-    let json: Value = serde_json::from_str(&fs::read_to_string(fixtures().join("cases.json")).unwrap()).unwrap();
-    json["cases"]
-        .as_array()
-        .unwrap()
+    ["cases.json", "cases-m4a.json"]
         .iter()
-        .map(|case| Case {
-            name: case["name"].as_str().unwrap().into(),
-            file: case["file"].as_str().unwrap().into(),
-            write: case["write"].as_str().unwrap().into(),
-            region_sha1: case["region"]["sha1"].as_str().unwrap().into(),
+        .flat_map(|list| {
+            let json: Value = serde_json::from_str(&fs::read_to_string(fixtures().join(list)).unwrap()).unwrap();
+            json["cases"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|case| Case {
+                    name: case["name"].as_str().unwrap().into(),
+                    file: case["file"].as_str().unwrap().into(),
+                    write: case["write"].as_str().unwrap().into(),
+                    region_sha1: case["region"]["sha1"].as_str().unwrap().into(),
+                })
+                .collect::<Vec<_>>()
         })
         .collect()
 }

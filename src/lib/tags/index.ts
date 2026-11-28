@@ -135,7 +135,7 @@ export async function writeTags(bytes: Uint8Array, previous: TrackMetadata, meta
   const one = await engine();
   const layout = layoutFor(one, bytes);
   if (!layout.format) {
-    throw new TagError("not-supported", "not an MP3 or FLAC file");
+    throw new TagError("not-supported", "not an MP3, FLAC or M4A file");
   }
   const out = writeOf(one, bytes, layout, editFor(previous, metadata));
   if (out === bytes) {

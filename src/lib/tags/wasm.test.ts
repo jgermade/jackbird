@@ -1,4 +1,4 @@
-// The shared fixtures (fixtures/tags/, made by make.mjs) against the built
+// The shared fixtures (fixtures/tags/, made by make.mjs and make-m4a.mjs) against the built
 // module (src/lib/tags/engine.wasm, scripts/build-wasm.mjs, which `npm test`
 // runs first), as the app drives it (./engine.ts): what reading each gives,
 // its layout and audio region, and what saving a new title gives. The same
@@ -16,7 +16,7 @@ import { instantiate, type Engine } from "./wasm.ts";
 type Case = {
   name: string;
   file: string;
-  format: "mp3" | "flac";
+  format: "mp3" | "flac" | "mp4";
   fields: Record<string, string>;
   cover: { file: string; mime: string; sha1: string } | null;
   write: string;
@@ -25,7 +25,9 @@ type Case = {
 };
 
 const fixtures = new URL("../../../fixtures/tags/", import.meta.url);
-const cases: Case[] = JSON.parse(readFileSync(new URL("cases.json", fixtures), "utf8")).cases;
+const casesIn = (name: string): Case[] => JSON.parse(readFileSync(new URL(name, fixtures), "utf8")).cases;
+// MP3 and FLAC, then MPEG-4 audio (RECORD/2026-11-28.aac-m4a.WIP.md, A3).
+const cases: Case[] = [...casesIn("cases.json"), ...casesIn("cases-m4a.json")];
 const bytesOf = (name: string) => new Uint8Array(readFileSync(new URL(name, fixtures)));
 const sha1 = (bytes: Uint8Array) => createHash("sha1").update(bytes).digest("hex");
 const engine: Engine = await instantiate(readFileSync(fileURLToPath(new URL("./engine.wasm", import.meta.url))));
@@ -39,7 +41,8 @@ const region = (bytes: Uint8Array) => layoutOf(engine, bytes).audio;
 
 describe("the tag engine as wasm, on the fixtures", () => {
   it("has every case", () => {
-    assert.ok(cases.length >= 26);
+    assert.ok(cases.length >= 26 + 13);
+    assert.equal(cases.filter((one) => one.format === "mp4").length, 13);
   });
 
   for (const fixture of cases) {
@@ -152,6 +155,29 @@ describe("the tag engine as wasm", () => {
     const layout = layoutOf(engine, covered);
     assert.ok(layout.tagsEnd > 300_000);
     assert.deepEqual(read(covered).cover, cover);
+  });
+
+  it("saves an .m4a's tags and cover with its audio in place, and its head alone goes to the module", () => {
+    const m4a = bytesOf(cases.find((one) => one.name === "m4a-faststart-padded")!.file);
+    const cover = { mime: "image/png", data: Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 1, 2, 3) };
+    const layout = layoutOf(engine, m4a);
+    const out = write(m4a, { fields: { title: "Nuevo", artist: "Ölgaard", track: "7/9" }, cover: { set: cover } });
+    // The room after ilst took it: the same length, the audio where it was.
+    assert.equal(out.length, m4a.length);
+    assert.deepEqual(out.subarray(layout.tagsEnd), m4a.subarray(layout.tagsEnd));
+    const back = read(out);
+    assert.deepEqual([back.fields.title, back.fields.artist, back.fields.track, back.fields.album], ["Nuevo", "Ölgaard", "7/9", "Album"]);
+    assert.deepEqual(back.cover, cover);
+    assert.equal(back.format, "mp4");
+    assert.ok(layout.tagsEnd < m4a.length, "the module is given the head, not the audio");
+  });
+
+  it("refuses an .m4a track number that is not a number, by its code", () => {
+    const m4a = bytesOf(cases.find((one) => one.name === "m4a-faststart-padded")!.file);
+    assert.throws(
+      () => write(m4a, { fields: { track: "three" }, cover: keep }),
+      (error: unknown) => error instanceof TagError && error.code === "refused-fields"
+    );
   });
 
   it("refuses a splice that does not replace the tags it was given", () => {
