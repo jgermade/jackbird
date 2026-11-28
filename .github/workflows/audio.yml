@@ -6,7 +6,8 @@
 name: audio
 
 on:
-  # A push runs this only when its last commit's message asks for it: `[ci audio]`, or
+  # A push runs this only when its last commit's message asks for it: `[ci audio]` (or
+  # `[ci audio:macos]`, `:windows`, `:linux` for that system alone), or
   # `[ci all]` for every workflow (any paths). Otherwise it runs on pull requests that are not
   # drafts (and when one is marked ready), by hand and from the release. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-13 18:30).
   push:
@@ -19,18 +20,31 @@ on:
       - "Cargo.lock"
       - ".github/workflows/audio.yml"
   workflow_dispatch:
+    inputs:
+      os:
+        description: The system to run on (all, by default, as a pull request).
+        type: choice
+        options: [all, macos, windows, linux]
+        default: all
 
 permissions:
   contents: read
 
 jobs:
   crate:
-    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name != 'push' && github.event_name != 'pull_request') || contains(github.event.head_commit.message, '[ci audio]') || contains(github.event.head_commit.message, '[ci all]')
+    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name != 'push' && github.event_name != 'pull_request') || contains(github.event.head_commit.message, '[ci audio]') || contains(github.event.head_commit.message, '[ci audio:') || contains(github.event.head_commit.message, '[ci all]')
     name: crates/audio on ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest, windows-latest]
+        # One system alone by `[ci audio:macos]` (`:windows`, `:linux`) in the last commit's message,
+        # or the `os` chosen by hand; else the three.
+        os: >-
+          ${{ fromJSON(
+          (inputs.os == 'macos' || contains(github.event.head_commit.message, '[ci audio:macos]')) && '["macos-latest"]' ||
+          (inputs.os == 'windows' || contains(github.event.head_commit.message, '[ci audio:windows]')) && '["windows-latest"]' ||
+          (inputs.os == 'linux' || contains(github.event.head_commit.message, '[ci audio:linux]')) && '["ubuntu-24.04"]' ||
+          '["ubuntu-24.04","macos-latest","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -50,7 +64,7 @@ jobs:
       - run: cargo test -p jackbird-audio --features device --locked
 
   loopback:
-    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name != 'push' && github.event_name != 'pull_request') || contains(github.event.head_commit.message, '[ci audio]') || contains(github.event.head_commit.message, '[ci all]')
+    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name != 'push' && github.event_name != 'pull_request' && inputs.os != 'macos' && inputs.os != 'windows') || contains(github.event.head_commit.message, '[ci audio]') || contains(github.event.head_commit.message, '[ci audio:linux]') || contains(github.event.head_commit.message, '[ci all]')
     name: Through ALSA itself (Linux)
     runs-on: ubuntu-24.04
     steps:
