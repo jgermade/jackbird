@@ -399,3 +399,79 @@ mod flatten;
 mod own;
 mod safety;
 mod tracks;
+
+/// MPEG-4 audio (RECORD/2026-11-28.aac-m4a.WIP.md, A5): imported by its content, a `.m4a` named
+/// `.mp3` given its own extension; served as `audio/mp4`; the same audio in another layout not
+/// kept twice; a family edit saved into it and leaving with it, its audio unchanged.
+#[test]
+fn m4a_songs_are_imported_served_and_edited() {
+    let library = Library::open(&scratch()).unwrap();
+    let folder = scratch();
+    // Three audios of their own: AAC, Apple Lossless, and AAC as afconvert made it.
+    fs::copy(fixtures().join("m4a-faststart-padded.m4a"), folder.join("aac.m4a")).unwrap();
+    fs::copy(fixtures().join("m4a-alac-png.m4a"), folder.join("alac.M4A")).unwrap();
+    fs::copy(fixtures().join("m4a-made-by-afconvert.m4a"), folder.join("apple.mp3")).unwrap();
+    let report = library
+        .import_folder(&folder, "Music", "Owner", None, |_, _| {})
+        .unwrap();
+    assert_eq!((report.added, report.unreadable.len()), (3, 0), "{report:?}");
+    let paths: Vec<String> = library.songs().unwrap().into_iter().map(|song| song.path).collect();
+    assert!(paths.contains(&"Music/aac.m4a".to_owned()), "{paths:?}");
+    assert!(paths.contains(&"Music/apple.m4a".to_owned()), "{paths:?}");
+    // An extension that is .m4a in another case is kept as it is.
+    assert!(paths.contains(&"Music/alac.M4A".to_owned()), "{paths:?}");
+    let song = library.song("Music/aac.m4a").unwrap();
+    assert_eq!(song.format, "m4a");
+    assert_eq!(song.file.title, "Before");
+    // Untouched, it leaves as it came, as audio/mp4.
+    let out = library.outgoing("Music/aac.m4a").unwrap();
+    assert_eq!(whole(&out), fs::read(folder.join("aac.m4a")).unwrap());
+    assert_eq!(out.mime, "audio/mp4");
+    // The same audio with moov after it: already there, not a second blob.
+    let other = scratch();
+    fs::copy(fixtures().join("m4a-moov-last.m4a"), other.join("again.m4a")).unwrap();
+    let again = library
+        .import_file(&other.join("again.m4a"), "Elsewhere/again.m4a", "Owner", None, false)
+        .unwrap();
+    assert!(matches!(again, Imported::Existing(_)), "{again:?}");
+    // A family edit, saved into the song, leaves with it; its audio is the source's.
+    for path in ["Music/aac.m4a", "Music/alac.M4A", "Music/apple.m4a"] {
+        let cover = Cover {
+            data: vec![0x89, b'P', b'N', b'G', 1, 2, 3],
+            mime: "image/png".into(),
+        };
+        library
+            .save(
+                path,
+                &Edit {
+                    title: Some("Family title".into()),
+                    track: Some("4/10".into()),
+                    cover: CoverEdit::Set(cover.clone()),
+                    ..Edit::default()
+                },
+            )
+            .unwrap_or_else(|error| panic!("{path}: {error}"));
+        let out = whole(&library.outgoing(path).unwrap());
+        let (tags, audio) = read_back(&out);
+        assert_eq!(
+            (tags.fields.title.as_str(), tags.fields.track.as_str()),
+            ("Family title", "4/10"),
+            "{path}"
+        );
+        assert_eq!(tags.cover, Some(cover), "{path}");
+        let blob = library.song(path).unwrap();
+        let (_, source_audio) = read_back(&fs::read(library.blob_path(&blob.blob, "m4a")).unwrap());
+        assert_eq!(audio, source_audio, "{path}");
+    }
+    // A track that is not a number is refused, and nothing is saved.
+    let before = library.song("Music/aac.m4a").unwrap();
+    let refused = library.save(
+        "Music/aac.m4a",
+        &Edit {
+            track: Some("four".into()),
+            ..Edit::default()
+        },
+    );
+    assert!(matches!(refused, Err(Error::Tags(_))), "{refused:?}");
+    assert_eq!(library.song("Music/aac.m4a").unwrap(), before);
+}

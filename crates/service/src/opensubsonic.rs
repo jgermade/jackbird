@@ -333,7 +333,6 @@ impl Catalogue {
         let artist = non_empty(&fields.artist, UNKNOWN_ARTIST);
         let album = non_empty(&fields.album, UNKNOWN_ALBUM);
         let album_id = id_of("al-", &format!("{artist}\u{0}{album}"));
-        let flac = song.format == "flac";
         let mut value = json!({
             "id": song.id.to_string(),
             "parent": album_id,
@@ -345,7 +344,7 @@ impl Catalogue {
             "artistId": id_of("ar-", &artist),
             "coverArt": song.id.to_string(),
             "size": song.size,
-            "contentType": if flac { "audio/flac" } else { "audio/mpeg" },
+            "contentType": jackbird_store::mime_of(&song.format),
             "suffix": song.format,
             "path": jackbird_store::on_shelf(&song.path).map_or(song.path.as_str(), |(_, inner)| inner),
             "type": "music",

@@ -40,8 +40,17 @@ mod tests;
 pub use own::{FAVOURITES, Layers, OWN, RECENT, Scope, Shares, Viewer, is_own};
 pub use safety::{Exported, Saved, Stale, TrashedSong, keep_backups, today};
 
-/// The formats the library keeps.
-pub const AUDIO: [&str; 2] = ["mp3", "flac"];
+/// The formats the library keeps (MPEG-4 audio since RECORD/2026-11-28.aac-m4a.WIP.md, A5).
+pub const AUDIO: [&str; 3] = ["mp3", "flac", "m4a"];
+
+/// The MIME type a song of this format (its `format`: `mp3`, `flac`, `m4a`) is served as.
+pub fn mime_of(format: &str) -> &'static str {
+    match format {
+        "flac" => "audio/flac",
+        "m4a" => "audio/mp4",
+        _ => "audio/mpeg",
+    }
+}
 
 /// Whether a path names a song (by its extension).
 pub fn is_audio(path: &str) -> bool {
@@ -817,22 +826,13 @@ impl Library {
     ) -> Result<Imported, Error> {
         let wanted = clean(wanted)?;
         if !is_audio(&wanted) {
-            return Ok(Imported::Unreadable("not an MP3 or FLAC file".into()));
+            return Ok(Imported::Unreadable("not an MP3, FLAC or M4A file".into()));
         }
         let examined = match examine(source) {
-            // MPEG-4 audio is read by the engine, but the library takes it only from A5 of
-            // RECORD/2026-11-28.aac-m4a.WIP.md (a `.m4a` renamed `.mp3` included).
-            Ok(examined)
-                if matches!(
-                    examined.layout.format,
-                    Some(jackbird_tags::Format::Mp3 | jackbird_tags::Format::Flac)
-                ) =>
-            {
-                examined
-            }
+            Ok(examined) if examined.layout.format.is_some() => examined,
             Ok(_) => {
                 return Ok(Imported::Unreadable(
-                    "not an MP3 or FLAC file the engine can read".into(),
+                    "not an MP3, FLAC or M4A file the engine can read".into(),
                 ));
             }
             Err(error) => return Ok(Imported::Unreadable(error.to_string())),
@@ -840,6 +840,7 @@ impl Library {
         // The format is the content's; a name that says otherwise gets the right extension.
         let format = match examined.layout.format {
             Some(jackbird_tags::Format::Flac) => "flac",
+            Some(jackbird_tags::Format::Mp4) => "m4a",
             _ => "mp3",
         };
         let wanted = match wanted.rsplit_once('.') {
@@ -1462,11 +1463,7 @@ impl Library {
             from,
             to: song.size,
             name: name_of(&song.path),
-            mime: if song.format == "flac" {
-                "audio/flac"
-            } else {
-                "audio/mpeg"
-            },
+            mime: mime_of(&song.format),
             blob,
         })
     }
