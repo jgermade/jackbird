@@ -25,8 +25,9 @@ pub struct FileLayout {
     /// region is still given, by the MP3 rule, as [`audio_region`] gives it).
     pub format: Option<Format>,
     /// The first byte after the tags (an ID3v2 tag; FLAC's marker and blocks,
-    /// after an optional ID3v2 tag): a save replaces the bytes before it, and
-    /// keeps the rest. 0 for an MP3 without an ID3v2 tag.
+    /// after an optional ID3v2 tag; MPEG-4's boxes up to `mdat`'s content, or
+    /// the whole file when `moov` follows the audio): a save replaces the bytes
+    /// before it, and keeps the rest. 0 for an MP3 without an ID3v2 tag.
     pub tags_end: u64,
     /// The bytes the audio checksum hashes.
     pub audio: Range<u64>,
@@ -93,6 +94,7 @@ fn flac_end(bytes: &[u8], marker: usize, len: usize) -> Walk {
 pub(crate) fn declared_end(bytes: &[u8], format: Format) -> Option<usize> {
     match format {
         Format::Mp3 => (bytes.len() >= 10 && bytes.starts_with(b"ID3")).then(|| id3_tag_len(bytes)),
+        Format::Mp4 => mp4_tags_end(bytes, bytes.len() as u64),
         Format::Flac => {
             let marker = id3_tag_len(bytes);
             if bytes.get(marker..marker + 4)? != b"fLaC" {
@@ -155,10 +157,43 @@ fn flac_audio(bytes: &[u8]) -> Option<usize> {
     jackbird_flac::read(bytes).ok().map(|metadata| metadata.audio)
 }
 
-/// The format of a file's bytes: FLAC when `fLaC` starts it (after an
-/// optional ID3v2 tag); MP3 when an ID3v2 tag does, or an MPEG frame sync is
-/// found near the start; else `None`.
+/// Whether a file is MPEG-4: its first box is `ftyp`.
+fn is_mp4(bytes: &[u8]) -> bool {
+    bytes.get(4..8) == Some(b"ftyp")
+}
+
+/// Where an MPEG-4 file's tags end, from its first bytes (`head`) and its length: where the first
+/// `mdat`'s content starts, when `moov` comes before it; the file's end when `moov` follows the
+/// audio. `None` when `head` does not reach that far, or the boxes do not fit.
+fn mp4_tags_end(head: &[u8], len: u64) -> Option<usize> {
+    let (boxes, _) = jackbird_mp4::top_level(head, len).ok()?;
+    let mut moov = false;
+    for placed in boxes {
+        match &placed.header.kind {
+            b"moov" => moov = true,
+            b"mdat" if moov => return usize::try_from(placed.content().start).ok(),
+            b"mdat" => return usize::try_from(len).ok(),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The audio region of an MPEG-4 file whose top-level headers are in `head`: the first `mdat`'s
+/// content.
+fn mp4_audio(head: &[u8], len: u64) -> Option<Range<usize>> {
+    let (boxes, _) = jackbird_mp4::top_level(head, len).ok()?;
+    let mdat = boxes.iter().find(|placed| placed.header.kind == *b"mdat")?.content();
+    Some(usize::try_from(mdat.start).ok()?..usize::try_from(mdat.end).ok()?)
+}
+
+/// The format of a file's bytes: MPEG-4 when `ftyp` is its first box; FLAC
+/// when `fLaC` starts it (after an optional ID3v2 tag); MP3 when an ID3v2 tag
+/// does, or an MPEG frame sync is found near the start; else `None`.
 pub fn format_of(bytes: &[u8]) -> Option<Format> {
+    if is_mp4(bytes) {
+        return Some(Format::Mp4);
+    }
     if jackbird_flac::marker_at(bytes).is_some() {
         return Some(Format::Flac);
     }
@@ -175,6 +210,9 @@ fn has_sync(bytes: &[u8]) -> bool {
 /// The bytes the audio checksum hashes, from the whole file (see [`layout`]'s
 /// `audio`, which gives the same from its parts).
 pub fn audio_region(bytes: &[u8]) -> Range<usize> {
+    if is_mp4(bytes) {
+        return mp4_audio(bytes, bytes.len() as u64).unwrap_or(0..bytes.len());
+    }
     let tail = &bytes[bytes.len().saturating_sub(TAIL_LEN)..];
     region(bytes, tail, bytes.len(), flac_audio(bytes))
 }
@@ -206,6 +244,9 @@ pub fn layout(head: &[u8], tail: &[u8], len: u64) -> Result<Layout, Error> {
     if let Some(more) = need(10) {
         return Ok(more);
     }
+    if is_mp4(head) {
+        return mp4_layout(head, len);
+    }
     let id3 = id3_tag_len(head);
     // Is `fLaC` after the ID3v2 tag (or at the start)?
     if let Some(more) = need(id3 + 4) {
@@ -227,4 +268,51 @@ pub fn layout(head: &[u8], tail: &[u8], len: u64) -> Result<Layout, Error> {
     }
     let format = has_sync(&head[..head.len().min(SYNC_SEARCH)]).then_some(Format::Mp3);
     known(format, 0, None)
+}
+
+/// [`layout`] for MPEG-4: its top-level boxes walked header by header. With `moov` before `mdat`
+/// (iTunes' layout), the tags end where `mdat`'s content starts, and `moov` is in the head asked
+/// for; with `mdat` first, the whole file is asked for, and the tags end at its end. The audio
+/// region is the first `mdat`'s content.
+fn mp4_layout(head: &[u8], len: u64) -> Result<Layout, Error> {
+    // Asks for `n` first bytes (or the whole file); a head that already has them cannot be helped.
+    let need = |n: u64| {
+        let n = n.min(len);
+        if head.len() as u64 >= n {
+            return Err(Error::Unreadable("a box's header is cut short".into()));
+        }
+        Ok(Layout::NeedHead(n))
+    };
+    let mut at = 0u64;
+    let mut moov = false;
+    while at < len {
+        let header = match usize::try_from(at).ok().and_then(|at| head.get(at..)) {
+            Some(from) => {
+                jackbird_mp4::header(from, len - at, at).map_err(|error| Error::Unreadable(error.to_string()))?
+            }
+            None => None,
+        };
+        // A box's header is 16 bytes at most.
+        let Some(header) = header else {
+            return need(at + 16);
+        };
+        let content = header.content(at);
+        match &header.kind {
+            b"moov" => moov = true,
+            b"mdat" => {
+                let tags_end = if moov { content.start } else { len };
+                if (head.len() as u64) < tags_end {
+                    return need(tags_end);
+                }
+                return Ok(Layout::Known(FileLayout {
+                    format: Some(Format::Mp4),
+                    tags_end,
+                    audio: content,
+                }));
+            }
+            _ => {}
+        }
+        at += header.size;
+    }
+    Err(Error::Unreadable("no mdat".into()))
 }

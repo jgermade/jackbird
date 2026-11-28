@@ -2,7 +2,7 @@
 //! rate, channels and depth, read from its first bytes alone. An MP3's from its first frame (a Xing
 //! or VBRI header's frame count for a variable bit rate; else its audio's bytes over its constant
 //! bit rate); a FLAC's from its STREAMINFO block (its samples over its rate; its bit rate, its
-//! audio's bytes over that length). See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-16).
+//! audio's bytes over that length); an MPEG-4 file's from its sound track's boxes. See RECORD/2026-11-03.deck-design-system.WIP.md (2026-11-16).
 
 use crate::{FileLayout, Format, mpeg};
 
@@ -92,6 +92,31 @@ pub fn audio(head: &[u8], layout: &FileLayout) -> Option<Audio> {
                 channels,
                 bits,
                 vbr: true,
+            })
+        }
+        // MPEG-4: the sound track's length (`mdhd`) and rates (its sample entry); the bit rate is
+        // the audio's bytes over its length. AAC varies when its description says its highest rate
+        // is not its average; Apple Lossless always does.
+        Format::Mp4 => {
+            let track = jackbird_mp4::audio_track(crate::mp4::moov(head).ok()?).ok()??;
+            if track.timescale == 0 || track.sample_rate == 0 {
+                return None;
+            }
+            let ms = track.duration * 1000 / u64::from(track.timescale);
+            let bitrate = (bytes * 8)
+                .checked_div(ms)
+                .unwrap_or(u64::from(track.avg_bitrate / 1000));
+            let vbr = match track.codec {
+                jackbird_mp4::Codec::Aac => track.max_bitrate != track.avg_bitrate,
+                _ => true,
+            };
+            Some(Audio {
+                duration_ms: u32::try_from(ms).ok()?,
+                bitrate: u32::try_from(bitrate).ok()?,
+                sample_rate: track.sample_rate,
+                channels: u8::try_from(track.channels).ok()?,
+                bits: track.bits,
+                vbr,
             })
         }
     }

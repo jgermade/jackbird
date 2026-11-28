@@ -43,6 +43,7 @@ pub fn tags(tags: &Tags, audio: Option<Audio>) -> Vec<u8> {
     out.push(match tags.format {
         Format::Mp3 => 0,
         Format::Flac => 1,
+        Format::Mp4 => 2,
     });
     for field in Field::ALL {
         put_bytes(&mut out, tags.fields.get(field).as_bytes());
@@ -86,6 +87,7 @@ fn put_layout(out: &mut Vec<u8>, layout: &FileLayout) -> Result<(), Error> {
     out.push(match layout.format {
         Some(Format::Mp3) => 0,
         Some(Format::Flac) => 1,
+        Some(Format::Mp4) => 2,
         None => 255,
     });
     put_u32(out, layout.tags_end)?;
@@ -151,6 +153,7 @@ impl<'a> Reader<'a> {
         let format = match self.byte()? {
             0 => Some(Format::Mp3),
             1 => Some(Format::Flac),
+            2 => Some(Format::Mp4),
             255 => None,
             other => return Err(format!("a format marked {other}")),
         };

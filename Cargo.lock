@@ -2170,6 +2170,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "jackbird-mp4"
+version = "0.1.0"
+
+[[package]]
 name = "jackbird-service"
 version = "0.1.0"
 dependencies = [
@@ -2223,6 +2227,7 @@ dependencies = [
  "id3",
  "jackbird-flac",
  "jackbird-id3",
+ "jackbird-mp4",
  "lofty",
  "serde_json",
 ]

@@ -517,6 +517,7 @@ fn found(bytes: &[u8]) -> (FileLayout, usize) {
 fn tags_end(case: &Case) -> u64 {
     match case.format {
         Format::Flac => jackbird_flac::read(&case.bytes).unwrap().audio as u64,
+        Format::Mp4 => unreachable!("cases.json has no MPEG-4 audio: fixtures_m4a.rs reads cases-m4a.json"),
         Format::Mp3 => match jackbird_id3::read(&case.bytes) {
             Ok(Some(tag)) => tag.len as u64,
             _ => {
@@ -646,6 +647,7 @@ fn every_case_with_audio_gives_its_length_and_rates() {
                 "{}",
                 case.name
             ),
+            Format::Mp4 => unreachable!("cases.json has no MPEG-4 audio"),
         }
         assert!(
             (450..700).contains(&found.duration_ms),

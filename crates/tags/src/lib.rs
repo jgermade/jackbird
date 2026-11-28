@@ -1,6 +1,7 @@
 //! jackbird's tag engine: the fields it edits (title, artist, album, year,
-//! genre, track, disc, album artist, compilation) and the cover, over MP3 (ID3v2) and FLAC (Vorbis
-//! comments), the audio region its checksums hash, and writes that keep
+//! genre, track, disc, album artist, compilation) and the cover, over MP3 (ID3v2), FLAC (Vorbis
+//! comments) and MPEG-4 audio (`.m4a`: iTunes' `ilst`, read only until A2 of
+//! `RECORD/2026-11-28.aac-m4a.WIP.md`), the audio region its checksums hash, and writes that keep
 //! everything they do not edit.
 //!
 //! Every write is checked before its bytes are given back, or refused:
@@ -11,13 +12,14 @@
 //! 3. every frame (ID3v2), block and comment entry (FLAC) of the source that
 //!    the edit does not touch is in the result, byte for byte, in order.
 //!
-//! No I/O, no dependencies but jackbird's own `jackbird-id3` and
-//! `jackbird-flac`. See `RECORD/2026-08-11.musikmatch-rust-migration.WIP.md`
+//! No I/O, no dependencies but jackbird's own `jackbird-id3`, `jackbird-flac` and
+//! `jackbird-mp4`. See `RECORD/2026-08-11.musikmatch-rust-migration.WIP.md`
 //! (21:45 to 22:20).
 
 mod audio;
 mod flac;
 mod mp3;
+mod mp4;
 pub mod mpeg;
 mod region;
 mod year;
@@ -25,6 +27,7 @@ mod year;
 use std::fmt;
 
 pub use audio::{AUDIO_PROBE, Audio, audio};
+pub use jackbird_id3::genre_name;
 pub use region::{FIRST_HEAD, FileLayout, Layout, TAIL_LEN, audio_region, format_of, layout};
 
 /// The formats the engine reads and writes.
@@ -34,6 +37,8 @@ pub enum Format {
     Mp3,
     /// FLAC with Vorbis comments.
     Flac,
+    /// MPEG-4 audio (`.m4a`: AAC, Apple Lossless) with iTunes' `ilst`.
+    Mp4,
 }
 
 /// One of the fields.
@@ -387,7 +392,7 @@ pub enum Refusal {
 /// Why a file could not be read or written.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
-    /// Neither MP3 nor FLAC.
+    /// Not MP3, FLAC or MPEG-4 audio; or a save of MPEG-4 audio, which is not written yet.
     NotSupported,
     /// Its tag or metadata cannot be read cleanly, so a write could lose what
     /// it could not read.
@@ -421,7 +426,7 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::NotSupported => write!(f, "not an MP3 or FLAC file"),
+            Error::NotSupported => write!(f, "not an MP3, FLAC or M4A file"),
             Error::Unreadable(why) => write!(f, "its tags cannot be read cleanly: {why}"),
             Error::InvalidYear(year) => write!(f, "the year {year:?} is not a date this file's tag can hold"),
             Error::Id3v22 => write!(f, "ID3v2.2 tags are read but not written"),
@@ -447,6 +452,7 @@ fn read_format(format: Format, bytes: &[u8]) -> Result<Tags, Error> {
     match format {
         Format::Mp3 => Ok(mp3::read(bytes)),
         Format::Flac => flac::read(bytes),
+        Format::Mp4 => mp4::read(bytes),
     }
 }
 
@@ -510,6 +516,8 @@ pub fn write_head(head: &[u8], layout: &FileLayout, edit: &Edit) -> Result<Splic
     let out = match format {
         Format::Mp3 => mp3::write(source, &changes, cover)?,
         Format::Flac => flac::write(source, &changes, cover)?,
+        // Written from A2 on.
+        Format::Mp4 => return Err(Error::NotSupported),
     };
     let change = Change {
         changes: &changes,
@@ -606,6 +614,7 @@ fn check_kept(format: Format, source: &[u8], out: &[u8], change: &Change<'_>) ->
     match format {
         Format::Mp3 => mp3::check_kept(source, out, change.changes, change.cover),
         Format::Flac => flac::check_kept(source, out, change.changes, change.cover),
+        Format::Mp4 => Err(Error::NotSupported),
     }
 }
 

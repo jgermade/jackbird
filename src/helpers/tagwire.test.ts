@@ -43,7 +43,7 @@ describe("decodeTags", () => {
   it("throws on an answer that ends early, an unknown format or text that is not UTF-8", () => {
     assert.throws(() => decodeTags(Uint8Array.of()), /ends early, at byte 0/);
     assert.throws(() => decodeTags(Uint8Array.of(0, ...u32(5), 1)), /ends early/);
-    assert.throws(() => decodeTags(Uint8Array.of(2)), /format 2/);
+    assert.throws(() => decodeTags(Uint8Array.of(3)), /format 3/);
     assert.throws(() => decodeTags(Uint8Array.of(0, ...run([0xff]))), TypeError);
   });
 });
@@ -66,6 +66,7 @@ describe("decodeLayout and decodeSplice", () => {
     assert.deepEqual(decodeLayout(Uint8Array.from([0, ...LAYOUT])), { known: flac });
     assert.deepEqual(decodeLayout(Uint8Array.of(0, 0, ...LAYOUT.slice(1))), { known: { ...flac, format: "mp3" } });
     assert.deepEqual(decodeLayout(Uint8Array.of(0, 255, ...LAYOUT.slice(1))), { known: { ...flac, format: null } });
+    assert.deepEqual(decodeLayout(Uint8Array.of(0, 2, ...LAYOUT.slice(1))), { known: { ...flac, format: "mp4" } });
     assert.deepEqual(decodeLayout(Uint8Array.of(1, 4, 3, 2, 1)), { needHead: 0x01020304 });
     assert.throws(() => decodeLayout(Uint8Array.of(0, 7, ...LAYOUT.slice(1))), /format 7/);
   });
@@ -84,6 +85,7 @@ describe("encodeLayout and encodeRead", () => {
     assert.deepEqual(encodeLayout(300, Uint8Array.of(1, 2), Uint8Array.of(9)), Uint8Array.of(44, 1, 0, 0, 2, 0, 0, 0, 1, 2, 9));
     assert.deepEqual(encodeRead(flac, Uint8Array.of(9, 9)), Uint8Array.from([...LAYOUT, 9, 9]));
     assert.deepEqual(encodeRead({ ...flac, format: null }, Uint8Array.of())[0], 255);
+    assert.deepEqual(encodeRead({ ...flac, format: "mp4" }, Uint8Array.of())[0], 2);
     assert.deepEqual(encodeRead({ ...flac, format: "mp3" }, Uint8Array.of())[0], 0);
   });
 });

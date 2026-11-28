@@ -17,9 +17,13 @@ export type WireField = (typeof WIRE_FIELDS)[number];
 /** A picture's bytes and MIME type. */
 export type WireCover = { mime: string; data: Uint8Array };
 
+/** The formats the engine reads, by their number on the wire (`crates/tags-wasm`): 0, 1 and 2. */
+const FORMATS = ["mp3", "flac", "mp4"] as const;
+export type WireFormat = (typeof FORMATS)[number];
+
 /** What reading a file gives. */
 export type WireTags = {
-  format: "mp3" | "flac";
+  format: WireFormat;
   fields: Record<WireField, string>;
   cover: WireCover | null;
   /** The file's audio, when the engine could tell it (from the head given, past the audio's start). */
@@ -37,7 +41,7 @@ export type WireError = { code: string; message: string };
 
 /** Where a file's tags end and its audio is (`FileLayout`); `format` null for a file the engine does not read. */
 export type WireLayout = {
-  format: "mp3" | "flac" | null;
+  format: WireFormat | null;
   /** The first byte after the tags: a save replaces the bytes before it. */
   tagsEnd: number;
   /** The region the audio checksum hashes. */
@@ -106,12 +110,12 @@ class Reader {
 
   layout(): WireLayout {
     const format = this.byte();
-    if (format !== 0 && format !== 1 && format !== 255) {
+    if (format !== 255 && FORMATS[format] === undefined) {
       throw new Error(`the engine's answer has format ${format}`);
     }
     const tagsEnd = this.u32();
     const start = this.u32();
-    return { format: format === 0 ? "mp3" : format === 1 ? "flac" : null, tagsEnd, audio: { start, end: this.u32() } };
+    return { format: FORMATS[format] ?? null, tagsEnd, audio: { start, end: this.u32() } };
   }
 
   rest(): Uint8Array {
@@ -124,9 +128,10 @@ class Reader {
 /** A read's result. The cover's bytes are a copy, free of the buffer they came in. */
 export function decodeTags(bytes: Uint8Array): WireTags {
   const reader = new Reader(bytes);
-  const format = reader.byte();
-  if (format > 1) {
-    throw new Error(`the engine's answer has format ${format}`);
+  const number = reader.byte();
+  const format = FORMATS[number];
+  if (format === undefined) {
+    throw new Error(`the engine's answer has format ${number}`);
   }
   const fields = {} as Record<WireField, string>;
   for (const field of WIRE_FIELDS) {
@@ -137,7 +142,7 @@ export function decodeTags(bytes: Uint8Array): WireTags {
     reader.byte() === 1
       ? { durationMs: reader.u32(), bitrate: reader.u32(), sampleRate: reader.u32(), channels: reader.byte(), bits: reader.byte(), vbr: reader.byte() === 1 }
       : null;
-  return { format: format === 0 ? "mp3" : "flac", fields, cover, audio };
+  return { format, fields, cover, audio };
 }
 
 /** An error's code and message. */
@@ -178,7 +183,7 @@ const u32 = (value: number): Uint8Array => {
 const run = (bytes: Uint8Array): Uint8Array[] => [u32(bytes.length), bytes];
 
 function layoutBytes(layout: WireLayout): Uint8Array[] {
-  const format = layout.format === "mp3" ? 0 : layout.format === "flac" ? 1 : 255;
+  const format = layout.format === null ? 255 : FORMATS.indexOf(layout.format);
   return [Uint8Array.of(format), u32(layout.tagsEnd), u32(layout.audio.start), u32(layout.audio.end)];
 }
 

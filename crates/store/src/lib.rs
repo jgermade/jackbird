@@ -820,7 +820,16 @@ impl Library {
             return Ok(Imported::Unreadable("not an MP3 or FLAC file".into()));
         }
         let examined = match examine(source) {
-            Ok(examined) if examined.layout.format.is_some() => examined,
+            // MPEG-4 audio is read by the engine, but the library takes it only from A5 of
+            // RECORD/2026-11-28.aac-m4a.WIP.md (a `.m4a` renamed `.mp3` included).
+            Ok(examined)
+                if matches!(
+                    examined.layout.format,
+                    Some(jackbird_tags::Format::Mp3 | jackbird_tags::Format::Flac)
+                ) =>
+            {
+                examined
+            }
             Ok(_) => {
                 return Ok(Imported::Unreadable(
                     "not an MP3 or FLAC file the engine can read".into(),

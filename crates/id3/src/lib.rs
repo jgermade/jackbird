@@ -12,6 +12,7 @@
 
 mod comment;
 mod error;
+mod genre;
 mod picture;
 mod sync;
 mod tag;
@@ -20,6 +21,7 @@ mod user;
 
 pub use comment::{Comment, decode_comment, encode_comment};
 pub use error::Error;
+pub use genre::genre_name;
 pub use picture::{Picture, decode_picture, encode_picture};
 pub use sync::{resynchronise, unsynchronise};
 pub use tag::{Frame, Tag, Version, read, tag_len, write};
