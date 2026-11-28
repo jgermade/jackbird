@@ -1,8 +1,9 @@
 # AAC and Apple Lossless (`.m4a`)
 
 An `.m4a` becomes a track like an MP3 or FLAC: its tags read and written by jackbird's own engine
-with its audio untouched, in folders, the library, drops and "Copy to…", the desktop app's native
-output and Rockbox's library. Asked for on 2026-11-28: five of six songs on the owner's nano 7G
+with its audio untouched, in folders, the library, drops and "Copy to…", and Rockbox's library.
+They already play in the desktop app: the native output hands them to the embedded one (the
+webview's `<audio>`), so the native output's AAC (A6) is last and optional. Asked for on 2026-11-28: five of six songs on the owner's nano 7G
 are AAC and cannot be copied to My music.
 
 - **The plan and its reasons.** [RECORD/2026-11-28.aac-m4a.WIP.md](../../RECORD/2026-11-28.aac-m4a.WIP.md).
@@ -27,9 +28,9 @@ gantt
   section The app
     A4 Folders, drops, Copy to       :a4, after a3, 1d
     A5 The family library            :a5, after a4, 2d
-  section Playing and Rockbox
-    A6 Native playback (Symphonia)   :a6, after a3, 1d
+  section Rockbox, then optional
     A7 Rockbox's library             :a7, after a4, 1d
+    A6 Native output (optional)      :a6, after a5, 1d
 ```
 
 | Step | Done when |
@@ -40,5 +41,5 @@ gantt
 | A3 Engine | the web's and the desktop's engines on the fixtures |
 | A4 The app | "Copy to…" My music takes the nano's AAC songs |
 | A5 The library | the nano's 1759 songs in My music |
-| A6 Native playback | AAC and ALAC fixtures decoded bit for bit |
 | A7 Rockbox | the classic's Rockbox library lists its `.m4a` |
+| A6 Native output (optional) | AAC and ALAC fixtures decoded bit for bit; exclusive output and gapless for them |
