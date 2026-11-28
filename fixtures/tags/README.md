@@ -24,3 +24,25 @@ extended header, a footer, an ID3v1 tag, an APEv2 tag; no tag; a v2.4 frame's ow
 frames; a year that is not a date; empty frames; UTF-16 and several values; ID3v2.2; junk after the
 frames; a file saved by today's app. FLAC: every kind of block, the padding first, none, an ID3v2 tag
 before `fLaC`, no comments, odd comments, a track total and a PNG cover.
+
+## MPEG-4 audio (`.m4a`)
+
+`make-m4a.mjs` makes `m4a-*.m4a` and `cases-m4a.json` (RECORD/2026-11-28.aac-m4a.WIP.md, A0): half
+a second of `ffmpeg` audio (AAC, and Apple Lossless), whose samples the script lays out in chunks
+in `mdat` and around which it writes every box (`ftyp`, `moov` with its sample tables, `udta`/
+`meta`/`ilst`, `free`, `mdat`). Each case adds its codec; its audio region is `mdat`'s content. One
+file, `m4a-made-by-afconvert.m4a`, was made by macOS's `afconvert` and is kept as it was made.
+
+It is apart from `make.mjs` so that making these again leaves the MP3 and FLAC fixtures as they are
+(another `ffmpeg` encodes other bytes); it reuses their covers.
+
+```bash
+node fixtures/tags/make-m4a.mjs
+```
+
+The cases: iTunes' layout (`moov` first, 1 KiB of `free` after `ilst`), the same with no `free`, with
+`free` between `moov` and `mdat`, with `moov` last; 64-bit chunk offsets (`co64`); a 64-bit `mdat`
+size; no `udta`; an empty `ilst`; QuickTime's `meta` without version and flags; Apple Lossless with
+a PNG cover and a track and disc without totals; the genre as `gnre`; UTF-8 beyond Latin-1; and the
+file `afconvert` made. Every field jackbird has, two covers, freeform atoms (`----`) and atoms it
+does not know, which a save must keep.

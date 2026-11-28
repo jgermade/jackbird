@@ -1,0 +1,429 @@
+{
+  "about": "Made by fixtures/tags/make-m4a.mjs. Each case: the file, its codec, what reading it gives, its audio region (mdat's content: start, end, SHA-1), and what a save of a new title gives: ok, or the error's code.",
+  "cases": [
+    {
+      "name": "m4a-faststart-padded",
+      "file": "m4a-faststart-padded.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "iTunes' layout: moov before mdat, every field, two covers, freeform and unknown atoms, 1 KiB of free after ilst in meta",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1",
+        "composer": "Composer",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": "120",
+        "mbRecordingId": "0b6c2b4e-1a2b-4c3d-9e8f-001122334455"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 3850,
+        "end": 5622,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 5622
+    },
+    {
+      "name": "m4a-faststart-tight",
+      "file": "m4a-faststart-tight.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "moov before mdat and no free anywhere: a save that grows the tags shifts every chunk offset",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1",
+        "composer": "Composer",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": "120",
+        "mbRecordingId": "0b6c2b4e-1a2b-4c3d-9e8f-001122334455"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 2826,
+        "end": 4598,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 4598
+    },
+    {
+      "name": "m4a-free-after-moov",
+      "file": "m4a-free-after-moov.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "moov before mdat with 2 KiB of free between them, at the top level",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1",
+        "composer": "Composer",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": "120",
+        "mbRecordingId": "0b6c2b4e-1a2b-4c3d-9e8f-001122334455"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 4874,
+        "end": 6646,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 6646
+    },
+    {
+      "name": "m4a-moov-last",
+      "file": "m4a-moov-last.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "mdat first, moov at the end (ffmpeg's own layout): no offset moves when the tags change",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1",
+        "composer": "Composer",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": "120",
+        "mbRecordingId": "0b6c2b4e-1a2b-4c3d-9e8f-001122334455"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 40,
+        "end": 1812,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 4598
+    },
+    {
+      "name": "m4a-co64",
+      "file": "m4a-co64.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "64-bit chunk offsets (co64), chunks of three samples, no free",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1",
+        "composer": "Composer",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": "120",
+        "mbRecordingId": "0b6c2b4e-1a2b-4c3d-9e8f-001122334455"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 2846,
+        "end": 4618,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 4618
+    },
+    {
+      "name": "m4a-large-mdat",
+      "file": "m4a-large-mdat.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "mdat with a 64-bit size (a 16-byte header), the audio starting after it",
+      "fields": {
+        "title": "Before",
+        "artist": "Artist",
+        "album": "Album",
+        "year": "1959",
+        "genre": "Jazz",
+        "track": "3/12",
+        "disc": "1/2",
+        "albumArtist": "Album Artist",
+        "compilation": "1",
+        "composer": "Composer",
+        "comment": "A comment",
+        "lyrics": "La la la",
+        "bpm": "120",
+        "mbRecordingId": "0b6c2b4e-1a2b-4c3d-9e8f-001122334455"
+      },
+      "cover": {
+        "file": "covers/cover1.jpg",
+        "mime": "image/jpeg",
+        "sha1": "920de10be55b2bd49e57ad0ad9288d8a7bad5a25"
+      },
+      "write": "ok",
+      "region": {
+        "start": 3090,
+        "end": 4862,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 4862
+    },
+    {
+      "name": "m4a-no-udta",
+      "file": "m4a-no-udta.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "no udta at all: a save adds one",
+      "fields": {
+        "title": "",
+        "artist": "",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 753,
+        "end": 2525,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 2525
+    },
+    {
+      "name": "m4a-empty-ilst",
+      "file": "m4a-empty-ilst.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "udta, meta and an empty ilst, as ffmpeg writes a file without metadata",
+      "fields": {
+        "title": "",
+        "artist": "",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 814,
+        "end": 2586,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 2586
+    },
+    {
+      "name": "m4a-quicktime-meta",
+      "file": "m4a-quicktime-meta.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "meta as a plain box, without a version and flags (QuickTime's form, which some writers use)",
+      "fields": {
+        "title": "QuickTime",
+        "artist": "Artist",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 873,
+        "end": 2645,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 2645
+    },
+    {
+      "name": "m4a-alac-png",
+      "file": "m4a-alac-png.m4a",
+      "format": "mp4",
+      "codec": "alac",
+      "about": "Apple Lossless; a track and a disc without totals; a PNG cover",
+      "fields": {
+        "title": "Lossless",
+        "artist": "Artist",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": "5",
+        "disc": "2",
+        "albumArtist": "",
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
+      },
+      "cover": {
+        "file": "covers/cover3.png",
+        "mime": "image/png",
+        "sha1": "6110c588ea1aee5a8e538215fbaafa3de7de85c9"
+      },
+      "write": "ok",
+      "region": {
+        "start": 1149,
+        "end": 6528,
+        "sha1": "efc75957d119e3309a8c89dd35cf09f73c5668e6"
+      },
+      "size": 6528
+    },
+    {
+      "name": "m4a-gnre",
+      "file": "m4a-gnre.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "the genre as gnre, ID3v1's number plus one (18: Rock), and cpil 0 (not a compilation)",
+      "fields": {
+        "title": "Numbered",
+        "artist": "",
+        "album": "",
+        "year": "",
+        "genre": "Rock",
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 961,
+        "end": 2733,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 2733
+    },
+    {
+      "name": "m4a-unicode",
+      "file": "m4a-unicode.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "UTF-8 beyond Latin-1",
+      "fields": {
+        "title": "Ñandú — 東京",
+        "artist": "Ölgaard",
+        "album": "Ålbum",
+        "year": "",
+        "genre": "",
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 982,
+        "end": 2754,
+        "sha1": "eadabfc152f0aea3b134e5ada2b1f62472c9bf72"
+      },
+      "size": 2754
+    },
+    {
+      "name": "m4a-made-by-afconvert",
+      "file": "m4a-made-by-afconvert.m4a",
+      "format": "mp4",
+      "codec": "aac",
+      "about": "the same tone through macOS's afconvert (m4af, AAC), kept as it was made",
+      "fields": {
+        "title": "",
+        "artist": "",
+        "album": "",
+        "year": "",
+        "genre": "",
+        "track": "",
+        "disc": "",
+        "albumArtist": "",
+        "compilation": "",
+        "composer": "",
+        "comment": "",
+        "lyrics": "",
+        "bpm": ""
+      },
+      "cover": null,
+      "write": "ok",
+      "region": {
+        "start": 4096,
+        "end": 5109,
+        "sha1": "24d7c1980b78dfc822733d7b1debb85d2a5ff153"
+      },
+      "size": 5109
+    }
+  ]
+}
