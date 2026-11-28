@@ -10,13 +10,14 @@ import { isCompilation } from "../helpers/metadata";
 import { DEFAULT_COMPILATION_PATTERN, DEFAULT_DROP_PATTERN, DEFAULT_READ_PATTERN, dropPath, freePath, missingTags, patternFor, recoverTags, tagsChanged, tidyTags, type DropTag } from "../helpers/drop";
 import { isAudioFile } from "../helpers/formats";
 import type { RootWorkspace, TrackMetadata } from "../types";
+import { coverDataUrl } from "./covers";
 import { t } from "./i18n";
 import { ipods, lookForIpods, reloadIpod } from "./ipod";
 import { library } from "./library";
 import { isDesktop } from "./platform";
 import { refreshRoot } from "./roots";
 import { STORAGE_KEYS, readStored, writeStored } from "./storage";
-import { readBlobTags, writeTags } from "./tags";
+import { readBlobTags, readTags, writeTags } from "./tags";
 import { uploadToLibrary } from "./sources/service";
 
 /** Where a drop goes: the active root, and what it is. */
@@ -262,11 +263,22 @@ export function closeDrop(): void {
   dropping.songs = [];
 }
 
-/** A song's bytes as it lands: its tags written where they changed. */
+/**
+ * A song's bytes as it lands: its tags, and the cover its listing shows, written over what the file
+ * itself holds; the same bytes, untouched, when they are the file's already. What the file holds is
+ * read from it, not taken from its listing: an iPod's songs have their tags in its database, and
+ * those Music re-encoded for it (the nano's AAC songs) have none in their files
+ * (RECORD/2026-11-28.aac-m4a.WIP.md, A1 and A4). A listing with no cover leaves the file's as it is.
+ */
 async function copyOf(song: DroppedSong): Promise<Uint8Array> {
   const bytes = await song.bytes();
+  const inFile = await readTags(bytes);
   const tags = tidyTags(song.tags);
-  return tagsChanged(song.read, tags) ? writeTags(bytes, song.read, tags) : bytes;
+  // Both as pictures (data URLs): a cover is held by reference, and the same picture has one name.
+  const coverNow = await coverDataUrl(inFile.coverDataUrl ?? null);
+  const cover = (await coverDataUrl(tags.coverDataUrl ?? null)) ?? coverNow;
+  if (!tagsChanged(inFile, tags) && cover === coverNow) return bytes;
+  return writeTags(bytes, { ...inFile, coverDataUrl: coverNow }, { ...tags, coverDataUrl: cover });
 }
 
 /** Every song lands where the drop was. */

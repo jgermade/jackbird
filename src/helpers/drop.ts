@@ -61,9 +61,12 @@ export function tidyTags(metadata: TrackMetadata): TrackMetadata {
   return tidy;
 }
 
-/** Whether two songs' tags differ in a field the drop may change. */
+/** The fields a drop or a copy writes: the text ones, and the compilation mark, lyrics and BPM. */
+const WRITTEN: readonly (keyof TrackMetadata)[] = [...TEXT, "compilation", "lyrics", "bpm"];
+
+/** Whether two songs' tags differ in a field the drop or a copy writes (an absent one is empty). */
 export function tagsChanged(before: TrackMetadata, after: TrackMetadata): boolean {
-  return TEXT.some((key) => before[key] !== after[key]);
+  return WRITTEN.some((key) => String(before[key] ?? "") !== String(after[key] ?? ""));
 }
 
 /** What a song's dropped path says of the tags it lacks, by `pattern` (only those it lacks). */

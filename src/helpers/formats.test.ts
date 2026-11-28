@@ -3,11 +3,15 @@ import { describe, it } from "node:test";
 import { AUDIO_FORMATS, audioFormatOf, audioMimeType, codecFamily, codecLabel, formatLabel, isAudioFile } from "./formats.ts";
 
 describe("audio formats", () => {
-  it("are MP3 and FLAC", () => {
+  it("are MP3, FLAC and MPEG-4 audio", () => {
     assert.deepEqual(
       AUDIO_FORMATS.map((format) => format.extension),
-      [".mp3", ".flac"]
+      [".mp3", ".flac", ".m4a"]
     );
+    assert.equal(audioMimeType("Jazz/So What.M4A"), "audio/mp4");
+    assert.equal(isAudioFile("iPod_Control/Music/F00/ABCD.m4a"), true);
+    // Protected songs, audiobooks and bare AAC streams are not tracks the engine reads.
+    for (const path of ["a.m4p", "b.m4b", "c.aac", "d.mp4"]) assert.equal(isAudioFile(path), false, path);
   });
 
   it("are told by extension, in any case, wherever the file is", () => {

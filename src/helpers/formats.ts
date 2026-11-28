@@ -8,7 +8,10 @@
 /** Each format: its extension (lower case, with the dot), MIME type and name. */
 export const AUDIO_FORMATS = [
   { extension: ".mp3", mime: "audio/mpeg", name: "MP3" },
-  { extension: ".flac", mime: "audio/flac", name: "FLAC" }
+  { extension: ".flac", mime: "audio/flac", name: "FLAC" },
+  // MPEG-4 audio, AAC or Apple Lossless (RECORD/2026-11-28.aac-m4a.WIP.md): its name stays the
+  // extension's, and its codec is told apart by `codecLabel`.
+  { extension: ".m4a", mime: "audio/mp4", name: "M4A" }
 ] as const;
 
 export type AudioFormat = (typeof AUDIO_FORMATS)[number];

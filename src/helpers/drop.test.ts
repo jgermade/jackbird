@@ -24,6 +24,10 @@ describe("tidyTags", () => {
     assert.equal(tidy.trackNumber, "3/12");
     assert.ok(tagsChanged(song({ title: "  a" }), tidyTags(song({ title: "  a" }))));
     assert.ok(!tagsChanged(song({ title: "a" }), tidyTags(song({ title: "a" }))));
+    // Beyond the text fields: what an iPod's database gives a copy, the compilation mark included.
+    assert.ok(tagsChanged(song({}), song({ compilation: "1" })));
+    assert.ok(tagsChanged(song({ lyrics: "la" }), song({ lyrics: "" })));
+    assert.ok(!tagsChanged(song({ bpm: undefined }), song({ bpm: "" })));
   });
 });
 

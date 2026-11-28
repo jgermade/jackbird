@@ -88,6 +88,7 @@ fn mime(path: &std::path::Path) -> &'static str {
     {
         Some("mp3") => "audio/mpeg",
         Some("flac") => "audio/flac",
+        Some("m4a") => "audio/mp4",
         _ => "application/octet-stream",
     }
 }
