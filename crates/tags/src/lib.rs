@@ -1,7 +1,7 @@
 //! jackbird's tag engine: the fields it edits (title, artist, album, year,
 //! genre, track, disc, album artist, compilation) and the cover, over MP3 (ID3v2), FLAC (Vorbis
-//! comments) and MPEG-4 audio (`.m4a`: iTunes' `ilst`, read only until A2 of
-//! `RECORD/2026-11-28.aac-m4a.WIP.md`), the audio region its checksums hash, and writes that keep
+//! comments) and MPEG-4 audio (`.m4a`: iTunes' `ilst`; `RECORD/2026-11-28.aac-m4a.WIP.md`), the
+//! audio region its checksums hash, and writes that keep
 //! everything they do not edit.
 //!
 //! Every write is checked before its bytes are given back, or refused:
@@ -392,7 +392,7 @@ pub enum Refusal {
 /// Why a file could not be read or written.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
-    /// Not MP3, FLAC or MPEG-4 audio; or a save of MPEG-4 audio, which is not written yet.
+    /// Not MP3, FLAC or MPEG-4 audio.
     NotSupported,
     /// Its tag or metadata cannot be read cleanly, so a write could lose what
     /// it could not read.
@@ -516,8 +516,7 @@ pub fn write_head(head: &[u8], layout: &FileLayout, edit: &Edit) -> Result<Splic
     let out = match format {
         Format::Mp3 => mp3::write(source, &changes, cover)?,
         Format::Flac => flac::write(source, &changes, cover)?,
-        // Written from A2 on.
-        Format::Mp4 => return Err(Error::NotSupported),
+        Format::Mp4 => mp4::write(source, &changes, cover)?,
     };
     let change = Change {
         changes: &changes,
@@ -603,6 +602,17 @@ fn check_fields(format: Format, out: &[u8], change: &Change<'_>) -> Result<(), E
 /// byte-identical.
 fn check_audio(source: &[u8], out: &[u8]) -> Result<(), Error> {
     let (before, after) = (audio_region(source), audio_region(out));
+    // MPEG-4 with `moov` after the audio: the audio the same bytes, and nothing before it moved
+    // (`moov`, after it, is what changed, and safeguard 3 checks it).
+    if format_of(source) == Some(Format::Mp4)
+        && before.start == after.start
+        && mp4::declared_end(source) == Some(source.len())
+    {
+        if source[..before.end] != out[..after.end] {
+            return Err(Error::Refused(Refusal::Audio));
+        }
+        return Ok(());
+    }
     if source[before.start..] != out[after.start..] || before.len() != after.len() {
         return Err(Error::Refused(Refusal::Audio));
     }
@@ -614,7 +624,7 @@ fn check_kept(format: Format, source: &[u8], out: &[u8], change: &Change<'_>) ->
     match format {
         Format::Mp3 => mp3::check_kept(source, out, change.changes, change.cover),
         Format::Flac => flac::check_kept(source, out, change.changes, change.cover),
-        Format::Mp4 => Err(Error::NotSupported),
+        Format::Mp4 => mp4::check_kept(source, out, change.changes, change.cover),
     }
 }
 

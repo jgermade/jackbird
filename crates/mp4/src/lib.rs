@@ -14,11 +14,13 @@
 //! data types, Apple's ALAC for its magic cookie). No I/O, no dependencies. See
 //! `RECORD/2026-11-28.aac-m4a.WIP.md`.
 
+mod build;
 mod track;
 
 use std::fmt;
 use std::ops::Range;
 
+pub use build::{ChunkTable, boxed, chunk_tables, data_atom, freeform, full_boxed, item, room, shift_chunks};
 pub use track::{Codec, Track, audio_track};
 
 /// A box's four-letter type (`©` is the byte 0xA9).

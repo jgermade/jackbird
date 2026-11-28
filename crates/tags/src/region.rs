@@ -94,7 +94,7 @@ fn flac_end(bytes: &[u8], marker: usize, len: usize) -> Walk {
 pub(crate) fn declared_end(bytes: &[u8], format: Format) -> Option<usize> {
     match format {
         Format::Mp3 => (bytes.len() >= 10 && bytes.starts_with(b"ID3")).then(|| id3_tag_len(bytes)),
-        Format::Mp4 => mp4_tags_end(bytes, bytes.len() as u64),
+        Format::Mp4 => crate::mp4::declared_end(bytes),
         Format::Flac => {
             let marker = id3_tag_len(bytes);
             if bytes.get(marker..marker + 4)? != b"fLaC" {
@@ -160,23 +160,6 @@ fn flac_audio(bytes: &[u8]) -> Option<usize> {
 /// Whether a file is MPEG-4: its first box is `ftyp`.
 fn is_mp4(bytes: &[u8]) -> bool {
     bytes.get(4..8) == Some(b"ftyp")
-}
-
-/// Where an MPEG-4 file's tags end, from its first bytes (`head`) and its length: where the first
-/// `mdat`'s content starts, when `moov` comes before it; the file's end when `moov` follows the
-/// audio. `None` when `head` does not reach that far, or the boxes do not fit.
-fn mp4_tags_end(head: &[u8], len: u64) -> Option<usize> {
-    let (boxes, _) = jackbird_mp4::top_level(head, len).ok()?;
-    let mut moov = false;
-    for placed in boxes {
-        match &placed.header.kind {
-            b"moov" => moov = true,
-            b"mdat" if moov => return usize::try_from(placed.content().start).ok(),
-            b"mdat" => return usize::try_from(len).ok(),
-            _ => {}
-        }
-    }
-    None
 }
 
 /// The audio region of an MPEG-4 file whose top-level headers are in `head`: the first `mdat`'s
